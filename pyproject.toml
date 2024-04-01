@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ai_tools"
+version = "0.0.11"
+authors = [
+  { name="Artem Rozumenko", email="support@projectalita.ai" },
+  { name="Vadym Vlasenko", email="vadym_vlasenko@epam.com"}
+]
+description = "Default set of tools and toolkits available within ProjectAlita and CodeMie applications."
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+]
+dynamic = ["dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[project.urls]
+Homepage = "https://projectalita.ai"
+Issues = "https://github.com/ProjectAlita/application-tools/issues"
