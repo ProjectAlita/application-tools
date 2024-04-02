@@ -16,7 +16,7 @@ class ConfluenceTookit(BaseToolkit):
         tools = []
         for tool in available_tools:
             if selected_tools:
-                if tool.name not in selected_tools:
+                if tool["name"] not in selected_tools:
                     continue
             tools.append(ConfluenceAction(
                 api_wrapper=confluence_api_wrapper,

@@ -35,9 +35,9 @@ class ConfluenceAPIWrapper(BaseModel):
     username: Optional[str] = None
     token: Optional[str] = None
     cloud: Optional[bool] = True
-    limit: Optional[int] = 10
+    limit: Optional[int] = 5
     space: Optional[str] = None
-    max_pages: Optional[int] = 100
+    max_pages: Optional[int] = 10
     content_format: Optional[ContentFormat] = ContentFormat.VIEW
     include_attachments: Optional[bool] = False
     include_comments: Optional[bool] = False
@@ -48,8 +48,6 @@ class ConfluenceAPIWrapper(BaseModel):
     keep_markdown_format: Optional[bool] = True
     ocr_languages: Optional[str] = None
     keep_newlines: Optional[bool] = True
-    
-        
     
     @root_validator()
     def validate_toolkit(cls, values):
@@ -259,23 +257,33 @@ class ConfluenceAPIWrapper(BaseModel):
         return [
             {
                 "name": "create_page",
+                "ref": self.create_page,
                 "description": self.create_page.__doc__,
                 "args_schema": createPage,
             },
             {
                 "name": "page_exists",
+                "ref": self.page_exists,
                 "description": self.page_exists.__doc__,
                 "args_schema": pageExists,
             },
             {
                 "name": "get_pages_with_label",
+                "ref": self.get_pages_with_label,
                 "description": self.get_pages_with_label.__doc__,
                 "args_schema": getPagesWithLabel,
             },
             {
                 "name": "search_pages",
+                "ref": self.search_pages,
                 "description": self.search_pages.__doc__,
                 "args_schema": searchPages,
             }
         ]
-        
+    
+    def run(self, mode: str, *args: Any, **kwargs: Any):
+        for tool in self.get_available_tools():
+            if tool["name"] == mode:
+                return tool["ref"](*args, **kwargs)
+        else:
+            raise ValueError(f"Unknown mode: {mode}")
