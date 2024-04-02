@@ -3,7 +3,7 @@ from typing import Optional, Type
 from langchain_core.callbacks import CallbackManagerForToolRun
 from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain_core.tools import BaseTool
-
+from traceback import format_exc
 from .api_wrapper import AlitaGitHubAPIWrapper
 
 
@@ -23,4 +23,7 @@ class GitHubAction(BaseTool):
         **kwargs,
     ) -> str:
         """Use the GitHub API to run an operation."""
-        return self.api_wrapper.run(self.mode, *args, **kwargs)
+        try:
+            return self.api_wrapper.run(self.mode, *args, **kwargs)
+        except Exception as e:
+            return f"Error: {format_exc()}"

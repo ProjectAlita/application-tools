@@ -1,17 +1,17 @@
 from typing import Optional, List
 from langchain_core.pydantic_v1 import root_validator
 from langchain_community.agent_toolkits.base import BaseToolkit
-from .api_wrapper import ConfluenceAPIWrapper
+from .api_wrapper import JiraApiWrapper
 from langchain_core.tools import BaseTool
 from ..base.tool import BaseAction
 
 
-class ConfluenceTookit(BaseToolkit):
+class JiraTookit(BaseToolkit):
     tools: List[BaseTool] = []
     
     @classmethod
     def get_toolkit(cls, selected_tools: list[str] = [], **kwargs):
-        confluence_api_wrapper = ConfluenceAPIWrapper(**kwargs)
+        confluence_api_wrapper = JiraApiWrapper(**kwargs)
         available_tools = confluence_api_wrapper.get_available_tools()
         tools = []
         for tool in available_tools:

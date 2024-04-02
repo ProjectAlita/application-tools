@@ -6,9 +6,7 @@ from langchain.utils import get_from_dict_or_env
 from langchain_community.tools.github.prompt import (
     COMMENT_ON_ISSUE_PROMPT,
     CREATE_BRANCH_PROMPT,
-    CREATE_FILE_PROMPT,
     CREATE_PULL_REQUEST_PROMPT,
-    CREATE_REVIEW_REQUEST_PROMPT,
     DELETE_FILE_PROMPT,
     GET_FILES_FROM_DIRECTORY_PROMPT,
     GET_ISSUE_PROMPT,
@@ -25,11 +23,14 @@ from langchain_community.tools.github.prompt import (
 )
 
 from langchain_community.agent_toolkits.github.toolkit import (
-    BranchName, CreateFile, CreatePR, DeleteFile,
-    GetIssue, GetPR, CreateReviewRequest, CommentOnIssue, BaseModel, Field
+    BranchName, CreatePR, DeleteFile,
+    GetIssue, GetPR, CommentOnIssue, BaseModel, Field
 )
 
 from langchain_community.utilities.github import GitHubAPIWrapper
+
+
+CREATE_FILE_PROMPT = """Create new file in your github repository."""
 
 class SearchCode(BaseModel):
     """Schema for operations that require a search query as input."""
@@ -85,6 +86,13 @@ class CreatePR(BaseModel):
     """Schema for operations that require a PR title and body as input."""
 
     pr_query: str = Field(..., description="Follow the required formatting.")
+
+
+class CreateFile(BaseModel):
+    """Schema for operations that require a file path and content as input."""
+
+    file_path: str = Field(..., description="Path of a file to be created.")
+    file_contents: str = Field(..., description="Content of a file to be put into chat.")
 
 
 class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
@@ -230,6 +238,46 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         """
         return self._get_files("", self.active_branch)
 
+    def create_file(self, file_path: str, file_contents: str) -> str:
+        """
+        Creates a new file on the Github repo
+        Parameters:
+            file_path (str): The path of the file to be created
+            file_conents (str): The content of the file to be created
+        Returns:
+            str: A success or failure message
+        """
+        if self.active_branch == self.github_base_branch:
+            return (
+                "You're attempting to commit to the directly to the"
+                f"{self.github_base_branch} branch, which is protected. "
+                "Please create a new branch and try again."
+            )
+        try:
+            try:
+                file = self.github_repo_instance.get_contents(
+                    file_path, ref=self.active_branch
+                )
+                if file:
+                    return (
+                        f"File already exists at `{file_path}` "
+                        f"on branch `{self.active_branch}`. You must use "
+                        "`update_file` to modify it."
+                    )
+            except Exception:
+                # expected behavior, file shouldn't exist yet
+                pass
+
+            self.github_repo_instance.create_file(
+                path=file_path,
+                message="Create " + file_path,
+                content=file_contents,
+                branch=self.active_branch,
+            )
+            return "Created file " + file_path
+        except Exception as e:
+            return "Unable to make file due to error:\n" + str(e)
+
     def get_available_tools(self):
         return [
             {
@@ -357,14 +405,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                 "name": "Get files from a directory",
                 "description": GET_FILES_FROM_DIRECTORY_PROMPT,
                 "args_schema": DirectoryPath,
-            },
-            {
-                "mode": "create_review_request",
-                "ref": self.create_review_request,
-                "name": "Create review request",
-                "description": CREATE_REVIEW_REQUEST_PROMPT,
-                "args_schema": CreateReviewRequest,
-            },
+            }
         ]
         
     def run(self, mode: str, *args: Any, **kwargs: Any):
