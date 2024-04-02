@@ -15,14 +15,14 @@ class JiraSearch(BaseModel):
 class JiraCreateIssue(BaseModel):
     issue_json: dict = Field(..., description="""JSON of body to create an issue for JIRA. You must follow the atlassian-python-api's Jira `issue_create` function's input format.
 For example, to create a low priority task called "test issue" with description "test description", you would pass in the following STRING dictionary:
-{{"fields: {{{{"project": {{"key": "project_key"}}, "summary": "test issue", "description": "test description", "issuetype": {{"name": "Task"}}, "priority": {{"name": "Major"}}}}}}
+{"fields: {"project": {"key": "project_key"}, "summary": "test issue", "description": "test description", "issuetype": {"name": "Task"}, "priority": {"name": "Major"}}}}
 """)
     
 class JiraUpdateIssue(BaseModel):
     issue_json: str = Field(
         description="""You must follow the atlassian-python-api's Jira `update_issue` function's input format. 
 For example, to update a task with key XXX-123 with new summary, description and custom field, you would pass in the following STRING dictionary: 
-{{"key": "issue key", "fields": {{"summary": "updated issue", "description": "updated description", "customfield_xxx": "updated custom field"}}}}
+{"key": "issue key", "fields": {"summary": "updated issue", "description": "updated description", "customfield_xxx": "updated custom field"}}
         """
     )
 
@@ -80,7 +80,7 @@ class JiraApiWrapper(BaseModel):
             duedate = issue_fields["duedate"]
             priority = issue_fields["priority"]["name"]
             status = issue_fields["status"]["name"]
-            issue_url = f"{self.base_url}browse/{key}"
+            issue_url = f"{self.client.url}browse/{key}"
             try:
                 assignee = issue_fields["assignee"]["displayName"]
             except Exception:
@@ -95,7 +95,7 @@ class JiraApiWrapper(BaseModel):
                     rel_type = related_issue["type"]["outward"]
                     rel_key = related_issue["outwardIssue"]["key"]
                     # rel_summary = related_issue["outwardIssue"]["fields"]["summary"]
-                rel_issues = {"type": rel_type, "key": rel_key, "url": f"{self.base_url}browse/{rel_key}"}
+                rel_issues = {"type": rel_type, "key": rel_key, "url": f"{self.client.url}browse/{rel_key}"}
 
             parsed_issue = {
                 "key": key,
@@ -164,9 +164,9 @@ class JiraApiWrapper(BaseModel):
             params = json.loads(issue_json)
             self.create_issue_validate(params)
             issue = self.client.issue_create(fields=dict(params["fields"]))
-            issue_url = f"{self.base_url}browse/{issue['key']}"
+            issue_url = f"{self.client.url}browse/{issue['key']}"
             logger.info(f"issue is created: {issue}")
-            return f"Issue {issue['key']} is created successfully. You can view it at {issue_url}. Details: {str(issue)}"
+            return f"Done. Issue {issue['key']} is created successfully. You can view it at {issue_url}. Details: {str(issue)}"
         except Exception as e:
             stacktrace = format_exc()
             logger.error(f"Error creating Jira issue: {stacktrace}")
@@ -180,8 +180,8 @@ class JiraApiWrapper(BaseModel):
             key = params["key"]
             fields = {"fields": dict(params["fields"])}
             issue = self.client.update_issue(issue_key=key, update=dict(fields))
-            issue_url = f"{self.base_url}browse/{key}"
-            output = f"Issue {key} has been updated successfully. You can view it at {issue_url}. Details: {str(issue)}"
+            issue_url = f"{self.client.url}browse/{key}"
+            output = f"Done. Issue {key} has been updated successfully. You can view it at {issue_url}. Details: {str(issue)}"
             logger.info(output)
             return output
         except Exception as e:
@@ -193,8 +193,8 @@ class JiraApiWrapper(BaseModel):
         """ Add a comment to a Jira issue."""
         try:
             self.client.issue_add_comment(issue_key, comment)
-            issue_url = f"{self.base_url}browse/{issue_key}"
-            output = f"Comment is added for issue {issue_key}. You can view it at {issue_url}"
+            issue_url = f"{self.client.url}browse/{issue_key}"
+            output = f"Done. Comment is added for issue {issue_key}. You can view it at {issue_url}"
             logger.info(output)
             return output
         except Exception as e:
