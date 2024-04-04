@@ -5,3 +5,4 @@ pygithub==2.3.0
 atlassian_python_api==3.41.11
 markdownify==0.12.1
 pillow==10.2.0
+alita_sdk

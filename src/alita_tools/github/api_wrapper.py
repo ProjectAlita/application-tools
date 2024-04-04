@@ -23,12 +23,10 @@ from langchain_community.tools.github.prompt import (
 )
 
 from langchain_community.agent_toolkits.github.toolkit import (
-    BranchName, CreatePR, DeleteFile,
-    GetIssue, GetPR, CommentOnIssue, BaseModel, Field
+    BranchName, CreatePR, GetIssue, GetPR, BaseModel, Field
 )
 
 from langchain_community.utilities.github import GitHubAPIWrapper
-
 
 CREATE_FILE_PROMPT = """Create new file in your github repository."""
 
@@ -93,6 +91,25 @@ class CreateFile(BaseModel):
 
     file_path: str = Field(..., description="Path of a file to be created.")
     file_contents: str = Field(..., description="Content of a file to be put into chat.")
+
+class CommentOnIssue(BaseModel):
+    """Schema for operations that require a comment as input."""
+
+    comment_query: str = Field(..., description="Follow the required formatting.")
+
+
+class DeleteFile(BaseModel):
+    """Schema for operations that require a file path as input."""
+
+    file_path: str = Field(
+        ...,
+        description=(
+            "The full file path of the file you would like to delete"
+            " where the path must NOT start with a slash, e.g."
+            " `some_dir/my_file.py`. Only input a string,"
+            " not the param name."
+        ),
+    )
 
 
 class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
