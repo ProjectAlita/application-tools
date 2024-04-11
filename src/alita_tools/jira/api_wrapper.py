@@ -34,7 +34,6 @@ class AddCommentInput(BaseModel):
 
 
 
-
 class JiraApiWrapper(BaseModel):
     base_url: str
     api_key: Optional[str] = None,
@@ -131,19 +130,19 @@ class JiraApiWrapper(BaseModel):
 
     
     def create_issue_validate(self, params: Dict[str, Any]):
-        if "fields" not in params:
+        if params.get("fields") is None:
             raise ToolException("""
             Jira fields are provided in a wrong way.
             For example, to create a low priority task called "test issue" with description "test description", you would pass in the following STRING dictionary:
             {{"fields: {{{{"project": {{"key": "project_key"}}, "summary": "test issue", "description": "test description", "issuetype": {{"name": "Task"}}, "priority": {{"name": "Major"}}}}}}
             """)
-        if "project" not in params["fields"]:
+        if params["fields"].get("project") is None:
             raise ToolException("Jira project key is required to create an issue. Ask user to provide it.")
     
     def update_issue_validate(self, params: Dict[str, Any]):
-        if "key" not in params:
+        if params.get("key") is None:
             raise ToolException("Jira issue key is required to update an issue. Ask user to provide it.")
-        if "fields" not in params:
+        if params.get("fields") is None:
             raise ToolException("""
         Jira fields are provided in a wrong way.
         For example, to update a task with key XXX-123 with new summary, description and custom field, you would pass in the following STRING dictionary: 
@@ -167,6 +166,8 @@ class JiraApiWrapper(BaseModel):
             issue_url = f"{self.client.url}browse/{issue['key']}"
             logger.info(f"issue is created: {issue}")
             return f"Done. Issue {issue['key']} is created successfully. You can view it at {issue_url}. Details: {str(issue)}"
+        except ToolException as e:
+            raise e
         except Exception as e:
             stacktrace = format_exc()
             logger.error(f"Error creating Jira issue: {stacktrace}")
@@ -184,6 +185,8 @@ class JiraApiWrapper(BaseModel):
             output = f"Done. Issue {key} has been updated successfully. You can view it at {issue_url}. Details: {str(issue)}"
             logger.info(output)
             return output
+        except ToolException as e:
+            raise e
         except Exception as e:
             stacktrace = format_exc()
             logger.error(f"Error updating Jira issue: {stacktrace}")

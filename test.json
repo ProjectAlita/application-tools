@@ -1,0 +1,112 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+      "title": "GitHub Repository Tree API",
+      "description": "This API is used to retrieve the tree structure of a repository on GitHub.",
+      "version": "1.0.0"
+    },
+    "servers": [
+      {
+        "url": "https://api.github.com",
+        "description": "GitHub API server"
+      }
+    ],
+    "paths": {
+      "/repos/{organization}/{repository}/git/trees/{branch}": {
+        "get": {
+          "operationId": "getRepoTree",
+          "summary": "Retrieve the repository tree",
+          "description": "Fetches the tree structure of the specified repository's main branch, with an option to retrieve it recursively.",
+          "parameters": [
+            {
+              "name": "organization",
+              "in": "path",
+              "required": true,
+              "description": "The name of the GitHub organization.",
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "repository",
+              "in": "path",
+              "required": true,
+              "description": "The name of the GitHub repository.",
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "recursive",
+              "in": "query",
+              "required": false,
+              "description": "Set to true to retrieve the tree recursively.",
+              "schema": {
+                "type": "boolean"
+              }
+            },
+            {
+              "name": "branch",
+              "in": "path",
+              "required": true,
+              "description": "The branch of the GitHub repository",
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "A JSON object representing the repository tree",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "sha": {
+                        "type": "string",
+                        "description": "The SHA of the tree."
+                      },
+                      "url": {
+                        "type": "string",
+                        "description": "API URL for the tree."
+                      },
+                      "tree": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "path": {
+                              "type": "string"
+                            },
+                            "mode": {
+                              "type": "string"
+                            },
+                            "type": {
+                              "type": "string"
+                            },
+                            "sha": {
+                              "type": "string"
+                            },
+                            "size": {
+                              "type": "integer"
+                            },
+                            "url": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      },
+                      "truncated": {
+                        "type": "boolean"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
