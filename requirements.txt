@@ -6,4 +6,3 @@ atlassian_python_api==3.41.11
 markdownify==0.12.1
 pillow==10.2.0
 requests_openapi==1.0.5
-alita_sdk==0.0.16
