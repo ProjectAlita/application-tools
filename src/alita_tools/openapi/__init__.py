@@ -1,25 +1,7 @@
 from typing import List, Any, Optional, Dict
 from langchain_community.agent_toolkits.base import BaseToolkit
-from langchain_core.tools import BaseTool, Tool
-from langchain.requests import RequestsWrapper
-from langchain_community.tools.requests.tool import (
-    RequestsDeleteTool,
-    RequestsGetTool,
-    RequestsPatchTool,
-    RequestsPostTool,
-    RequestsPutTool,
-)
-from langchain_community.agent_toolkits.openapi.spec import ReducedOpenAPISpec
-from langchain_community.tools.json.tool import (
-    JsonGetValueTool,
-    JsonListKeysTool,
-    JsonSpec,
-)
-from langchain_community.agent_toolkits.openapi import planner
-from langchain_community.agent_toolkits.openapi.spec import reduce_openapi_spec
-from langchain_community.agent_toolkits import OpenAPIToolkit
+from langchain_core.tools import BaseTool
 
-from requests import Session
 import requests_openapi
 from requests_openapi import Operation
 
@@ -47,7 +29,7 @@ class ApiTool(BaseTool):
         return callable(**kwargs).content
     
 class AlitaOpenAPIToolkit(BaseToolkit):
-    request_session: Session  #: :meta private:
+    request_session: Any  #: :meta private:
     tools: List[BaseTool] = []
 
     @classmethod
