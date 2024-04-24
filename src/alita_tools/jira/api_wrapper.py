@@ -13,9 +13,9 @@ class JiraSearch(BaseModel):
     jql: str = Field(..., description="Jira Query Language (JQL) query string")
     
 class JiraCreateIssue(BaseModel):
-    issue_json: dict = Field(..., description="""JSON of body to create an issue for JIRA. You must follow the atlassian-python-api's Jira `issue_create` function's input format.
+    issue_json: str = Field(..., description="""JSON of body to create an issue for JIRA. You must follow the atlassian-python-api's Jira `issue_create` function's input format.
 For example, to create a low priority task called "test issue" with description "test description", you would pass in the following STRING dictionary:
-{"fields: {"project": {"key": "project_key"}, "summary": "test issue", "description": "test description", "issuetype": {"name": "Task"}, "priority": {"name": "Major"}}}}
+{"fields": {"project": {"key": "project_key"}, "summary": "test issue", "description": "test description", "issuetype": {"name": "Task"}, "priority": {"name": "Major"}}}
 """)
     
 class JiraUpdateIssue(BaseModel):
@@ -134,7 +134,7 @@ class JiraApiWrapper(BaseModel):
             raise ToolException("""
             Jira fields are provided in a wrong way.
             For example, to create a low priority task called "test issue" with description "test description", you would pass in the following STRING dictionary:
-            {{"fields: {{{{"project": {{"key": "project_key"}}, "summary": "test issue", "description": "test description", "issuetype": {{"name": "Task"}}, "priority": {{"name": "Major"}}}}}}
+            {"fields": {"project": {"key": "project_key"}, "summary": "test issue", "description": "test description", "issuetype": {"name": "Task"}, "priority": {"name": "Major"}}}
             """)
         if params["fields"].get("project") is None:
             raise ToolException("Jira project key is required to create an issue. Ask user to provide it.")
@@ -146,7 +146,7 @@ class JiraApiWrapper(BaseModel):
             raise ToolException("""
         Jira fields are provided in a wrong way.
         For example, to update a task with key XXX-123 with new summary, description and custom field, you would pass in the following STRING dictionary: 
-        {{"key": "issue key", "fields": {{"summary": "updated issue", "description": "updated description", "customfield_xxx": "updated custom field"}}}}
+        {"key": "issue key", "fields": {"summary": "updated issue", "description": "updated description", "customfield_xxx": "updated custom field"}}
         """)
 
 
@@ -160,6 +160,7 @@ class JiraApiWrapper(BaseModel):
     def create_issue(self, issue_json: str):
         """ Create an issue in Jira."""
         try:
+            print(issue_json)
             params = json.loads(issue_json)
             self.create_issue_validate(params)
             issue = self.client.issue_create(fields=dict(params["fields"]))
