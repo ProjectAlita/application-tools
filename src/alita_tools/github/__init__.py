@@ -9,7 +9,9 @@ from github.Consts import DEFAULT_BASE_URL
 
 class AlitaGitHubToolkit(GitHubToolkit):
     @classmethod
-    def get_toolkit(cls, selected_tools: list[str] = [], **kwargs):
+    def get_toolkit(cls, selected_tools: list[str] | None = None, **kwargs):
+        if selected_tools is None:
+            selected_tools = []
         github_api_wrapper = AlitaGitHubAPIWrapper(**kwargs)
         available_tools: List[Dict] = github_api_wrapper.get_available_tools()
         tools = []

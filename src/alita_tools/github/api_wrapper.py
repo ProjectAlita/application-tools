@@ -257,10 +257,10 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
 
     def create_file(self, file_path: str, file_contents: str) -> str:
         """
-        Creates a new file on the Github repo
+        Creates a new file on the GitHub repo
         Parameters:
             file_path (str): The path of the file to be created
-            file_conents (str): The content of the file to be created
+            file_contents (str): The content of the file to be created
         Returns:
             str: A success or failure message
         """

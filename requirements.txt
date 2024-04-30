@@ -1,6 +1,6 @@
 pydantic==1.10.9
-langchain_core==0.1.30
-langchain==0.1.11
+langchain_core~=0.1.30
+langchain==0.1.12
 pygithub==2.3.0
 atlassian_python_api==3.41.11
 markdownify==0.12.1

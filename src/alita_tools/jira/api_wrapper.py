@@ -118,13 +118,13 @@ class JiraApiWrapper(BaseModel):
     def _parse_projects(self, projects: List[dict]) -> List[dict]:
         parsed = []
         for project in projects:
-            id = project["id"]
+            id_ = project["id"]
             key = project["key"]
             name = project["name"]
-            type = project["projectTypeKey"]
+            type_ = project["projectTypeKey"]
             style = ""
             parsed.append(
-                {"id": id, "key": key, "name": name, "type": type, "style": style}
+                {"id": id_, "key": key, "name": name, "type": type_, "style": style}
             )
         return parsed
 

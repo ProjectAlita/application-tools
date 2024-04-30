@@ -6,11 +6,13 @@ from langchain_core.tools import BaseTool
 from ..base.tool import BaseAction
 
 
-class ConfluenceTookit(BaseToolkit):
+class ConfluenceToolkit(BaseToolkit):
     tools: List[BaseTool] = []
     
     @classmethod
-    def get_toolkit(cls, selected_tools: list[str] = [], **kwargs):
+    def get_toolkit(cls, selected_tools: list[str] | None = None, **kwargs):
+        if selected_tools is None:
+            selected_tools = []
         confluence_api_wrapper = ConfluenceAPIWrapper(**kwargs)
         available_tools = confluence_api_wrapper.get_available_tools()
         tools = []
