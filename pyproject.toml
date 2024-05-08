@@ -4,11 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "alita_tools"
-version = "0.0.10"
+version = "0.0.11"
 authors = [
   { name="Artem Rozumenko", email="support@projectalita.ai" },
-  { name="Artem Dubrovskii", email="artem_dubrovskii@epam.com"},
-  { name="Vadym Vlasenko", email="vadym_vlasenko@epam.com"}
+  { name="Artem Dubrovskii", email="artem_dubrovskii@epam.com"}
 ]
 description = "Default set of tools and toolkits available within ProjectAlita and CodeMie applications."
 readme = "README.md"
