@@ -13,3 +13,4 @@ playwright==1.43.0
 beautifulsoup4==4.12.3
 google-api-python-client==2.100.0
 wikipedia==1.4.0
+python-gitlab==4.5.0

@@ -3,7 +3,6 @@ from typing import List
 from langchain_community.agent_toolkits.base import BaseToolkit
 from langchain_core.tools import BaseTool
 
-from pydantic import create_model
 from langchain_community.tools.google_search import GoogleSearchResults
 from langchain_community.tools.wikipedia.tool import WikipediaQueryRun
 from langchain_community.utilities.google_search import GoogleSearchAPIWrapper
