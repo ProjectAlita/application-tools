@@ -10,7 +10,7 @@ pillow==10.2.0
 requests_openapi==1.0.5
 duckduckgo_search==5.3.0
 playwright==1.43.0
-beautifulsoup4==4.12.3
 google-api-python-client==2.100.0
 wikipedia==1.4.0
 python-gitlab==4.5.0
+beautifulsoup4
