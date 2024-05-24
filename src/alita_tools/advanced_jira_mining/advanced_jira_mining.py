@@ -9,32 +9,29 @@ from langchain_community.document_loaders import ConfluenceLoader
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain_core.documents import Document
-from langchain_core.output_parsers import StrOutputParser
 from langchain_core.pydantic_v1 import root_validator, BaseModel, Field
-from langchain_core.runnables import RunnableParallel, RunnableLambda, RunnablePassthrough
 from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
 
+from src.alita_tools.llm.llm_utils import get_model, summarize
 
-class GapsAnalysisSchema(BaseModel):
+
+class PrepareDataSchema(BaseModel):
     jira_issue_key: str = Field(...,
                                 description="""The issue key of the Jira issue to which the comment is to be added, e.g. "TEST-123".""")
-    ac: str = Field(..., description="The AC for which Gaps will be analyzed")
 
 
-class TempTestCaseGeneratorSchema(BaseModel):
-    gaps_and_ambiguities: str = Field(..., description="Gaps and Ambiguities in ac together with their resolutions")
+class SearchDataSchema(BaseModel):
+    query: str = Field(...,
+                       description="The query to search in the data created from jira ticket. Usually it will be an AC")
 
 
 class AdvancedJiraMining(BaseModel):
     jira_base_url: str
     confluence_base_url: str
     llm_settings: dict
-    summarization_prompt_id: int
-    summarization_prompt_version_id: int
-    gaps_analysis_prompt_id: int
-    gaps_analysis_prompt_version_id: int
-    temp_test_case_generation_prompt_id: int
-    temp_test_case_generation_prompt_version_id: int
+    model_type: str
+    __vectorstore = None
+    summarization_prompt: Optional[str] = None
     jira_api_key: Optional[str] = None,
     jira_username: Optional[str] = None
     jira_token: Optional[str] = None
@@ -51,14 +48,6 @@ class AdvancedJiraMining(BaseModel):
                 "`pip install atlassian-python-api`"
             )
 
-        try:
-            from alita_sdk.llms import AlitaChatModel  # noqa: F401
-        except ImportError:
-            raise ImportError(
-                "`alita-sdk` package not found, please run "
-                "`pip install alita-sdk`"
-            )
-
         url = values['jira_base_url']
         api_key = values.get('jira_api_key')
         username = values.get('jira_username')
@@ -69,7 +58,7 @@ class AdvancedJiraMining(BaseModel):
         else:
             values['client'] = Jira(url=url, username=username, password=api_key, cloud=is_cloud,
                                     verify_ssl=values['verify_ssl'])
-        values['llm'] = AlitaChatModel(**values['llm_settings'])
+        values['llm'] = get_model(cls.model_type, cls.llm_settings)
         return values
 
     def __zip_directory(self, folder_path, output_path):
@@ -192,10 +181,6 @@ class AdvancedJiraMining(BaseModel):
         confluence_result_docs = [character_splitter.split_documents(d) for d in splitted_by_headers_docs]
         return list(itertools.chain.from_iterable(confluence_result_docs))
 
-    def __create_summarization_chain(self, element_tag_to_summarize: str):
-        return {element_tag_to_summarize: lambda x: x} | self.llm.client.prompt(prompt_id=self.summarization_prompt_id,
-                                                                                prompt_version_id=self.summarization_prompt_version_id) | self.llm | StrOutputParser()
-
     def __clean_text_lines(self, text: str):
         # Clean none-breaking spaces (nbsp)
         return (line.replace('\xa0', ' ').strip() for line in text.splitlines() if line.strip())
@@ -205,11 +190,13 @@ class AdvancedJiraMining(BaseModel):
         return re.sub(r'\{color}', '', clean_color_start)
 
     def __process_issue_from_bulk_response(self, issue_from_bulk_response: dict) -> str:
-        description_summarization_chain = self.__create_summarization_chain(
-            'description')  # Summarization chain for descriptions
         description = self.__clean_text_from_color_identifiers(
             '\n'.join(self.__clean_text_lines(issue_from_bulk_response['fields']['description'])))
-        return description_summarization_chain.invoke(description)
+        if self.summarization_prompt:
+            return summarize(llm=self.llm, data_to_summarize=description, summarization_key='description',
+                             summarization_prompt=self.summarization_prompt)
+        else:
+            return description
 
     def __get_jira_descriptions_to_dict(self, jira_issue_key: str) -> Tuple[dict, list[str]]:
         # Cache to store fetched Jira data
@@ -246,17 +233,6 @@ class AdvancedJiraMining(BaseModel):
                     metadata={'source': key}))
         return related_description_content
 
-    def __split_text_types(self, docs: list) -> dict:
-        return {'texts': [doc.page_content for doc in docs]}
-
-    def __prompt_texts(self, docs_dict: dict):
-        # Context from retriever
-        formatted_texts = '\n'.join(docs_dict['context']['texts'])
-        prompt = self.llm.client.prompt(prompt_id=self.gaps_analysis_prompt_id,
-                                        prompt_version_id=self.gaps_analysis_prompt_version_id).format_messages(
-            ac=docs_dict['question'], embedding_documents=formatted_texts)
-        return prompt
-
     def __get_attachment_id(self, jira_issue_key: str, file_name: str):
         attachment_ids = self.client.get_attachments_ids_from_issue(jira_issue_key)
         filtered_ids = list(filter(lambda attachment: attachment['filename'] == file_name, attachment_ids))
@@ -279,7 +255,8 @@ class AdvancedJiraMining(BaseModel):
             zip_ref.extractall(persistent_path)
         os.remove(file_name)
 
-    def __prepare_data(self, jira_issue_key: str):
+    def prepare_data(self, jira_issue_key: str) -> str:
+        """ Prepare the embeddings for the specific jira issue key. They will include both Jira and Confluence info. """
         embedding_function = HuggingFaceEmbeddings(encode_kwargs={'normalize_embeddings': True})
         persistent_path = 'jira_ticket_embeddings'
         zip_file_name = 'jira_ticket_embeddings.zip'
@@ -307,45 +284,31 @@ class AdvancedJiraMining(BaseModel):
             self.__zip_directory('jira_ticket_embeddings', zip_file_name)
             self.__attach_file_to_jira_issue(jira_issue_key, zip_file_name)
             os.remove('jira_ticket_embeddings.zip')
-        # search_type="mmr", search_kwargs={'k': 30, 'lambda_mult': 1}
-        retriever = vectorstore.as_retriever(search_type="mmr", search_kwargs={'k': 40})
-        return retriever
+        self.__vectorstore = vectorstore
+        return f'Successfully created embeddings for the jira ticket with following id - {jira_issue_key}'
 
-    def do_gaps_analysis(self, jira_issue_key: str, ac: str):
-        """ Perform gaps analysis for the AC provided by user"""
-        retriever = self.__prepare_data(jira_issue_key)
-        rag = (
-                RunnableParallel({
-                    "context": retriever | RunnableLambda(self.__split_text_types),
-                    "question": RunnablePassthrough(),
-                })
-                | RunnableLambda(self.__prompt_texts)
-                | self.llm
-                | StrOutputParser()
-        )
-        return rag.invoke(ac)
-
-    def generate_test_case(self, gaps_and_ambiguities: str):
-        """Generate test case based on the gaps and ambiguities analysis"""
-        test_case_chain = {'gaps_and_ambiguities_ac': lambda x: x} | self.llm.client.prompt(
-            prompt_id=self.temp_test_case_generation_prompt_id,
-            prompt_version_id=self.temp_test_case_generation_prompt_version_id) | self.llm | StrOutputParser()
-
-        return test_case_chain.invoke(gaps_and_ambiguities)
+    def search_data(self, query: str) -> str:
+        """ Search the specific jira ticket data with the given query. Usually query will be a simple AC from the same ticket """
+        vectorstore = self.__vectorstore
+        output = ''
+        retrieved_docs = vectorstore.search(query, 'mmr', k=20)
+        for doc in retrieved_docs:
+            output += f'\n\n{doc.page_content}'
+        return output
 
     def get_available_tools(self):
         return [
             {
-                "name": "do_gaps_analysis",
-                "description": self.do_gaps_analysis.__doc__,
-                "args_schema": GapsAnalysisSchema,
-                "ref": self.do_gaps_analysis,
+                "name": "prepare_data",
+                "description": self.prepare_data.__doc__,
+                "args_schema": PrepareDataSchema,
+                "ref": self.prepare_data,
             },
             {
-                "name": "generate_test_case",
-                "description": self.generate_test_case.__doc__,
-                "args_schema": TempTestCaseGeneratorSchema,
-                "ref": self.generate_test_case,
+                "name": "search_data",
+                "description": self.search_data.__doc__,
+                "args_schema": SearchDataSchema,
+                "ref": self.search_data,
             },
 
         ]
