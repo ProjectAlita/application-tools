@@ -1,4 +1,5 @@
 import os
+from json import dumps
 from typing import Dict, Any, Optional, List
 from pydantic import root_validator
 from langchain.utils import get_from_dict_or_env
@@ -96,6 +97,7 @@ class CommentOnIssue(BaseModel):
     """Schema for operations that require a comment as input."""
 
     comment_query: str = Field(..., description="Follow the required formatting.")
+
 
 
 class DeleteFile(BaseModel):
@@ -255,6 +257,39 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         """
         return self._get_files("", self.active_branch)
 
+
+    def get_pull_request(self, pr_number: str) -> str:
+        """
+        Fetches information about a specific pull request.
+        
+        Returns:
+            str: A dictionary containing information about the pull request.
+        """
+        return dumps(super().get_pull_request(int(pr_number)))
+
+    def list_pull_request_diffs(self, pr_number: str) -> str:
+        """
+        Fetches the files included in a pull request.
+        
+        Returns:
+            str: A list of files and pathes to then included in the pull request.
+        """
+        # Grab PR
+        repo = self.github_repo_instance
+        pr = repo.get_pull(int(pr_number))
+        files = pr.get_files()
+        data = []
+        for file in files:
+            path = file.filename
+            patch = file.patch
+            data.append(
+                {
+                    "path": path,
+                    "patch": patch
+                }
+            )    
+        return dumps(data)
+
     def create_file(self, file_path: str, file_contents: str) -> str:
         """
         Creates a new file on the GitHub repo
@@ -334,7 +369,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             },
             {
                 "mode": "list_pull_request_files",
-                "ref": self.list_pull_request_files,
+                "ref": self.list_pull_request_diffs,
                 "name": "Overview of files included in PR",
                 "description": LIST_PULL_REQUEST_FILES,
                 "args_schema": GetPR,
@@ -345,13 +380,6 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                 "name": "Create Pull Request",
                 "description": CREATE_PULL_REQUEST_PROMPT,
                 "args_schema": CreatePR,
-            },
-            {
-                "mode": "list_pull_request_files",
-                "ref": self.list_pull_request_files,
-                "name": "List Pull Requests' Files",
-                "description": LIST_PULL_REQUEST_FILES,
-                "args_schema": GetPR,
             },
             {
                 "mode": "create_file",

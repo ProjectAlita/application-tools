@@ -3,8 +3,6 @@ from langchain_community.llms import __getattr__ as get_llm, __all__ as llms  # 
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import PromptTemplate
 
-from src.alita_tools.llm import AlitaChatModel
-
 
 def get_model(model_type: str, model_params: dict):
     """ Get LLM or ChatLLM """
@@ -13,6 +11,10 @@ def get_model(model_type: str, model_params: dict):
     if model_type in llms:
         return get_llm(model_type)(**model_params)
     elif model_type == "Alita":
+        try:
+            from src.alita_sdk.llms.alita import AlitaChatModel
+        except ImportError:
+            raise RuntimeError("Alita model not found")
         return AlitaChatModel(**model_params)
     elif model_type in chat_models:
         model = getattr(__import__("langchain_community.chat_models", fromlist=[model_type]), model_type)
