@@ -80,6 +80,8 @@ class JiraApiWrapper(BaseModel):
             priority = issue_fields["priority"]["name"]
             status = issue_fields["status"]["name"]
             issue_url = f"{self.client.url}browse/{key}"
+            id = issue["id"]
+            projectId = issue_fields["project"]["id"]
             try:
                 assignee = issue_fields["assignee"]["displayName"]
             except Exception:
@@ -108,6 +110,8 @@ class JiraApiWrapper(BaseModel):
                 "duedate": duedate,
                 "url": issue_url,
                 "related_issues": rel_issues,
+                "id": id,
+                "projectId": projectId
             }
             for field in self.additional_fields:
                 field_value = issue_fields.get(field, None)
