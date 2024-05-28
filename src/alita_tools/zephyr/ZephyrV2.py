@@ -14,7 +14,7 @@ class ZephyrV2(object):
     def __init__(self, base_url, access_token):
         self.base_url = base_url
         self.access_token = access_token
-        self.request_client = ZephyrRestAPI(base_url=self.base_url, version=2, token=self.access_token)
+        self.request_client = ZephyrRestAPI(base_url=self.base_url, token=self.access_token)
 
     def get_test_cases(self, jira_ticket_key: str):
         relative_path = f"/issuelinks/{jira_ticket_key}/testcases"

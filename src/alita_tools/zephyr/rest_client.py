@@ -26,7 +26,6 @@ class ZephyrRestAPI(object):
         relative_path=None,
         method=None,
         access_key=None,
-        version=1,
         timeout=75,
     ):
         """
@@ -41,7 +40,6 @@ class ZephyrRestAPI(object):
         self.access_key = access_key
         self.method = method
         self.token = token
-        self.version = version
         self.timeout = int(timeout)
         self._create_token_session(token, access_key)
 
@@ -55,7 +53,7 @@ class ZephyrRestAPI(object):
         self.headers = {
             "Accept": "application/json"
         }
-        if (self.version == 1):
+        if self.access_key is not None:
             self.headers.update({
                 "zapiAccessKey": access_key.strip(),
                 "Authorization": 'JWT ' + token.strip()
