@@ -1,5 +1,7 @@
 # coding=utf-8
-import logging
+import hashlib
+import jwt
+import time
 from json import dumps
 from urllib.parse import urlencode
 
@@ -26,10 +28,13 @@ class ZephyrRestAPI(object):
         relative_path=None,
         method=None,
         access_key=None,
+        secret_key=None,
+        account_id=None,
+        version=1,
         timeout=75,
     ):
         """
-        init function for the ZephyrRestAPI object.
+        init function for the AtlassianRestAPI object.
 
         :param base_url: The url to be used in the request.
         :param access_key: User's access key to be used in the request for authorization.
@@ -38,8 +43,11 @@ class ZephyrRestAPI(object):
         self.base_url = base_url
         self.relative_path = relative_path
         self.access_key = access_key
+        self.secret_key = secret_key
+        self.account_id = account_id
         self.method = method
         self.token = token
+        self.version = version
         self.timeout = int(timeout)
         self._create_token_session(token, access_key)
 
@@ -56,12 +64,23 @@ class ZephyrRestAPI(object):
         if self.access_key is not None:
             self.headers.update({
                 "zapiAccessKey": access_key.strip(),
-                "Authorization": 'JWT ' + token.strip()
+                "Authorization": 'JWT ' + self.get_request_token(self.relative_path, self.method, 300)
             })
         else:
             self.headers.update({
                 "Authorization": 'Bearer ' + token.strip()
             })
+
+    def get_request_token(self, relative_path, http_method, jwt_expire_sec):
+        canonical_path = (http_method + '&' + relative_path).replace('?', '&')
+        payload_token = {
+            'sub': self.account_id,
+            'qsh': hashlib.sha256(canonical_path.encode('utf-8')).hexdigest(),
+            'iss': self.access_key,
+            'exp': int(time.time()) + jwt_expire_sec,
+            'iat': int(time.time())
+        }
+        return jwt.encode(payload_token, self.secret_key, algorithm='HS256')
 
     def _update_header(self, key, value):
         """
@@ -129,6 +148,7 @@ class ZephyrRestAPI(object):
         :param files:
         :param trailing: bool - OPTIONAL: Add trailing slash to url
         :param absolute: bool, OPTIONAL: Do not prefix url, url is absolute
+        :param advanced_mode: bool, OPTIONAL: Return the raw response
         :return:
         """
         url = self.url_joiner(None if absolute else self.base_url, path, trailing)
