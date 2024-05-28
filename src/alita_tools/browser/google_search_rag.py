@@ -17,7 +17,7 @@ class searchPages(BaseModel):
 class GoogleSearchRag(BaseAction):
     googleApiWrapper: GoogleSearchAPIWrapper = None
     max_response_size: int = 3000
-    name: str = "Google Search with Scrapper"
+    name: str = "google_search_with_scrapper"
     description: str = "Searches Google for 5 top results, reads the pages and searches for relevant content"
     args_schema = searchPages
 

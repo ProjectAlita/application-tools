@@ -22,7 +22,6 @@ class AlitaGitHubToolkit(GitHubToolkit):
             tools.append(GitHubAction(
                 api_wrapper=github_api_wrapper,
                 name=tool["name"],
-                mode=tool["mode"],
                 description=tool["description"],
                 args_schema=tool["args_schema"]
             ))

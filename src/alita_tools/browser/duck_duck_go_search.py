@@ -14,7 +14,7 @@ class searchPages(BaseModel):
     query: str = Field(..., title="Query text to search pages")
 
 class DuckDuckGoSearch(BaseAction):
-    name: str = "DuckDuckGo Search"
+    name: str = "DuckDuckGo_Search"
     max_response_size: int = 3000
     description: str = "Searches DuckDuckGo for the query and returns the top 5 results, and them provide summary documents"
     args_schema = searchPages

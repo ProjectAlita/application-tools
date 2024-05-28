@@ -24,7 +24,7 @@ from langchain_community.tools.github.prompt import (
 )
 
 from langchain_community.agent_toolkits.github.toolkit import (
-    BranchName, CreatePR, GetIssue, GetPR, BaseModel, Field
+    BranchName, CreatePR, BaseModel, Field
 )
 
 from langchain_community.utilities.github import GitHubAPIWrapper
@@ -41,6 +41,16 @@ class SearchCode(BaseModel):
             "query for code, e.g. `MyFunctionName()`."
         ),
     )
+
+class GetIssue(BaseModel):
+    """Schema for operations that require an issue number as input."""
+
+    issue_number: str = Field('0', description="Issue number as an integer, e.g. `42`")
+
+class GetPR(BaseModel):
+    """Schema for operations that require a PR number as input."""
+
+    pr_number: str = Field('0', description="The PR number as an integer, e.g. `12`")
 
 class DirectoryPath(BaseModel):
     """Schema for operations that require a directory path as input."""
@@ -201,8 +211,6 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         values["active_branch"] = active_branch
         values["github_base_branch"] = github_base_branch
         
-        print(values)
-        
         return values
     
     
@@ -238,6 +246,15 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         
         return self._get_files(directory_path, self.active_branch)
 
+    def get_issue(self, issue_number: str) -> str:
+        """
+        Fetches information about a specific issue.
+
+        Returns:
+            str: A dictionary containing information about the issue.
+        """
+        return dumps(super().get_issue(int(issue_number)))
+    
 
     def list_files_in_main_branch(self) -> str:
         """
@@ -333,129 +350,106 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
     def get_available_tools(self):
         return [
             {
-                "mode": "get_issues",
                 "ref": self.get_issues,
-                "name": "Get Issues",
+                "name": "get_issues",
                 "description": GET_ISSUES_PROMPT,
                 "args_schema": NoInput,
             },
             {
-                "mode": "get_issue",
                 "ref": self.get_issue,
-                "name": "Get Issue",
+                "name": "get_issue",
                 "description": GET_ISSUE_PROMPT,
                 "args_schema": GetIssue,
             },
             {
-                "mode": "comment_on_issue",
                 "ref": self.comment_on_issue,
-                "name": "Comment on Issue",
+                "name": "comment_on_issue",
                 "description": COMMENT_ON_ISSUE_PROMPT,
                 "args_schema": CommentOnIssue,
             },
             {
-                "mode": "list_open_pull_requests",
                 "ref": self.list_open_pull_requests,
-                "name": "List open pull requests (PRs)",
+                "name": "list_open_pull_requests",
                 "description": LIST_PRS_PROMPT,
                 "args_schema": NoInput,
             },
             {
-                "mode": "get_pull_request",
                 "ref": self.get_pull_request,
-                "name": "Get Pull Request",
+                "name": "get_pull_request",
                 "description": GET_PR_PROMPT,
                 "args_schema": GetPR,
             },
             {
-                "mode": "list_pull_request_files",
                 "ref": self.list_pull_request_diffs,
-                "name": "Overview of files included in PR",
+                "name": "list_pull_request_files",
                 "description": LIST_PULL_REQUEST_FILES,
                 "args_schema": GetPR,
             },
             {
-                "mode": "create_pull_request",
                 "ref": self.create_pull_request,
-                "name": "Create Pull Request",
+                "name": "create_pull_request",
                 "description": CREATE_PULL_REQUEST_PROMPT,
                 "args_schema": CreatePR,
             },
             {
-                "mode": "create_file",
                 "ref": self.create_file,
-                "name": "Create File",
+                "name": "create_file",
                 "description": CREATE_FILE_PROMPT,
                 "args_schema": CreateFile,
             },
             {
-                "mode": "read_file",
                 "ref": self.read_file,
-                "name": "Read File",
+                "name": "read_file",
                 "description": READ_FILE_PROMPT,
                 "args_schema": ReadFile,
             },
             {
-                "mode": "update_file",
                 "ref": self.update_file,
-                "name": "Update File",
+                "name": "update_file",
                 "description": UPDATE_FILE_PROMPT,
                 "args_schema": UpdateFile,
             },
             {
-                "mode": "delete_file",
                 "ref": self.delete_file,
-                "name": "Delete File",
+                "name": "delete_file",
                 "description": DELETE_FILE_PROMPT,
                 "args_schema": DeleteFile,
             },
             {
-                "mode": "list_files_in_main_branch",
                 "ref": self.list_files_in_main_branch,
-                "name": "Overview of existing files in Main branch",
+                "name": "list_files_in_main_branch",
                 "description": OVERVIEW_EXISTING_FILES_IN_MAIN,
                 "args_schema": NoInput,
             },
             {
-                "mode": "list_files_in_bot_branch",
-                "ref": self.list_files_in_bot_branch,
-                "name": "Overview of files in current working branch",
-                "description": OVERVIEW_EXISTING_FILES_BOT_BRANCH,
-                "args_schema": NoInput,
-            },
-            {
-                "mode": "list_branches_in_repo",
                 "ref": self.list_branches_in_repo,
-                "name": "List branches in this repository",
+                "name": "list_branches_in_repo",
                 "description": LIST_BRANCHES_IN_REPO_PROMPT,
                 "args_schema": NoInput,
             },
             {
-                "mode": "set_active_branch",
                 "ref": self.set_active_branch,
-                "name": "Set active branch",
+                "name": "set_active_branch",
                 "description": SET_ACTIVE_BRANCH_PROMPT,
                 "args_schema": BranchName,
             },
             {
-                "mode": "create_branch",
                 "ref": self.create_branch,
-                "name": "Create a new branch",
+                "name": "create_branch",
                 "description": CREATE_BRANCH_PROMPT,
                 "args_schema": CreateBranchName,
             },
             {
-                "mode": "get_files_from_directory",
                 "ref": self.get_files_from_directory,
-                "name": "Get files from a directory",
+                "name": "get_files_from_directory",
                 "description": GET_FILES_FROM_DIRECTORY_PROMPT,
                 "args_schema": DirectoryPath,
             }
         ]
         
-    def run(self, mode: str, *args: Any, **kwargs: Any):
+    def run(self, name: str, *args: Any, **kwargs: Any):
         for tool in self.get_available_tools():
-            if tool["mode"] == mode:
+            if tool["name"] == name:
                 return tool["ref"](*args, **kwargs)
         else:
-            raise ValueError(f"Unknown mode: {mode}")
+            raise ValueError(f"Unknown mode: {name}")

@@ -11,8 +11,7 @@ class GitHubAction(BaseTool):
     """Tool for interacting with the GitHub API."""
 
     api_wrapper: AlitaGitHubAPIWrapper = Field(default_factory=AlitaGitHubAPIWrapper)
-    mode: str
-    name: str = ""
+    name: str
     description: str = ""
     args_schema: Optional[Type[BaseModel]] = None
 
@@ -24,6 +23,6 @@ class GitHubAction(BaseTool):
     ) -> str:
         """Use the GitHub API to run an operation."""
         try:
-            return self.api_wrapper.run(self.mode, *args, **kwargs)
+            return self.api_wrapper.run(self.name, *args, **kwargs)
         except Exception as e:
             return f"Error: {format_exc()}"
