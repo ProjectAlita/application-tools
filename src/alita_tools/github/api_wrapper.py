@@ -307,6 +307,50 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             )    
         return dumps(data)
 
+    def create_branch(self, proposed_branch_name: str) -> str:
+        """
+        Create a new branch, and set it as the active bot branch.
+        Equivalent to `git switch -c proposed_branch_name`
+        If the proposed branch already exists, we append _v1 then _v2...
+        until a unique name is found.
+
+        Returns:
+            str: A plaintext success message.
+        """
+        from github import GithubException
+
+        i = 0
+        new_branch_name = proposed_branch_name
+        base_branch = self.github_repo_instance.get_branch(
+            self.active_branch if self.active_branch else self.github_base_branch
+        )
+        for i in range(1000):
+            try:
+                self.github_repo_instance.create_git_ref(
+                    ref=f"refs/heads/{new_branch_name}", sha=base_branch.commit.sha
+                )
+                self.active_branch = new_branch_name
+                return (
+                    f"Branch '{new_branch_name}' "
+                    "created successfully, and set as current active branch."
+                )
+            except GithubException as e:
+                if e.status == 422 and "Reference already exists" in e.data["message"]:
+                    i += 1
+                    new_branch_name = f"{proposed_branch_name}_v{i}"
+                else:
+                    # Handle any other exceptions
+                    print(f"Failed to create branch. Error: {e}")  # noqa: T201
+                    raise Exception(
+                        "Unable to create branch name from proposed_branch_name: "
+                        f"{proposed_branch_name}"
+                    )
+        return (
+            "Unable to create branch. "
+            "At least 1000 branches exist with named derived from "
+            f"proposed_branch_name: `{proposed_branch_name}`"
+        )
+
     def create_file(self, file_path: str, file_contents: str) -> str:
         """
         Creates a new file on the GitHub repo
