@@ -11,13 +11,13 @@ logger = logging.getLogger(__name__)
 
 class JiraSearch(BaseModel):
     jql: str = Field(..., description="Jira Query Language (JQL) query string")
-    
+
 class JiraCreateIssue(BaseModel):
     issue_json: str = Field(..., description="""JSON of body to create an issue for JIRA. You must follow the atlassian-python-api's Jira `issue_create` function's input format.
 For example, to create a low priority task called "test issue" with description "test description", you would pass in the following STRING dictionary:
 {"fields": {"project": {"key": "project_key"}, "summary": "test issue", "description": "test description", "issuetype": {"name": "Task"}, "priority": {"name": "Major"}}}
 """)
-    
+
 class JiraUpdateIssue(BaseModel):
     issue_json: str = Field(
         description="""You must follow the atlassian-python-api's Jira `update_issue` function's input format. 
@@ -43,7 +43,7 @@ class JiraApiWrapper(BaseModel):
     limit: Optional[int] = 5
     additional_fields: Optional[list[str]] = []
     verify_ssl: Optional[bool] = True
-    
+
     @root_validator()
     def validate_toolkit(cls, values):
         try:
@@ -53,7 +53,7 @@ class JiraApiWrapper(BaseModel):
                 "`atlassian` package not found, please run "
                 "`pip install atlassian-python-api`"
             )
-        
+
         url = values['base_url']
         api_key = values.get('api_key')
         username = values.get('username')
@@ -64,7 +64,7 @@ class JiraApiWrapper(BaseModel):
         else:
             values['client'] = Jira(url=url, username=username, password=api_key, cloud=cloud, verify_ssl=values['verify_ssl'])
         return values
-    
+
     def _parse_issues(self, issues: Dict) -> List[dict]:
         parsed = []
         for issue in issues["issues"]:
@@ -72,6 +72,7 @@ class JiraApiWrapper(BaseModel):
                 break
             issue_fields = issue["fields"]
             key = issue["key"]
+            id = issue["id"]
             summary = issue_fields["summary"]
             description = issue_fields["description"]
             created = issue_fields["created"][0:10]
@@ -79,6 +80,7 @@ class JiraApiWrapper(BaseModel):
             duedate = issue_fields["duedate"]
             priority = issue_fields["priority"]["name"]
             status = issue_fields["status"]["name"]
+            projectId = issue_fields["project"]["id"]
             issue_url = f"{self.client.url}browse/{key}"
             try:
                 assignee = issue_fields["assignee"]["displayName"]
@@ -98,6 +100,8 @@ class JiraApiWrapper(BaseModel):
 
             parsed_issue = {
                 "key": key,
+                "id": id,
+                "projectId": projectId,
                 "summary": summary,
                 "description": description,
                 "created": created,
@@ -128,7 +132,7 @@ class JiraApiWrapper(BaseModel):
             )
         return parsed
 
-    
+
     def create_issue_validate(self, params: Dict[str, Any]):
         if params.get("fields") is None:
             raise ToolException("""
@@ -138,7 +142,7 @@ class JiraApiWrapper(BaseModel):
             """)
         if params["fields"].get("project") is None:
             raise ToolException("Jira project key is required to create an issue. Ask user to provide it.")
-    
+
     def update_issue_validate(self, params: Dict[str, Any]):
         if params.get("key") is None:
             raise ToolException("Jira issue key is required to update an issue. Ask user to provide it.")
@@ -163,7 +167,9 @@ class JiraApiWrapper(BaseModel):
             print(issue_json)
             params = json.loads(issue_json)
             self.create_issue_validate(params)
-            issue = self.client.issue_create(fields=dict(params["fields"]))
+            # used in case linkage via `update` is required
+            update = dict(params["update"]) if (params.get("update")) is not None else None
+            issue = self.client.create_issue(fields=dict(params["fields"]), update=update)
             issue_url = f"{self.client.url}browse/{issue['key']}"
             logger.info(f"issue is created: {issue}")
             return f"Done. Issue {issue['key']} is created successfully. You can view it at {issue_url}. Details: {str(issue)}"
@@ -173,7 +179,7 @@ class JiraApiWrapper(BaseModel):
             stacktrace = format_exc()
             logger.error(f"Error creating Jira issue: {stacktrace}")
             raise ToolException(f"Error creating Jira issue: {stacktrace}")
-    
+
     def update_issue(self, issue_json: str):
         """ Update an issue in Jira."""
         try:
@@ -205,7 +211,7 @@ class JiraApiWrapper(BaseModel):
             stacktrace = format_exc()
             logger.error(f"Error adding comment to Jira issue: {stacktrace}")
             raise ToolException(f"Error adding comment to Jira issue: {stacktrace}")
-    
+
     def list_projects(self):
         """ List all projects in Jira. """
         try:
@@ -222,7 +228,7 @@ class JiraApiWrapper(BaseModel):
             return f"Error creating Jira issue: {stacktrace}"
 
 
-    
+
     def get_available_tools(self):
         return [
             {
@@ -255,9 +261,9 @@ class JiraApiWrapper(BaseModel):
                 "args_schema": BaseModel,
                 "ref": self.list_projects,
             },
-            
+
         ]
-    
+
     def run(self, mode: str, *args: Any, **kwargs: Any):
         for tool in self.get_available_tools():
             if tool["name"] == mode:
