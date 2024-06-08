@@ -1,7 +1,8 @@
 import os
 from json import dumps
 from typing import Dict, Any, Optional, List
-from pydantic import root_validator
+from pydantic import root_validator, create_model
+from pydantic.fields import FieldInfo
 from langchain.utils import get_from_dict_or_env
 
 from langchain_community.tools.github.prompt import (
@@ -16,112 +17,137 @@ from langchain_community.tools.github.prompt import (
     LIST_BRANCHES_IN_REPO_PROMPT,
     LIST_PRS_PROMPT,
     LIST_PULL_REQUEST_FILES,
-    OVERVIEW_EXISTING_FILES_BOT_BRANCH,
     OVERVIEW_EXISTING_FILES_IN_MAIN,
     READ_FILE_PROMPT,
     SET_ACTIVE_BRANCH_PROMPT,
-    UPDATE_FILE_PROMPT,
-)
-
-from langchain_community.agent_toolkits.github.toolkit import (
-    BranchName, CreatePR, BaseModel, Field
 )
 
 from langchain_community.utilities.github import GitHubAPIWrapper
 
 CREATE_FILE_PROMPT = """Create new file in your github repository."""
 
-class SearchCode(BaseModel):
-    """Schema for operations that require a search query as input."""
+UPDATE_FILE_PROMPT = """
+Updates the contents of a file in a GitHub repository. **VERY IMPORTANT**: Your input to this tool MUST strictly follow these rules:
 
-    query: str = Field(
-        ...,
-        description=(
-            "A keyword-focused natural language search"
-            "query for code, e.g. `MyFunctionName()`."
-        ),
+- First you must specify which file to modify by passing a full file path (**IMPORTANT**: the path must not start with a slash)
+- Then you must specify at lest 2 lines of the old contents which you would like to replace wrapped in OLD <<<< and >>>> OLD
+- Then you must specify the new contents which you would like to replace the old contents with wrapped in NEW <<<< and >>>> NEW
+- **VERY IMPORTANT**: NEW content may contain lines from OLD content in case you want to add content without removing the old content.
+
+Example 1: you would like to replace the contents of the file /test/test.txt from "old contents" to "new contents", you would pass in the following string:
+
+test/test.txt
+
+This is text that will not be changed
+OLD <<<<
+old contents
+>>>> OLD
+NEW <<<<
+new contents
+>>>> NEW
+
+Example 2: if you would like to add the contents of the file /test/test.txt where "existing contents" will be extended with "new contents", you would pass in the following string:
+
+test/test.txt
+
+This is text that will not be changed
+OLD <<<<
+existing contents
+>>>> OLD
+NEW <<<<
+existing contents
+new contents
+>>>> NEW
+
+"""
+
+
+SearchCode = create_model(
+    "SearchCodeModel",
+    query=(str, FieldInfo(description=("A keyword-focused natural language "
+                                       "search query for code, e.g. `MyFunctionName()`.")))
     )
 
-class GetIssue(BaseModel):
-    """Schema for operations that require an issue number as input."""
+GetIssue = create_model(
+    "GetIssue",
+    issue_number=(str, FieldInfo(description="Issue number as an integer, e.g. `42`"))
+)
 
-    issue_number: str = Field('0', description="Issue number as an integer, e.g. `42`")
-
-class GetPR(BaseModel):
-    """Schema for operations that require a PR number as input."""
-
-    pr_number: str = Field('0', description="The PR number as an integer, e.g. `12`")
-
-class DirectoryPath(BaseModel):
-    """Schema for operations that require a directory path as input."""
-
-    directory_path: str = Field(
+GetPR = create_model(
+    "GetPR",
+    pr_number=(str, FieldInfo(description="The PR number as an integer, e.g. `12`"))
+)
+DirectoryPath = create_model(
+    "DirectoryPath",
+    directory_path=(str, FieldInfo(
         "",
         description=(
             "The path of the directory, e.g. `some_dir/inner_dir`."
             " Only input a string, do not include the parameter name."
         ),
-    )
-class NoInput(BaseModel):
-    """Schema for operations that do not require any input."""
-    pass
+    ))
+)
 
-class ReadFile(BaseModel):
-    """Schema for operations that require a file path as input."""
+NoInput = create_model(
+    "NoInput"
+)
 
-    file_path: str = Field(
-        ...,
+ReadFile = create_model(
+    "ReadFile",
+    file_path=(str, FieldInfo(
         description=(
             "The full file path of the file you would like to read where the "
             "path must NOT start with a slash, e.g. `some_dir/my_file.py`."
         ),
-    )
+    ))
+)
 
-class CreateBranchName(BaseModel):
-    """Schema for operations that require a branch name as input."""
+CreateBranchName = create_model(
+    "CreateBranchName",
+    proposed_branch_name=(str, FieldInfo(
+        description="The name of the branch, e.g. `my_branch`."
+    ))
+)
 
-    proposed_branch_name: str = Field(
-        ..., description="The name of the branch, e.g. `my_branch`."
-    )
+UpdateFile = create_model(
+    "UpdateFile",
+    file_query=(str, FieldInfo(
+        description="Strictly follow the provided rules."
+    ))
+)
 
-class UpdateFile(BaseModel):
-    """Schema for operations that require a file path and content as input."""
+CreateFile = create_model(
+    "CreateFile",
+    file_path=(str, FieldInfo(description="Path of a file to be created.")),
+    file_contents=(str, FieldInfo(description="Content of a file to be put into chat."))
+)
 
-    file_query: str = Field(
-        ..., description="Strictly follow the provided rules."
-    )
+CreatePR = create_model(
+    "CreatePR",
+    pr_query=(str, FieldInfo(description="Follow the required formatting."))
+)
 
-class CreatePR(BaseModel):
-    """Schema for operations that require a PR title and body as input."""
+CommentOnIssue = create_model(
+    "CommentOnIssue",
+    comment_query=(str, FieldInfo(..., description="Follow the required formatting."))
+)
 
-    pr_query: str = Field(..., description="Follow the required formatting.")
-
-
-class CreateFile(BaseModel):
-    """Schema for operations that require a file path and content as input."""
-
-    file_path: str = Field(..., description="Path of a file to be created.")
-    file_contents: str = Field(..., description="Content of a file to be put into chat.")
-
-class CommentOnIssue(BaseModel):
-    """Schema for operations that require a comment as input."""
-
-    comment_query: str = Field(..., description="Follow the required formatting.")
-
-
-
-class DeleteFile(BaseModel):
-    """Schema for operations that require a file path as input."""
-
-    file_path: str = Field(
-        ...,
+DeleteFile = create_model(
+    "DeleteFile",
+    file_path=(str, FieldInfo(
         description=(
             "The full file path of the file you would like to delete"
             " where the path must NOT start with a slash, e.g."
             " `some_dir/my_file.py`. Only input a string,"
             " not the param name."
         ),
-    )
+    ))
+)
+
+BranchName = create_model(
+    "BranchName",
+    branch_name=(str, FieldInfo(description="The name of the branch, e.g. `my_branch`."))
+)
 
 
 class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
@@ -390,6 +416,114 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             return "Created file " + file_path
         except Exception as e:
             return "Unable to make file due to error:\n" + str(e)
+    
+    def extract_old_new_pairs(self, file_query):
+        # Split the file content by lines
+        code_lines = file_query.split("\n")
+        
+        # Initialize lists to hold the contents of OLD and NEW sections
+        old_contents = []
+        new_contents = []
+        
+        # Initialize variables to track whether the current line is within an OLD or NEW section
+        in_old_section = False
+        in_new_section = False
+        
+        # Temporary storage for the current section's content
+        current_section_content = []
+        
+        # Iterate through each line in the file content
+        for line in code_lines:
+            # Check for OLD section start
+            if "OLD <<<" in line:
+                in_old_section = True
+                current_section_content = []  # Reset current section content
+                continue  # Skip the line with the marker
+            
+            # Check for OLD section end
+            if ">>>> OLD" in line:
+                in_old_section = False
+                old_contents.append("\n".join(current_section_content).strip())  # Add the captured content
+                current_section_content = []  # Reset current section content
+                continue  # Skip the line with the marker
+            
+            # Check for NEW section start
+            if "NEW <<<" in line:
+                in_new_section = True
+                current_section_content = []  # Reset current section content
+                continue  # Skip the line with the marker
+            
+            # Check for NEW section end
+            if ">>>> NEW" in line:
+                in_new_section = False
+                new_contents.append("\n".join(current_section_content).strip())  # Add the captured content
+                current_section_content = []  # Reset current section content
+                continue  # Skip the line with the marker
+            
+            # If currently in an OLD or NEW section, add the line to the current section content
+            if in_old_section or in_new_section:
+                current_section_content.append(line)
+        
+        # Pair the OLD and NEW contents
+        paired_contents = list(zip(old_contents, new_contents))
+        
+        return paired_contents
+    
+    def update_file(self, file_query: str) -> str:
+        """
+        Updates a file with new content.
+        Parameters:
+            file_query(str): Contains the file path and the file contents.
+                The old file contents is wrapped in OLD <<<< and >>>> OLD
+                The new file contents is wrapped in NEW <<<< and >>>> NEW
+                For example:
+                /test/hello.txt
+                OLD <<<<
+                Hello Earth!
+                >>>> OLD
+                NEW <<<<
+                Hello Mars!
+                >>>> NEW
+        Returns:
+            A success or failure message
+        """
+        if self.active_branch == self.github_base_branch:
+            return (
+                "You're attempting to commit to the directly"
+                f"to the {self.github_base_branch} branch, which is protected. "
+                "Please create a new branch and try again."
+            )
+        try:
+            
+            file_path: str = file_query.split("\n")[0]
+            
+            file_content = self.read_file(file_path)
+            updated_file_content = file_content
+            for old, new in self.extract_old_new_pairs(file_query):
+                if not old.strip():
+                    continue
+                updated_file_content = updated_file_content.replace(old, new)
+
+            if file_content == updated_file_content:
+                return (
+                    "File content was not updated because old content was not found or empty."
+                    "It may be helpful to use the read_file action to get "
+                    "the current file contents."
+                )
+
+            self.github_repo_instance.update_file(
+                path=file_path,
+                message="Update " + str(file_path),
+                content=updated_file_content,
+                branch=self.active_branch,
+                sha=self.github_repo_instance.get_contents(
+                    file_path, ref=self.active_branch
+                ).sha,
+            )
+            return "Updated file " + str(file_path)
+        except Exception as e:
+            return "Unable to update file due to error:\n" + str(e)
+
 
     def get_available_tools(self):
         return [

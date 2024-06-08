@@ -1,8 +1,10 @@
 import logging
 import requests
 from typing import List, Optional, Any
+from pydantic import create_model
+from pydantic.fields import FieldInfo
 from langchain_core.documents import Document
-from langchain_core.pydantic_v1 import root_validator, BaseModel, Field
+from langchain_core.pydantic_v1 import root_validator, BaseModel
 from langchain_community.document_loaders.confluence import ContentFormat
 from tenacity import (
     before_sleep_log,
@@ -14,20 +16,26 @@ from tenacity import (
 
 logger = logging.getLogger(__name__)
 
+createPage = create_model(
+    "createPage",
+    title=(str, FieldInfo(description="Title of the page")),
+    body=(str, FieldInfo(description="Body of the page")),
+)
 
-class createPage(BaseModel):
-    title: str = Field(..., title="Title of the page")
-    body: str = Field(..., title="Body of the page")
+pageExists = create_model(
+    "pageExists",
+    title=(str, FieldInfo(description="Title of the page")),
+)
 
-class pageExists(BaseModel):
-    title: str = Field(..., title="Title of the page")
-    
-class getPagesWithLabel(BaseModel):
-    label: str = Field(..., title="Label of the pages")
-
-class searchPages(BaseModel):
-    query: str = Field(..., title="Query text to search pages")
-    
+getPagesWithLabel = create_model(
+    "getPagesWithLabel",
+    label=(str, FieldInfo(description="Label of the pages")),
+)
+   
+searchPages = create_model(
+    "searchPages",
+    query=(str, FieldInfo(description="Query text to search pages")),
+)
 
 class ConfluenceAPIWrapper(BaseModel):
     base_url: str
@@ -129,10 +137,12 @@ class ConfluenceAPIWrapper(BaseModel):
         """Search pages in Confluence by query text in title or body."""
         start = 0
         content = []
-        cql = f'(type=page and space={self.space}) and (title~"{query}" or text~"{query}")'
+        if not self.space:
+            cql = f'(type=page) and (title~"{query}" or text~"{query}")'
+        else:
+            cql = f'(type=page and space={self.space}) and (title~"{query}" or text~"{query}")'
         for _ in range(self.max_pages // self.limit):
             pages = self.client.cql(cql, start=0, limit=self.limit).get("results", [])
-            print(pages)
             if not pages:
                 break
             content += [page.page_content for page in self.get_pages_by_id([page['content']["id"] for page in pages])]

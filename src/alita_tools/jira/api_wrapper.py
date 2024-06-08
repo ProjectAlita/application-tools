@@ -3,35 +3,55 @@ from traceback import format_exc
 import json
 from typing import List, Optional, Any, Dict
 from langchain_core.tools import ToolException
-from langchain_core.pydantic_v1 import root_validator, BaseModel, Field
-
+from langchain_core.pydantic_v1 import root_validator, BaseModel
+from pydantic import create_model
+from pydantic.fields import FieldInfo
 
 logger = logging.getLogger(__name__)
 
 
-class JiraSearch(BaseModel):
-    jql: str = Field(..., description="Jira Query Language (JQL) query string")
+NoInput = create_model(
+    "NoInput"
+)
 
-class JiraCreateIssue(BaseModel):
-    issue_json: str = Field(..., description="""JSON of body to create an issue for JIRA. You must follow the atlassian-python-api's Jira `issue_create` function's input format.
-For example, to create a low priority task called "test issue" with description "test description", you would pass in the following STRING dictionary:
-{"fields": {"project": {"key": "project_key"}, "summary": "test issue", "description": "test description", "issuetype": {"name": "Task"}, "priority": {"name": "Major"}}}
-""")
 
-class JiraUpdateIssue(BaseModel):
-    issue_json: str = Field(
-        description="""You must follow the atlassian-python-api's Jira `update_issue` function's input format. 
-For example, to update a task with key XXX-123 with new summary, description and custom field, you would pass in the following STRING dictionary: 
-{"key": "issue key", "fields": {"summary": "updated issue", "description": "updated description", "customfield_xxx": "updated custom field"}}
-        """
-    )
+JiraSearch = create_model(
+    "JiraSearchModel",
+    jql=(str, FieldInfo(description="Jira Query Language (JQL) query string")))
 
-class AddCommentInput(BaseModel):
-    issue_key: str = Field(
-        description="""The issue key of the Jira issue to which the comment is to be added, e.g. "TEST-123"."""
-    )
-    comment: str = Field(description="""The comment to be added to the Jira issue, e.g. "This is a test comment.""")
-
+JiraCreateIssue = create_model(
+    "JiraCreateIssueModel",
+    issue_json=(str, FieldInfo(
+        description=("JSON of body to create an issue for JIRA. "
+                     "You must follow the atlassian-python-api's Jira "
+                     "`issue_create` function's input format. For example,"
+                     " to create a low priority task called 'test issue' "
+                     "with description 'test description', you would pass "
+                     "in the following STRING dictionary: "
+                     "{'fields': {'project': {'key': 'project_key'}, "
+                     "'summary': 'test issue', 'description': 'test description', "
+                     "'issuetype': {'name': 'Task'}, 'priority': {'name': 'Major'}}}"))))
+    
+    
+JiraUpdateIssue = create_model(
+    "JiraUpdateIssueModel",
+    issue_json=(str, FieldInfo(
+        description=("JSON of body to update an issue for JIRA. "
+                        "You must follow the atlassian-python-api's Jira "
+                        "`update_issue` function's input format. For example,"
+                        " to update a task with "
+                        "key XXX-123 with new summary, description and custom field, "
+                        "you would pass in the following STRING dictionary: "
+                        "{'key': 'issue key', 'fields': {'summary': 'updated issue', "
+                        "'description': 'updated description', 'customfield_xxx': 'updated custom field'}}}")
+        ))
+)
+    
+AddCommentInput = create_model(
+    "AddCommentInputModel",
+    issue_key=(str, FieldInfo(description="The issue key of the Jira issue to which the comment is to be added, e.g. 'TEST-123'.")),
+    comment=(str, FieldInfo(description="The comment to be added to the Jira issue, e.g. 'This is a test comment.'"))
+)
 
 
 class JiraApiWrapper(BaseModel):
@@ -258,7 +278,7 @@ class JiraApiWrapper(BaseModel):
             {
                 "name": "list_projects",
                 "description": self.list_projects.__doc__,
-                "args_schema": BaseModel,
+                "args_schema": NoInput,
                 "ref": self.list_projects,
             },
 

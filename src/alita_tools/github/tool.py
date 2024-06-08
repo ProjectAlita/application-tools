@@ -1,7 +1,7 @@
 from typing import Optional, Type
 
 from langchain_core.callbacks import CallbackManagerForToolRun
-from langchain_core.pydantic_v1 import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 from langchain_core.tools import BaseTool
 from traceback import format_exc
 from .api_wrapper import AlitaGitHubAPIWrapper
@@ -12,8 +12,15 @@ class GitHubAction(BaseTool):
 
     api_wrapper: AlitaGitHubAPIWrapper = Field(default_factory=AlitaGitHubAPIWrapper)
     name: str
+    mode: str = ""
     description: str = ""
     args_schema: Optional[Type[BaseModel]] = None
+    
+    @validator('name', pre=True, allow_reuse=True)
+    def remove_spaces(cls, v):
+        repo = cls.api_wrapper.github_repository.split("/")[1]
+        cls.mode = v
+        return repo + "_" + v.replace(' ', '')
 
     def _run(
         self,
@@ -23,6 +30,6 @@ class GitHubAction(BaseTool):
     ) -> str:
         """Use the GitHub API to run an operation."""
         try:
-            return self.api_wrapper.run(self.name, *args, **kwargs)
+            return self.api_wrapper.run(self.mode, *args, **kwargs)
         except Exception as e:
             return f"Error: {format_exc()}"

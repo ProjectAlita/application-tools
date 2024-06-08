@@ -9,21 +9,23 @@ from langchain_community.document_loaders import ConfluenceLoader
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain_core.documents import Document
-from langchain_core.pydantic_v1 import root_validator, BaseModel, Field
+from langchain_core.pydantic_v1 import root_validator, BaseModel
 from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
-
+from pydantic import create_model
+from pydantic.fields import FieldInfo
 from src.alita_tools.llm.llm_utils import get_model, summarize
 
 
-class PrepareDataSchema(BaseModel):
-    jira_issue_key: str = Field(...,
-                                description="""The issue key of the Jira issue to which the comment is to be added, e.g. "TEST-123".""")
+PrepareDataSchema = create_model(
+    "PrepareDataSchema",
+    jira_issue_key=(str, FieldInfo(description="The issue key of the Jira issue to which the comment is to be added, e.g. 'TEST-123'.")),
+)
 
 
-class SearchDataSchema(BaseModel):
-    query: str = Field(...,
-                       description="The query to search in the data created from jira ticket. Usually it will be an AC")
-
+SearchDataSchema = create_model(
+    "SearchDataSchema",
+    query=(str, FieldInfo(description="The query to search in the data created from jira ticket. Usually it will be an AC")),
+)
 
 class AdvancedJiraMining(BaseModel):
     jira_base_url: str

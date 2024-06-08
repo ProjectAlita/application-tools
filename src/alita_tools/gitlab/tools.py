@@ -15,7 +15,8 @@ logger = logging.getLogger(__name__)
 
 branchInput = create_model(
         "BranchInput", 
-        branch_name=(str, FieldInfo(description="The name of the branch, e.g. `my_branch`.")))
+        branch_name=(str, 
+                     FieldInfo(description="The name of the branch, e.g. `my_branch`.")))
 
 class CreateGitLabBranchTool(BaseTool):
 
