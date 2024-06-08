@@ -2,34 +2,35 @@ from typing import List, Any
 from langchain_core.pydantic_v1 import root_validator, BaseModel, Field
 import json
 import logging
+from pydantic import create_model
+from pydantic.fields import FieldInfo
 
 from src.alita_tools.zephyr.Zephyr import Zephyr
 
 logger = logging.getLogger(__name__)
 
 
-class ZephyrGetTestSteps(BaseModel):
-    issue_id: int = Field(description="Jira ticket id for which test steps are required.")
-    project_id: int = Field(description="Jira project id which test case is belong to.")
+ZephyrGetTestSteps = create_model(
+    "ZephyrGetTestSteps",
+    issue_id=(int, FieldInfo(description="Jira ticket id for which test steps are required.")),
+    project_id=(int, FieldInfo(description="Jira project id which test case is belong to."))
+)
 
+ZephyrAddNewTestStep = create_model(
+    "ZephyrAddNewTestStep",
+    issue_id=(int, FieldInfo(description="Jira ticket id for which test steps are required.")),
+    project_id=(int, FieldInfo(description="Jira project id which test case is belong to.")),
+    step=(str, FieldInfo(description="Test step description with flow what should be done in this step. e.g. 'Click search button.'")),
+    data=(str, FieldInfo(description="Any test data which is used in this specific test. Can be empty if no specific data is used for the step. e.g. 'program languages: 'Java', 'Kotlin', 'Python'")),
+    result=(str, FieldInfo(description="Verification what should be checked after test step is executed. Can be empty if no specific verifications is needed for the step. e.g. 'Search results page is loaded'"))
+)
 
-class ZephyrAddNewTestStep(BaseModel):
-    issue_id: int = Field(description="Jira ticket id for which test steps are required.")
-    project_id: int = Field(description="Jira project id which test case is belong to.")
-    step: str = Field(
-        description="Test step description with flow what should be done in this step. e.g. 'Click search button.'")
-    data: str = Field(
-        description="Any test data which is used in this specific test. Can be empty if no specific data is used for the step. e.g. 'program languages: 'Java', 'Kotlin', 'Python'")
-    result: str = Field(
-        description="Verification what should be checked after test step is executed. Can be empty if no specific verifications is needed for the step. e.g. 'Search results page is loaded'")
-
-
-class ZephyrAddTestCase(BaseModel):
-    issue_id: int = Field(description="Jira ticket id for where test case should be created.")
-    project_id: int = Field(description="Jira project id which test case is belong to.")
-    steps_data: str = Field(
-        description="""JSON list of steps need to be added to Jira ticket in format { "steps":[ { "step":"click something", "data":"expected data", "result":"expected result" }, { "step":"click something2", "data":"expected data2", "result":"expected result" } ] }""")
-
+ZephyrAddTestCase = create_model(
+    "ZephyrAddTestCase",
+    issue_id=(int, FieldInfo(description="Jira ticket id for where test case should be created.")),
+    project_id=(int, FieldInfo(description="Jira project id which test case is belong to.")),
+    steps_data=(str, FieldInfo(description="""JSON list of steps need to be added to Jira ticket in format { "steps":[ { "step":"click something", "data":"expected data", "result":"expected result" }, { "step":"click something2", "data":"expected data2", "result":"expected result" } ] }"""))
+)
 
 class ZephyrV1ApiWrapper(BaseModel):
     base_url: str
