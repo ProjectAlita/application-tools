@@ -15,13 +15,15 @@ class AlitaGitHubToolkit(GitHubToolkit):
         github_api_wrapper = AlitaGitHubAPIWrapper(**kwargs)
         available_tools: List[Dict] = github_api_wrapper.get_available_tools()
         tools = []
+        repo = github_api_wrapper.github_repository.split("/")[1]
         for tool in available_tools:
             if selected_tools:
                 if tool["name"] not in selected_tools:
                     continue
             tools.append(GitHubAction(
                 api_wrapper=github_api_wrapper,
-                name=tool["name"],
+                name=repo + "_" + tool["name"],
+                mode=tool["mode"],
                 description=tool["description"],
                 args_schema=tool["args_schema"]
             ))

@@ -18,9 +18,7 @@ class GitHubAction(BaseTool):
     
     @validator('name', pre=True, allow_reuse=True)
     def remove_spaces(cls, v):
-        repo = cls.api_wrapper.github_repository.split("/")[1]
-        cls.mode = v
-        return repo + "_" + v.replace(' ', '')
+        return v.replace(' ', '')
 
     def _run(
         self,
