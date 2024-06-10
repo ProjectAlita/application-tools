@@ -3,11 +3,14 @@ from typing import Dict, List
 
 from .api_wrapper import AlitaGitHubAPIWrapper
 from .tool import GitHubAction
-from langchain_community.agent_toolkits.github.toolkit import GitHubToolkit
+from langchain_core.tools import BaseToolkit
+from langchain_core.tools import BaseTool
 from github.Consts import DEFAULT_BASE_URL
 
 
-class AlitaGitHubToolkit(GitHubToolkit):
+class AlitaGitHubToolkit(BaseToolkit):
+    tools: List[BaseTool] = []
+    
     @classmethod
     def get_toolkit(cls, selected_tools: list[str] | None = None, **kwargs):
         if selected_tools is None:
@@ -28,4 +31,6 @@ class AlitaGitHubToolkit(GitHubToolkit):
                 args_schema=tool["args_schema"]
             ))
         return cls(tools=tools)
- 
+    
+    def get_tools(self):
+        return self.tools
