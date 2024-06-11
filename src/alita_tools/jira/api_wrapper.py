@@ -31,8 +31,8 @@ JiraCreateIssue = create_model(
                      "{'fields': {'project': {'key': 'project_key'}, "
                      "'summary': 'test issue', 'description': 'test description', "
                      "'issuetype': {'name': 'Task'}, 'priority': {'name': 'Major'}}}"))))
-    
-    
+
+
 JiraUpdateIssue = create_model(
     "JiraUpdateIssueModel",
     issue_json=(str, FieldInfo(
@@ -46,11 +46,23 @@ JiraUpdateIssue = create_model(
                         "'description': 'updated description', 'customfield_xxx': 'updated custom field'}}}")
         ))
 )
-    
+
 AddCommentInput = create_model(
     "AddCommentInputModel",
     issue_key=(str, FieldInfo(description="The issue key of the Jira issue to which the comment is to be added, e.g. 'TEST-123'.")),
     comment=(str, FieldInfo(description="The comment to be added to the Jira issue, e.g. 'This is a test comment.'"))
+)
+
+SetIssueStatus = create_model(
+    "SetIssueStatusModel",
+    issue_key=(str, FieldInfo(
+        description="""The issue key of the Jira issue to which the comment is to be added, e.g. "TEST-123".""")),
+    status_name=(str, FieldInfo(description="""Jira issue status name, e.g. "Close", "In progress".""")),
+    mandatory_fields_json=(str, FieldInfo(description="""JSON of body containing mandatory fields required to be updated to change an issue's status.
+     If there are mandatory fields for the transition, these can be set using a dict in 'fields'.
+     For updating screen properties that cannot be set/updated via the fields properties,
+     they can set using a dict through 'update'.
+     """))
 )
 
 
@@ -163,6 +175,12 @@ class JiraApiWrapper(BaseModel):
         if params["fields"].get("project") is None:
             raise ToolException("Jira project key is required to create an issue. Ask user to provide it.")
 
+    def set_issue_status_validate(self, issue_key: str, status_name: str):
+        if issue_key is None:
+            raise ToolException("Jira project key is required to create an issue. Ask user to provide it.")
+        if status_name is None:
+            raise ToolException(f"Target status name is missing for {issue_key}")
+
     def update_issue_validate(self, params: Dict[str, Any]):
         if params.get("key") is None:
             raise ToolException("Jira issue key is required to update an issue. Ask user to provide it.")
@@ -196,6 +214,28 @@ class JiraApiWrapper(BaseModel):
         except ToolException as e:
             raise e
         except Exception as e:
+            stacktrace = format_exc()
+            logger.error(f"Error creating Jira issue: {stacktrace}")
+            raise ToolException(f"Error creating Jira issue: {stacktrace}")
+
+    def set_issue_status(self, issue_key: str, status_name: str, mandatory_fields_json: str):
+        """Set new status for the issue in Jira. Used to move ticket through the defined workflow."""
+        try:
+            print(f"Fields to be updated during the status change: {mandatory_fields_json}")
+            self.set_issue_status_validate(issue_key, status_name)
+            fields = json.loads(mandatory_fields_json)
+            # prepare field block
+            fields_data = dict(fields["update"]) if (fields.get("update")) is not None else None
+            # prepare update block
+            update = dict(fields["update"]) if (fields.get("update")) is not None else None
+            self.client.set_issue_status(issue_key=issue_key, status_name=status_name, fields=fields_data,
+                                                         update=update)
+            logger.info(f"issue is updated: {issue_key} with status {status_name}")
+            issue_url = f"{self.client.url}browse/{issue_key}"
+            return f"Done. Status for issue {issue_key} was updated successfully. You can view it at {issue_url}."
+        except ToolException as e:
+            raise e
+        except Exception:
             stacktrace = format_exc()
             logger.error(f"Error creating Jira issue: {stacktrace}")
             raise ToolException(f"Error creating Jira issue: {stacktrace}")
@@ -281,7 +321,12 @@ class JiraApiWrapper(BaseModel):
                 "args_schema": NoInput,
                 "ref": self.list_projects,
             },
-
+            {
+                "name": "set_issue_status",
+                "description": self.set_issue_status.__doc__,
+                "args_schema": SetIssueStatus,
+                "ref": self.set_issue_status,
+            }
         ]
 
     def run(self, mode: str, *args: Any, **kwargs: Any):
