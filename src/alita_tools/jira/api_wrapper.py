@@ -73,7 +73,7 @@ class JiraApiWrapper(BaseModel):
     token: Optional[str] = None
     cloud: Optional[bool] = True
     limit: Optional[int] = 5
-    additional_fields: Optional[list[str]] = []
+    additional_fields: list[str] | str | None = []
     verify_ssl: Optional[bool] = True
 
     @root_validator()
@@ -91,6 +91,9 @@ class JiraApiWrapper(BaseModel):
         username = values.get('username')
         token = values.get('token')
         cloud = values.get('cloud')
+        additional_fields = values.get('additional_fields')
+        if isinstance(additional_fields, str):
+            values['additional_fields'] = [i.strip() for i in additional_fields.split(',')]
         if token:
             values['client'] = Jira(url=url, token=token, cloud=cloud, verify_ssl=values['verify_ssl'])
         else:
