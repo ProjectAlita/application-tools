@@ -1,11 +1,11 @@
 from typing import List, Any
-from langchain_core.pydantic_v1 import root_validator, BaseModel, Field
+from langchain_core.pydantic_v1 import root_validator, BaseModel
 import json
 import logging
 from pydantic import create_model
 from pydantic.fields import FieldInfo
 
-from src.alita_tools.zephyr.Zephyr import Zephyr
+from .Zephyr import Zephyr
 
 logger = logging.getLogger(__name__)
 

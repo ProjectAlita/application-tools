@@ -3,8 +3,8 @@ from typing import List
 from langchain_community.agent_toolkits.base import BaseToolkit
 from langchain_core.tools import BaseTool
 
-from src.alita_tools.base.tool import BaseAction
-from src.alita_tools.zephyr.api_wrapper import ZephyrV1ApiWrapper
+from ..base.tool import BaseAction
+from .api_wrapper import ZephyrV1ApiWrapper
 
 
 class ZephyrToolkit(BaseToolkit):
