@@ -24,7 +24,7 @@ class ZephyrRestAPI(object):
     def __init__(
         self,
         base_url,
-        user_name,
+        username,
         password,
         timeout=75,
     ):
@@ -36,7 +36,7 @@ class ZephyrRestAPI(object):
         :param timeout: Request timeout. Defaults to 75.
         """
         self.base_url = base_url
-        self.user_name = user_name
+        self.username = username
         self.password = password
         self.timeout = int(timeout)
         self._create_token_session()
@@ -50,7 +50,7 @@ class ZephyrRestAPI(object):
     def _create_token_session(self):
         self.headers = {
             "Accept": "application/json",
-            "Authorization": 'Basic ' + base64.b64encode(f"{self.user_name}:{self.password}".encode('utf-8')).decode('utf-8')
+            "Authorization": 'Basic ' + base64.b64encode(f"{self.username}:{self.password}".encode('utf-8')).decode('utf-8')
             }
 
     def get_request_token(self, relative_path, http_method, jwt_expire_sec):

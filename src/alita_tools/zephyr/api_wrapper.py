@@ -40,10 +40,10 @@ class ZephyrV1ApiWrapper(BaseModel):
     @root_validator()
     def validate_toolkit(cls, values):
         base_url = values['base_url']
-        user_name = values['user_name']
+        username = values['username']
         password = values['password']
         values['client'] = Zephyr(base_url=base_url,
-                                  user_name=user_name,
+                                  username=username,
                                   password=password)
         return values
 
