@@ -34,7 +34,7 @@ ZephyrAddTestCase = create_model(
 
 class ZephyrV1ApiWrapper(BaseModel):
     base_url: str
-    user_name: str
+    username: str
     password: str
 
     @root_validator()
