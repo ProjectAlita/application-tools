@@ -1,6 +1,7 @@
 import os
 from json import dumps
 from typing import Dict, Any, Optional, List
+import tiktoken
 from pydantic import root_validator, create_model
 from pydantic.fields import FieldInfo
 from langchain.utils import get_from_dict_or_env
@@ -308,7 +309,55 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         Returns:
             str: A dictionary containing information about the pull request.
         """
-        return dumps(super().get_pull_request(int(pr_number)))
+        max_tokens = 2000
+        pull = self.github_repo_instance.get_pull(number=int(pr_number))
+        total_tokens = 0
+
+        def get_tokens(text: str) -> int:
+            return len(tiktoken.get_encoding("cl100k_base").encode(text))
+
+        def add_to_dict(data_dict: Dict[str, Any], key: str, value: str) -> None:
+            nonlocal total_tokens  # Declare total_tokens as nonlocal
+            tokens = get_tokens(value)
+            if total_tokens + tokens <= max_tokens:
+                data_dict[key] = value
+                total_tokens += tokens  # Now this will modify the outer variable
+
+        response_dict: Dict[str, str] = {}
+        add_to_dict(response_dict, "title", pull.title)
+        add_to_dict(response_dict, "number", str(pr_number))
+        add_to_dict(response_dict, "body", str(pull.body))
+
+        comments: List[str] = []
+        page = 0
+        while len(comments) <= 10:
+            comments_page = pull.get_issue_comments().get_page(page)
+            if len(comments_page) == 0:
+                break
+            for comment in comments_page:
+                comment_str = str({"body": comment.body, "user": comment.user.login})
+                if total_tokens + get_tokens(comment_str) > max_tokens:
+                    break
+                comments.append(comment_str)
+                total_tokens += get_tokens(comment_str)
+            page += 1
+        add_to_dict(response_dict, "comments", str(comments))
+
+        commits: List[str] = []
+        page = 0
+        while len(commits) <= 10:
+            commits_page = pull.get_commits().get_page(page)
+            if len(commits_page) == 0:
+                break
+            for commit in commits_page:
+                commit_str = str({"message": commit.commit.message})
+                if total_tokens + get_tokens(commit_str) > max_tokens:
+                    break
+                commits.append(commit_str)
+                total_tokens += get_tokens(commit_str)
+            page += 1
+        add_to_dict(response_dict, "commits", str(commits))
+        return dumps(response_dict)
 
     def list_pull_request_diffs(self, pr_number: str) -> str:
         """
