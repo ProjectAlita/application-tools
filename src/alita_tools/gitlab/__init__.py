@@ -1,10 +1,9 @@
 from typing import Dict, List
-from langchain_community.utilities.gitlab import GitLabAPIWrapper
-from langchain_community.agent_toolkits.gitlab.toolkit import GitLabToolkit, GitLabAction
+from .api_wrapper import GitLabAPIWrapper
 from .tools import __all__
-                    
+from langchain_core.tools import BaseToolkit
 
-class AlitaGitlabToolkit(GitLabToolkit):
+class AlitaGitlabToolkit(BaseToolkit):
     @classmethod
     def get_toolkit(cls, selected_tools: list[str] | None = None, **kwargs):
         if selected_tools is None:

@@ -1,2 +1,2 @@
 # application-tools
-Default set of tools available in ProjectAlita and CodeMie application interfaces
+Default set of tools available in ELITEA for Agents

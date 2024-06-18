@@ -2,16 +2,50 @@ import logging
 import traceback
 from typing import Type
 
-from langchain_core.pydantic_v1 import BaseModel, Field
-from langchain_community.utilities.gitlab import GitLabAPIWrapper
+from .api_wrapper import GitLabAPIWrapper
 from langchain_core.tools import BaseTool, ToolException
 from pydantic.fields import FieldInfo
-from pydantic import create_model
+from pydantic import create_model, BaseModel, Field
 from gitlab.exceptions import GitlabGetError
 
 from .utils import get_diff_w_position, get_position
 
 logger = logging.getLogger(__name__)
+
+UPDATE_FILE_PROMPT = """
+Updates the contents of a file in a GitHub repository. **VERY IMPORTANT**: Your input to this tool MUST strictly follow these rules:
+
+- First you must specify which file to modify by passing a full file path (**IMPORTANT**: the path must not start with a slash)
+- Then you must specify at lest 2 lines of the old contents which you would like to replace wrapped in OLD <<<< and >>>> OLD
+- Then you must specify the new contents which you would like to replace the old contents with wrapped in NEW <<<< and >>>> NEW
+- **VERY IMPORTANT**: NEW content may contain lines from OLD content in case you want to add content without removing the old content.
+
+Example 1: you would like to replace the contents of the file /test/test.txt from "old contents" to "new contents", you would pass in the following string:
+
+test/test.txt
+
+This is text that will not be changed
+OLD <<<<
+old contents
+>>>> OLD
+NEW <<<<
+new contents
+>>>> NEW
+
+Example 2: if you would like to add the contents of the file /test/test.txt where "existing contents" will be extended with "new contents", you would pass in the following string:
+
+test/test.txt
+
+This is text that will not be changed
+OLD <<<<
+existing contents
+>>>> OLD
+NEW <<<<
+existing contents
+new contents
+>>>> NEW
+
+"""
 
 branchInput = create_model(
         "BranchInput", 
@@ -47,9 +81,9 @@ class CreatePRTool(BaseTool):
 
     def _run(self, pr_title: str, pr_body: str, *args):
         try:
-            base_branch = self.api_wrapper.gitlab_base_branch
+            base_branch = self.api_wrapper.branch
             logger.info(f"Creating pull request with title: {pr_title}, body: {pr_body}, base_branch: {base_branch}")
-            return self.api_wrapper.create_pull_request(pr_title + "\n" + pr_body)
+            return self.api_wrapper.create_pull_request(pr_title, pr_body)
         except Exception as e:
             stacktrace = traceback.format_exc()
             logger.error(f"Unable to create PR: {stacktrace}")
@@ -90,7 +124,7 @@ class CreateFileTool(BaseTool):
 
     def _run(self, file_path: str, file_contents: str, *args):
         logger.info(f"Create file in the repository {file_path} with content: {file_contents}")
-        return self.api_wrapper.create_file(file_path + "\n " + file_contents)
+        return self.api_wrapper.create_file(file_path, file_contents)
 
 
 class SetActiveBranchTool(BaseTool):
@@ -140,7 +174,7 @@ class GetPullRequesChanges(BaseTool):
 
     def _run(self, pr_number: str, *args):
         try:
-            repo = self.api_wrapper.gitlab_repo_instance
+            repo = self.api_wrapper.repo_instance
             try:
                 mr = repo.mergerequests.get(pr_number)
             except GitlabGetError as e:
@@ -178,7 +212,7 @@ class CreatePullRequestChangeComment(BaseTool):
     handle_tool_error = True
 
     def _run(self, pr_number: str, file_path: str, line_number: int, comment: str, *args):
-        repo = self.api_wrapper.gitlab_repo_instance
+        repo = self.api_wrapper.repo_instance
         try:
             mr = repo.mergerequests.get(pr_number)
         except GitlabGetError as e:
@@ -193,13 +227,55 @@ class CreatePullRequestChangeComment(BaseTool):
             raise ToolException(f"An error occurred: {e}")
 
 
+
+class UpdateFileToolModel(BaseModel):
+    file_query: str = Field(description="Strictly follow the provided rules.")
+
+class UpdateFileTool(BaseTool):
+    api_wrapper: GitLabAPIWrapper = Field(default_factory=GitLabAPIWrapper)
+    name: str = "update_file"
+    description: str = UPDATE_FILE_PROMPT
+    args_schema: Type[BaseModel] = UpdateFileToolModel
+    handle_tool_error = True
+    
+    def _run(self, file_query: str, *args):
+        try:
+            return self.api_wrapper.update_file(file_query)
+        except Exception as e:
+            stacktrace = traceback.format_exc()
+            logger.error(f"Unable to update file: {stacktrace}")
+            raise ToolException(f"Unable to update file: {stacktrace}")
+
+class ReadFileTool(BaseTool):
+    api_wrapper: GitLabAPIWrapper = Field(default_factory=GitLabAPIWrapper)
+    name: str = "read_file"
+    description: str = """This tool is a wrapper for the GitLab API, useful when you need to read a file in a GitLab repository. 
+    Simply pass in the full
+    file path of the file you would like to read. **IMPORTANT**: the path must not start with a slash"""
+    args_schema: Type[BaseModel] = create_model(
+        "ReadFileInput", 
+        file_path=(str, FieldInfo(description="File path of file to be read. e.g. `src/agents/developer/tools/git/github_tools.py`. **IMPORTANT**: the path must not start with a slash")
+                   )
+    )
+    
+    def _run(self, file_path: str, *args):
+        try:
+            return self.api_wrapper.read_file(file_path)
+        except Exception as e:
+            stacktrace = traceback.format_exc()
+            logger.error(f"Unable to read file: {stacktrace}")
+            return f"Unable to read file: {stacktrace}"
+
+
 __all__ = [
     {"name": "create_branch", "tool": CreateGitLabBranchTool},
     {"name": "create_pull_request", "tool": CreatePRTool},
     {"name": "delete_file", "tool": DeleteFileTool},
     {"name": "create_file", "tool": CreateFileTool},
+    {"name": "update_file", "tool": UpdateFileTool},
     {"name": "set_active_branch", "tool": SetActiveBranchTool},
     {"name": "list_branches_in_repo", "tool": ListBranchesTool},
     {"name": "get_pr_changes", "tool": GetPullRequesChanges},
-    {"name": "create_pr_change_comment", "tool": CreatePullRequestChangeComment}
+    {"name": "create_pr_change_comment", "tool": CreatePullRequestChangeComment},
+    {"name": "read_file", "tool": ReadFileTool}
 ]
