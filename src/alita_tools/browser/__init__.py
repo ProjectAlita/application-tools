@@ -32,12 +32,15 @@ class BrowserToolkit(BaseToolkit):
             elif tool == 'get_html_content':
                 tools.append(GetHTMLContent())
             elif tool == 'google':
-                google_api_wrapper = GoogleSearchAPIWrapper(
-                    google_api_key=kwargs.get("google_api_key"),
-                    google_cse_id=kwargs.get("google_cse_id"),
-                )
-                tools.append(GoogleSearchResults(api_wrapper=google_api_wrapper))
-                tools.append(GoogleSearchRag(googleApiWrapper=google_api_wrapper))
+                try:
+                    google_api_wrapper = GoogleSearchAPIWrapper(
+                        google_api_key=kwargs.get("google_api_key"),
+                        google_cse_id=kwargs.get("google_cse_id"),
+                    )
+                    tools.append(GoogleSearchResults(api_wrapper=google_api_wrapper))
+                    tools.append(GoogleSearchRag(googleApiWrapper=google_api_wrapper))
+                except Exception as e:
+                    print(f"Google API Wrapper failed to initialize: {e}")
             elif tool == 'wiki':
                 tools.append(WikipediaQueryRun(api_wrapper=WikipediaAPIWrapper()))
         return cls(tools=tools)

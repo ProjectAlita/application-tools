@@ -99,7 +99,7 @@ class ConfluenceAPIWrapper(BaseModel):
             content += [page.page_content for page in self.get_pages_by_id([page["id"] for page in pages])]
             start += self.limit
         return "\n".join(content)
-    
+
     
     def is_public_page(self, page: dict) -> bool:
         """Check if a page is publicly accessible."""
@@ -265,18 +265,18 @@ class ConfluenceAPIWrapper(BaseModel):
     
     def get_available_tools(self):
         return [
-            {
-                "name": "create_page",
-                "ref": self.create_page,
-                "description": self.create_page.__doc__,
-                "args_schema": createPage,
-            },
-            {
-                "name": "page_exists",
-                "ref": self.page_exists,
-                "description": self.page_exists.__doc__,
-                "args_schema": pageExists,
-            },
+            # {
+            #     "name": "create_page",
+            #     "ref": self.create_page,
+            #     "description": self.create_page.__doc__,
+            #     "args_schema": createPage,
+            # },
+            # {
+            #     "name": "page_exists",
+            #     "ref": self.page_exists,
+            #     "description": self.page_exists.__doc__,
+            #     "args_schema": pageExists,
+            # },
             {
                 "name": "get_pages_with_label",
                 "ref": self.get_pages_with_label,
