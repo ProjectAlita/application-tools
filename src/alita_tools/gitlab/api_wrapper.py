@@ -20,7 +20,7 @@ class GitLabAPIWrapper(BaseModel):
     url: str = ''
     repository: str = ''
     """The name of the GitLab repository, in the form {username}/{repo-name}."""
-    personal_access_token: str = None
+    private_token: str = None
     """Personal access token for the GitLab service, used for authentication."""
     branch: Optional[str] = 'main'
     """The specific branch in the GitLab repository where the bot will make 
@@ -42,7 +42,7 @@ class GitLabAPIWrapper(BaseModel):
 
         g = gitlab.Gitlab(
             url=values['url'],
-            private_token=values['personal_access_token'],
+            private_token=values['private_token'],
             keep_base_url=True,
         )
 
