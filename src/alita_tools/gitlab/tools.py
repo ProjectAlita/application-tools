@@ -59,7 +59,7 @@ class CreateGitLabBranchTool(BaseTool):
     description: str = """This tool is a wrapper for the GitLab API to create a new branch in the repository."""
     args_schema: Type[BaseModel] = branchInput
 
-    def _run(self, branch_name: str, *args):
+    def _run(self, branch_name: str):
         try:
             logger.info(f"Creating branch {branch_name} in the repository.")
             return self.api_wrapper.create_branch(branch_name)
@@ -79,7 +79,7 @@ class CreatePRTool(BaseTool):
         pr_title=(str, FieldInfo(description="Title of pull request. Maybe generated from made changes in the branch.")),
         pr_body=(str, FieldInfo(description="Body or description of the pull request of made changes.")))
 
-    def _run(self, pr_title: str, pr_body: str, *args):
+    def _run(self, pr_title: str, pr_body: str):
         try:
             base_branch = self.api_wrapper.branch
             logger.info(f"Creating pull request with title: {pr_title}, body: {pr_body}, base_branch: {base_branch}")
@@ -100,7 +100,7 @@ class DeleteFileTool(BaseTool):
         file_path=(str, FieldInfo(description="File path of file to be deleted. e.g. `src/agents/developer/tools/git/github_tools.py`. **IMPORTANT**: the path must not start with a slash")
                    ))
 
-    def _run(self, file_path: str, *args):
+    def _run(self, file_path: str):
         try:
             return self.api_wrapper.delete_file(file_path)
         except Exception as e:
@@ -122,7 +122,7 @@ class CreateFileTool(BaseTool):
     You MUST NOT ignore, skip or comment any details, PROVIDE FULL CONTENT including all content based on all best practices.
     """)))
 
-    def _run(self, file_path: str, file_contents: str, *args):
+    def _run(self, file_path: str, file_contents: str):
         logger.info(f"Create file in the repository {file_path} with content: {file_contents}")
         return self.api_wrapper.create_file(file_path, file_contents)
 
@@ -134,7 +134,7 @@ class SetActiveBranchTool(BaseTool):
     This tool is a wrapper for the Git API and set the active branch in the repository, similar to `git checkout <branch_name>` and `git switch -c <branch_name>`."""
     args_schema: Type[BaseModel] = branchInput
 
-    def _run(self, branch_name: str, *args):
+    def _run(self, branch_name: str):
         try:
             logger.info(f"Set active branch {branch_name} in the repository.")
             return self.api_wrapper.set_active_branch(branch_name=branch_name)
@@ -152,7 +152,7 @@ class ListBranchesTool(BaseTool):
     It will return the name of each branch. No input parameters are required."""
     args_schema: Type[BaseModel] = None
 
-    def _run(self, *args):
+    def _run(self):
         try:
             logger.debug(f"List branches in the repository.")
             return self.api_wrapper.list_branches_in_repo()
@@ -172,7 +172,7 @@ class GetPullRequesChanges(BaseTool):
         pr_number=(str, FieldInfo(description="GitLab Merge Request (Pull Request) number")))
     handle_tool_error = True
 
-    def _run(self, pr_number: str, *args):
+    def _run(self, pr_number: str):
         try:
             repo = self.api_wrapper.repo_instance
             try:
@@ -238,7 +238,7 @@ class UpdateFileTool(BaseTool):
     args_schema: Type[BaseModel] = UpdateFileToolModel
     handle_tool_error = True
     
-    def _run(self, file_query: str, *args):
+    def _run(self, file_query: str):
         try:
             return self.api_wrapper.update_file(file_query)
         except Exception as e:
@@ -258,7 +258,7 @@ class ReadFileTool(BaseTool):
                    )
     )
     
-    def _run(self, file_path: str, *args):
+    def _run(self, file_path: str):
         try:
             return self.api_wrapper.read_file(file_path)
         except Exception as e:
