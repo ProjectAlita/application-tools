@@ -2,8 +2,8 @@ from typing import List
 
 from langchain_core.tools import BaseToolkit, BaseTool
 
-from src.alita_tools.advanced_jira_mining.advanced_jira_mining import AdvancedJiraMining
-from src.alita_tools.base.tool import BaseAction
+from .advanced_jira_mining import AdvancedJiraMining
+from ..base.tool import BaseAction
 
 
 class AdvancedJiraMiningToolkit(BaseToolkit):
