@@ -137,7 +137,7 @@ class SetActiveBranchTool(BaseTool):
     def _run(self, branch_name: str):
         try:
             logger.info(f"Set active branch {branch_name} in the repository.")
-            return self.api_wrapper.set_active_branch(branch_name=branch_name)
+            return self.api_wrapper.set_active_branch(branch=branch_name)
         except Exception as e:
             stacktrace = traceback.format_exc()
             logger.error(f"Unable to set active branch: {stacktrace}")
