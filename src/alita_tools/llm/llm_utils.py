@@ -12,7 +12,7 @@ def get_model(model_type: str, model_params: dict):
         return get_llm(model_type)(**model_params)
     elif model_type == "Alita":
         try:
-            from src.alita_sdk.llms.alita import AlitaChatModel
+            from alita_sdk.llms.alita import AlitaChatModel
         except ImportError:
             raise RuntimeError("Alita model not found")
         return AlitaChatModel(**model_params)
