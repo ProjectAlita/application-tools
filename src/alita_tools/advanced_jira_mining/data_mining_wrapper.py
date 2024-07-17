@@ -13,26 +13,27 @@ from langchain_core.pydantic_v1 import root_validator, BaseModel
 from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
 from pydantic import create_model
 from pydantic.fields import FieldInfo
-from src.alita_tools.llm.llm_utils import get_model, summarize
-
+from ..llm.llm_utils import get_model, summarize
 
 PrepareDataSchema = create_model(
     "PrepareDataSchema",
-    jira_issue_key=(str, FieldInfo(description="The issue key of the Jira issue to which the comment is to be added, e.g. 'TEST-123'.")),
+    jira_issue_key=(str, FieldInfo(
+        description="The issue key of the Jira issue to which the comment is to be added, e.g. 'TEST-123'.")),
 )
-
 
 SearchDataSchema = create_model(
     "SearchDataSchema",
-    query=(str, FieldInfo(description="The query to search in the data created from jira ticket. Usually it will be an AC")),
+    query=(
+    str, FieldInfo(description="The query to search in the data created from jira ticket. Usually it will be an AC")),
 )
 
-class AdvancedJiraMining(BaseModel):
+
+class AdvancedJiraMiningWrapper(BaseModel):
     jira_base_url: str
     confluence_base_url: str
     llm_settings: dict
     model_type: str
-    __vectorstore = None
+    vectorstore: Optional[Any] = None
     summarization_prompt: Optional[str] = None
     jira_api_key: Optional[str] = None,
     jira_username: Optional[str] = None
@@ -51,6 +52,8 @@ class AdvancedJiraMining(BaseModel):
             )
 
         url = values['jira_base_url']
+        model_type = values['model_type']
+        llm_settings = values['llm_settings']
         api_key = values.get('jira_api_key')
         username = values.get('jira_username')
         token = values.get('jira_token')
@@ -60,7 +63,7 @@ class AdvancedJiraMining(BaseModel):
         else:
             values['client'] = Jira(url=url, username=username, password=api_key, cloud=is_cloud,
                                     verify_ssl=values['verify_ssl'])
-        values['llm'] = get_model(cls.model_type, cls.llm_settings)
+        values['llm'] = get_model(model_type, llm_settings)
         return values
 
     def __zip_directory(self, folder_path, output_path):
@@ -161,7 +164,7 @@ class AdvancedJiraMining(BaseModel):
         confluence_loader = ConfluenceLoader(
             page_ids=page_ids,
             url=self.confluence_base_url,
-            api_key=self.jira_token,
+            api_key=self.jira_api_key,
             username=self.jira_username,
             limit=100,
             keep_markdown_format=True,
@@ -260,8 +263,8 @@ class AdvancedJiraMining(BaseModel):
     def prepare_data(self, jira_issue_key: str) -> str:
         """ Prepare the embeddings for the specific jira issue key. They will include both Jira and Confluence info. """
         embedding_function = HuggingFaceEmbeddings(encode_kwargs={'normalize_embeddings': True})
-        persistent_path = 'jira_ticket_embeddings'
-        zip_file_name = 'jira_ticket_embeddings.zip'
+        persistent_path = f'jira_ticket_embeddings_{jira_issue_key}'
+        zip_file_name = f'jira_ticket_embeddings_{jira_issue_key}.zip'
         if self.__get_attachment_id(jira_issue_key, zip_file_name) is not None and not os.path.exists(persistent_path):
             self.__download_attachment_by_id(jira_issue_key, zip_file_name)
         if os.path.exists(persistent_path):
@@ -283,17 +286,17 @@ class AdvancedJiraMining(BaseModel):
             vectorstore.add_documents(result_confluence_docs)
             vectorstore.add_documents(related_description_list)
             vectorstore.persist()
-            self.__zip_directory('jira_ticket_embeddings', zip_file_name)
+            self.__zip_directory(persistent_path, zip_file_name)
             self.__attach_file_to_jira_issue(jira_issue_key, zip_file_name)
-            os.remove('jira_ticket_embeddings.zip')
-        self.__vectorstore = vectorstore
+            os.remove(zip_file_name)
+        self.vectorstore = vectorstore
         return f'Successfully created embeddings for the jira ticket with following id - {jira_issue_key}'
 
     def search_data(self, query: str) -> str:
         """ Search the specific jira ticket data with the given query. Usually query will be a simple AC from the same ticket """
-        vectorstore = self.__vectorstore
+        vectorstore = self.vectorstore
         output = ''
-        retrieved_docs = vectorstore.search(query, 'mmr', k=20)
+        retrieved_docs = vectorstore.search(query, 'mmr', k=20, fetch_k=50)
         for doc in retrieved_docs:
             output += f'\n\n{doc.page_content}'
         return output
