@@ -1,14 +1,15 @@
 import re
+import requests
 from langchain_community.document_loaders import AsyncChromiumLoader
 from langchain_community.document_transformers import BeautifulSoupTransformer
 from langchain.text_splitter import CharacterTextSplitter
+import fitz
 
 from langchain_chroma import Chroma
 
 from langchain_community.embeddings.sentence_transformer import (
     SentenceTransformerEmbeddings,
 )
-from json import dumps
 
 # retrieves pages and extracts text by tag
 def get_page(urls, html_only=False):
@@ -41,3 +42,23 @@ def webRag(urls, max_response_size, query):
             break
     return text
 
+
+def getPDFContent(url):
+    response = requests.get(url)
+    # Check if the request was successful
+    if response.status_code == 200:
+        # Open the PDF from the bytes in memory
+        pdf = fitz.open(stream=response.content, filetype="pdf")
+        text_content = ''
+        # Extract text from each page
+        for page_num in range(len(pdf)):
+            page = pdf[page_num]
+            text_content += page.get_text()
+        
+        # Close the PDF after extracting text
+        pdf.close()
+        
+        return text_content
+    else:
+        print(f"Failed to download PDF. Status code: {response.status_code}")
+        return None

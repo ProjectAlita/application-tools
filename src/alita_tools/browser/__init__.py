@@ -7,7 +7,7 @@ from langchain_core.tools import BaseTool
 from langchain_community.utilities.google_search import GoogleSearchAPIWrapper
 from langchain_community.utilities.wikipedia import WikipediaAPIWrapper
 from .google_search_rag import GoogleSearchRag, GoogleSearchResults
-from .crawler import SingleURLCrawler, MultiURLCrawler, GetHTMLContent
+from .crawler import SingleURLCrawler, MultiURLCrawler, GetHTMLContent, GetPDFContent
 from .wiki import WikipediaQueryRun
 
 class BrowserToolkit(BaseToolkit):
@@ -31,6 +31,8 @@ class BrowserToolkit(BaseToolkit):
                 tools.append(MultiURLCrawler())
             elif tool == 'get_html_content':
                 tools.append(GetHTMLContent())
+            elif tool == 'get_pdf_content':
+                tools.append(GetPDFContent())
             elif tool == 'google':
                 try:
                     google_api_wrapper = GoogleSearchAPIWrapper(

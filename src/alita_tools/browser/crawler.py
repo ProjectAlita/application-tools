@@ -4,7 +4,7 @@ from pydantic import create_model, BaseModel
 from pydantic.fields import FieldInfo
 from json import loads
 
-from .utils import get_page, webRag
+from .utils import get_page, webRag, getPDFContent
 
 class SingleURLCrawler(BaseAction):
     max_response_size: int = 3000
@@ -44,3 +44,11 @@ class GetHTMLContent(BaseAction):
     
     def _run(self, url: str, run_manager=None):
         return get_page([url], html_only=True)
+
+class GetPDFContent(BaseAction):
+    name: str = "get_pdf_content"
+    description: str = "Get PDF content of the page"
+    args_schema: Type[BaseModel] = create_model("GetPDFContentModel", 
+                               url=(str, FieldInfo(description="URL to get PDF content")))
+    def _run(self, url: str, run_manager=None):
+        return getPDFContent(url)
