@@ -367,12 +367,3 @@ class LocalGit(BaseModel):
                 return tool["ref"](*args, **kwargs)
         else:
             raise ValueError(f"Unknown mode: {name}")
-
-
-if __name__ == '__main__':
-    local_git = LocalGit(repo_path='moatless-tools', base_path='c:\\Test', is_existing_repo=False,
-                         repo_url='https://github.com/aorwall/moatless-tools.git', commit_sha=None)
-    local_git.checkout_commit('ac520b146fe3eaa2edbfaedb827f591320911cb0')
-    local_git.commit_changes("Commit me")
-    diff = local_git.get_diff()
-    print(diff)
