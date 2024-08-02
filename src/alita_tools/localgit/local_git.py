@@ -111,12 +111,16 @@ class LocalGit(BaseModel):
         repo_path = values['repo_path']
         base_path = values['base_path']
         repo_url = values.get('repo_url')
+        commit_sha = values.get('commit_sha')
         os.makedirs(base_path, exist_ok=True)
         full_repo_path = os.path.join(base_path, repo_path)
         if not os.path.exists(full_repo_path) and repo_url:
-            values['repo'] = Repo.clone_from(url=repo_url, to_path=str(full_repo_path))
+            repo = Repo.clone_from(url=repo_url, to_path=str(full_repo_path))
         else:
-            values['repo'] = Repo(path=str(full_repo_path))
+            repo = Repo(path=str(full_repo_path))
+        if commit_sha:
+            repo.head.reset(commit=commit_sha, working_tree=True)
+        values['repo'] = repo
         return values
 
     def extract_old_new_pairs(self, file_query):
@@ -172,6 +176,7 @@ class LocalGit(BaseModel):
         return paired_contents
 
     def checkout_commit(self, commit_sha: str) -> str:
+        """ Checkout specific commit from repository """
         try:
             self.repo.head.reset(commit=commit_sha, working_tree=True)
             return 'Successfully checked out commit {}'.format(commit_sha)
@@ -182,6 +187,7 @@ class LocalGit(BaseModel):
             return 'Unable to checkout commit - {}'.format(commit_sha)
 
     def get_diff(self) -> str:
+        """ Show difference of the file for which changes have been made"""
         output = subprocess.run(
             ["git", "diff"], cwd=self.repo.working_dir, check=True, text=True, capture_output=True
         )
@@ -189,6 +195,7 @@ class LocalGit(BaseModel):
         return output.stdout
 
     def delete_file(self, file_path: str) -> str:
+        """ Delete file from the repository by its path """
         if os.path.exists(file_path) and os.path.isfile(file_path):
             os.remove(file_path)
             return 'Successfully deleted file {}'.format(file_path)
@@ -196,6 +203,7 @@ class LocalGit(BaseModel):
             return f"File '{file_path}' cannot be deleted because it does not exist"
 
     def create_file(self, file_path: str, file_content: str) -> str:
+        """ Create file in repository by specific path and content """
         if os.path.exists(file_path) and os.path.isfile(file_path):
             return f"File - '{file_path}' already exists"
         else:
@@ -205,14 +213,17 @@ class LocalGit(BaseModel):
         return 'Successfully created file {} with content - {}'.format(file_path, file_content)
 
     def commit_changes(self, commit_message: str) -> str:
+        """ Commit changes to the repo """
         self.repo.index.commit(commit_message)
         return f'Successfully committed changes with the commit message - {commit_message}'
 
     def checkout_branch(self, branch_name: str) -> str:
+        """ Checkout specific branch of repository """
         self.repo.git.checkout(branch_name)
         return 'Successfully checked out branch {}'.format(branch_name)
 
     def read_file(self, file_path: str) -> str:
+        """ Read file from repository """
         if os.path.exists(file_path) and os.path.isfile(file_path):
             with open(file_path, 'r') as f:
                 return f.read()
@@ -221,6 +232,7 @@ class LocalGit(BaseModel):
 
     def update_file_content_by_lines(self, file_path: str, start_line_index: int, end_line_index: int,
                                      new_content: str) -> str:
+        """ Update file content by lines """
         # Validate line numbers
         if start_line_index < 1 or end_line_index < start_line_index:
             raise ToolException(
@@ -261,23 +273,7 @@ class LocalGit(BaseModel):
             return f"Unable to update file '{file_path}' with content: {new_content}"
 
     def update_file(self, file_query: str) -> str:
-        """
-        Updates a file with new content.
-        Parameters:
-            file_query(str): Contains the file path and the file contents.
-                The old file contents is wrapped in OLD <<<< and >>>> OLD
-                The new file contents is wrapped in NEW <<<< and >>>> NEW
-                For example:
-                /test/hello.txt
-                OLD <<<<
-                Hello Earth!
-                >>>> OLD
-                NEW <<<<
-                Hello Mars!
-                >>>> NEW
-        Returns:
-            A success or failure message
-        """
+        """ Updates a file with new content. """
         try:
 
             file_path: str = file_query.split("\n")[0]
@@ -301,6 +297,7 @@ class LocalGit(BaseModel):
             return "Updated file " + str(file_path)
         except Exception as e:
             return "Unable to update file due to error:\n" + str(e)
+
     def get_available_tools(self):
         return [
             {
