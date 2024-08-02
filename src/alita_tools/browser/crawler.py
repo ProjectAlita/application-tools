@@ -51,4 +51,7 @@ class GetPDFContent(BaseAction):
     args_schema: Type[BaseModel] = create_model("GetPDFContentModel", 
                                url=(str, FieldInfo(description="URL to get PDF content")))
     def _run(self, url: str, run_manager=None):
-        return getPDFContent(url)
+        try:
+            return getPDFContent(url)
+        except Exception as e:
+            return get_page([url], html_only=True)
