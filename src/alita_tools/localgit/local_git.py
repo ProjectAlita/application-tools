@@ -188,11 +188,7 @@ class LocalGit(BaseModel):
 
     def get_diff(self) -> str:
         """ Show difference of the file for which changes have been made"""
-        output = subprocess.run(
-            ["git", "diff"], cwd=self.repo.working_dir, check=True, text=True, capture_output=True
-        )
-
-        return output.stdout
+        return self.repo.git.diff(None)
 
     def delete_file(self, file_path: str) -> str:
         """ Delete file from the repository by its path """

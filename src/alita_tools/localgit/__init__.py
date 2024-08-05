@@ -16,7 +16,7 @@ class AlitaLocalGitToolkit(BaseToolkit):
         local_git_tool = LocalGit(**kwargs)
         available_tools: List[Dict] = local_git_tool.get_available_tools()
         tools = []
-        repo = local_git_tool.repo_path.split("/")[1]
+        repo = local_git_tool.repo_path
         for tool in available_tools:
             if selected_tools:
                 if tool["name"] not in selected_tools:
