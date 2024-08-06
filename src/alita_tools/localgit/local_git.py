@@ -1,12 +1,10 @@
+import glob
 import logging
 import os
-import subprocess
 from traceback import format_exc
 from typing import Any
 
-from git import Repo, Diff
-from langchain_community.tools.github.prompt import CREATE_BRANCH_PROMPT, GET_ISSUES_PROMPT, DELETE_FILE_PROMPT, \
-    READ_FILE_PROMPT
+from git import Repo
 from langchain_core.pydantic_v1 import root_validator, BaseModel, create_model
 from langchain_core.tools import ToolException
 from pydantic.fields import FieldInfo
@@ -110,7 +108,7 @@ class LocalGit(BaseModel):
     base_path: str
     repo_url: str = None
     commit_sha: str = None
-    full_repo_path: str = None
+    path_pattern: str = '**/*.py'
 
     @root_validator()
     def validate_toolkit(cls, values):
@@ -119,11 +117,11 @@ class LocalGit(BaseModel):
         repo_url = values.get('repo_url')
         commit_sha = values.get('commit_sha')
         os.makedirs(base_path, exist_ok=True)
-        values['full_repo_path'] = os.path.join(base_path, repo_path)
-        if not os.path.exists(values['full_repo_path']) and repo_url:
-            repo = Repo.clone_from(url=repo_url, to_path=str(values['full_repo_path']))
+        full_repo_path = os.path.join(base_path, repo_path)
+        if not os.path.exists(full_repo_path) and repo_url:
+            repo = Repo.clone_from(url=repo_url, to_path=str(full_repo_path))
         else:
-            repo = Repo(path=str(values['full_repo_path']))
+            repo = Repo(path=str(full_repo_path))
         if commit_sha:
             repo.head.reset(commit=commit_sha, working_tree=True)
         values['repo'] = repo
@@ -198,7 +196,7 @@ class LocalGit(BaseModel):
 
     def delete_file(self, file_path: str) -> str:
         """ Delete file from the repository by its path """
-        file_path = os.path.join(self.full_repo_path, file_path)
+        file_path = os.path.join(self.repo.working_dir, file_path)
         if os.path.exists(file_path) and os.path.isfile(file_path):
             os.remove(file_path)
             return 'Successfully deleted file {}'.format(file_path)
@@ -207,7 +205,7 @@ class LocalGit(BaseModel):
 
     def create_file(self, file_path: str, file_content: str) -> str:
         """ Create file in repository by specific path and content """
-        file_path = os.path.join(self.full_repo_path, file_path)
+        file_path = os.path.join(self.repo.working_dir, file_path)
         if os.path.exists(file_path) and os.path.isfile(file_path):
             return f"File - '{file_path}' already exists"
         else:
@@ -228,7 +226,7 @@ class LocalGit(BaseModel):
 
     def read_file(self, file_path: str) -> str:
         """ Read file from repository """
-        file_path = os.path.join(self.full_repo_path, file_path)
+        file_path = os.path.join(self.repo.working_dir, file_path)
         if os.path.exists(file_path) and os.path.isfile(file_path):
             with open(file_path, 'r') as f:
                 return f.read()
@@ -245,7 +243,7 @@ class LocalGit(BaseModel):
 
         try:
             # Read the file into a list of lines
-            file_path = os.path.join(self.full_repo_path, file_path)
+            file_path = os.path.join(self.repo.working_dir, file_path)
             with open(file_path, 'r') as file:
                 lines = file.readlines()
 
@@ -278,20 +276,41 @@ class LocalGit(BaseModel):
             logger.error(f"Error updating file '{file_path}': {e}")
             return f"Unable to update file '{file_path}' with content: {new_content}"
 
+    def __dict_to_indented_string(self, data: dict, indent=0):
+        """ Convert a nested dictionary to an indented string """
+        result = []
+        for key, value in data.items():
+            result.append('  ' * indent + str(key))
+            if isinstance(value, dict):
+                result.append(self.__dict_to_indented_string(value, indent + 1))
+        return '\n'.join(result)
+
     def list_files(self) -> str:
-        """ List all files in the repository """
-        return "\n".join([file for file in os.listdir(self.full_repo_path) if os.path.isfile(os.path.join(self.full_repo_path, file))])
+        """ List all files in the repository and return an YAML like object representing the directory structure """
+        file_tree = {}
+
+        for file in glob.iglob(self.path_pattern, root_dir=self.repo.working_dir, recursive=True):
+            if "test" not in file:
+                parts = file.split(os.sep)
+                current_level = file_tree
+                for part in parts[:-1]:
+                    if part not in current_level:
+                        current_level[part] = {}
+                    current_level = current_level[part]
+                current_level[parts[-1]] = None
+
+        return self.__dict_to_indented_string(file_tree)
     
     def get_files_in_folder(self, folder_path: str) -> str:
         """ List all files in the repository """
-        folder_path = os.path.join(self.full_repo_path, folder_path)
+        folder_path = os.path.join(self.repo.working_dir, folder_path)
         return "\n".join([file for file in os.listdir(folder_path) if os.path.isfile(os.path.join(folder_path, file))])
 
     def update_file(self, file_query: str) -> str:
         """ Updates a file with new content. """
         try:
             file_path: str = file_query.split("\n")[0]
-            file_path = os.path.join(self.full_repo_path, file_path)
+            file_path = os.path.join(self.repo.working_dir, file_path)
             file_content = self.read_file(file_path)
             updated_file_content = file_content
             for old, new in self.extract_old_new_pairs(file_query):
@@ -374,7 +393,7 @@ class LocalGit(BaseModel):
                 "ref": self.list_files,
                 "name": "list_files",
                 "mode": "list_files",
-                "description": "This tool lists all files in the repository. No input needed.",
+                "description": "This tool lists all files in the repository. No input needed. The output of the tool is an YAML like representation of directory structure.",
                 "args_schema": NoInput,
             },
             {
