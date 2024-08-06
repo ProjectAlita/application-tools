@@ -4,7 +4,7 @@ from alita_tools.base.tool import BaseAction
 from langchain_core.tools import BaseToolkit, BaseTool
 
 from .local_git import LocalGit
-
+from .tool import LocalGitAction
 
 class AlitaLocalGitToolkit(BaseToolkit):
     tools: List[BaseTool] = []
@@ -21,7 +21,7 @@ class AlitaLocalGitToolkit(BaseToolkit):
             if selected_tools:
                 if tool["name"] not in selected_tools:
                     continue
-            tools.append(BaseAction(
+            tools.append(LocalGitAction(
                 api_wrapper=local_git_tool,
                 name=repo + "_" + tool["name"],
                 mode=tool["mode"],

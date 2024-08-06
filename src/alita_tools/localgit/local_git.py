@@ -85,6 +85,11 @@ ReadFile = create_model(
     file_path=(str, FieldInfo(description="File path e.g test/inventory.py to read content from"))
 )
 
+FolderFiles = create_model(
+    "FolderFiles",
+    folder_path=(str, FieldInfo(description="Folder path e.g test/ to list files from"))
+)
+
 UpdateFileContentByLines = create_model(
     "UpdateFileCommitByLines",
     file_path=(str, FieldInfo(description="File path e.g test/inventory.py to update in")),
@@ -105,6 +110,7 @@ class LocalGit(BaseModel):
     base_path: str
     repo_url: str = None
     commit_sha: str = None
+    full_repo_path: str = None
 
     @root_validator()
     def validate_toolkit(cls, values):
@@ -113,11 +119,11 @@ class LocalGit(BaseModel):
         repo_url = values.get('repo_url')
         commit_sha = values.get('commit_sha')
         os.makedirs(base_path, exist_ok=True)
-        full_repo_path = os.path.join(base_path, repo_path)
-        if not os.path.exists(full_repo_path) and repo_url:
-            repo = Repo.clone_from(url=repo_url, to_path=str(full_repo_path))
+        values['full_repo_path'] = os.path.join(base_path, repo_path)
+        if not os.path.exists(values['full_repo_path']) and repo_url:
+            repo = Repo.clone_from(url=repo_url, to_path=str(values['full_repo_path']))
         else:
-            repo = Repo(path=str(full_repo_path))
+            repo = Repo(path=str(values['full_repo_path']))
         if commit_sha:
             repo.head.reset(commit=commit_sha, working_tree=True)
         values['repo'] = repo
@@ -192,6 +198,7 @@ class LocalGit(BaseModel):
 
     def delete_file(self, file_path: str) -> str:
         """ Delete file from the repository by its path """
+        file_path = os.path.join(self.full_repo_path, file_path)
         if os.path.exists(file_path) and os.path.isfile(file_path):
             os.remove(file_path)
             return 'Successfully deleted file {}'.format(file_path)
@@ -200,6 +207,7 @@ class LocalGit(BaseModel):
 
     def create_file(self, file_path: str, file_content: str) -> str:
         """ Create file in repository by specific path and content """
+        file_path = os.path.join(self.full_repo_path, file_path)
         if os.path.exists(file_path) and os.path.isfile(file_path):
             return f"File - '{file_path}' already exists"
         else:
@@ -220,6 +228,7 @@ class LocalGit(BaseModel):
 
     def read_file(self, file_path: str) -> str:
         """ Read file from repository """
+        file_path = os.path.join(self.full_repo_path, file_path)
         if os.path.exists(file_path) and os.path.isfile(file_path):
             with open(file_path, 'r') as f:
                 return f.read()
@@ -236,6 +245,7 @@ class LocalGit(BaseModel):
 
         try:
             # Read the file into a list of lines
+            file_path = os.path.join(self.full_repo_path, file_path)
             with open(file_path, 'r') as file:
                 lines = file.readlines()
 
@@ -268,12 +278,20 @@ class LocalGit(BaseModel):
             logger.error(f"Error updating file '{file_path}': {e}")
             return f"Unable to update file '{file_path}' with content: {new_content}"
 
+    def list_files(self) -> str:
+        """ List all files in the repository """
+        return "\n".join([file for file in os.listdir(self.full_repo_path) if os.path.isfile(os.path.join(self.full_repo_path, file))])
+    
+    def get_files_in_folder(self, folder_path: str) -> str:
+        """ List all files in the repository """
+        folder_path = os.path.join(self.full_repo_path, folder_path)
+        return "\n".join([file for file in os.listdir(folder_path) if os.path.isfile(os.path.join(folder_path, file))])
+
     def update_file(self, file_query: str) -> str:
         """ Updates a file with new content. """
         try:
-
             file_path: str = file_query.split("\n")[0]
-
+            file_path = os.path.join(self.full_repo_path, file_path)
             file_content = self.read_file(file_path)
             updated_file_content = file_content
             for old, new in self.extract_old_new_pairs(file_query):
@@ -351,7 +369,28 @@ class LocalGit(BaseModel):
                 "mode": "update_file_content_by_lines",
                 "description": "This tool is designed to do content update by start and en indexes in the file. Following parameters should be passed to the tool: full file path where content should be changed, start line index - the index from where update should start, end line index - the line index where update will end, new conten which should be placed into the file.",
                 "args_schema": UpdateFileContentByLines,
-            }
+            },
+            {
+                "ref": self.list_files,
+                "name": "list_files",
+                "mode": "list_files",
+                "description": "This tool lists all files in the repository. No input needed.",
+                "args_schema": NoInput,
+            },
+            {
+                "ref": self.get_files_in_folder,
+                "name": "get_files_in_folder",
+                "mode": "get_files_in_folder",
+                "description": "This tool lists all files in the folder. You should pass the path to the folder.",
+                "args_schema": FolderFiles,
+            },
+            {
+                "ref": self.commit_changes,
+                "name": "commit_changes",
+                "mode": "commit_changes",
+                "description": "This tool is designed to commit changes to the repository. You should provide a descriptive commit message to the tool.",
+                "args_schema": CommitChanges,
+            },
         ]
 
     def run(self, name: str, *args: Any, **kwargs: Any):
