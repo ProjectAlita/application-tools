@@ -1,5 +1,5 @@
 import logging
-from typing import List, Any
+from typing import List, Any, Optional
 from langchain_core.pydantic_v1 import root_validator, BaseModel
 from pydantic import create_model
 from pydantic.fields import FieldInfo
@@ -24,12 +24,14 @@ SendEmail = create_model(
 class YagmailWrapper(BaseModel):
     username: str
     password: str
+    host: Optional[str] = "smtp.gmail.com"
 
     @root_validator()
     def validate_toolkit(cls, values):
         username = values['username']
         password = values['password']
-        values['client'] = yagmail.SMTP(user=username, password=password)
+        host = values.get("host")
+        values['client'] = yagmail.SMTP(user=username, password=password, host=host)
         return values
 
     def send_gmail_message(self, receiver: str, message: str, subject: str, cc=None):
