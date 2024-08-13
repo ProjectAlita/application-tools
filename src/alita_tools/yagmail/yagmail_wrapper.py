@@ -8,6 +8,8 @@ import yagmail
 logger = logging.getLogger(__name__)
 
 
+SMTP_SERVER = "smtp.gmail.com"
+
 NoInput = create_model(
     "NoInput"
 )
@@ -24,7 +26,7 @@ SendEmail = create_model(
 class YagmailWrapper(BaseModel):
     username: str
     password: str
-    host: Optional[str] = "smtp.gmail.com"
+    host: Optional[str] = SMTP_SERVER
 
     @root_validator()
     def validate_toolkit(cls, values):
