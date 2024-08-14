@@ -6,6 +6,14 @@ from langchain_core.tools import BaseTool
 from ..base.tool import BaseAction
 from .api_wrapper import ZephyrV1ApiWrapper
 
+name = "zephyr"
+
+def get_tools(tool):
+    return ZephyrToolkit().get_toolkit(
+        selected_tools=tool['settings'].get('selected_tools', []),
+        base_url=tool['settings']['base_url'],
+        user_name=tool['settings']['user_name'],
+        password=tool['settings']['password']).get_tools()
 
 class ZephyrToolkit(BaseToolkit):
     tools: List[BaseTool] = []

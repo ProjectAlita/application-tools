@@ -7,6 +7,18 @@ from langchain_core.tools import BaseToolkit
 from langchain_core.tools import BaseTool
 from github.Consts import DEFAULT_BASE_URL
 
+name = "github"
+
+def get_tools(tool):
+    return AlitaGitHubToolkit().get_toolkit(
+        selected_tools=tool['settings'].get('selected_tools', []),
+        github_repository=tool['settings']['repository'],
+        active_branch=tool['settings']['active_branch'],
+        github_base_branch=tool['settings']['base_branch'],
+        github_access_token=tool['settings'].get('access_token', ''),
+        github_username=tool['settings'].get('username', ''),
+        github_password=tool['settings'].get('password', '')
+    ).get_tools()
 
 class AlitaGitHubToolkit(BaseToolkit):
     tools: List[BaseTool] = []

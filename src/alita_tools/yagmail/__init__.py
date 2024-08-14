@@ -3,8 +3,19 @@ from typing import List
 from langchain_core.tools import BaseToolkit
 from langchain_core.tools import BaseTool
 
-from .yagmail_wrapper import YagmailWrapper
+from .yagmail_wrapper import YagmailWrapper, SMTP_SERVER
 from ..base.tool import BaseAction
+
+name = "yagmail"
+
+def get_tools(tool):
+    return AlitaYagmailToolkit().get_toolkit(
+        selected_tools=tool['settings'].get('selected_tools', []),
+        host=tool['settings'].get('host', SMTP_SERVER),
+        username=tool['settings'].get('username'),
+        password=tool['settings'].get("password")
+    ).get_tools()
+
 
 class AlitaYagmailToolkit(BaseToolkit):
     tools: List[BaseTool] = []

@@ -4,6 +4,17 @@ from .tools import __all__
 from langchain_core.tools import BaseToolkit
 from langchain_core.tools import BaseTool
 
+name = "gitlab"
+
+def get_tools(tool):
+    return AlitaGitlabToolkit().get_toolkit(
+        selected_tools=tool['settings'].get('selected_tools', []),
+        url=tool['settings']['url'],
+        repository=tool['settings']['repository'],
+        branch=tool['settings']['branch'],
+        private_token=tool['settings']['private_token']
+    ).get_tools()
+
 class AlitaGitlabToolkit(BaseToolkit):
     tools: List[BaseTool] = []
     

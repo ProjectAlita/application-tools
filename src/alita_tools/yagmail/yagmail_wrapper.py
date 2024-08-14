@@ -22,7 +22,6 @@ SendEmail = create_model(
     cc=(List[str], FieldInfo(description="Persons who you are going to share a copy of email to."))
 )
 
-
 class YagmailWrapper(BaseModel):
     username: str
     password: str
