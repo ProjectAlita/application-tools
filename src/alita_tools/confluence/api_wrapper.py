@@ -20,6 +20,13 @@ createPage = create_model(
     "createPage",
     title=(str, FieldInfo(description="Title of the page")),
     body=(str, FieldInfo(description="Body of the page")),
+    parent_id=(str, FieldInfo(description="Page parent id (optional)", default=None)),
+)
+
+createPages = create_model(
+    "createPages",
+    pages_info=(dict, FieldInfo(description="Content in key-value format: Title=Body")),
+    parent_id=(str, FieldInfo(description="Page parent id (optional)", default=None)),
 )
 
 pageExists = create_model(
@@ -31,7 +38,7 @@ getPagesWithLabel = create_model(
     "getPagesWithLabel",
     label=(str, FieldInfo(description="Label of the pages")),
 )
-   
+
 searchPages = create_model(
     "searchPages",
     query=(str, FieldInfo(description="Query text to search pages")),
@@ -56,7 +63,7 @@ class ConfluenceAPIWrapper(BaseModel):
     keep_markdown_format: Optional[bool] = True
     ocr_languages: Optional[str] = None
     keep_newlines: Optional[bool] = True
-    
+
     @root_validator()
     def validate_toolkit(cls, values):
         try:
@@ -66,7 +73,7 @@ class ConfluenceAPIWrapper(BaseModel):
                 "`atlassian` package not found, please run "
                 "`pip install atlassian-python-api`"
             )
-        
+
         url = values['base_url']
         api_key = values.get('api_key')
         username = values.get('username')
@@ -77,12 +84,24 @@ class ConfluenceAPIWrapper(BaseModel):
         else:
             values['client'] = Confluence(url=url,username=username, password=api_key, cloud=cloud)
         return values
-    
-    def create_page(self, title: str, body: str):
+
+    def create_page(self, title: str, body: str, parent_id: str = None):
         """ Creates a page in the Confluence space."""
-        status = self.client.create_page(space=self.space, title=title, body=body)
-        return status
-    
+        # normal user flow: put pages in the Space Home, not in the root of the Space
+        parent_id_filled = parent_id if parent_id else self.client.get_space(self.space)['homepage']['id']
+        status = self.client.create_page(space=self.space, title=title, body=body, parent_id=parent_id_filled)
+        logger.info(f"Page created: {status['_links']['base'] + status['_links']['webui']}")
+        return f"The page '{title}' was created under the parent page '{parent_id}': '{status['_links']['base'] + status['_links']['webui']}'. \nDetails: {str(status)}"
+
+    def create_pages(self, pages_info: dict, parent_id: str = None):
+        """ Creates a batch of pages in the Confluence space."""
+        statuses = []
+        parent_id_filled = parent_id if parent_id else self.client.get_space(self.space)['homepage']['id']
+        for title, body in pages_info.items():
+            status = self.create_page(title, body, parent_id_filled)
+            statuses.append(status)
+        return statuses
+
     def page_exists(self, title: str):
         """ Checks if a page exists in the Confluence space."""
         status = self.client.page_exists(space=self.space, title=title)
@@ -265,12 +284,18 @@ class ConfluenceAPIWrapper(BaseModel):
     
     def get_available_tools(self):
         return [
-            # {
-            #     "name": "create_page",
-            #     "ref": self.create_page,
-            #     "description": self.create_page.__doc__,
-            #     "args_schema": createPage,
-            # },
+            {
+                "name": "create_page",
+                "ref": self.create_page,
+                "description": self.create_page.__doc__,
+                "args_schema": createPage,
+            },
+            {
+                "name": "create_pages",
+                "ref": self.create_pages,
+                "description": self.create_pages.__doc__,
+                "args_schema": createPages,
+            },
             # {
             #     "name": "page_exists",
             #     "ref": self.page_exists,
