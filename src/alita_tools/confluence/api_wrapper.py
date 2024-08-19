@@ -29,6 +29,11 @@ createPages = create_model(
     parent_id=(str, FieldInfo(description="Page parent id (optional)", default=None)),
 )
 
+getPageTree = create_model(
+    "getPageTree",
+    page_id=(str, FieldInfo(description="Page id")),
+)
+
 pageExists = create_model(
     "pageExists",
     title=(str, FieldInfo(description="Title of the page")),
@@ -101,6 +106,33 @@ class ConfluenceAPIWrapper(BaseModel):
             status = self.create_page(title, body, parent_id_filled)
             statuses.append(status)
         return statuses
+
+    def get_page_tree(self, page_id: str):
+        """ Gets page tree for the Confluence space """
+        descendant_pages = self.get_all_descendants(page_id)  # Pass None as the parent for the root
+        for page in descendant_pages:
+            logger.info(f"Page ID: {page['id']}, Title: {page['title']}, Parent ID: {page['parent_id']}")
+        descendants = {page['id']: (page['title'], page['parent_id']) for page in descendant_pages}
+        return f"The list of pages under the '{page_id}' was extracted: {descendants}"
+
+    def get_all_descendants(self, page_id: str):
+        """ Recursively gets all descendant pages of a given page. """
+        descendants = []
+        limit = 100
+        start = 0
+
+        while True:
+            children = self.client.get_page_child_by_type(page_id, type='page', start=start, limit=limit)
+            if not children:
+                break
+            for child in children:
+                # parent_id = self.client.get_parent_content_id(f"{child['id']}")
+                child_info = {'id': child['id'], 'title': child['title'], 'parent_id': page_id}
+                descendants.append(child_info)
+                descendants.extend(self.get_all_descendants(child['id']))
+            start += limit
+
+        return descendants
 
     def page_exists(self, title: str):
         """ Checks if a page exists in the Confluence space."""
@@ -295,6 +327,12 @@ class ConfluenceAPIWrapper(BaseModel):
                 "ref": self.create_pages,
                 "description": self.create_pages.__doc__,
                 "args_schema": createPages,
+            },
+            {
+                "name": "get_page_tree",
+                "ref": self.get_page_tree,
+                "description": self.get_page_tree.__doc__,
+                "args_schema": getPageTree,
             },
             # {
             #     "name": "page_exists",
