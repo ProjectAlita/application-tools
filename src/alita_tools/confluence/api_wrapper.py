@@ -97,7 +97,14 @@ class ConfluenceAPIWrapper(BaseModel):
         parent_id_filled = parent_id if parent_id else self.client.get_space(self.space)['homepage']['id']
         status = self.client.create_page(space=self.space, title=title, body=body, parent_id=parent_id_filled, representation=representation)
         logger.info(f"Page created: {status['_links']['base'] + status['_links']['webui']}")
-        return f"The page '{title}' was created under the parent page '{parent_id}': '{status['_links']['base'] + status['_links']['webui']}'. \nDetails: {str(status)}"
+        page_details = {
+            'title': status['title'],
+            'id': status['id'],
+            'space key': status['space']['key'],
+            'author': status['version']['by']['displayName'],
+            'link': status['_links']['base'] + status['_links']['webui']
+        }
+        return f"The page '{title}' was created under the parent page '{parent_id_filled}': '{status['_links']['base'] + status['_links']['webui']}'. \nDetails: {str(page_details)}"
 
     def create_pages(self, pages_info: dict, parent_id: str = None):
         """ Creates a batch of pages in the Confluence space."""
