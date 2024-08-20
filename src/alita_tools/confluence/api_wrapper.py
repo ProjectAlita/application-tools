@@ -20,6 +20,19 @@ createPage = create_model(
     "createPage",
     title=(str, FieldInfo(description="Title of the page")),
     body=(str, FieldInfo(description="Body of the page")),
+    parent_id=(str, FieldInfo(description="Page parent id (optional)", default=None)),
+    representation=(str, FieldInfo(description="Content representation format: storage for html, wiki for markdown", default='storage')),
+)
+
+createPages = create_model(
+    "createPages",
+    pages_info=(dict, FieldInfo(description="Content in key-value format: Title=Body")),
+    parent_id=(str, FieldInfo(description="Page parent id (optional)", default=None)),
+)
+
+getPageTree = create_model(
+    "getPageTree",
+    page_id=(str, FieldInfo(description="Page id")),
 )
 
 pageExists = create_model(
@@ -31,7 +44,7 @@ getPagesWithLabel = create_model(
     "getPagesWithLabel",
     label=(str, FieldInfo(description="Label of the pages")),
 )
-   
+
 searchPages = create_model(
     "searchPages",
     query=(str, FieldInfo(description="Query text to search pages")),
@@ -56,7 +69,7 @@ class ConfluenceAPIWrapper(BaseModel):
     keep_markdown_format: Optional[bool] = True
     ocr_languages: Optional[str] = None
     keep_newlines: Optional[bool] = True
-    
+
     @root_validator()
     def validate_toolkit(cls, values):
         try:
@@ -66,7 +79,7 @@ class ConfluenceAPIWrapper(BaseModel):
                 "`atlassian` package not found, please run "
                 "`pip install atlassian-python-api`"
             )
-        
+
         url = values['base_url']
         api_key = values.get('api_key')
         username = values.get('username')
@@ -77,12 +90,58 @@ class ConfluenceAPIWrapper(BaseModel):
         else:
             values['client'] = Confluence(url=url,username=username, password=api_key, cloud=cloud)
         return values
-    
-    def create_page(self, title: str, body: str):
-        """ Creates a page in the Confluence space."""
-        status = self.client.create_page(space=self.space, title=title, body=body)
-        return status
-    
+
+    def create_page(self, title: str, body: str, parent_id: str = None, representation: str = 'storage'):
+        """ Creates a page in the Confluence space. Represents content in html (storage) or wiki (wiki) formats """
+        # normal user flow: put pages in the Space Home, not in the root of the Space
+        parent_id_filled = parent_id if parent_id else self.client.get_space(self.space)['homepage']['id']
+        status = self.client.create_page(space=self.space, title=title, body=body, parent_id=parent_id_filled, representation=representation)
+        logger.info(f"Page created: {status['_links']['base'] + status['_links']['webui']}")
+        page_details = {
+            'title': status['title'],
+            'id': status['id'],
+            'space key': status['space']['key'],
+            'author': status['version']['by']['displayName'],
+            'link': status['_links']['base'] + status['_links']['webui']
+        }
+        return f"The page '{title}' was created under the parent page '{parent_id_filled}': '{status['_links']['base'] + status['_links']['webui']}'. \nDetails: {str(page_details)}"
+
+    def create_pages(self, pages_info: dict, parent_id: str = None):
+        """ Creates a batch of pages in the Confluence space."""
+        statuses = []
+        # duplicate action to avoid extra api calls in downstream function
+        parent_id_filled = parent_id if parent_id else self.client.get_space(self.space)['homepage']['id']
+        for title, body in pages_info.items():
+            status = self.create_page(title, body, parent_id_filled)
+            statuses.append(status)
+        return statuses
+
+    def get_page_tree(self, page_id: str):
+        """ Gets page tree for the Confluence space """
+        descendant_pages = self.get_all_descendants(page_id)  # Pass None as the parent for the root
+        for page in descendant_pages:
+            logger.info(f"Page ID: {page['id']}, Title: {page['title']}, Parent ID: {page['parent_id']}")
+        descendants = {page['id']: (page['title'], page['parent_id']) for page in descendant_pages}
+        return f"The list of pages under the '{page_id}' was extracted: {descendants}"
+
+    def get_all_descendants(self, page_id: str):
+        """ Recursively gets all descendant pages of a given page. """
+        descendants = []
+        limit = 100
+        start = 0
+
+        while True:
+            children = self.client.get_page_child_by_type(page_id, type='page', start=start, limit=limit)
+            if not children:
+                break
+            for child in children:
+                child_info = {'id': child['id'], 'title': child['title'], 'parent_id': page_id}
+                descendants.append(child_info)
+                descendants.extend(self.get_all_descendants(child['id']))
+            start += limit
+
+        return descendants
+
     def page_exists(self, title: str):
         """ Checks if a page exists in the Confluence space."""
         status = self.client.page_exists(space=self.space, title=title)
@@ -265,12 +324,24 @@ class ConfluenceAPIWrapper(BaseModel):
     
     def get_available_tools(self):
         return [
-            # {
-            #     "name": "create_page",
-            #     "ref": self.create_page,
-            #     "description": self.create_page.__doc__,
-            #     "args_schema": createPage,
-            # },
+            {
+                "name": "create_page",
+                "ref": self.create_page,
+                "description": self.create_page.__doc__,
+                "args_schema": createPage,
+            },
+            {
+                "name": "create_pages",
+                "ref": self.create_pages,
+                "description": self.create_pages.__doc__,
+                "args_schema": createPages,
+            },
+            {
+                "name": "get_page_tree",
+                "ref": self.get_page_tree,
+                "description": self.get_page_tree.__doc__,
+                "args_schema": getPageTree,
+            },
             # {
             #     "name": "page_exists",
             #     "ref": self.page_exists,
