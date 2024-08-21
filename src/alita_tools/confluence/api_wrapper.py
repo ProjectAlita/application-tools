@@ -30,6 +30,12 @@ createPages = create_model(
     parent_id=(str, FieldInfo(description="Page parent id (optional)", default=None)),
 )
 
+deletePage = create_model(
+    "deletePage",
+    page_id=(str, FieldInfo(description="Page id")),
+    recursive=(bool, FieldInfo(description="Recursive: if True - will recursively delete all children pages too", default=False))
+)
+
 getPageTree = create_model(
     "getPageTree",
     page_id=(str, FieldInfo(description="Page id")),
@@ -115,6 +121,12 @@ class ConfluenceAPIWrapper(BaseModel):
             status = self.create_page(title, body, parent_id_filled)
             statuses.append(status)
         return statuses
+
+    def delete_page(self, page_id, recursive=False):
+        """Deletes a page by its defined page_id and considering recursive flag: child entities will be removed as well if it is True"""
+        logger.info(f"Remove page '{page_id}', recursively: {recursive}")
+        self.client.remove_page(page_id=page_id, recursive=recursive)
+        return f"Page with page_id: '{page_id}' was removed."
 
     def get_page_tree(self, page_id: str):
         """ Gets page tree for the Confluence space """
@@ -359,6 +371,12 @@ class ConfluenceAPIWrapper(BaseModel):
                 "ref": self.search_pages,
                 "description": self.search_pages.__doc__,
                 "args_schema": searchPages,
+            },
+            {
+                "name": "delete_page",
+                "ref": self.delete_page,
+                "description": self.delete_page.__doc__,
+                "args_schema": deletePage,
             }
         ]
     
