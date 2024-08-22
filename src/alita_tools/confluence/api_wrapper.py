@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 createPage = create_model(
     "createPage",
+    space=(str, FieldInfo(description="Confluence space that is used for page's creation", default=None)),
     title=(str, FieldInfo(description="Title of the page")),
     body=(str, FieldInfo(description="Body of the page")),
     parent_id=(str, FieldInfo(description="Page parent id (optional)", default=None)),
@@ -26,6 +27,7 @@ createPage = create_model(
 
 createPages = create_model(
     "createPages",
+    space=(str, FieldInfo(description="Confluence space that is used for pages creation", default=None)),
     pages_info=(dict, FieldInfo(description="Content in key-value format: Title=Body")),
     parent_id=(str, FieldInfo(description="Page parent id (optional)", default=None)),
 )
@@ -97,11 +99,13 @@ class ConfluenceAPIWrapper(BaseModel):
             values['client'] = Confluence(url=url,username=username, password=api_key, cloud=cloud)
         return values
 
-    def create_page(self, title: str, body: str, parent_id: str = None, representation: str = 'storage'):
+    def create_page(self, title: str, body: str, space: str = None, parent_id: str = None, representation: str = 'storage'):
         """ Creates a page in the Confluence space. Represents content in html (storage) or wiki (wiki) formats """
         # normal user flow: put pages in the Space Home, not in the root of the Space
-        parent_id_filled = parent_id if parent_id else self.client.get_space(self.space)['homepage']['id']
-        status = self.client.create_page(space=self.space, title=title, body=body, parent_id=parent_id_filled, representation=representation)
+        user_space = space if space else self.space
+        # logger.info(f"Page will be created within the space ${user_space}")
+        parent_id_filled = parent_id if parent_id else self.client.get_space(user_space)['homepage']['id']
+        status = self.client.create_page(space=user_space, title=title, body=body, parent_id=parent_id_filled, representation=representation)
         logger.info(f"Page created: {status['_links']['base'] + status['_links']['webui']}")
         page_details = {
             'title': status['title'],
@@ -112,13 +116,15 @@ class ConfluenceAPIWrapper(BaseModel):
         }
         return f"The page '{title}' was created under the parent page '{parent_id_filled}': '{status['_links']['base'] + status['_links']['webui']}'. \nDetails: {str(page_details)}"
 
-    def create_pages(self, pages_info: dict, parent_id: str = None):
+    def create_pages(self, pages_info: dict, space: str = None, parent_id: str = None):
         """ Creates a batch of pages in the Confluence space."""
         statuses = []
+        user_space = space if space else self.space
+        logger.info(f"Pages will be created within the space ${user_space}")
         # duplicate action to avoid extra api calls in downstream function
-        parent_id_filled = parent_id if parent_id else self.client.get_space(self.space)['homepage']['id']
+        parent_id_filled = parent_id if parent_id else self.client.get_space(user_space)['homepage']['id']
         for title, body in pages_info.items():
-            status = self.create_page(title, body, parent_id_filled)
+            status = self.create_page(title=title, body=body, parent_id=parent_id_filled, space=user_space)
             statuses.append(status)
         return statuses
 
