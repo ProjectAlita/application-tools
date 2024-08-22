@@ -11,6 +11,7 @@ def get_tools(tool):
     return ConfluenceToolkit().get_toolkit(
             selected_tools=tool['settings'].get('selected_tools', []),
             base_url=tool['settings']['base_url'],
+            space=tool['settings'].get('space', None),
             cloud=tool['settings'].get('cloud', True),
             api_key=tool['settings'].get('api_key', None),
             username=tool['settings'].get('username', None),
