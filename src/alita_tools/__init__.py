@@ -8,6 +8,7 @@ from .confluence import get_tools as get_confluence
 from .gitlab import get_tools as get_gitlab
 from .zephyr import get_tools as get_zephyr
 from .browser import get_tools as get_browser
+from .report_portal import get_tools as get_report_portal
 
 from .yagmail import get_tools as get_yagmail
 
@@ -32,6 +33,8 @@ def get_tools(tools_list, *args, **kwargs):
             tools.extend(get_browser(tool))
         elif tool['type'] == 'yagmail':
             tools.extend(get_yagmail(tool))
+        elif tool['type'] == 'report_portal':
+            tools.extend(get_report_portal(tool))
         else:
             if tool.get("settings", {}).get("module"):
                 try:
