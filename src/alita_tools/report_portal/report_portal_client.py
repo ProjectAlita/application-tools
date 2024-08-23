@@ -60,13 +60,6 @@ class RPClient():
 
         return response.json()
 
-    def get_defects_statistics(self, launch_id: str):
-        url = f"{self.endpoint}/api/v1/{self.project}/launch/{launch_id}/statistics"
-        response = requests.request("GET", url, headers=self.headers)
-        response.raise_for_status()
-
-        return response.json()
-
     def get_user_information(self, username: str):
         url = f"{self.endpoint}/api/v1/user/{username}"
         response = requests.request("GET", url, headers=self.headers)
@@ -76,13 +69,6 @@ class RPClient():
 
     def get_dashboard_data(self, dashboard_id: str):
         url = f"{self.endpoint}/api/v1/{self.project}/dashboard/{dashboard_id}"
-        response = requests.request("GET", url, headers=self.headers)
-        response.raise_for_status()
-
-        return response.json()
-
-    def get_dashboard_widgets(self, dashboard_id: str):
-        url = f"{self.endpoint}/api/v1/{self.project}/dashboard/{dashboard_id}/widgets"
         response = requests.request("GET", url, headers=self.headers)
         response.raise_for_status()
 

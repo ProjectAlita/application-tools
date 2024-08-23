@@ -39,10 +39,6 @@ GetLogsForTestItem = create_model(
     item_id=(str, FieldInfo(description="Item ID of the item to get logs for.")),
     page_number=PageNumberField,
 )
-GetDefectStatistics = create_model(
-    "GetDefectStatisticsModel",
-    launch_id=(str, FieldInfo(description="Launch ID of the launch to get defect statistics for.")),
-)
 GetUserInformation = create_model(
     "GetUserInformationModel",
     username=(str, FieldInfo(description="Username of the user to get information for.")),
@@ -50,10 +46,6 @@ GetUserInformation = create_model(
 GetDashboardData = create_model(
     "GetDashboardDataModel",
     dashboard_id=(str, FieldInfo(description="Dashboard ID of the dashboard to get data for.")),
-)
-GetDashboardWidgets = create_model(
-    "GetDashboardWidgetsModel",
-    dashboard_id=(str, FieldInfo(description="Dashboard ID of the dashboard to get widgets for.")),
 )
 
 
@@ -139,14 +131,6 @@ class ReportPortalApiWrapper(BaseModel):
         """
         return self.client.get_logs_for_test_items(item_id, page_number)
 
-    def get_defects_statistics(self, launch_id: str) -> dict:
-        """
-        Use defect statistics to provide a quality overview to stakeholders.
-        It can identify the most common defect types, predict potential high-risk areas in the application,
-        and suggest targeted testing strategies to mitigate these risks.
-        """
-        return self.client.get_defects_statistics(launch_id)
-
     def get_user_information(self, username: str) -> dict:
         """
         Use user information to personalize dashboards and reports. It can also analyze user activity to optimize
@@ -161,14 +145,6 @@ class ReportPortalApiWrapper(BaseModel):
         It can also provide predictive analytics for future test planning.
         """
         return self.client.get_dashboard_data(dashboard_id)
-
-    def get_dashboard_widgets(self, dashboard_id: str) -> list[dict]:
-        """
-        Analyze the widgets on a dashboard to provide in-depth analytical reports.
-        It can combine data from multiple widgets to offer a multidimensional view of the testing landscape,
-        including test pass rates, defect trends, and environment stability.
-        """
-        return self.client.get_dashboard_widgets(dashboard_id)
 
     def get_available_tools(self):
         return [
@@ -209,12 +185,6 @@ class ReportPortalApiWrapper(BaseModel):
                 "ref": self.get_logs_for_test_items,
             },
             {
-                "name": "get_defects_statistics",
-                "description": self.get_defects_statistics.__doc__,
-                "args_schema": GetDefectStatistics,
-                "ref": self.get_defects_statistics,
-            },
-            {
                 "name": "get_user_information",
                 "description": self.get_user_information.__doc__,
                 "args_schema": GetUserInformation,
@@ -225,12 +195,6 @@ class ReportPortalApiWrapper(BaseModel):
                 "description": self.get_dashboard_data.__doc__,
                 "args_schema": GetDashboardData,
                 "ref": self.get_dashboard_data,
-            },
-            {
-                "name": "get_dashboard_widgets",
-                "description": self.get_dashboard_widgets.__doc__,
-                "args_schema": GetDashboardWidgets,
-                "ref": self.get_dashboard_widgets,
             }
         ]
 
