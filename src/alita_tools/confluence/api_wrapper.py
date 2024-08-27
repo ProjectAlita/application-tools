@@ -28,7 +28,6 @@ createPage = create_model(
 
 updatePage = create_model(
     "updatePage",
-    # space=(str, FieldInfo(description="Confluence space that is used for page's creation", default=None)),
     page_id=(str, FieldInfo(description="Page id", default=None)),
     new_body=(str, FieldInfo(description="New page content")),
     representation=(str, FieldInfo(description="Content representation format: storage for html, wiki for markdown", default='storage')),
@@ -152,18 +151,12 @@ class ConfluenceAPIWrapper(BaseModel):
     def delete_page(self, page_id: str = None, page_title: str = None):
         """ Deletes a page by its defined page_id or page_title """
         try:
-            if page_id:
-                self.client.remove_page(page_id)
-                message = f"Page with ID '{page_id}' has been successfully deleted."
-            elif page_title:
-                page = self.client.get_page_by_title(space=self.space, title=page_title)
-                if page:
-                    self.client.remove_page(page['id'])
-                    message = f"Page '{page_title}' has been successfully deleted."
-                else:
-                    message = f"Page '{page_title}' was not found."
+            resolved_page_id = page_id if page_id else self.client.get_page_by_title(space=self.space, title=page_title)['id']
+            if resolved_page_id:
+                self.client.remove_page(resolved_page_id)
+                message = f"Page with ID '{resolved_page_id}' has been successfully deleted."
             else:
-                message = f"Failed to delete page: page_id '{page_id}', page_title '{page_title}' "
+                message = f"Page instance could not be resolved with id '{page_id}' and/or title '{page_title}'"
         except Exception as e:
             message = f"Failed to delete page: {e}"
         return message
@@ -175,10 +168,15 @@ class ConfluenceAPIWrapper(BaseModel):
             if not current_page:
                 return f"Page with ID {page_id} not found."
 
+            current_version = current_page['version']['number']
+            next_version = current_version + 1
+
             title_to_use = new_title if new_title is not None else current_page['title']
 
             status = self.client.update_page(page_id=page_id, title=title_to_use, body=new_body, representation=representation)
             logger.info(f"Page updated: {status['_links']['base'] + status['_links']['webui']}")
+            diff_link = f"{status['_links']['base']}/pages/diffpagesbyversion.action?pageId={page_id}&selectedPageVersions={current_version}&selectedPageVersions={next_version}"
+            logger.info(f"Link to diff: {diff_link}")
 
             update_details = {
                 'title': status['title'],
@@ -186,7 +184,8 @@ class ConfluenceAPIWrapper(BaseModel):
                 'space key': status['space']['key'],
                 'author': status['version']['by']['displayName'],
                 'link': status['_links']['base'] + status['_links']['webui'],
-                'version': current_page['version']['number'] + 1
+                'version': next_version,
+                'diff': diff_link
             }
 
             if new_labels is not None:
