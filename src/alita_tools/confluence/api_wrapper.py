@@ -23,6 +23,16 @@ createPage = create_model(
     body=(str, FieldInfo(description="Body of the page")),
     parent_id=(str, FieldInfo(description="Page parent id (optional)", default=None)),
     representation=(str, FieldInfo(description="Content representation format: storage for html, wiki for markdown", default='storage')),
+    label=(str, FieldInfo(description="Page label (optional)", default=None)),
+)
+
+updatePage = create_model(
+    "updatePage",
+    page_id=(str, FieldInfo(description="Page id", default=None)),
+    new_body=(str, FieldInfo(description="New page content")),
+    representation=(str, FieldInfo(description="Content representation format: storage for html, wiki for markdown", default='storage')),
+    new_title=(str, FieldInfo(description="New page title (optional)", default=None)),
+    new_labels=(list, FieldInfo(description="Page labels (optional)", default=None)),
 )
 
 createPages = create_model(
@@ -34,8 +44,8 @@ createPages = create_model(
 
 deletePage = create_model(
     "deletePage",
-    page_id=(str, FieldInfo(description="Page id")),
-    recursive=(bool, FieldInfo(description="Recursive: if True - will recursively delete all children pages too", default=False))
+    page_id=(str, FieldInfo(description="Page id", default=None)),
+    page_title=(str, FieldInfo(description="Page title", default=None)),
 )
 
 getPageTree = create_model(
@@ -99,14 +109,18 @@ class ConfluenceAPIWrapper(BaseModel):
             values['client'] = Confluence(url=url,username=username, password=api_key, cloud=cloud)
         return values
 
-    def create_page(self, title: str, body: str, space: str = None, parent_id: str = None, representation: str = 'storage'):
+    def create_page(self, title: str, body: str, space: str = None, parent_id: str = None, representation: str = 'storage', label: str = None):
         """ Creates a page in the Confluence space. Represents content in html (storage) or wiki (wiki) formats """
         # normal user flow: put pages in the Space Home, not in the root of the Space
         user_space = space if space else self.space
         # logger.info(f"Page will be created within the space ${user_space}")
         parent_id_filled = parent_id if parent_id else self.client.get_space(user_space)['homepage']['id']
-        status = self.client.create_page(space=user_space, title=title, body=body, parent_id=parent_id_filled, representation=representation)
+        try:
+            status = self.client.create_page(space=user_space, title=title, body=body, parent_id=parent_id_filled, representation=representation)
+        except Exception as e:
+            return f"Failed to create page, the page with title '{title}' already exists in the space '{user_space}': {e}"
         logger.info(f"Page created: {status['_links']['base'] + status['_links']['webui']}")
+
         page_details = {
             'title': status['title'],
             'id': status['id'],
@@ -114,6 +128,12 @@ class ConfluenceAPIWrapper(BaseModel):
             'author': status['version']['by']['displayName'],
             'link': status['_links']['base'] + status['_links']['webui']
         }
+
+        if label:
+            self.client.set_page_label(page_id = status['id'], label = label)
+            logger.info(f"Label '{label}' added to the page '{title}'.")
+            page_details['label'] = label
+
         return f"The page '{title}' was created under the parent page '{parent_id_filled}': '{status['_links']['base'] + status['_links']['webui']}'. \nDetails: {str(page_details)}"
 
     def create_pages(self, pages_info: dict, space: str = None, parent_id: str = None):
@@ -128,11 +148,58 @@ class ConfluenceAPIWrapper(BaseModel):
             statuses.append(status)
         return statuses
 
-    def delete_page(self, page_id, recursive=False):
-        """Deletes a page by its defined page_id and considering recursive flag: child entities will be removed as well if it is True"""
-        logger.info(f"Remove page '{page_id}', recursively: {recursive}")
-        self.client.remove_page(page_id=page_id, recursive=recursive)
-        return f"Page with page_id: '{page_id}' was removed."
+    def delete_page(self, page_id: str = None, page_title: str = None):
+        """ Deletes a page by its defined page_id or page_title """
+        try:
+            resolved_page_id = page_id if page_id else self.client.get_page_by_title(space=self.space, title=page_title)['id']
+            if resolved_page_id:
+                self.client.remove_page(resolved_page_id)
+                message = f"Page with ID '{resolved_page_id}' has been successfully deleted."
+            else:
+                message = f"Page instance could not be resolved with id '{page_id}' and/or title '{page_title}'"
+        except Exception as e:
+            message = f"Failed to delete page: {e}"
+        return message
+
+    def update_page(self, page_id: str, new_body: str, representation: str = 'storage', new_title: str = None, new_labels: list = None):
+        """ Updates an existing Confluence page by replacing its content with new_body and optional update the title  """
+        try:
+            current_page = self.client.get_page_by_id(page_id, expand='version')
+            if not current_page:
+                return f"Page with ID {page_id} not found."
+
+            current_version = current_page['version']['number']
+            next_version = current_version + 1
+
+            title_to_use = new_title if new_title is not None else current_page['title']
+
+            status = self.client.update_page(page_id=page_id, title=title_to_use, body=new_body, representation=representation)
+            logger.info(f"Page updated: {status['_links']['base'] + status['_links']['webui']}")
+            diff_link = f"{status['_links']['base']}/pages/diffpagesbyversion.action?pageId={page_id}&selectedPageVersions={current_version}&selectedPageVersions={next_version}"
+            logger.info(f"Link to diff: {diff_link}")
+
+            update_details = {
+                'title': status['title'],
+                'id': status['id'],
+                'space key': status['space']['key'],
+                'author': status['version']['by']['displayName'],
+                'link': status['_links']['base'] + status['_links']['webui'],
+                'version': next_version,
+                'diff': diff_link
+            }
+
+            if new_labels is not None:
+                current_labels = self.client.get_page_labels(page_id)
+                for label in current_labels['results']:
+                    self.client.remove_page_label(page_id, label['name'])
+                for label in new_labels:
+                    self.client.set_page_label(page_id, label)
+                logger.info(f"Labels updated for the page '{title_to_use}'.")
+                update_details['labels'] = new_labels
+
+            return f"The page '{page_id}' was updated successfully: '{status['_links']['base'] + status['_links']['webui']}'. \nDetails: {str(update_details)}"
+        except Exception as e:
+            return f"Failed to update page: {e}"
 
     def get_page_tree(self, page_id: str):
         """ Gets page tree for the Confluence space """
@@ -164,7 +231,7 @@ class ConfluenceAPIWrapper(BaseModel):
         """ Checks if a page exists in the Confluence space."""
         status = self.client.page_exists(space=self.space, title=title)
         return status
-    
+
     def get_pages_with_label(self, label: str):
         """ Gets pages with specific label in the Confluence space."""
         start = 0
@@ -177,7 +244,6 @@ class ConfluenceAPIWrapper(BaseModel):
             start += self.limit
         return "\n".join(content)
 
-    
     def is_public_page(self, page: dict) -> bool:
         """Check if a page is publicly accessible."""
         restrictions = self.client.get_all_restrictions_for_content(page["id"])
@@ -209,7 +275,7 @@ class ConfluenceAPIWrapper(BaseModel):
             if not self.include_restricted_content and not self.is_public_page(page):
                 continue
             yield self.process_page(page)
-    
+
     def search_pages(self, query: str):
         """Search pages in Confluence by query text in title or body."""
         start = 0
@@ -225,9 +291,9 @@ class ConfluenceAPIWrapper(BaseModel):
             content += [page.page_content for page in self.get_pages_by_id([page['content']["id"] for page in pages])]
             start += self.limit
         return "\n".join(content)
-    
+
     def process_page(self, page: dict) -> Document:
-        
+
         if self.keep_markdown_format:
             try:
                 from markdownify import markdownify
@@ -383,6 +449,12 @@ class ConfluenceAPIWrapper(BaseModel):
                 "ref": self.delete_page,
                 "description": self.delete_page.__doc__,
                 "args_schema": deletePage,
+            },
+            {
+                "name": "update_page",
+                "ref": self.update_page,
+                "description": self.update_page.__doc__,
+                "args_schema": updatePage,
             }
         ]
     
