@@ -10,6 +10,16 @@ from .google_search_rag import GoogleSearchRag, GoogleSearchResults
 from .crawler import SingleURLCrawler, MultiURLCrawler, GetHTMLContent, GetPDFContent
 from .wiki import WikipediaQueryRun
 
+name = "browser"
+
+def get_tools(tool):
+    return BrowserToolkit().get_toolkit(
+        selected_tools=tool['settings'].get('selected_tools', []),
+        google_api_key=tool['settings'].get('google_api_key'),
+        google_cse_id=tool['settings'].get("google_cse_id")
+    ).get_tools()
+                
+
 class BrowserToolkit(BaseToolkit):
     tools: List[BaseTool] = []
     @classmethod

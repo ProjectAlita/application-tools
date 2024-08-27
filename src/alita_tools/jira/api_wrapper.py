@@ -65,6 +65,12 @@ SetIssueStatus = create_model(
      """))
 )
 
+GetSpecificFieldInfo = create_model(
+    "GetSpecificFieldInfoModel",
+    jira_issue_key=(str, FieldInfo(description="Jira issue key specific information will be exctracted from in following format, TEST-1234")),
+    field_name=(str, FieldInfo(description="Field name data from which will be taken. It should be either 'description', 'summary', 'priority' etc or custom field name in following format 'customfield_10300'"))
+)
+
 
 class JiraApiWrapper(BaseModel):
     base_url: str
@@ -202,6 +208,12 @@ class JiraApiWrapper(BaseModel):
             return "No Jira issues found"
         return "Found " + str(len(parsed)) + " Jira issues:\n" + str(parsed)
 
+    def get_specific_field_info(self, jira_issue_key: str, field_name: str):
+        """ Get the specific field information from Jira by jira issue key and field name """
+        jira_issue = self.client.issue(jira_issue_key, fields=field_name)
+        field_info = jira_issue['fields'][field_name]
+        return f"Got the data from following Jira issue - {jira_issue_key} and field - {field_name}. The data is:\n{field_info}"
+
     def create_issue(self, issue_json: str):
         """ Create an issue in Jira."""
         try:
@@ -329,6 +341,13 @@ class JiraApiWrapper(BaseModel):
                 "description": self.set_issue_status.__doc__,
                 "args_schema": SetIssueStatus,
                 "ref": self.set_issue_status,
+            },
+            {
+                "name": "get_specific_field_info",
+                "description": self.get_specific_field_info.__doc__,
+                "args_schema": GetSpecificFieldInfo,
+                "ref": self.get_specific_field_info,
+
             }
         ]
 

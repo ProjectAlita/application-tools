@@ -5,7 +5,7 @@ sentence-transformers==2.7.0
 pygithub==2.3.0
 atlassian_python_api==3.41.11
 markdownify==0.12.1
-pillow==10.2.0
+pillow==10.3.0
 requests_openapi==1.0.5
 duckduckgo_search==5.3.0
 playwright==1.43.0
@@ -18,4 +18,5 @@ beautifulsoup4
 pymupdf==1.24.9
 yagmail==0.15.293
 gitpython==3.1.43
-qtest-swagger-client==0.0.2
+qtest-swagger-client==0.0.3
+requests==2.32.3

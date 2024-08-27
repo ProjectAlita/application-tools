@@ -1,5 +1,5 @@
 import logging
-from typing import List, Any
+from typing import List, Any, Optional
 from langchain_core.pydantic_v1 import root_validator, BaseModel
 from pydantic import create_model
 from pydantic.fields import FieldInfo
@@ -7,6 +7,8 @@ import yagmail
 
 logger = logging.getLogger(__name__)
 
+
+SMTP_SERVER = "smtp.gmail.com"
 
 NoInput = create_model(
     "NoInput"
@@ -20,16 +22,17 @@ SendEmail = create_model(
     cc=(List[str], FieldInfo(description="Persons who you are going to share a copy of email to."))
 )
 
-
 class YagmailWrapper(BaseModel):
     username: str
     password: str
+    host: Optional[str] = SMTP_SERVER
 
     @root_validator()
     def validate_toolkit(cls, values):
         username = values['username']
         password = values['password']
-        values['client'] = yagmail.SMTP(user=username, password=password)
+        host = values.get("host")
+        values['client'] = yagmail.SMTP(user=username, password=password, host=host)
         return values
 
     def send_gmail_message(self, receiver: str, message: str, subject: str, cc=None):

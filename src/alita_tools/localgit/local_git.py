@@ -196,7 +196,7 @@ class LocalGit(BaseModel):
 
     def delete_file(self, file_path: str) -> str:
         """ Delete file from the repository by its path """
-        file_path = os.path.join(self.repo.working_dir, file_path)
+        file_path = os.path.normpath(os.path.join(self.repo.working_dir, file_path))
         if os.path.exists(file_path) and os.path.isfile(file_path):
             os.remove(file_path)
             return 'Successfully deleted file {}'.format(file_path)
@@ -205,7 +205,7 @@ class LocalGit(BaseModel):
 
     def create_file(self, file_path: str, file_content: str) -> str:
         """ Create file in repository by specific path and content """
-        file_path = os.path.join(self.repo.working_dir, file_path)
+        file_path = os.path.normpath(os.path.join(self.repo.working_dir, file_path))
         if os.path.exists(file_path) and os.path.isfile(file_path):
             return f"File - '{file_path}' already exists"
         else:
@@ -226,7 +226,7 @@ class LocalGit(BaseModel):
 
     def read_file(self, file_path: str) -> str:
         """ Read file from repository """
-        file_path = os.path.join(self.repo.working_dir, file_path)
+        file_path = os.path.normpath(os.path.join(self.repo.working_dir, file_path))
         if os.path.exists(file_path) and os.path.isfile(file_path):
             with open(file_path, 'r') as f:
                 return f.read()
@@ -243,7 +243,7 @@ class LocalGit(BaseModel):
 
         try:
             # Read the file into a list of lines
-            file_path = os.path.join(self.repo.working_dir, file_path)
+            file_path = os.path.normpath(os.path.join(self.repo.working_dir, file_path))
             with open(file_path, 'r') as file:
                 lines = file.readlines()
 
@@ -310,7 +310,7 @@ class LocalGit(BaseModel):
         """ Updates a file with new content. """
         try:
             file_path: str = file_query.split("\n")[0]
-            file_path = os.path.join(self.repo.working_dir, file_path)
+            file_path = os.path.normpath(os.path.join(self.repo.working_dir, file_path))
             file_content = self.read_file(file_path)
             updated_file_content = file_content
             for old, new in self.extract_old_new_pairs(file_query):
