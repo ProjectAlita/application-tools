@@ -30,7 +30,7 @@ CREATE_FILE_PROMPT = """Create new file in your github repository."""
 UPDATE_FILE_PROMPT = """Updates the contents of a file in a GitHub repository. Your input to this tool MUST strictly follow these rules:
 Specify which file to modify by passing a full file path (the path must not start with a slash); Specify at lest 2 lines of the old contents which you would like to replace wrapped in OLD <<<< and >>>> OLD; Specify the new contents which you would like to replace the old contents with wrapped in NEW <<<< and >>>> NEW; NEW content may contain lines from OLD content in case you want to add content without removing the old content
 
-Example 1: you replacing the contents of the file /test/test.txt from "old contents" to "new contents", pass in the following string:
+Example 1: Replace "old contents" to "new contents" in the file /test/test.txt from , pass in the following string:
 
 test/test.txt
 
@@ -42,7 +42,7 @@ NEW <<<<
 new contents
 >>>> NEW
 
-Example 2: you adding the contents of the file /test/test.txt use "existing contents" and extend with "new contents", pass in the following string:
+Example 2: Extend "existing contents" with new contents" in the file /test/test.txt, pass in the following string:
 
 test/test.txt
 
@@ -52,9 +52,7 @@ existing contents
 NEW <<<<
 existing contents
 new contents
->>>> NEW
-
-"""
+>>>> NEW"""
 
 
 SearchCode = create_model(
