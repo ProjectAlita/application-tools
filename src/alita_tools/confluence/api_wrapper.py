@@ -26,15 +26,6 @@ createPage = create_model(
     label=(str, FieldInfo(description="Page label (optional)", default=None)),
 )
 
-updatePage = create_model(
-    "updatePage",
-    page_id=(str, FieldInfo(description="Page id", default=None)),
-    new_body=(str, FieldInfo(description="New page content")),
-    representation=(str, FieldInfo(description="Content representation format: storage for html, wiki for markdown", default='storage')),
-    new_title=(str, FieldInfo(description="New page title (optional)", default=None)),
-    new_labels=(list, FieldInfo(description="Page labels (optional)", default=None)),
-)
-
 createPages = create_model(
     "createPages",
     space=(str, FieldInfo(description="Confluence space that is used for pages creation", default=None)),
@@ -46,6 +37,24 @@ deletePage = create_model(
     "deletePage",
     page_id=(str, FieldInfo(description="Page id", default=None)),
     page_title=(str, FieldInfo(description="Page title", default=None)),
+)
+
+updatePage = create_model(
+    "updatePage",
+    page_id=(str, FieldInfo(description="Page id", default=None)),
+    page_title=(str, FieldInfo(description="Page title", default=None)),
+    representation=(str, FieldInfo(description="Content representation format: storage for html, wiki for markdown", default='storage')),
+    new_title=(str, FieldInfo(description="New page title", default=None)),
+    new_body=(str, FieldInfo(description="New page content", default=None)),
+    new_labels=(list, FieldInfo(description="Page labels", default=None)),
+)
+
+updatePages = create_model(
+    "updatePage",
+    page_ids=(list, FieldInfo(description="List of ids of pages to be updated", default=None)),
+    parent_id=(str, FieldInfo(description="Id of the page to update its descendants", default=None)),
+    new_body=(str, FieldInfo(description="New page content", default=None)),
+    new_labels=(list, FieldInfo(description="Page labels", default=None)),
 )
 
 getPageTree = create_model(
@@ -111,14 +120,15 @@ class ConfluenceAPIWrapper(BaseModel):
 
     def create_page(self, title: str, body: str, space: str = None, parent_id: str = None, representation: str = 'storage', label: str = None):
         """ Creates a page in the Confluence space. Represents content in html (storage) or wiki (wiki) formats """
+        if self.client.get_page_by_title(space=self.space, title=title) is not None:
+            return f"Page with title {title} already exists, please use other title."
+
         # normal user flow: put pages in the Space Home, not in the root of the Space
         user_space = space if space else self.space
-        # logger.info(f"Page will be created within the space ${user_space}")
+        logger.info(f"Page will be created within the space ${user_space}")
         parent_id_filled = parent_id if parent_id else self.client.get_space(user_space)['homepage']['id']
-        try:
-            status = self.client.create_page(space=user_space, title=title, body=body, parent_id=parent_id_filled, representation=representation)
-        except Exception as e:
-            return f"Failed to create page, the page with title '{title}' already exists in the space '{user_space}': {e}"
+
+        status = self.client.create_page(space=user_space, title=title, body=body, parent_id=parent_id_filled, representation=representation)
         logger.info(f"Page created: {status['_links']['base'] + status['_links']['webui']}")
 
         page_details = {
@@ -150,56 +160,79 @@ class ConfluenceAPIWrapper(BaseModel):
 
     def delete_page(self, page_id: str = None, page_title: str = None):
         """ Deletes a page by its defined page_id or page_title """
-        try:
-            resolved_page_id = page_id if page_id else self.client.get_page_by_title(space=self.space, title=page_title)['id']
-            if resolved_page_id:
-                self.client.remove_page(resolved_page_id)
-                message = f"Page with ID '{resolved_page_id}' has been successfully deleted."
-            else:
-                message = f"Page instance could not be resolved with id '{page_id}' and/or title '{page_title}'"
-        except Exception as e:
-            message = f"Failed to delete page: {e}"
+        resolved_page_id = page_id or (self.client.get_page_by_title(space=self.space, title=page_title) or {}).get('id') if page_title else None
+        if resolved_page_id:
+            self.client.remove_page(resolved_page_id)
+            message = f"Page with ID '{resolved_page_id}' has been successfully deleted."
+        else:
+            message = f"Page instance could not be resolved with id '{page_id}' and/or title '{page_title}'"
         return message
 
-    def update_page(self, page_id: str, new_body: str, representation: str = 'storage', new_title: str = None, new_labels: list = None):
-        """ Updates an existing Confluence page by replacing its content with new_body and optional update the title  """
-        try:
-            current_page = self.client.get_page_by_id(page_id, expand='version')
+    def update_page(self, page_id: str = None, page_title: str = None, representation: str = 'storage', new_title: str = None, new_body: str = None, new_labels: list = None):
+        """ Updates an existing Confluence page (using id or title) by replacing its content, title, labels """
+        current_page = None
+        if page_id:
+            current_page = self.client.get_page_by_id(page_id, expand='version,body.view')
             if not current_page:
                 return f"Page with ID {page_id} not found."
+        elif page_title:
+            current_page = self.client.get_page_by_title(space=self.space, title=page_title)
+            if not current_page:
+                return f"Page with title {page_title} not found."
 
-            current_version = current_page['version']['number']
-            next_version = current_version + 1
+        if new_title and self.client.get_page_by_title(space=self.space, title=new_title):
+            return f"Page with title {new_title} already exists."
 
-            title_to_use = new_title if new_title is not None else current_page['title']
+        current_version = current_page['version']['number']
+        title_to_use = new_title if new_title is not None else current_page['title']
+        body_to_use = new_body if new_body else current_page['body']['view']['value']
+        representation_to_use = representation if representation else current_page['body']['view']['representation']
 
-            status = self.client.update_page(page_id=page_id, title=title_to_use, body=new_body, representation=representation)
-            logger.info(f"Page updated: {status['_links']['base'] + status['_links']['webui']}")
-            diff_link = f"{status['_links']['base']}/pages/diffpagesbyversion.action?pageId={page_id}&selectedPageVersions={current_version}&selectedPageVersions={next_version}"
-            logger.info(f"Link to diff: {diff_link}")
+        updated_page = self.client.update_page(page_id=page_id, title=title_to_use, body=body_to_use, representation=representation_to_use)
+        webui_link = updated_page['_links']['base'] + updated_page['_links']['webui']
+        logger.info(f"Page updated: {webui_link}")
 
-            update_details = {
-                'title': status['title'],
-                'id': status['id'],
-                'space key': status['space']['key'],
-                'author': status['version']['by']['displayName'],
-                'link': status['_links']['base'] + status['_links']['webui'],
-                'version': next_version,
-                'diff': diff_link
-            }
+        next_version = updated_page['version']['number']
+        diff_link = f"{updated_page['_links']['base']}/pages/diffpagesbyversion.action?pageId={page_id}&selectedPageVersions={current_version}&selectedPageVersions={next_version}"
+        logger.info(f"Link to diff: {diff_link}")
 
-            if new_labels is not None:
-                current_labels = self.client.get_page_labels(page_id)
-                for label in current_labels['results']:
-                    self.client.remove_page_label(page_id, label['name'])
-                for label in new_labels:
-                    self.client.set_page_label(page_id, label)
-                logger.info(f"Labels updated for the page '{title_to_use}'.")
-                update_details['labels'] = new_labels
+        update_details = {
+            'title': updated_page['title'],
+            'id': updated_page['id'],
+            'space key': updated_page['space']['key'],
+            'author': updated_page['version']['by']['displayName'],
+            'link': updated_page['_links']['base'] + updated_page['_links']['webui'],
+            'version': next_version,
+            'diff': diff_link
+        }
 
-            return f"The page '{page_id}' was updated successfully: '{status['_links']['base'] + status['_links']['webui']}'. \nDetails: {str(update_details)}"
-        except Exception as e:
-            return f"Failed to update page: {e}"
+        if new_labels is not None:
+            current_labels = self.client.get_page_labels(page_id)
+            for label in current_labels['results']:
+                self.client.remove_page_label(page_id, label['name'])
+            for label in new_labels:
+                self.client.set_page_label(page_id, label)
+            logger.info(f"Labels updated for the page '{title_to_use}'.")
+            update_details['labels'] = new_labels
+
+        return f"The page '{page_id}' was updated successfully: '{webui_link}'. \nDetails: {str(update_details)}"
+
+    def update_pages(self, page_ids: list = None, parent_id: str = None, new_body: str = None, new_labels: list = None):
+        """ Update a batch of pages in the Confluence space. """
+        statuses = []
+        if page_ids:
+            for page_id in page_ids:
+                status = self.update_page(page_id=page_id, new_body=new_body, new_labels=new_labels)
+                statuses.append(status)
+            return statuses
+        elif parent_id:
+            descendant_pages = self.get_all_descendants(parent_id)
+            for page in descendant_pages:
+                status = self.update_page(page_id=page['id'], new_body=new_body, new_labels=new_labels)
+                statuses.append(status)
+            return statuses
+        else:
+            return "Either list of page_ids or parent_id (to update descendants) should be provided."
 
     def get_page_tree(self, page_id: str):
         """ Gets page tree for the Confluence space """
@@ -293,7 +326,6 @@ class ConfluenceAPIWrapper(BaseModel):
         return "\n".join(content)
 
     def process_page(self, page: dict) -> Document:
-
         if self.keep_markdown_format:
             try:
                 from markdownify import markdownify
@@ -421,6 +453,24 @@ class ConfluenceAPIWrapper(BaseModel):
                 "args_schema": createPages,
             },
             {
+                "name": "delete_page",
+                "ref": self.delete_page,
+                "description": self.delete_page.__doc__,
+                "args_schema": deletePage,
+            },
+            {
+                "name": "update_page",
+                "ref": self.update_page,
+                "description": self.update_page.__doc__,
+                "args_schema": updatePage,
+            },
+            {
+                "name": "update_pages",
+                "ref": self.update_pages,
+                "description": self.update_pages.__doc__,
+                "args_schema": updatePages,
+            },
+            {
                 "name": "get_page_tree",
                 "ref": self.get_page_tree,
                 "description": self.get_page_tree.__doc__,
@@ -443,18 +493,6 @@ class ConfluenceAPIWrapper(BaseModel):
                 "ref": self.search_pages,
                 "description": self.search_pages.__doc__,
                 "args_schema": searchPages,
-            },
-            {
-                "name": "delete_page",
-                "ref": self.delete_page,
-                "description": self.delete_page.__doc__,
-                "args_schema": deletePage,
-            },
-            {
-                "name": "update_page",
-                "ref": self.update_page,
-                "description": self.update_page.__doc__,
-                "args_schema": updatePage,
             }
         ]
     
