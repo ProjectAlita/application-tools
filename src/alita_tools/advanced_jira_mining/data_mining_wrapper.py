@@ -63,7 +63,7 @@ class AdvancedJiraMiningWrapper(BaseModel):
             values['client'] = Jira(url=url, username=username, password=api_key, cloud=is_cloud,
                                     verify_ssl=values['verify_ssl'])
         values['llm'] = get_model(model_type, llm_settings)
-        values['index_dict'] = {'Chroma', None}
+        values['index_dict'] = {'vectorstore': None}
         return values
 
     def __zip_directory(self, folder_path, output_path):
@@ -289,12 +289,12 @@ class AdvancedJiraMiningWrapper(BaseModel):
             self.__zip_directory(persistent_path, zip_file_name)
             self.__attach_file_to_jira_issue(jira_issue_key, zip_file_name)
             os.remove(zip_file_name)
-        self.index_dict['Chroma'] = vectorstore
+        self.index_dict['vectorstore'] = vectorstore
         return f'Successfully created embeddings for the jira ticket with following id - {jira_issue_key}'
 
     def search_data(self, query: str) -> str:
         """ Search the specific jira ticket data with the given query. Usually query will be a simple AC from the same ticket """
-        vectorstore = self.index_dict['Chroma']
+        vectorstore = self.index_dict['vectorstore']
         output = ''
         retrieved_docs = vectorstore.search(query, 'mmr', k=20, fetch_k=50)
         for doc in retrieved_docs:
