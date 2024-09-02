@@ -184,7 +184,7 @@ class ConfluenceAPIWrapper(BaseModel):
             return f"Page with title {new_title} already exists."
 
         current_version = current_page['version']['number']
-        title_to_use = new_title if new_title is not None else current_page['title']
+        title_to_use = new_title if not new_title else current_page['title']
         body_to_use = new_body if new_body else current_page['body']['view']['value']
         representation_to_use = representation if representation else current_page['body']['view']['representation']
 
