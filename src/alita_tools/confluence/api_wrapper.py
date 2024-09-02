@@ -52,8 +52,7 @@ updatePage = create_model(
 updatePages = create_model(
     "updatePage",
     page_ids=(list, FieldInfo(description="List of ids of pages to be updated", default=None)),
-    parent_id=(str, FieldInfo(description="Id of the page to update its descendants", default=None)),
-    new_body=(str, FieldInfo(description="New page content", default=None)),
+    new_contents=(list, FieldInfo(description="List of new contents for each page. If content the same for all the pages then it should be a list with a single entry", default=None)),
     new_labels=(list, FieldInfo(description="Page labels", default=None)),
 )
 
@@ -217,18 +216,14 @@ class ConfluenceAPIWrapper(BaseModel):
 
         return f"The page '{page_id}' was updated successfully: '{webui_link}'. \nDetails: {str(update_details)}"
 
-    def update_pages(self, page_ids: list = None, parent_id: str = None, new_body: str = None, new_labels: list = None):
+    def update_pages(self, page_ids: list = None, new_contents: list = None, new_labels: list = None):
         """ Update a batch of pages in the Confluence space. """
         statuses = []
+        if len(page_ids) != len(new_contents) and len(new_contents) != 1:
+            raise ValueError("New content should be provided for all the pages or it should contain only 1 new body for bulk update")
         if page_ids:
-            for page_id in page_ids:
-                status = self.update_page(page_id=page_id, new_body=new_body, new_labels=new_labels)
-                statuses.append(status)
-            return statuses
-        elif parent_id:
-            descendant_pages = self.get_all_descendants(parent_id)
-            for page in descendant_pages:
-                status = self.update_page(page_id=page['id'], new_body=new_body, new_labels=new_labels)
+            for index, page_id in enumerate(page_ids):
+                status = self.update_page(page_id=page_id, new_body=new_contents[index if len(new_contents) != 1 else 0], new_labels=new_labels)
                 statuses.append(status)
             return statuses
         else:
