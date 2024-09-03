@@ -18,13 +18,16 @@ from ..llm.llm_utils import get_model, summarize
 PrepareDataSchema = create_model(
     "PrepareDataSchema",
     jira_issue_key=(str, FieldInfo(
-        description="The issue key of the Jira issue to which the comment is to be added, e.g. 'TEST-123'.")),
+        description="The issue key of the Jira issue, which will be used to pull data from, e.g. 'TEST-123'.")),
 )
 
 SearchDataSchema = create_model(
     "SearchDataSchema",
+    jira_issue_key=(str, FieldInfo(
+        description="The issue key of the Jira issue, which will be used to pull data from, e.g. 'TEST-123'.")),
     query=(
-    str, FieldInfo(description="The query to search in the data created from jira ticket. Usually it will be an AC")),
+        str,
+        FieldInfo(description="The query to search in the data created from jira ticket. Usually it will be an AC")),
 )
 
 
@@ -49,7 +52,7 @@ class AdvancedJiraMiningWrapper(BaseModel):
                 "`atlassian` package not found, please run "
                 "`pip install atlassian-python-api`"
             )
-
+        embedding_function = HuggingFaceEmbeddings(encode_kwargs={'normalize_embeddings': True})
         url = values['jira_base_url']
         model_type = values['model_type']
         llm_settings = values['llm_settings']
@@ -63,7 +66,10 @@ class AdvancedJiraMiningWrapper(BaseModel):
             values['client'] = Jira(url=url, username=username, password=api_key, cloud=is_cloud,
                                     verify_ssl=values['verify_ssl'])
         values['llm'] = get_model(model_type, llm_settings)
-        values['index_dict'] = {'vectorstore': None}
+        values['vectorstore'] = Chroma(
+            collection_name="jira_ticket_data",
+            embedding_function=embedding_function,
+        )
         return values
 
     def __zip_directory(self, folder_path, output_path):
@@ -268,33 +274,26 @@ class AdvancedJiraMiningWrapper(BaseModel):
         if self.__get_attachment_id(jira_issue_key, zip_file_name) is not None and not os.path.exists(persistent_path):
             self.__download_attachment_by_id(jira_issue_key, zip_file_name)
         if os.path.exists(persistent_path):
-            vectorstore = Chroma(
-                collection_name="jira_ticket_data",
-                persist_directory=persistent_path,
-                embedding_function=embedding_function,
-            )
+            vectorstore = self.vectorstore
+            vectorstore._persistent_path = persistent_path
         else:
             initial_confluence_docs = self.__get_confluence_documents_by_jira_ticket(jira_issue_key)
             result_confluence_docs = self.__split_the_confluence_documents(initial_confluence_docs)
             related_description_list = self.__create_ac_documents_content(jira_issue_key)
-            vectorstore = Chroma(
-                collection_name="jira_ticket_data",
-                persist_directory=persistent_path,
-                embedding_function=embedding_function,
-            )
-
+            vectorstore = self.vectorstore
+            vectorstore._persistent_path = persistent_path
             vectorstore.add_documents(result_confluence_docs)
             vectorstore.add_documents(related_description_list)
             vectorstore.persist()
             self.__zip_directory(persistent_path, zip_file_name)
             self.__attach_file_to_jira_issue(jira_issue_key, zip_file_name)
             os.remove(zip_file_name)
-        self.index_dict['vectorstore'] = vectorstore
         return f'Successfully created embeddings for the jira ticket with following id - {jira_issue_key}'
 
-    def search_data(self, query: str) -> str:
-        """ Search the specific jira ticket data with the given query. Usually query will be a simple AC from the same ticket """
-        vectorstore = self.index_dict['vectorstore']
+    def search_data(self, jira_issue_key: str, query: str) -> str:
+        """ Search the specific jira ticket data using already provided by user jira ticket id and given query. Usually query will be a simple AC from the same ticket """
+        vectorstore = self.vectorstore
+        vectorstore._persistent_path = f'jira_ticket_embeddings_{jira_issue_key}'
         output = ''
         retrieved_docs = vectorstore.search(query, 'mmr', k=20, fetch_k=50)
         for doc in retrieved_docs:
