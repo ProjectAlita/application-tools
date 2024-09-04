@@ -6,13 +6,15 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Optional, Tuple, Any
 
 from langchain_community.document_loaders import ConfluenceLoader
+from langchain_community.document_loaders.confluence import ContentFormat
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain_core.documents import Document
 from langchain_core.pydantic_v1 import root_validator, BaseModel
-from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
+from langchain_text_splitters import MarkdownHeaderTextSplitter
 from pydantic import create_model
 from pydantic.fields import FieldInfo
+
 from ..llm.llm_utils import get_model, summarize
 
 PrepareDataSchema = create_model(
@@ -52,7 +54,6 @@ class AdvancedJiraMiningWrapper(BaseModel):
                 "`atlassian` package not found, please run "
                 "`pip install atlassian-python-api`"
             )
-        embedding_function = HuggingFaceEmbeddings(encode_kwargs={'normalize_embeddings': True})
         url = values['jira_base_url']
         model_type = values['model_type']
         llm_settings = values['llm_settings']
@@ -66,10 +67,6 @@ class AdvancedJiraMiningWrapper(BaseModel):
             values['client'] = Jira(url=url, username=username, password=api_key, cloud=is_cloud,
                                     verify_ssl=values['verify_ssl'])
         values['llm'] = get_model(model_type, llm_settings)
-        values['vectorstore'] = Chroma(
-            collection_name="jira_ticket_data",
-            embedding_function=embedding_function,
-        )
         return values
 
     def __zip_directory(self, folder_path, output_path):
@@ -172,8 +169,10 @@ class AdvancedJiraMiningWrapper(BaseModel):
             url=self.confluence_base_url,
             api_key=self.jira_api_key,
             username=self.jira_username,
-            limit=100,
+            limit=len(page_ids),
+            max_pages=len(page_ids),
             keep_markdown_format=True,
+            content_format=ContentFormat.VIEW
         )
         return confluence_loader.load()
 
@@ -184,13 +183,19 @@ class AdvancedJiraMiningWrapper(BaseModel):
             ("#", "Header 1"),
             ("##", "Header 2"),
             ("###", "Header 3"),
+            ("####", "Header 4"),
         ]
 
         markdown_splitter = MarkdownHeaderTextSplitter(headers_to_split_on=headers_to_split_on, strip_headers=False)
-        splitted_by_headers_docs = [markdown_splitter.split_text(doc.page_content) for doc in confluence_documents]
-        character_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
-        confluence_result_docs = [character_splitter.split_documents(d) for d in splitted_by_headers_docs]
-        return list(itertools.chain.from_iterable(confluence_result_docs))
+        splitted_by_headers_docs = []
+        for doc in confluence_documents:
+            meta = doc.metadata
+            docs_by_headers = markdown_splitter.split_text(doc.page_content)
+            for i, split in enumerate(docs_by_headers):
+                meta['split_id'] = i
+                split.metadata = meta | split.metadata
+                splitted_by_headers_docs.append(split)
+        return splitted_by_headers_docs
 
     def __clean_text_lines(self, text: str):
         # Clean none-breaking spaces (nbsp)
@@ -266,39 +271,49 @@ class AdvancedJiraMiningWrapper(BaseModel):
             zip_ref.extractall(persistent_path)
         os.remove(file_name)
 
+    def __prepare_vectorstore(self, jira_issue_key: str, obtain_vectorstore: bool = False) -> Tuple[str, Chroma | None]:
+        persistent_path = os.path.abspath(os.path.join('.', f'jira_ticket_embeddings_{jira_issue_key}'))
+        if obtain_vectorstore:
+            embedding_function = HuggingFaceEmbeddings(encode_kwargs={'normalize_embeddings': True})
+            vectorstore = Chroma(
+                collection_name="jira_ticket_data",
+                embedding_function=embedding_function,
+                persist_directory=persistent_path
+            )
+            return  persistent_path, vectorstore
+        return persistent_path, None
+
+
     def prepare_data(self, jira_issue_key: str) -> str:
         """ Prepare the embeddings for the specific jira issue key. They will include both Jira and Confluence info. """
-        embedding_function = HuggingFaceEmbeddings(encode_kwargs={'normalize_embeddings': True})
-        persistent_path = f'jira_ticket_embeddings_{jira_issue_key}'
+        path, _ = self.__prepare_vectorstore(jira_issue_key)
         zip_file_name = f'jira_ticket_embeddings_{jira_issue_key}.zip'
-        if self.__get_attachment_id(jira_issue_key, zip_file_name) is not None and not os.path.exists(persistent_path):
+        if self.__get_attachment_id(jira_issue_key, zip_file_name) is not None:
             self.__download_attachment_by_id(jira_issue_key, zip_file_name)
-        if os.path.exists(persistent_path):
-            vectorstore = self.vectorstore
-            vectorstore._persistent_path = persistent_path
-        else:
+            return f"The vectorstore content have been obtained from Jira ticket - {jira_issue_key}. You can use it from the path - {path}"
+        elif not os.path.exists(path):
             initial_confluence_docs = self.__get_confluence_documents_by_jira_ticket(jira_issue_key)
             result_confluence_docs = self.__split_the_confluence_documents(initial_confluence_docs)
             related_description_list = self.__create_ac_documents_content(jira_issue_key)
-            vectorstore = self.vectorstore
-            vectorstore._persistent_path = persistent_path
+            _, vectorstore = self.__prepare_vectorstore(jira_issue_key, obtain_vectorstore=True)
             vectorstore.add_documents(result_confluence_docs)
             vectorstore.add_documents(related_description_list)
             vectorstore.persist()
-            self.__zip_directory(persistent_path, zip_file_name)
+            self.__zip_directory(path, zip_file_name)
             self.__attach_file_to_jira_issue(jira_issue_key, zip_file_name)
             os.remove(zip_file_name)
-        return f'Successfully created embeddings for the jira ticket with following id - {jira_issue_key}'
+            return f'Successfully created embeddings for the jira ticket with following id - {jira_issue_key}'
+        else:
+            pass
 
     def search_data(self, jira_issue_key: str, query: str) -> str:
         """ Search the specific jira ticket data using already provided by user jira ticket id and given query. Usually query will be a simple AC from the same ticket """
-        vectorstore = self.vectorstore
-        vectorstore._persistent_path = f'jira_ticket_embeddings_{jira_issue_key}'
-        output = ''
+        _, vectorstore = self.__prepare_vectorstore(jira_issue_key, obtain_vectorstore=True)
+        output = []
         retrieved_docs = vectorstore.search(query, 'mmr', k=20, fetch_k=50)
         for doc in retrieved_docs:
-            output += f'\n\n{doc.page_content}'
-        return output
+            output.append(f'\n\n{doc.page_content}')
+        return ''.join(output)
 
     def get_available_tools(self):
         return [
