@@ -41,8 +41,16 @@ deletePage = create_model(
 
 updatePage = create_model(
     "updatePage",
-    page_id=(str, FieldInfo(description="Page id", default=None)),
-    page_title=(str, FieldInfo(description="Page title", default=None)),
+    page_id=(str, FieldInfo(description="Page id")),
+    representation=(str, FieldInfo(description="Content representation format: storage for html, wiki for markdown", default='storage')),
+    new_title=(str, FieldInfo(description="New page title", default=None)),
+    new_body=(str, FieldInfo(description="New page content", default=None)),
+    new_labels=(list, FieldInfo(description="Page labels", default=None)),
+)
+
+updatePageByTitle = create_model(
+    "updatePageByTitle",
+    page_title=(str, FieldInfo(description="Page title")),
     representation=(str, FieldInfo(description="Content representation format: storage for html, wiki for markdown", default='storage')),
     new_title=(str, FieldInfo(description="New page title", default=None)),
     new_body=(str, FieldInfo(description="New page content", default=None)),
@@ -50,9 +58,15 @@ updatePage = create_model(
 )
 
 updatePages = create_model(
-    "updatePage",
+    "updatePageы",
     page_ids=(list, FieldInfo(description="List of ids of pages to be updated", default=None)),
     new_contents=(list, FieldInfo(description="List of new contents for each page. If content the same for all the pages then it should be a list with a single entry", default=None)),
+    new_labels=(list, FieldInfo(description="Page labels", default=None)),
+)
+
+updateLabels = create_model(
+    "updateLabels",
+    page_ids=(list, FieldInfo(description="List of ids of pages to be updated", default=None)),
     new_labels=(list, FieldInfo(description="Page labels", default=None)),
 )
 
@@ -167,19 +181,13 @@ class ConfluenceAPIWrapper(BaseModel):
             message = f"Page instance could not be resolved with id '{page_id}' and/or title '{page_title}'"
         return message
 
-    def update_page(self, page_id: str = None, page_title: str = None, representation: str = 'storage', new_title: str = None, new_body: str = None, new_labels: list = None):
+    def update_page(self, page_id: str, representation: str = 'storage', new_title: str = None, new_body: str = None, new_labels: list = None):
         """ Updates an existing Confluence page (using id or title) by replacing its content, title, labels """
-        current_page = None
-        if page_id:
-            current_page = self.client.get_page_by_id(page_id, expand='version,body.view')
-            if not current_page:
-                return f"Page with ID {page_id} not found."
-        elif page_title:
-            current_page = self.client.get_page_by_title(space=self.space, title=page_title)
-            if not current_page:
-                return f"Page with title {page_title} not found."
+        current_page = self.client.get_page_by_id(page_id, expand='version,body.view')
+        if not current_page:
+            return f"Page with ID {page_id} not found."
 
-        if new_title and self.client.get_page_by_title(space=self.space, title=new_title):
+        if new_title and current_page['title'] != new_title and self.client.get_page_by_title(space=self.space, title=new_title):
             return f"Page with title {new_title} already exists."
 
         current_version = current_page['version']['number']
@@ -216,6 +224,14 @@ class ConfluenceAPIWrapper(BaseModel):
 
         return f"The page '{page_id}' was updated successfully: '{webui_link}'. \nDetails: {str(update_details)}"
 
+    def update_page_by_title(self, page_title: str, representation: str = 'storage', new_title: str = None, new_body: str = None, new_labels: list = None):
+        """ Updates an existing Confluence page (using id or title) by replacing its content, title, labels """
+        current_page = self.client.get_page_by_title(space=self.space, title=page_title)
+        if not current_page:
+            return f"Page with title {page_title} not found."
+
+        return self.update_page(page_id=current_page['id'], representation=representation, new_title=new_title, new_body=new_body, new_labels=new_labels)
+
     def update_pages(self, page_ids: list = None, new_contents: list = None, new_labels: list = None):
         """ Update a batch of pages in the Confluence space. """
         statuses = []
@@ -228,6 +244,17 @@ class ConfluenceAPIWrapper(BaseModel):
             return statuses
         else:
             return "Either list of page_ids or parent_id (to update descendants) should be provided."
+
+    def update_labels(self, page_ids: list = None, new_labels: list = None):
+        """ Update a batch of pages in the Confluence space. """
+        statuses = []
+        if page_ids:
+            for index, page_id in enumerate(page_ids):
+                status = self.update_page(page_id=page_id, new_labels=new_labels)
+                statuses.append(status)
+            return statuses
+        else:
+            return "Either list of page_ids should be provided."
 
     def get_page_tree(self, page_id: str):
         """ Gets page tree for the Confluence space """
@@ -307,18 +334,26 @@ class ConfluenceAPIWrapper(BaseModel):
     def search_pages(self, query: str):
         """Search pages in Confluence by query text in title or body."""
         start = 0
-        content = []
+        pages_info = []
         if not self.space:
             cql = f'(type=page) and (title~"{query}" or text~"{query}")'
         else:
             cql = f'(type=page and space={self.space}) and (title~"{query}" or text~"{query}")'
         for _ in range(self.max_pages // self.limit):
-            pages = self.client.cql(cql, start=0, limit=self.limit).get("results", [])
+            pages = self.client.cql(cql, start=start, limit=self.limit).get("results", [])
             if not pages:
                 break
-            content += [page.page_content for page in self.get_pages_by_id([page['content']["id"] for page in pages])]
+            page_ids = [page['content']['id'] for page in pages]
+            for page in self.get_pages_by_id(page_ids):
+                page_info = {
+                    'content': page.page_content,
+                    'page_id': page.metadata['id'],
+                    'page_title': page.metadata['title'],
+                    'page_url': page.metadata['source']
+                }
+                pages_info.append(page_info)
             start += self.limit
-        return "\n".join(content)
+        return pages_info
 
     def process_page(self, page: dict) -> Document:
         if self.keep_markdown_format:
@@ -460,10 +495,22 @@ class ConfluenceAPIWrapper(BaseModel):
                 "args_schema": updatePage,
             },
             {
+                "name": "update_page_by_title",
+                "ref": self.update_page_by_title,
+                "description": self.update_page_by_title.__doc__,
+                "args_schema": updatePageByTitle,
+            },
+            {
                 "name": "update_pages",
                 "ref": self.update_pages,
                 "description": self.update_pages.__doc__,
                 "args_schema": updatePages,
+            },
+            {
+                "name": "update_labels",
+                "ref": self.update_labels,
+                "description": self.update_labels.__doc__,
+                "args_schema": updateLabels,
             },
             {
                 "name": "get_page_tree",
