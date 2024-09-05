@@ -58,7 +58,7 @@ updatePageByTitle = create_model(
 )
 
 updatePages = create_model(
-    "updatePageы",
+    "updatePages",
     page_ids=(list, FieldInfo(description="List of ids of pages to be updated", default=None)),
     new_contents=(list, FieldInfo(description="List of new contents for each page. If content the same for all the pages then it should be a list with a single entry", default=None)),
     new_labels=(list, FieldInfo(description="Page labels", default=None)),
@@ -88,6 +88,11 @@ getPagesWithLabel = create_model(
 searchPages = create_model(
     "searchPages",
     query=(str, FieldInfo(description="Query text to search pages")),
+)
+
+siteSearch = create_model(
+    "siteSearch",
+    query=(str, FieldInfo(description="Query text to execute site search in Confluence")),
 )
 
 class ConfluenceAPIWrapper(BaseModel):
@@ -355,6 +360,27 @@ class ConfluenceAPIWrapper(BaseModel):
             start += self.limit
         return pages_info
 
+    def site_search(self, query: str):
+        """Search for pages in Confluence using site search by query text."""
+        content = []
+        if not self.space:
+            cql = f'(type=page) and (siteSearch~"{query}")'
+        else:
+            cql = f'(type=page and space={self.space}) and (siteSearch~"{query}")'
+        pages = self.client.cql(cql, start=0, limit=10).get("results", [])
+        if not pages:
+            return f"Unable to find anything using query {query}"
+        # extract id, title, url and preview text
+        for page in pages:
+            page_data = {
+                'page_id': page['content']['id'],
+                'page_title': page['content']['title'],
+                'page_url': page['content']['_links']['self']
+            }
+            page_data['preview'] = page['excerpt'] if page['excerpt'] else ""
+            content.append(page_data)
+        return '---'.join([str(page_data) for page_data in content])
+
     def process_page(self, page: dict) -> Document:
         if self.keep_markdown_format:
             try:
@@ -535,6 +561,12 @@ class ConfluenceAPIWrapper(BaseModel):
                 "ref": self.search_pages,
                 "description": self.search_pages.__doc__,
                 "args_schema": searchPages,
+            },
+            {
+                "name": "site_search",
+                "ref": self.site_search,
+                "description": self.site_search.__doc__,
+                "args_schema": siteSearch,
             }
         ]
     
