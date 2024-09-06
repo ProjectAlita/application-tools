@@ -143,4 +143,4 @@ class BitbucketAPIWrapper(BaseModel):
             str: The file decoded as a string
         """
         file = self.bitbucket.get_content_of_file(project_key=self.project, repository_slug=self.repository, filename=file_path)
-        return file.decode().decode("utf-8")
+        return file.decode("utf-8")

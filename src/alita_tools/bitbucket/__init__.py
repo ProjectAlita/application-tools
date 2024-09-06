@@ -4,6 +4,19 @@ from .tools import __all__
 from langchain_core.tools import BaseToolkit
 from langchain_core.tools import BaseTool
 
+name = "bitbucket"
+
+
+def get_tools(tool):
+    return AlitaBitbucketToolkit.get_toolkit(
+        url=tool['settings']['url'],
+        project=tool['settings']['project'],
+        repository=tool['settings']['repository'],
+        username=tool['settings']['username'],
+        password=tool['settings']['password'],
+        branch=tool['settings']['branch']
+    ).get_tools()
+
 class AlitaBitbucketToolkit(BaseToolkit):
     tools: List[BaseTool] = []
     
