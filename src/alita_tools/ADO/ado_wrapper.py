@@ -20,7 +20,8 @@ AzureDevOpsSearch = create_model(
 
 AzureDevOpsCreateWorkItem = create_model(
     "AzureDevOpsCreateWorkItemModel",
-    work_item_json=(str, Field(description="JSON of the work item fields to create in Azure DevOps"))
+    work_item_json=(str, Field(description="JSON of the work item fields to create in Azure DevOps")),
+    WorkItemType=(str,Field(description="Work item type, e.g. 'Task', 'Issue' or  'EPIC'"))
 )
 
 AzureDevOpsUpdateWorkItem = create_model(
@@ -119,7 +120,7 @@ class AzureDevOpsApiWrapper(BaseModel):
 
 
 
-    def create_work_item(self, work_item_json: str):
+    def create_work_item(self, work_item_json: str, WorkItemType='Task'):
         """Create a work item in Azure DevOps."""
         try:
             # Convert the input JSON to a Python dictionary
@@ -143,7 +144,7 @@ class AzureDevOpsApiWrapper(BaseModel):
             work_item = self._client.create_work_item(
                 document=patch_document,
                 project=self.project,
-                type="Task"
+                type=WorkItemType
             )
 
             return f"Work item {work_item.id} created successfully. View it at {work_item.url}."
