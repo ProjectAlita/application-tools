@@ -71,6 +71,11 @@ GetSpecificFieldInfo = create_model(
     field_name=(str, FieldInfo(description="Field name data from which will be taken. It should be either 'description', 'summary', 'priority' etc or custom field name in following format 'customfield_10300'"))
 )
 
+ListCommentsInput = create_model(
+    "ListCommentsInputModel",
+    issue_key=(str, FieldInfo(description="The issue key of the Jira issue from which comments will be extracted, e.g. 'TEST-123'."))
+)
+
 
 class JiraApiWrapper(BaseModel):
     base_url: str
@@ -274,6 +279,23 @@ class JiraApiWrapper(BaseModel):
             logger.error(f"Error updating Jira issue: {stacktrace}")
             return f"Error updating Jira issue: {stacktrace}"
 
+    def list_comments(self, issue_key: str):
+        """ Extract the comments related to specified Jira issue """
+        try:
+            comments = self.client.issue_get_comments(issue_key)
+            comments_list = []
+            for comment in comments['comments']:
+                comments_list.append(
+                    {"author": comment['author']['displayName'], "comment": comment['body'], "id": comment['id'],
+                     "url": comment['self']})
+            output = f"Done. Comments were found for issue '{issue_key}': {comments_list}"
+            logger.info(output)
+            return output
+        except Exception as e:
+            stacktrace = format_exc()
+            logger.error(f"Unable to extract any comments from the issue: {stacktrace}")
+            return f"Error during the attempt to extract available comments: {stacktrace}"
+
     def add_comments(self, issue_key: str, comment: str):
         """ Add a comment to a Jira issue."""
         try:
@@ -323,6 +345,12 @@ class JiraApiWrapper(BaseModel):
                 "description": self.update_issue.__doc__,
                 "args_schema": JiraUpdateIssue,
                 "ref": self.update_issue,
+            },
+            {
+                "name": "list_comments",
+                "description": self.list_comments.__doc__,
+                "args_schema": ListCommentsInput,
+                "ref": self.list_comments,
             },
             {
                 "name": "add_comments",
