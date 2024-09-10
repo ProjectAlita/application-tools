@@ -23,18 +23,6 @@ AzureDevOpsCreateWorkItem = create_model(
     work_item_json=(str, Field(description="JSON of the work item fields to create in Azure DevOps")),
     WorkItemType=(str,Field(description="Work item type, e.g. 'Task', 'Issue' or  'EPIC'"))
 )
-
-AzureDevOpsUpdateWorkItem = create_model(
-    "AzureDevOpsUpdateWorkItemModel",
-    work_item_json=(str, Field(description="JSON of the work item fields to update in Azure DevOps"))
-)
-
-AddCommentInput = create_model(
-    "AddCommentInputModel",
-    work_item_id=(int, Field(description="The ID of the work item to which the comment is to be added")),
-    comment=(str, Field(description="The comment to add to the work item"))
-)
-
 NoInput = create_model("NoInput")
 logger = logging.getLogger(__name__)
 
