@@ -174,11 +174,13 @@ class ConfluenceAPIWrapper(BaseModel):
         for title, body in pages_info.items():
             status = self.create_page(title=title, body=body, parent_id=parent_id_filled, space=user_space)
             statuses.append(status)
-        return statuses
+        return str(statuses)
 
     def delete_page(self, page_id: str = None, page_title: str = None):
         """ Deletes a page by its defined page_id or page_title """
-        resolved_page_id = page_id or (self.client.get_page_by_title(space=self.space, title=page_title) or {}).get('id') if page_title else None
+        if not page_id and not page_title:
+            raise ValueError("Either page_id or page_title is required to delete the page")
+        resolved_page_id = page_id if page_id else self.client.get_page_by_title(space=self.space, title=page_title).get('id')
         if resolved_page_id:
             self.client.remove_page(resolved_page_id)
             message = f"Page with ID '{resolved_page_id}' has been successfully deleted."
@@ -246,7 +248,7 @@ class ConfluenceAPIWrapper(BaseModel):
             for index, page_id in enumerate(page_ids):
                 status = self.update_page(page_id=page_id, new_body=new_contents[index if len(new_contents) != 1 else 0], new_labels=new_labels)
                 statuses.append(status)
-            return statuses
+            return str(statuses)
         else:
             return "Either list of page_ids or parent_id (to update descendants) should be provided."
 
@@ -257,7 +259,7 @@ class ConfluenceAPIWrapper(BaseModel):
             for index, page_id in enumerate(page_ids):
                 status = self.update_page(page_id=page_id, new_labels=new_labels)
                 statuses.append(status)
-            return statuses
+            return str(statuses)
         else:
             return "Either list of page_ids should be provided."
 
@@ -309,9 +311,9 @@ class ConfluenceAPIWrapper(BaseModel):
         restrictions = self.client.get_all_restrictions_for_content(page["id"])
 
         return (
-            page["status"] == "current"
-            and not restrictions["read"]["restrictions"]["user"]["results"]
-            and not restrictions["read"]["restrictions"]["group"]["results"]
+                page["status"] == "current"
+                and not restrictions["read"]["restrictions"]["user"]["results"]
+                and not restrictions["read"]["restrictions"]["group"]["results"]
         )
 
     def get_pages_by_id(self, page_ids: List[str]):
@@ -358,7 +360,7 @@ class ConfluenceAPIWrapper(BaseModel):
                 }
                 pages_info.append(page_info)
             start += self.limit
-        return pages_info
+        return str(pages_info)
 
     def site_search(self, query: str):
         """Search for pages in Confluence using site search by query text."""
@@ -443,11 +445,11 @@ class ConfluenceAPIWrapper(BaseModel):
             page_content=text,
             metadata=metadata,
         )
-    
+
     def process_attachment(
-        self,
-        page_id: str,
-        ocr_languages: Optional[str] = None,
+            self,
+            page_id: str,
+            ocr_languages: Optional[str] = None,
     ) -> List[str]:
         try:
             from PIL import Image  # noqa: F401
@@ -468,14 +470,14 @@ class ConfluenceAPIWrapper(BaseModel):
                 if media_type == "application/pdf":
                     text = title + self.process_pdf(absolute_url, ocr_languages)
                 elif (
-                    media_type == "image/png"
-                    or media_type == "image/jpg"
-                    or media_type == "image/jpeg"
+                        media_type == "image/png"
+                        or media_type == "image/jpg"
+                        or media_type == "image/jpeg"
                 ):
                     text = title + self.process_image(absolute_url, ocr_languages)
                 elif (
-                    media_type == "application/vnd.openxmlformats-officedocument"
-                    ".wordprocessingml.document"
+                        media_type == "application/vnd.openxmlformats-officedocument"
+                                      ".wordprocessingml.document"
                 ):
                     text = title + self.process_doc(absolute_url)
                 elif media_type == "application/vnd.ms-excel":
@@ -493,7 +495,7 @@ class ConfluenceAPIWrapper(BaseModel):
                     raise
 
         return texts
-    
+
     def get_available_tools(self):
         return [
             {
@@ -569,7 +571,7 @@ class ConfluenceAPIWrapper(BaseModel):
                 "args_schema": siteSearch,
             }
         ]
-    
+
     def run(self, mode: str, *args: Any, **kwargs: Any):
         for tool in self.get_available_tools():
             if tool["name"] == mode:
