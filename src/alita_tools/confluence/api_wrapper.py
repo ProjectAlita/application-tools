@@ -547,7 +547,7 @@ class ConfluenceAPIWrapper(BaseModel):
                 "args_schema": deletePage,
             },
             {
-                "name": "update_page",
+                "name": "update_page_by_id",
                 "ref": self.update_page_by_id,
                 "description": self.update_page_by_id.__doc__,
                 "args_schema": updatePageById,
