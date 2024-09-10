@@ -10,7 +10,7 @@ from langchain_core.tools import ToolException
 from langchain_core.pydantic_v1 import root_validator, BaseModel
 from typing import List, Optional, Any
 from pydantic import create_model, Field, PrivateAttr
-
+import re
 
 # Input models for Azure DevOps operations
 AzureDevOpsSearch = create_model(
