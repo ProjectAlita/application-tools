@@ -21,6 +21,7 @@ createPage = create_model(
     space=(str, FieldInfo(description="Confluence space that is used for page's creation", default=None)),
     title=(str, FieldInfo(description="Title of the page")),
     body=(str, FieldInfo(description="Body of the page")),
+    status=(str, FieldInfo(description="Page publishing option: 'current' for publish page, 'draft' to create draft.", default='current')),
     parent_id=(str, FieldInfo(description="Page parent id (optional)", default=None)),
     representation=(str, FieldInfo(description="Content representation format: storage for html, wiki for markdown", default='storage')),
     label=(str, FieldInfo(description="Page label (optional)", default=None)),
@@ -31,6 +32,7 @@ createPages = create_model(
     space=(str, FieldInfo(description="Confluence space that is used for pages creation", default=None)),
     pages_info=(dict, FieldInfo(description="Content in key-value format: Title=Body")),
     parent_id=(str, FieldInfo(description="Page parent id (optional)", default=None)),
+    status=(str, FieldInfo(description="Page publishing option: 'current' for publish page, 'draft' to create draft.", default='current')),
 )
 
 deletePage = create_model(
@@ -39,8 +41,8 @@ deletePage = create_model(
     page_title=(str, FieldInfo(description="Page title", default=None)),
 )
 
-updatePage = create_model(
-    "updatePage",
+updatePageById = create_model(
+    "updatePageById",
     page_id=(str, FieldInfo(description="Page id")),
     representation=(str, FieldInfo(description="Content representation format: storage for html, wiki for markdown", default='storage')),
     new_title=(str, FieldInfo(description="New page title", default=None)),
@@ -136,51 +138,79 @@ class ConfluenceAPIWrapper(BaseModel):
             values['client'] = Confluence(url=url,username=username, password=api_key, cloud=cloud)
         return values
 
-    def create_page(self, title: str, body: str, space: str = None, parent_id: str = None, representation: str = 'storage', label: str = None):
-        """ Creates a page in the Confluence space. Represents content in html (storage) or wiki (wiki) formats """
+    def create_page(self, title: str, body: str, status: str = 'current', space: str = None, parent_id: str = None, representation: str = 'storage', label: str = None):
+        """ Creates a page in the Confluence space. Represents content in html (storage) or wiki (wiki) formats
+            Page could be either published status='current' or make a draft with status='draft'
+        """
         if self.client.get_page_by_title(space=self.space, title=title) is not None:
             return f"Page with title {title} already exists, please use other title."
 
         # normal user flow: put pages in the Space Home, not in the root of the Space
         user_space = space if space else self.space
-        logger.info(f"Page will be created within the space ${user_space}")
+        logger.info(f"Page will be created within the space {user_space}")
         parent_id_filled = parent_id if parent_id else self.client.get_space(user_space)['homepage']['id']
 
-        status = self.client.create_page(space=user_space, title=title, body=body, parent_id=parent_id_filled, representation=representation)
-        logger.info(f"Page created: {status['_links']['base'] + status['_links']['webui']}")
+        created_page = self.temp_create_page(space=user_space, title=title, body=body, status=status, parent_id=parent_id_filled, representation=representation)
 
         page_details = {
-            'title': status['title'],
-            'id': status['id'],
-            'space key': status['space']['key'],
-            'author': status['version']['by']['displayName'],
-            'link': status['_links']['base'] + status['_links']['webui']
+            'title': created_page['title'],
+            'id': created_page['id'],
+            'space key': created_page['space']['key'],
+            'author': created_page['version']['by']['displayName'],
+            'link': created_page['_links']['base'] + (created_page['_links']['edit'] if status == 'draft' else created_page['_links']['webui'])
         }
 
+        logger.info(f"Page created: {page_details['link']}")
+
         if label:
-            self.client.set_page_label(page_id = status['id'], label = label)
+            self.client.set_page_label(page_id=created_page['id'], label=label)
             logger.info(f"Label '{label}' added to the page '{title}'.")
             page_details['label'] = label
 
-        return f"The page '{title}' was created under the parent page '{parent_id_filled}': '{status['_links']['base'] + status['_links']['webui']}'. \nDetails: {str(page_details)}"
+        return f"The page '{title}' was created under the parent page '{parent_id_filled}': '{page_details['link']}'. \nDetails: {str(page_details)}"
 
-    def create_pages(self, pages_info: dict, space: str = None, parent_id: str = None):
+    def create_pages(self, pages_info: dict, status: str = 'current', space: str = None, parent_id: str = None):
         """ Creates a batch of pages in the Confluence space."""
-        statuses = []
+        created_pages = []
         user_space = space if space else self.space
-        logger.info(f"Pages will be created within the space ${user_space}")
+        logger.info(f"Pages will be created within the space {user_space}")
         # duplicate action to avoid extra api calls in downstream function
         parent_id_filled = parent_id if parent_id else self.client.get_space(user_space)['homepage']['id']
         for title, body in pages_info.items():
-            status = self.create_page(title=title, body=body, parent_id=parent_id_filled, space=user_space)
-            statuses.append(status)
-        return str(statuses)
+            created_page = self.create_page(title=title, body=body, status=status, parent_id=parent_id_filled, space=user_space)
+            created_pages.append(created_page)
+        return str(created_pages)
+
+    # delete after https://github.com/atlassian-api/atlassian-python-api/pull/1452 will be merged
+    def temp_create_page(self, space, title, body, parent_id=None, type="page", representation="storage", editor=None, full_width=False, status='current'):
+        logger.info('Creating %s "%s" -> "%s"', type, space, title)
+        url = "rest/api/content/"
+        data = {
+            "type": type,
+            "title": title,
+            "status": status,
+            "space": {"key": space},
+            "body": self.client._create_body(body, representation),
+            "metadata": {"properties": {}},
+        }
+        if parent_id:
+            data["ancestors"] = [{"type": type, "id": parent_id}]
+        if editor is not None and editor in ["v1", "v2"]:
+            data["metadata"]["properties"]["editor"] = {"value": editor}
+        if full_width is True:
+            data["metadata"]["properties"]["content-appearance-draft"] = {"value": "full-width"}
+            data["metadata"]["properties"]["content-appearance-published"] = {"value": "full-width"}
+        else:
+            data["metadata"]["properties"]["content-appearance-draft"] = {"value": "fixed-width"}
+            data["metadata"]["properties"]["content-appearance-published"] = {"value": "fixed-width"}
+
+        return self.client.post(url, data=data)
 
     def delete_page(self, page_id: str = None, page_title: str = None):
         """ Deletes a page by its defined page_id or page_title """
         if not page_id and not page_title:
             raise ValueError("Either page_id or page_title is required to delete the page")
-        resolved_page_id = page_id if page_id else self.client.get_page_by_title(space=self.space, title=page_title).get('id')
+        resolved_page_id = page_id if page_id else (self.client.get_page_by_title(space=self.space, title=page_title) or {}).get('id')
         if resolved_page_id:
             self.client.remove_page(resolved_page_id)
             message = f"Page with ID '{resolved_page_id}' has been successfully deleted."
@@ -188,7 +218,7 @@ class ConfluenceAPIWrapper(BaseModel):
             message = f"Page instance could not be resolved with id '{page_id}' and/or title '{page_title}'"
         return message
 
-    def update_page(self, page_id: str, representation: str = 'storage', new_title: str = None, new_body: str = None, new_labels: list = None):
+    def update_page_by_id(self, page_id: str, representation: str = 'storage', new_title: str = None, new_body: str = None, new_labels: list = None):
         """ Updates an existing Confluence page (using id or title) by replacing its content, title, labels """
         current_page = self.client.get_page_by_id(page_id, expand='version,body.view')
         if not current_page:
@@ -311,9 +341,9 @@ class ConfluenceAPIWrapper(BaseModel):
         restrictions = self.client.get_all_restrictions_for_content(page["id"])
 
         return (
-                page["status"] == "current"
-                and not restrictions["read"]["restrictions"]["user"]["results"]
-                and not restrictions["read"]["restrictions"]["group"]["results"]
+            page["status"] == "current"
+            and not restrictions["read"]["restrictions"]["user"]["results"]
+            and not restrictions["read"]["restrictions"]["group"]["results"]
         )
 
     def get_pages_by_id(self, page_ids: List[str]):
@@ -447,9 +477,9 @@ class ConfluenceAPIWrapper(BaseModel):
         )
 
     def process_attachment(
-            self,
-            page_id: str,
-            ocr_languages: Optional[str] = None,
+        self,
+        page_id: str,
+        ocr_languages: Optional[str] = None,
     ) -> List[str]:
         try:
             from PIL import Image  # noqa: F401
@@ -470,14 +500,14 @@ class ConfluenceAPIWrapper(BaseModel):
                 if media_type == "application/pdf":
                     text = title + self.process_pdf(absolute_url, ocr_languages)
                 elif (
-                        media_type == "image/png"
-                        or media_type == "image/jpg"
-                        or media_type == "image/jpeg"
+                    media_type == "image/png"
+                    or media_type == "image/jpg"
+                    or media_type == "image/jpeg"
                 ):
                     text = title + self.process_image(absolute_url, ocr_languages)
                 elif (
-                        media_type == "application/vnd.openxmlformats-officedocument"
-                                      ".wordprocessingml.document"
+                    media_type == "application/vnd.openxmlformats-officedocument"
+                    ".wordprocessingml.document"
                 ):
                     text = title + self.process_doc(absolute_url)
                 elif media_type == "application/vnd.ms-excel":
@@ -517,10 +547,10 @@ class ConfluenceAPIWrapper(BaseModel):
                 "args_schema": deletePage,
             },
             {
-                "name": "update_page",
-                "ref": self.update_page,
-                "description": self.update_page.__doc__,
-                "args_schema": updatePage,
+                "name": "update_page_by_id",
+                "ref": self.update_page_by_id,
+                "description": self.update_page_by_id.__doc__,
+                "args_schema": updatePageById,
             },
             {
                 "name": "update_page_by_title",
