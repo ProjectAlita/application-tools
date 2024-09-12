@@ -408,9 +408,9 @@ class ConfluenceAPIWrapper(BaseModel):
     def search_by_title(self, query: str):
         """Search pages in Confluence by query text in title."""
         if not self.space:
-            cql = f'(type=page) and (title~"{query}"'
+            cql = f'(type=page) and (title~"{query}")'
         else:
-            cql = f'(type=page and space={self.space})'
+            cql = f'(type=page and space={self.space}) and (title~"{query}")'
         return self._process_search(cql)
 
 
