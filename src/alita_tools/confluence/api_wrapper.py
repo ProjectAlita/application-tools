@@ -97,6 +97,11 @@ siteSearch = create_model(
     query=(str, FieldInfo(description="Query text to execute site search in Confluence")),
 )
 
+pageId = create_model(
+    "pageId",
+    page_id=(str, FieldInfo(description="Id of page to be read")),
+)
+
 class ConfluenceAPIWrapper(BaseModel):
     base_url: str
     api_key: Optional[str] = None,
@@ -367,15 +372,15 @@ class ConfluenceAPIWrapper(BaseModel):
             if not self.include_restricted_content and not self.is_public_page(page):
                 continue
             yield self.process_page(page)
-
-    def search_pages(self, query: str):
-        """Search pages in Confluence by query text in title or body."""
+    
+    def read_page_by_id(self, page_id: str):
+        """Reads a page by its id in the Confluence space."""
+        result = list(self.get_pages_by_id([page_id]))
+        return result[0].page_content if result else "Page not found"
+    
+    def _process_search(self, cql):
         start = 0
         pages_info = []
-        if not self.space:
-            cql = f'(type=page) and (title~"{query}" or text~"{query}")'
-        else:
-            cql = f'(type=page and space={self.space}) and (title~"{query}" or text~"{query}")'
         for _ in range(self.max_pages // self.limit):
             pages = self.client.cql(cql, start=start, limit=self.limit).get("results", [])
             if not pages:
@@ -391,6 +396,23 @@ class ConfluenceAPIWrapper(BaseModel):
                 pages_info.append(page_info)
             start += self.limit
         return str(pages_info)
+
+    def search_pages(self, query: str):
+        """Search pages in Confluence by query text in title or page content."""
+        if not self.space:
+            cql = f'(type=page) and (title~"{query}" or text~"{query}")'
+        else:
+            cql = f'(type=page and space={self.space}) and (title~"{query}" or text~"{query}")'
+        return self._process_search(cql)
+
+    def search_by_title(self, query: str):
+        """Search pages in Confluence by query text in title."""
+        if not self.space:
+            cql = f'(type=page) and (title~"{query}"'
+        else:
+            cql = f'(type=page and space={self.space})'
+        return self._process_search(cql)
+
 
     def site_search(self, query: str):
         """Search for pages in Confluence using site search by query text."""
@@ -475,7 +497,7 @@ class ConfluenceAPIWrapper(BaseModel):
             page_content=text,
             metadata=metadata,
         )
-
+    
     def process_attachment(
         self,
         page_id: str,
@@ -525,7 +547,7 @@ class ConfluenceAPIWrapper(BaseModel):
                     raise
 
         return texts
-
+    
     def get_available_tools(self):
         return [
             {
@@ -589,9 +611,21 @@ class ConfluenceAPIWrapper(BaseModel):
                 "args_schema": getPagesWithLabel,
             },
             {
+                "name": "read_page_by_id",
+                "ref": self.read_page_by_id,
+                "description": self.read_page_by_id.__doc__,
+                "args_schema": pageId,
+            },
+            {
                 "name": "search_pages",
                 "ref": self.search_pages,
                 "description": self.search_pages.__doc__,
+                "args_schema": searchPages,
+            },
+            {
+                "name": "search_by_title",
+                "ref": self.search_by_title,
+                "description": self.search_by_title.__doc__,
                 "args_schema": searchPages,
             },
             {
@@ -601,7 +635,7 @@ class ConfluenceAPIWrapper(BaseModel):
                 "args_schema": siteSearch,
             }
         ]
-
+    
     def run(self, mode: str, *args: Any, **kwargs: Any):
         for tool in self.get_available_tools():
             if tool["name"] == mode:
