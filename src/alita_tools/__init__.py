@@ -10,6 +10,7 @@ from .zephyr import get_tools as get_zephyr
 from .browser import get_tools as get_browser
 from .report_portal import get_tools as get_report_portal
 from .bitbucket import get_tools as get_bitbucket
+from .testrail import get_tools as get_testrail
 
 from .yagmail import get_tools as get_yagmail
 
@@ -38,6 +39,8 @@ def get_tools(tools_list, *args, **kwargs):
             tools.extend(get_report_portal(tool))
         elif tool['type'] == 'bitbucket':
             tools.extend(get_bitbucket(tool))
+        elif tool['type'] == 'testrail':
+            tools.extend(get_testrail(tool))
         else:
             if tool.get("settings", {}).get("module"):
                 try:
