@@ -272,7 +272,7 @@ class ConfluenceAPIWrapper(BaseModel):
         if not current_page:
             return f"Page with title {page_title} not found."
 
-        return self.update_page(page_id=current_page['id'], representation=representation, new_title=new_title, new_body=new_body, new_labels=new_labels)
+        return self.update_page_by_id(page_id=current_page['id'], representation=representation, new_title=new_title, new_body=new_body, new_labels=new_labels)
 
     def update_pages(self, page_ids: list = None, new_contents: list = None, new_labels: list = None):
         """ Update a batch of pages in the Confluence space. """
@@ -281,7 +281,7 @@ class ConfluenceAPIWrapper(BaseModel):
             raise ValueError("New content should be provided for all the pages or it should contain only 1 new body for bulk update")
         if page_ids:
             for index, page_id in enumerate(page_ids):
-                status = self.update_page(page_id=page_id, new_body=new_contents[index if len(new_contents) != 1 else 0], new_labels=new_labels)
+                status = self.update_page_by_id(page_id=page_id, new_body=new_contents[index if len(new_contents) != 1 else 0], new_labels=new_labels)
                 statuses.append(status)
             return str(statuses)
         else:
@@ -292,7 +292,7 @@ class ConfluenceAPIWrapper(BaseModel):
         statuses = []
         if page_ids:
             for index, page_id in enumerate(page_ids):
-                status = self.update_page(page_id=page_id, new_labels=new_labels)
+                status = self.update_page_by_id(page_id=page_id, new_labels=new_labels)
                 statuses.append(status)
             return str(statuses)
         else:
