@@ -332,14 +332,19 @@ class ConfluenceAPIWrapper(BaseModel):
     def get_pages_with_label(self, label: str):
         """ Gets pages with specific label in the Confluence space."""
         start = 0
-        content = []
+        pages_info = []
         for _ in range(self.max_pages // self.limit):
-            pages = self.client.get_all_pages_by_label(label, start=start, limit=self.limit)
+            pages = self.client.get_all_pages_by_label(label, start=start, limit=self.limit) #, expand="body.view.value"
             if not pages:
                 break
-            content += [page.page_content for page in self.get_pages_by_id([page["id"] for page in pages])]
+            pages_info += [{
+                'page_id': page.metadata['id'],
+                'page_title': page.metadata['title'],
+                'page_url': page.metadata['source'],
+                'content': page.page_content
+            } for page in self.get_pages_by_id([page["id"] for page in pages])]
             start += self.limit
-        return "\n".join(content)
+        return str(pages_info)
 
     def is_public_page(self, page: dict) -> bool:
         """Check if a page is publicly accessible."""
@@ -412,7 +417,6 @@ class ConfluenceAPIWrapper(BaseModel):
         else:
             cql = f'(type=page and space={self.space}) and (title~"{query}")'
         return self._process_search(cql)
-
 
     def site_search(self, query: str):
         """Search for pages in Confluence using site search by query text."""
