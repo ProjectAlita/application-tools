@@ -21,3 +21,5 @@ gitpython==3.1.43
 qtest-swagger-client==0.0.3
 requests~=2.3
 testrail-api==1.13.2
+azure-devops==7.1.0b4
+msrest==0.7.1
