@@ -124,8 +124,8 @@ class QtestApiWrapper(BaseModel):
         initial_project_properties = self.__get_properties_form_project()
         props = []
         for prop in initial_project_properties:
-            props.append(PropertyResource(field_id=prop.field_id, field_name=prop.field_name,
-                                          field_value_name=prop.field_value_name, field_value=prop.field_value))
+            props.append(PropertyResource(field_id=prop['field_id'], field_name=prop['field_name'],
+                                          field_value_name=prop.get('field_value_name', None), field_value=prop['field_value']))
         bodies = []
         for test_case in test_cases_data:
             body = swagger_client.TestCaseWithCustomFieldResource(properties=props)
@@ -216,12 +216,12 @@ class QtestApiWrapper(BaseModel):
         parsed_data = self.__perform_search_by_dql(dql)
         return parsed_data[0]['Qtest Id']
 
-    def __get_properties_form_project(self) -> list[PropertyResource]:
+    def __get_properties_form_project(self) -> list[dict]:
         test_api_instance = self.__instantiate_test_api_instance()
         expand_props = 'true'
         try:
             response = test_api_instance.get_test_cases(self.project_id, 1, 1, expand_props=expand_props)
-            return response[0].properties
+            return response[0]['properties']
         except ApiException as e:
             logger.error("Exception when calling TestCaseApi->get_test_cases: %s\n" % e)
 

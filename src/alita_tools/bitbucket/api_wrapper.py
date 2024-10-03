@@ -81,33 +81,22 @@ class BitbucketAPIWrapper(BaseModel):
         self.active_branch = branch_name
         return f"Branch {branch_name} created successfully and set as active"
 
-    def create_pull_request(self, pr_title: str, pr_description: str) -> str:
+    def create_pull_request(self, pr_json_data: str) -> str:
         """
         Makes a pull request from the bot's branch to the base branch
         Parameters:
-            pr_title(str): a string which contains the PR title
-            pr_description(str): a string which contains the PR description
-             the body are the rest of the string.
-            For example, "Updated README\nmade changes to add info"
+            pr_json_data(str): a JSON string which contains information on how pull request should be done
         Returns:
             str: A success or failure message
         """
-        if self.branch == self.active_branch:
-            return f"""Cannot make a pull request because 
-            commits are already in the {self.branch} branch"""
-        else:
-            try:
-                pr = self.bitbucket.create_pull_request(
-                    project_key=self.project,
-                    repository_slug=self.repository,
-                    title=pr_title,
-                    description=pr_description,
-                    from_branch=self.active_branch,
-                    to_branch=self.branch
-                )
-                return f"Successfully created PR number {pr.iid}"
-            except Exception as e:
-                return "Unable to make pull request due to error:\n" + str(e)
+        try:
+            pr = self.bitbucket.create_pull_request(project_key=self.project,
+                                                    repository_slug=self.repository,
+                                                    data = json.loads(pr_json_data)
+                                                    )
+            return f"Successfully created PR number {pr['id']}"
+        except Exception as e:
+            return "Unable to make pull request due to error:\n" + str(e)
 
     def create_file(self, file_path: str, file_contents: str) -> str:
         """

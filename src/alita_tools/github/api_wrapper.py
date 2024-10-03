@@ -73,7 +73,7 @@ GetPR = create_model(
 DirectoryPath = create_model(
     "DirectoryPath",
     directory_path=(str, FieldInfo(
-        "",
+        default="",
         description=(
             "The path of the directory, e.g. `some_dir/inner_dir`."
             " Only input a string, do not include the parameter name."
@@ -122,7 +122,7 @@ CreatePR = create_model(
 
 CommentOnIssue = create_model(
     "CommentOnIssue",
-    comment_query=(str, FieldInfo(..., description="Follow the required formatting."))
+    comment_query=(str, FieldInfo(default=..., description="Follow the required formatting."))
 )
 
 DeleteFile = create_model(
