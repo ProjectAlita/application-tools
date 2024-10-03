@@ -22,3 +22,4 @@ qtest-swagger-client==0.0.3
 requests~=2.3
 azure-devops
 msrest
+gql
