@@ -57,7 +57,6 @@ class AzureDevOpsApiWrapper(BaseModel):
     project: str
     token: str
     limit: Optional[int] = 5
-    verify_ssl: Optional[bool] = True
     _client: Optional[WorkItemTrackingClient] = PrivateAttr()  # Private attribute for the work item tracking client
 
     class Config:
@@ -88,8 +87,8 @@ class AzureDevOpsApiWrapper(BaseModel):
             fields = ["System.Title", "System.State", "System.AssignedTo", "System.WorkItemType", "System.CreatedDate", "System.ChangedDate"]
         
         # Remove 'System.Id' from the fields list, as it's not a field you request, it's metadata
-        fields = [field for field in fields if "System.Id" not in field]
-        fields = [field for field in fields if "System.WorkItemType" not in field]
+        fields.remove("System.Id")
+        fields.remove("System.WorkItemType")
         for item in work_items:
             # Fetch full details of the work item, including the requested fields
             full_item = self._client.get_work_item(id=item.id,project=self.project, fields=fields)
@@ -124,10 +123,6 @@ class AzureDevOpsApiWrapper(BaseModel):
                 for field, value in params["fields"].items()
             ]
 
-            # Validate that the Azure DevOps client is initialized
-            if not self._client:
-                raise ToolException("Azure DevOps client not initialized.")
-
             # Use the transformed patch_document to create the work item
             work_item = self._client.create_work_item(
                 document=patch_document,
@@ -157,6 +152,7 @@ class AzureDevOpsApiWrapper(BaseModel):
 
             # Validate that the Azure DevOps client is initialized
             if not self._client:
+                logger.error("Azure DevOps client not initialized.")
                 raise ToolException("Azure DevOps client not initialized.")
             print(wiql)
             # Execute the WIQL query
