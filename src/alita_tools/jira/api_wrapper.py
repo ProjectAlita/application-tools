@@ -71,6 +71,11 @@ GetSpecificFieldInfo = create_model(
     field_name=(str, FieldInfo(description="Field name data from which will be taken. It should be either 'description', 'summary', 'priority' etc or custom field name in following format 'customfield_10300'"))
 )
 
+GetRemoteLinks = create_model(
+    "GetRemoteLinksModel",
+    jira_issue_key=(str, FieldInfo(description="Jira issue key from which remote links will be extracted, e.g. TEST-1234"))
+)
+
 ListCommentsInput = create_model(
     "ListCommentsInputModel",
     issue_key=(str, FieldInfo(description="The issue key of the Jira issue from which comments will be extracted, e.g. 'TEST-123'."))
@@ -218,6 +223,11 @@ class JiraApiWrapper(BaseModel):
         jira_issue = self.client.issue(jira_issue_key, fields=field_name)
         field_info = jira_issue['fields'][field_name]
         return f"Got the data from following Jira issue - {jira_issue_key} and field - {field_name}. The data is:\n{field_info}"
+
+    def get_remote_links(self, jira_issue_key: str):
+        """ Get the remote links from the specified jira issue key"""
+        remote_links = self.client.get_issue_remotelinks(jira_issue_key)
+        return f"Jira issue - {jira_issue_key} has the following remote links:\n{str(remote_links)}"
 
     def create_issue(self, issue_json: str):
         """ Create an issue in Jira."""
@@ -375,6 +385,13 @@ class JiraApiWrapper(BaseModel):
                 "description": self.get_specific_field_info.__doc__,
                 "args_schema": GetSpecificFieldInfo,
                 "ref": self.get_specific_field_info,
+
+            },
+            {
+                "name": "get_remote_links",
+                "description": self.get_remote_links.__doc__,
+                "args_schema": GetRemoteLinks,
+                "ref": self.get_remote_links,
 
             }
         ]

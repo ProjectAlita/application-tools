@@ -40,14 +40,14 @@ class CreatePRTool(BaseTool):
     """
     args_schema: Type[BaseModel] = create_model(
         "CreatePRInput",
-        pr_title=(str, FieldInfo(description="Title of pull request. Maybe generated from made changes in the branch.")),
-        pr_body=(str, FieldInfo(description="Body or description of the pull request of made changes.")))
+        pr_json_data=(str, FieldInfo(description="JSON string describing pull request structure: i.e. "
+                                                 "'{ \"title\":\"PR title\", \"description\":\"PR description\", \"state\":\"OPEN\", \"open\":true, \"closed\":false, \"fromRef\":{ \"id\":\"refs/heads/source_branch\" }, \"toRef\":{ \"id\":\"refs/heads/target_branch\" }, \"locked\":false }'")))
 
-    def _run(self, pr_title: str, pr_body: str):
+    def _run(self, pr_json_data: str):
         try:
             base_branch = self.api_wrapper.branch
-            logger.info(f"Creating pull request with title: {pr_title}, body: {pr_body}, base_branch: {base_branch}")
-            return self.api_wrapper.create_pull_request(pr_title, pr_body)
+            logger.info(f"Creating pull request using data: base_branch: {pr_json_data}")
+            return self.api_wrapper.create_pull_request(pr_json_data)
         except Exception as e:
             stacktrace = traceback.format_exc()
             logger.error(f"Unable to create PR: {stacktrace}")
