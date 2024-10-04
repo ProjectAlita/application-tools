@@ -22,6 +22,9 @@ class AzureDevOpsToolkit(BaseToolkit):
 
     @classmethod
     def get_toolkit(cls, selected_tools: list[str] | None = None, **kwargs):
+        from os import environ
+        if not environ.get('AZURE_DEVOPS_CACHE_DIR', None):
+            environ['AZURE_DEVOPS_CACHE_DIR'] = '/tmp/.azure-devops'
         if selected_tools is None:
             selected_tools = []
         azure_devops_api_wrapper = AzureDevOpsApiWrapper(**kwargs)
