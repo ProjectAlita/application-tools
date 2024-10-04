@@ -232,7 +232,6 @@ class JiraApiWrapper(BaseModel):
     def create_issue(self, issue_json: str):
         """ Create an issue in Jira."""
         try:
-            print(issue_json)
             params = json.loads(issue_json)
             self.create_issue_validate(params)
             # used in case linkage via `update` is required

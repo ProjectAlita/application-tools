@@ -205,7 +205,6 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         github_base_url = get_from_dict_or_env(
             values, "github_base_url", "GITHUB_BASE_URL", default=DEFAULT_BASE_URL)        
         if github_access_token:
-            print(github_access_token)
             auth = Auth.Token(github_access_token)
         elif github_username and github_password:
             auth = Auth.Login(github_username, github_password)
