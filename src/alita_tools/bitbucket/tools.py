@@ -5,19 +5,19 @@ from typing import Type
 from langchain_core.tools import BaseTool
 from pydantic import create_model, BaseModel, Field
 from pydantic.fields import FieldInfo
+from src.alita_tools.bitbucket.bitbucket_constants import create_pr_data
 
 from .api_wrapper import BitbucketAPIWrapper
-
 
 logger = logging.getLogger(__name__)
 
 branchInput = create_model(
-        "BranchInput", 
-        branch_name=(str, 
-                     FieldInfo(description="The name of the branch, e.g. `my_branch`.")))
+    "BranchInput",
+    branch_name=(str,
+                 FieldInfo(description="The name of the branch, e.g. `my_branch`.")))
+
 
 class CreateBitbucketBranchTool(BaseTool):
-
     api_wrapper: BitbucketAPIWrapper = Field(default_factory=BitbucketAPIWrapper)
     name: str = "create_branch"
     description: str = """This tool is a wrapper for the Bitbucket API to create a new branch in the repository."""
@@ -32,6 +32,7 @@ class CreateBitbucketBranchTool(BaseTool):
             logger.error(f"Unable to create a branch: {stacktrace}")
             return f"Unable to create a branch: {stacktrace}"
 
+
 class CreatePRTool(BaseTool):
     api_wrapper: BitbucketAPIWrapper = Field(default_factory=BitbucketAPIWrapper)
     name: str = "create_pull_request"
@@ -40,8 +41,7 @@ class CreatePRTool(BaseTool):
     """
     args_schema: Type[BaseModel] = create_model(
         "CreatePRInput",
-        pr_json_data=(str, FieldInfo(description="JSON string describing pull request structure: i.e. "
-                                                 "'{ \"title\":\"PR title\", \"description\":\"PR description\", \"state\":\"OPEN\", \"open\":true, \"closed\":false, \"fromRef\":{ \"id\":\"refs/heads/source_branch\" }, \"toRef\":{ \"id\":\"refs/heads/target_branch\" }, \"locked\":false }'")))
+        pr_json_data=(str, FieldInfo(description=create_pr_data)))
 
     def _run(self, pr_json_data: str):
         try:
@@ -60,8 +60,9 @@ class CreateFileTool(BaseTool):
     description: str = """This tool is a wrapper for the Bitbucket API, useful when you need to create a file in a Bitbucket repository.
     """
     args_schema: Type[BaseModel] = create_model(
-        "CreateFileInput", 
-        file_path=(str, FieldInfo(description="File path of file to be created. e.g. `src/agents/developer/tools/git/bitbucket.py`. **IMPORTANT**: the path must not start with a slash")),
+        "CreateFileInput",
+        file_path=(str, FieldInfo(
+            description="File path of file to be created. e.g. `src/agents/developer/tools/git/bitbucket.py`. **IMPORTANT**: the path must not start with a slash")),
         file_contents=(str, FieldInfo(description="""
     Full file content to be created. It must be without any escapes, just raw content to CREATE in GIT.
     Generate full file content for this field without any additional texts, escapes, just raw code content. 
@@ -88,6 +89,7 @@ class SetActiveBranchTool(BaseTool):
             stacktrace = traceback.format_exc()
             logger.error(f"Unable to set active branch: {stacktrace}")
             return f"Unable to set active branch: {stacktrace}"
+
 
 class ListBranchesTool(BaseTool):
     """Tool for interacting with the Bitbucket API."""
@@ -116,7 +118,8 @@ class ReadFileTool(BaseTool):
     file path of the file you would like to read. **IMPORTANT**: the path must not start with a slash"""
     args_schema: Type[BaseModel] = create_model(
         "ReadFileInput",
-        file_path=(str, FieldInfo(description="File path of file to be read. e.g. `src/agents/developer/tools/git/github_tools.py`. **IMPORTANT**: the path must not start with a slash")
+        file_path=(str, FieldInfo(
+            description="File path of file to be read. e.g. `src/agents/developer/tools/git/github_tools.py`. **IMPORTANT**: the path must not start with a slash")
                    )
     )
 
