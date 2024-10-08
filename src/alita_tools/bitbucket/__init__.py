@@ -24,6 +24,8 @@ class AlitaBitbucketToolkit(BaseToolkit):
     def get_toolkit(cls, selected_tools: list[str] | None = None, **kwargs):
         if selected_tools is None:
             selected_tools = []
+        if "cloud" not in kwargs and ("bitbucket.org" in kwargs.get('url')):
+            kwargs["cloud"] = True
         bitbucket_api_wrapper = BitbucketAPIWrapper(**kwargs)
         available_tools: List[Dict] = __all__
         tools = []
