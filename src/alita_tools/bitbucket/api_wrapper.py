@@ -131,6 +131,6 @@ class BitbucketAPIWrapper(BaseModel):
             str: The file decoded as a string
         """
         try:
-            self.bitbucket.get_file(file_path=file_path, branch=self.active_branch)
+            return self.bitbucket.get_file(file_path=file_path, branch=self.active_branch)
         except Exception as e:
             raise ToolException(f"Can't extract file content (`{file_path}`) due to error:\n{str(e)}")
