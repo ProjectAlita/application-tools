@@ -5,7 +5,7 @@ from typing import Type
 from langchain_core.tools import BaseTool
 from pydantic import create_model, BaseModel, Field
 from pydantic.fields import FieldInfo
-from src.alita_tools.bitbucket.bitbucket_constants import create_pr_data
+from .bitbucket_constants import create_pr_data
 
 from .api_wrapper import BitbucketAPIWrapper
 

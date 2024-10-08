@@ -6,9 +6,8 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from langchain_core.tools import ToolException
 from pydantic import BaseModel, root_validator
-from src.alita_tools.bitbucket.bitbucket_constants import create_pr_data
-
-from src.alita_tools.bitbucket.cloud_api_wrapper import BitbucketCloudApi, BitbucketServerApi
+from .bitbucket_constants import create_pr_data
+from .cloud_api_wrapper import BitbucketCloudApi, BitbucketServerApi
 
 logger = logging.getLogger(__name__)
 
