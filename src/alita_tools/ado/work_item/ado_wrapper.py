@@ -12,10 +12,25 @@ from pydantic import create_model, Field, PrivateAttr
 
 logger = logging.getLogger(__name__)
 
+create_wi_field = """JSON of the work item fields to create in Azure DevOps, i.e.
+                    {
+                       "fields":{
+                          "System.Title":"Implement Registration Form Validation",
+                          "field2":"Value 2",
+                       }
+                    }
+                    """
+
 # Input models for Azure DevOps operations
 ADOWorkItemsSearch = create_model(
     "AzureDevOpsSearchModel",
     query=(str, Field(description="WIQL query for searching Azure DevOps work items"))
+)
+
+ADOCreateWorkItem = create_model(
+    "AzureDevOpsCreateWorkItemModel",
+    work_item_json=(str, Field(description=create_wi_field)),
+    wi_type=(str, Field(description="Work item type, e.g. 'Task', 'Issue' or  'EPIC'", default="Task"))
 )
 
 class AzureDevOpsApiWrapper(BaseModel):
@@ -40,7 +55,7 @@ class AzureDevOpsApiWrapper(BaseModel):
             cls._client = connection.clients.get_work_item_tracking_client()
 
         except Exception as e:
-            raise ImportError(f"Failed to connect to Azure DevOps: {e}")
+            return ImportError(f"Failed to connect to Azure DevOps: {e}")
 
         return values
 
@@ -72,12 +87,17 @@ class AzureDevOpsApiWrapper(BaseModel):
 
         return parsed_items
 
-    # To be added
-    def create_work_item(self, work_item_json: str, WorkItemType='Task'):
+    def create_work_item(self, work_item_json: str, wi_type="Task"):
         """Create a work item in Azure DevOps."""
         try:
             # Convert the input JSON to a Python dictionary
             params = json.loads(work_item_json)
+        except (json.JSONDecodeError, ValueError) as e:
+            return ToolException(f"Issues during attempt to parse work_item_json: {e}")
+
+        try:
+            if 'fields' not in params:
+                raise ToolException("The 'fields' property is missing from the work_item_json.")
 
             # Transform the dictionary into a list of JsonPatchOperation objects
             patch_document = [
@@ -91,19 +111,21 @@ class AzureDevOpsApiWrapper(BaseModel):
 
             # Validate that the Azure DevOps client is initialized
             if not self._client:
-                raise ToolException("Azure DevOps client not initialized.")
+                return ToolException("Azure DevOps client not initialized.")
 
             # Use the transformed patch_document to create the work item
             work_item = self._client.create_work_item(
                 document=patch_document,
                 project=self.project,
-                type=WorkItemType
+                type=wi_type
             )
-
             return f"Work item {work_item.id} created successfully. View it at {work_item.url}."
         except Exception as e:
+            if "unknown value" in str(e):
+                logger.error(f"Unable to create work item due to incorrect assignee: {e}")
+                raise ToolException(f"Unable to create work item due to incorrect assignee: {e}")
             logger.error(f"Error creating work item: {e}")
-            raise ToolException(f"Error creating work item: {e}")
+            return ToolException(f"Error creating work item: {e}")
 
     def search_work_items(self, query: str):
         """Search for work items using a WIQL query and dynamically fetch fields based on the query."""
@@ -128,10 +150,10 @@ class AzureDevOpsApiWrapper(BaseModel):
             return parsed_work_items
         except ValueError as ve:
             logger.error(f"Invalid WIQL query: {ve}")
-            raise ToolException(f"Invalid WIQL query: {ve}")
+            return ToolException(f"Invalid WIQL query: {ve}")
         except Exception as e:
             logger.error(f"Error searching work items: {e}")
-            raise ToolException(f"Error searching work items: {e}")
+            return ToolException(f"Error searching work items: {e}")
 
     def get_available_tools(self):
         """Return a list of available tools."""
@@ -141,6 +163,12 @@ class AzureDevOpsApiWrapper(BaseModel):
                 "description": self.search_work_items.__doc__,
                 "args_schema": ADOWorkItemsSearch,
                 "ref": self.search_work_items,
+            },
+            {
+                "name": "create_work_item",
+                "description": self.create_work_item.__doc__,
+                "args_schema": ADOCreateWorkItem,
+                "ref": self.create_work_item,
             }
         ]
 

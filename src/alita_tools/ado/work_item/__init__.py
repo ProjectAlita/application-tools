@@ -2,9 +2,9 @@ from typing import List
 from langchain_community.agent_toolkits.base import BaseToolkit
 from .ado_wrapper import AzureDevOpsApiWrapper  # Import the API wrapper for Azure DevOps
 from langchain_core.tools import BaseTool
-from ..base.tool import BaseAction
+from ...base.tool import BaseAction
 
-name = "azure_devops"
+name = "azure_devops_boards"
 
 def get_tools(tool):
     return AzureDevOpsToolkit().get_toolkit(
@@ -13,7 +13,6 @@ def get_tools(tool):
         project=tool['settings'].get('project', None),
         token=tool['settings'].get('token', None),
         limit=tool['settings'].get('limit', 5),
-        verify_ssl=tool['settings'].get('verify_ssl', True)
     ).get_tools()
 
 
