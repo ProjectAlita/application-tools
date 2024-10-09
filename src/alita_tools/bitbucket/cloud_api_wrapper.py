@@ -104,14 +104,17 @@ class BitbucketCloudApi(BitbucketApiAbstract):
         branch_names = [branch.name for branch in branches]
         return ', '.join(branch_names)
 
+    def _get_branch(self, branch_name: str) -> Response:
+        return self.repository.branches.get(branch_name)
+
     def create_branch(self, branch_name: str, branch_from: str) -> Response:
         """
         Creates new branch from last commit branch
         """
-        commits = self.repository.commits.each()
-        commits_name = [commit.hash for commit in commits]
+        logger.info(f"Create new branch from '{branch_from}")
+        commits_name = self._get_branch(branch_from).hash
         # create new branch from last commit
-        return self.repository.branches.create(branch_name, commits_name[0])
+        return self.repository.branches.create(branch_name, commits_name)
 
     def create_pull_request(self, pr_json_data: str) -> Any:
         response = self.repository.pullrequests.post(None, data=json.loads(pr_json_data))

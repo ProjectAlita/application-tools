@@ -11,7 +11,8 @@ from .browser import get_tools as get_browser
 from .report_portal import get_tools as get_report_portal
 from .bitbucket import get_tools as get_bitbucket
 from .testrail import get_tools as get_testrail
-from .ado import get_tools as get_ado
+from .ado.work_item import get_tools as get_ado_work_item
+from .ado.wiki import get_tools as get_ado_wiki
 from .testio import get_tools as get_testio
 
 from .yagmail import get_tools as get_yagmail
@@ -43,8 +44,10 @@ def get_tools(tools_list, *args, **kwargs):
             tools.extend(get_bitbucket(tool))
         elif tool['type'] == 'testrail':
             tools.extend(get_testrail(tool))
-        elif tool['type'] == 'ado':
-            tools.extend(get_ado(tool))
+        elif tool['type'] == 'ado_boards':
+            tools.extend(get_ado_work_item(tool))
+        elif tool['type'] == 'ado_wiki':
+            tools.extend(get_ado_wiki(tool))
         elif tool['type'] == 'testio':
             tools.extend(get_testio(tool))
         else:
