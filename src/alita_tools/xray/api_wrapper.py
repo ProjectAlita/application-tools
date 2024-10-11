@@ -3,6 +3,7 @@ from typing import Optional, Any, List
 
 import requests
 from langchain_core.pydantic_v1 import root_validator, BaseModel
+from langchain_core.tools import ToolException
 from pydantic import create_model, PrivateAttr
 from pydantic.fields import FieldInfo
 from python_graphql_client import GraphqlClient
@@ -54,7 +55,7 @@ NoInput = create_model(
 
 XrayGrapql = create_model(
     "XrayGrapql",
-    graphql=(str, FieldInfo(description="""XRAY GraphQL query for execution"""))
+    graphql=(str, FieldInfo(description="""Custom XRAY GraphQL query for execution"""))
 )
 
 XrayGetTests = create_model(
@@ -131,9 +132,12 @@ class XrayApiWrapper(BaseModel):
         logger.info(f"jql to get tests: {jql}")
         while True:
             # get tests
-            get_tests_response = self._client.execute(query=_get_tests_query,
-                                                      variables={"jql": jql, "start": start_at, "limit": self.limit})[
-                'data']["getTests"]
+            try:
+                get_tests_response = self._client.execute(query=_get_tests_query,
+                                                          variables={"jql": jql, "start": start_at,
+                                                                     "limit": self.limit})['data']["getTests"]
+            except Exception as e:
+                return ToolException(f"Unable to get tests due to error:\n{str(e)}")
             # filter tests results
             tests = _parse_tests(get_tests_response["results"])
             total = get_tests_response['total']
@@ -146,12 +150,24 @@ class XrayApiWrapper(BaseModel):
             start_at += self.limit
         return f"Extracted tests ({len(all_tests)}):\n{all_tests}"
 
-    def create_test(self, graphql_mutation: str):
+    def create_test(self, graphql_mutation: str) -> str:
         """Create new test in XRAY per defined XRAY graphql mutation"""
 
         logger.info(f"graphql_mutation to create new test: {graphql_mutation}")
-        create_test_response = self._client.execute(query=graphql_mutation)
+        try:
+            create_test_response = self._client.execute(query=graphql_mutation)
+        except Exception as e:
+            return ToolException(f"Unable to create new test due to error:\n{str(e)}")
         return create_test_response
+
+    def execute_graphql(self, graphql: str) -> str:
+        """Executes custom graphql query or mutation"""
+
+        logger.info(f"The following graphql will be executed: {graphql}")
+        try:
+            return f"Result of graphql execution:\n{self._client.execute(query=graphql)}"
+        except Exception as e:
+            return ToolException(f"Unable to execute custom graphql due to error:\n{str(e)}")
 
     def get_available_tools(self):
         return [
@@ -166,6 +182,12 @@ class XrayApiWrapper(BaseModel):
                 "description": self.create_test.__doc__,
                 "args_schema": XrayCreateTest,
                 "ref": self.create_test,
+            },
+            {
+                "name": "execute_graphql",
+                "description": self.execute_graphql.__doc__,
+                "args_schema": XrayGrapql,
+                "ref": self.execute_graphql,
             }
         ]
 
