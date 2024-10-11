@@ -14,6 +14,7 @@ from .testrail import get_tools as get_testrail
 from .ado.work_item import get_tools as get_ado_work_item
 from .ado.wiki import get_tools as get_ado_wiki
 from .testio import get_tools as get_testio
+from .xray import get_tools as get_xray_cloud
 
 from .yagmail import get_tools as get_yagmail
 
@@ -50,6 +51,8 @@ def get_tools(tools_list, *args, **kwargs):
             tools.extend(get_ado_wiki(tool))
         elif tool['type'] == 'testio':
             tools.extend(get_testio(tool))
+        elif tool['type'] == 'xray_cloud':
+            tools.extend(get_xray_cloud(tool))
         else:
             if tool.get("settings", {}).get("module"):
                 try:
