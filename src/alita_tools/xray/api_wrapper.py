@@ -112,16 +112,23 @@ class XrayApiWrapper(BaseModel):
                 "`gqpython_graphql_clientl` package not found, please run "
                 "`pip install python_graphql_client`"
             )
+        client_id = values['client_id']
+        client_secret = values['client_secret']
         # Authenticate to get the token
         auth_url = f"{values['base_url']}/api/v1/authenticate"
         auth_data = {
-            "client_id": values['client_id'],
-            "client_secret": values['client_secret']
+            "client_id": client_id,
+            "client_secret": client_secret
         }
-        auth_response = requests.post(auth_url, json=auth_data)
-        token = auth_response.json()
-        cls._client = GraphqlClient(endpoint=f"{values['base_url']}/api/v2/graphql",
-                                    headers={'Authorization': f'Bearer {token}'})
+        try:
+            auth_response = requests.post(auth_url, json=auth_data)
+            token = auth_response.json()
+            cls._client = GraphqlClient(endpoint=f"{values['base_url']}/api/v2/graphql",
+                                        headers={'Authorization': f'Bearer {token}'})
+        except Exception as e:
+            if "invalid or doesn't have the required permissions" in str(e):
+                masked_secret = '*' * (len(client_secret) - 4) + client_secret[-4:] if client_secret is not None else "UNDEFINED"
+                return ToolException(f"Please, check you credentials ({values['client_id']} / {masked_secret}). Unable")
         return values
 
     def get_tests(self, jql: str):

@@ -10,7 +10,7 @@ name = "xray_cloud"
 
 
 def get_tools(tool):
-    return XrayApiWrapper().get_toolkit(
+    return XrayToolkit().get_toolkit(
         selected_tools=tool['settings'].get('selected_tools', []),
         client_id=tool['settings'].get('client_id', None),
         client_secret=tool['settings'].get('client_secret', None),
