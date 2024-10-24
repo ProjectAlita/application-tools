@@ -19,14 +19,14 @@ QtestDataQuerySearch = create_model(
 QtestCreateTestCase = create_model(
     "QtestCreateTestCase",
     test_case_content=(str, FieldInfo(
-        description="Test case content in Markdown format as table and contain following columns:  Id, Name, Description, Type, Status, Priority, Test Type, Precondition, Test Step Number, Test Step Description, Test Step Expected Result"))
+        description="Strictly follow the provided instructions."))
 )
 
 UpdateTestCase = create_model(
     "UpdateTestCase",
     test_id=(str, FieldInfo(description="Test ID e.g. TC-1234")),
     test_case_content=(str, FieldInfo(
-        description="Test case content in Markdown format as table and contain following columns:  Id, Name, Description, Type, Status, Priority, Test Type, Precondition, Test Step Number, Test Step Description, Test Step Expected Result"))
+        description="Strictly follow the provided instructions."))
 )
 
 FindTestCaseById = create_model(
@@ -38,6 +38,29 @@ DeleteTestCase = create_model(
     "DeleteTestCase",
     id=(int, FieldInfo(description="Qtest id e.g. 3253490123")),
 )
+
+TEST_CASES_CONVERSION_PROMPT = """
+### Instructions:
+1. If the provided test cases meet the "Output Format" guidelines, leave them unchanged.
+2. Revise test cases using the "Output Format" guidelines.
+
+### Output Format:
+Create a table with these columns. For multi-step cases, fill Id, Name, Description, Type, Status, Priority, Test Type, and Precondition only for the first step:
+- **Id**: Unique identifier (e.g., TC-12780).
+- **Name**: Brief title.
+- **Description**: Short purpose.
+- **Type**: 'Manual' or 'Automation - UTAF'. Leave blank if unknown.
+- **Status**: Default 'New'.
+- **Priority**: Leave blank.
+- **Test Type**: Default 'Functional'.
+- **Precondition**: List prerequisites in one cell, formatted as:
+  <Step1>
+  <Step2>
+  Leave blank if none.
+- **Test Step Number**: Start from 1 for each test case.
+- **Test Step Description**: Clear, actionable test steps.
+- **Test Step Expected Result**: Expected outcome for each test step.
+"""
 
 
 class QtestApiWrapper(BaseModel):
@@ -285,23 +308,23 @@ class QtestApiWrapper(BaseModel):
             {
                 "name": "search_by_dql",
                 "mode": "search_by_dql",
-                "description": 'Search the test cases in qTest using Data Query Language. The input of the tool will be in fowwoing format - Module in \'MD-78 Master Test Suite\' and Type = \'Automation - UTAF\'. If keyword or value to check against has 2 words in it it should be surrounded with single quotes',
+                "description": 'Search the test cases in qTest using Data Query Language. The input of the tool will be in following format - Module in \'MD-78 Master Test Suite\' and Type = \'Automation - UTAF\'. If keyword or value to check against has 2 words in it it should be surrounded with single quotes',
                 "args_schema": QtestDataQuerySearch,
                 "ref": self.search_by_dql,
             },
             {
                 "name": "create_test_cases",
                 "mode": "create_test_cases",
-                "description": "Create multiple test cases in the particular project in Qtest. The input requirement is that the content should be in Markdown format as a table and contain following columns:  Id, Name, Description, Type, Status, Priority, Test Type, Precondition, Test Step Number, Test Step Description, Test Step Expected Result",
+                "description": TEST_CASES_CONVERSION_PROMPT,
                 "args_schema": QtestCreateTestCase,
                 "ref": self.create_test_cases,
             },
             {
                 "name": "update_test_case",
                 "mode": "update_test_case",
-                "description": "Update the test case base on the incoming content and test id e.g. TC-1234.",
+                "description": TEST_CASES_CONVERSION_PROMPT,
                 "args_schema": UpdateTestCase,
-                "ref": self.create_test_cases,
+                "ref": self.update_test_case,
             },
             {
                 "name": "find_test_case_by_id",
@@ -313,7 +336,7 @@ class QtestApiWrapper(BaseModel):
             {
                 "name": "delete_test_case",
                 "mode": "delete_test_case",
-                "description": "Delete test case by its id. Id should be in format 3534653120.",
+                "description": "Delete test case by its qtest id. Id should be in format 3534653120.",
                 "args_schema": DeleteTestCase,
                 "ref": self.delete_test_case,
             },
