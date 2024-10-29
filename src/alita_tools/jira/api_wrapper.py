@@ -80,6 +80,24 @@ ListCommentsInput = create_model(
     "ListCommentsInputModel",
     issue_key=(str, FieldInfo(description="The issue key of the Jira issue from which comments will be extracted, e.g. 'TEST-123'."))
 )
+LinkIssues = create_model(
+    "LinkIssuesModel",
+    inward_issue_key=(str, FieldInfo(description="""The JIRA issue id  of inward issue.
+                                    Example: 
+                                    To link test to another issue ( test 'test' story, story 'is tested by test'). 
+                                    Use the appropriate issue link type (e.g., "Test", "Relates", "Blocks").
+                                    If we use "Test" linktype, the test is inward issue, the story/other issue is outward issue.""")),
+    outward_issue_key=(str, FieldInfo(description="""The JIRA issue id  of outward issue. 
+                                    Example: 
+                                    To link test to another issue ( test 'test' story, story 'is tested by test'). 
+                                    Use the appropriate issue link type (e.g., "Test", "Relates", "Blocks").
+                                    If we use "Test" linktype, the test is inward issue, the story/other issue is outward issue.""")),
+    linktype=(str, FieldInfo(description="""Use the appropriate issue link type (e.g., "Test", "Relates", "Blocks").
+                                    Example: 
+                                    To link test to another issue ( test 'test' story, story 'is tested by test'). 
+                                    Use the appropriate issue link type (e.g., "Test", "Relates", "Blocks").
+                                    If we use "Test" linktype, the test is inward issue, the story/other issue is outward issue."""))
+                              )
 
 
 class JiraApiWrapper(BaseModel):
@@ -217,6 +235,23 @@ class JiraApiWrapper(BaseModel):
         if len(parsed) == 0:
             return "No Jira issues found"
         return "Found " + str(len(parsed)) + " Jira issues:\n" + str(parsed)
+    
+    def link_issues(self, inward_issue_key: str, outward_issue_key: str, linktype:str ):
+        """ Link issues functionality for Jira issues. To link test to another issue ( test 'test' story, story 'is tested by test'). 
+        Use the appropriate issue link type (e.g., "Test", "Relates", "Blocks").
+        If we use "Test" linktype, the test is inward issue, the story/other issue is outward issue.."""
+        
+        link_data = {
+    "type": {"name": f"{linktype}"},  
+    "inwardIssue": {"key": f"{inward_issue_key}"},
+    "outwardIssue": {"key": f"{outward_issue_key}"},
+    "comment": {
+        "body": "This test is linked to the story."
+    }
+}
+        self.client.create_issue_link(link_data)
+        """ Get the remote links from the specified jira issue key"""
+        return f"Link created using following data: {link_data}."
 
     def get_specific_field_info(self, jira_issue_key: str, field_name: str):
         """ Get the specific field information from Jira by jira issue key and field name """
@@ -392,6 +427,13 @@ class JiraApiWrapper(BaseModel):
                 "description": self.get_remote_links.__doc__,
                 "args_schema": GetRemoteLinks,
                 "ref": self.get_remote_links,
+
+            },
+            {
+                "name": "link_issues",
+                "description": self.link_issues.__doc__,
+                "args_schema": LinkIssues,
+                "ref": self.link_issues,
 
             }
         ]
