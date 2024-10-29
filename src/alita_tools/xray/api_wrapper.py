@@ -94,7 +94,8 @@ def _parse_tests(test_results) -> List[Any]:
 
 
 class XrayApiWrapper(BaseModel):
-    base_url: str = 'https://xray.cloud.getxray.app'
+    _default_base_url: str = 'https://xray.cloud.getxray.app'
+    base_url: str = ""
     client_id: str = None,
     client_secret: str = None,
     limit: Optional[int] = 100,
@@ -115,6 +116,7 @@ class XrayApiWrapper(BaseModel):
         client_id = values['client_id']
         client_secret = values['client_secret']
         # Authenticate to get the token
+        values['base_url'] = values.get('base_url', '') or cls._default_base_url
         auth_url = f"{values['base_url']}/api/v1/authenticate"
         auth_data = {
             "client_id": client_id,
