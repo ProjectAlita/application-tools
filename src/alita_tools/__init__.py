@@ -16,6 +16,7 @@ from .ado.wiki import get_tools as get_ado_wiki
 from .testio import get_tools as get_testio
 from .xray import get_tools as get_xray_cloud
 from .qtest import get_tools as get_qtest
+from .zephyr_scale import get_tools as get_zephyr_scale
 
 from .yagmail import get_tools as get_yagmail
 
@@ -56,6 +57,8 @@ def get_tools(tools_list, *args, **kwargs):
             tools.extend(get_xray_cloud(tool))
         elif tool['type'] == 'qtest':
             tools.extend(get_qtest(tool))
+        elif tool['type'] == 'zephyr_scale':
+            tools.extend(get_zephyr_scale(tool))
         else:
             if tool.get("settings", {}).get("module"):
                 try:
