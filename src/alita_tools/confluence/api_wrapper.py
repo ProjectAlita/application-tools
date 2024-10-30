@@ -407,7 +407,7 @@ class ConfluenceAPIWrapper(BaseModel):
         if not self.space:
             cql = f'(type=page) and (title~"{query}" or text~"{query}")'
         else:
-            cql = f'(type=page and space={self.space}) and (title~"{query}" or text~"{query}")'
+            cql = f'(type=page and space="{self.space}") and (title~"{query}" or text~"{query}")'
         return self._process_search(cql)
 
     def search_by_title(self, query: str):
@@ -415,7 +415,7 @@ class ConfluenceAPIWrapper(BaseModel):
         if not self.space:
             cql = f'(type=page) and (title~"{query}")'
         else:
-            cql = f'(type=page and space={self.space}) and (title~"{query}")'
+            cql = f'(type=page and space="{self.space}") and (title~"{query}")'
         return self._process_search(cql)
 
     def site_search(self, query: str):
@@ -424,7 +424,7 @@ class ConfluenceAPIWrapper(BaseModel):
         if not self.space:
             cql = f'(type=page) and (siteSearch~"{query}")'
         else:
-            cql = f'(type=page and space={self.space}) and (siteSearch~"{query}")'
+            cql = f'(type=page and space="{self.space}") and (siteSearch~"{query}")'
         pages = self.client.cql(cql, start=0, limit=10).get("results", [])
         if not pages:
             return f"Unable to find anything using query {query}"
