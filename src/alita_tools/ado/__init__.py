@@ -10,7 +10,8 @@ def get_tools(tool_type, tool):
         "selected_tools": tool['settings'].get('selected_tools', []),
         "organization_url": tool['settings']['organization_url'],
         "project": tool['settings'].get('project', None),
-        "token": tool['settings'].get('token', None)
+        "token": tool['settings'].get('token', None),
+        "limit": tool['settings'].get('limit', 5),
     }
     if tool_type == 'ado_plans':
         return AzureDevOpsPlansToolkit().get_toolkit(**config_dict).get_tools()
