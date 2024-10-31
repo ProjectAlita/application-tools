@@ -6,17 +6,7 @@ from ...base.tool import BaseAction
 
 name = "azure_devops_boards"
 
-def get_tools(tool):
-    return AzureDevOpsToolkit().get_toolkit(
-        selected_tools=tool['settings'].get('selected_tools', []),
-        organization_url=tool['settings']['organization_url'],
-        project=tool['settings'].get('project', None),
-        token=tool['settings'].get('token', None),
-        limit=tool['settings'].get('limit', 5),
-    ).get_tools()
-
-
-class AzureDevOpsToolkit(BaseToolkit):
+class AzureDevOpsWorkItemsToolkit(BaseToolkit):
     tools: List[BaseTool] = []
 
     @classmethod
