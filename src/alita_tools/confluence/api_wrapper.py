@@ -143,6 +143,26 @@ class ConfluenceAPIWrapper(BaseModel):
             values['client'] = Confluence(url=url,username=username, password=api_key, cloud=cloud)
         return values
 
+    def __unquote_confluence_space(self) -> str | None:
+        if self.space:
+            # Remove single quotes or backticks if present
+            if (self.space.startswith("'") and self.space.endswith("'")) or (
+                    self.space.startswith("`") and self.space.endswith("`")):
+                return self.space[1:-1]
+            else:
+                return self.space
+        else:
+            return None
+
+    def __sanitize_confluence_space(self) -> str:
+        """Ensure the space parameter is enclosed in double quotes."""
+        unquoted_space = self.__unquote_confluence_space()
+        if unquoted_space:
+            # Add double quotes if not already present
+            if not (unquoted_space.startswith('"') and unquoted_space.endswith('"')):
+                unquoted_space = f'"{unquoted_space}"'
+        return unquoted_space
+
     def create_page(self, title: str, body: str, status: str = 'current', space: str = None, parent_id: str = None, representation: str = 'storage', label: str = None):
         """ Creates a page in the Confluence space. Represents content in html (storage) or wiki (wiki) formats
             Page could be either published status='current' or make a draft with status='draft'
@@ -407,7 +427,7 @@ class ConfluenceAPIWrapper(BaseModel):
         if not self.space:
             cql = f'(type=page) and (title~"{query}" or text~"{query}")'
         else:
-            cql = f'(type=page and space="{self.space}") and (title~"{query}" or text~"{query}")'
+            cql = f'(type=page and space={self.__sanitize_confluence_space()}) and (title~"{query}" or text~"{query}")'
         return self._process_search(cql)
 
     def search_by_title(self, query: str):
@@ -415,7 +435,7 @@ class ConfluenceAPIWrapper(BaseModel):
         if not self.space:
             cql = f'(type=page) and (title~"{query}")'
         else:
-            cql = f'(type=page and space="{self.space}") and (title~"{query}")'
+            cql = f'(type=page and space={self.__sanitize_confluence_space()}) and (title~"{query}")'
         return self._process_search(cql)
 
     def site_search(self, query: str):
@@ -424,7 +444,7 @@ class ConfluenceAPIWrapper(BaseModel):
         if not self.space:
             cql = f'(type=page) and (siteSearch~"{query}")'
         else:
-            cql = f'(type=page and space="{self.space}") and (siteSearch~"{query}")'
+            cql = f'(type=page and space={self.__sanitize_confluence_space()}) and (siteSearch~"{query}")'
         pages = self.client.cql(cql, start=0, limit=10).get("results", [])
         if not pages:
             return f"Unable to find anything using query {query}"
