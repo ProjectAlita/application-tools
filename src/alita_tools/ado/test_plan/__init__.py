@@ -1,12 +1,14 @@
 from typing import List
+
 from langchain_community.agent_toolkits.base import BaseToolkit
-from .ado_wrapper import AzureDevOpsApiWrapper  # Import the API wrapper for Azure DevOps
 from langchain_core.tools import BaseTool
+
+from .test_plan_wrapper import TestPlanApiWrapper
 from ...base.tool import BaseAction
 
-name = "azure_devops_wiki"
+name = "azure_devops_plans"
 
-class AzureDevOpsWikiToolkit(BaseToolkit):
+class AzureDevOpsPlansToolkit(BaseToolkit):
     tools: List[BaseTool] = []
 
     @classmethod
@@ -16,13 +18,14 @@ class AzureDevOpsWikiToolkit(BaseToolkit):
             environ['AZURE_DEVOPS_CACHE_DIR'] = '/tmp/.azure-devops'
         if selected_tools is None:
             selected_tools = []
-        azure_devops_api_wrapper = AzureDevOpsApiWrapper(**kwargs)
+        azure_devops_api_wrapper = TestPlanApiWrapper(**kwargs)
         available_tools = azure_devops_api_wrapper.get_available_tools()
         tools = []
         for tool in available_tools:
             if selected_tools:
                 if tool["name"] not in selected_tools:
                     continue
+            print(tool)
             tools.append(BaseAction(
                 api_wrapper=azure_devops_api_wrapper,
                 name=tool["name"],
