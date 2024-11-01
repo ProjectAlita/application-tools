@@ -1,7 +1,9 @@
+import json
 import logging
 from typing import Optional, Any
 
 from langchain_core.pydantic_v1 import root_validator, BaseModel
+from langchain_core.tools import ToolException
 from pydantic import create_model
 from pydantic.fields import FieldInfo
 from testrail_api import StatusCodeError
@@ -16,6 +18,12 @@ getCase = create_model(
 getCases = create_model(
     "getCases",
     project_id=(str, FieldInfo(description="Project id"))
+)
+
+getCasesByFilter = create_model(
+    "getCasesByFilter",
+    project_id=(str, FieldInfo(description="Project id")),
+    json_case_arguments=(str, FieldInfo(description="JSON of the test case arguments used to filter test cases"))
 )
 
 addCase = create_model(
@@ -61,7 +69,7 @@ class TestrailAPIWrapper(BaseModel):
         try:
             extracted_case = self.client.cases.get_case(testcase_id)
         except StatusCodeError as e:
-            return f"Unable to extract testcase {e}"
+            return ToolException(f"Unable to extract testcase {e}")
         return f"Extracted test case:\n{str(extracted_case)}"
 
     def get_cases(self, project_id: str):
@@ -73,8 +81,19 @@ class TestrailAPIWrapper(BaseModel):
                 extracted_cases_data.append({"id": case['id'], "title": case['title']})
 
         except StatusCodeError as e:
-            return f"Unable to extract testcases {e}"
+            return ToolException(f"Unable to extract testcases {e}")
         return f"Extracted test case:\n{str(extracted_cases_data)}"
+
+    def get_cases_by_filter(self, project_id: str, json_case_arguments):
+        """Extracts test cases from specified project and per given case attributes provided as json"""
+        try:
+            params = json.loads(json_case_arguments)
+            extracted_cases = self.client.cases.get_cases(project_id=project_id, **params)
+            steps_list = [str(case) for case in extracted_cases]
+            all_cases_concatenated = '\n'.join(steps_list)
+        except StatusCodeError as e:
+            return ToolException(f"Unable to extract testcases {e}")
+        return f"Extracted test case:\n{str(all_cases_concatenated)}"
 
     def get_available_tools(self):
         return [
@@ -89,6 +108,12 @@ class TestrailAPIWrapper(BaseModel):
                 "ref": self.get_cases,
                 "description": self.get_cases.__doc__,
                 "args_schema": getCases,
+            },
+            {
+                "name": "get_cases_by_filter",
+                "ref": self.get_cases_by_filter,
+                "description": self.get_cases_by_filter.__doc__,
+                "args_schema": getCasesByFilter,
             },
             {
                 "name": "add_case",

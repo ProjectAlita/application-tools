@@ -13,13 +13,13 @@ class Zephyr(object):
 
     def __init__(self,
                  base_url,
-                 user_name,
+                 username,
                  password):
         self.base_url = base_url
-        self.user_name = user_name
+        self.username = username
         self.password = password
         self.request_client = ZephyrRestAPI(base_url=self.base_url,
-                                            user_name=self.user_name,
+                                            user_name=self.username,
                                             password=self.password)
 
     def get_test_case_steps(self, issue_id, project_id):
