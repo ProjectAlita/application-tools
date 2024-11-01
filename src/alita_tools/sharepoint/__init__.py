@@ -15,7 +15,6 @@ def get_tools(tool):
         tenant=tool['settings'].get('tenant', None),
         client_id=tool['settings'].get('client_id', None),
         client_secret=tool['settings'].get('client_secret', None),
-        redirect_uri=tool['settings'].get('redirect_uri', None),
         refresh_token=tool['settings'].get('refresh_token', None)
     ).get_tools()
 
@@ -23,7 +22,7 @@ class AlitaSharePointToolkit(BaseToolkit):
     tools: List[BaseTool] = []
 
     @classmethod
-    def get_toolkit(cls, tenant, client_id, client_secret, redirect_uri, refresh_token, selected_tools: list[str] | None = None, **kwargs):
+    def get_toolkit(cls, tenant, client_id, client_secret, refresh_token, selected_tools: list[str] | None = None, **kwargs):
         if selected_tools is None:
             selected_tools = []
         sharepoint_wrapper = SharepointWrapper(tenant=tenant, client_id=client_id, client_secret=client_secret)
@@ -43,7 +42,7 @@ class AlitaSharePointToolkit(BaseToolkit):
             ))
             scopes.add(tool["scope"])
         scope = " ".join(scopes)
-        auth_helper = SharepointAuthorizationHelper(tenant, client_id, client_secret, redirect_uri, scope, refresh_token)
+        auth_helper = SharepointAuthorizationHelper(tenant, client_id, client_secret, scope, refresh_token)
         sharepoint_wrapper.access_token = auth_helper.refresh_access_token()
         if not sharepoint_wrapper.access_token:
             raise Exception("Failed to obtain an access token")

@@ -2,11 +2,10 @@ import requests
 
 class SharepointAuthorizationHelper:
 
-    def __init__(self, tenant, client_id, client_secret, redirect_uri, scope, refresh_token):
+    def __init__(self, tenant, client_id, client_secret, scope, refresh_token):
         self.tenant = tenant
         self.client_id = client_id
         self.client_secret = client_secret
-        self.redirect_uri = redirect_uri
         self.scope = scope
         self.auth_code = None
         self.access_token = None
