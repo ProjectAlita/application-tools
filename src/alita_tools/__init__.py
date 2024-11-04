@@ -13,9 +13,11 @@ from .bitbucket import get_tools as get_bitbucket
 from .testrail import get_tools as get_testrail
 from .testio import get_tools as get_testio
 from .xray import get_tools as get_xray_cloud
+from .sharepoint import get_tools as get_sharepoint
 from .qtest import get_tools as get_qtest
 from .zephyr_scale import get_tools as get_zephyr_scale
 from .ado import get_tools as get_ado
+
 
 from .yagmail import get_tools as get_yagmail
 
@@ -52,6 +54,8 @@ def get_tools(tools_list, *args, **kwargs):
             tools.extend(get_testio(tool))
         elif tool['type'] == 'xray_cloud':
             tools.extend(get_xray_cloud(tool))
+        elif tool['type'] == 'sharepoint':
+            tools.extend(get_sharepoint(tool))
         elif tool['type'] == 'qtest':
             tools.extend(get_qtest(tool))
         elif tool['type'] == 'zephyr_scale':
