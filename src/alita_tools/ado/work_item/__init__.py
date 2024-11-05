@@ -16,6 +16,7 @@ class AzureDevOpsWorkItemsToolkit(BaseToolkit):
             environ['AZURE_DEVOPS_CACHE_DIR'] = '/tmp/.azure-devops'
         if selected_tools is None:
             selected_tools = []
+
         azure_devops_api_wrapper = AzureDevOpsApiWrapper(**kwargs)
         available_tools = azure_devops_api_wrapper.get_available_tools()
         tools = []

@@ -9,6 +9,7 @@ from .sharepoint_wrapper import SharepointWrapper
 
 name = "sharepoint"
 
+
 def get_tools(tool):
     return AlitaSharePointToolkit().get_toolkit(
         selected_tools=tool['settings'].get('selected_tools', []),
@@ -18,18 +19,27 @@ def get_tools(tool):
         refresh_token=tool['settings'].get('token_json', None)
     ).get_tools()
 
+
 class AlitaSharePointToolkit(BaseToolkit):
     tools: List[BaseTool] = []
 
     @classmethod
-    def get_toolkit(cls, tenant, client_id, client_secret, token_json, selected_tools: list[str] | None = None, **kwargs):
+    def get_toolkit(cls, selected_tools: list[str] | None = None, **kwargs):
         if selected_tools is None:
             selected_tools = []
-        sharepoint_wrapper = SharepointWrapper(tenant=tenant, client_id=client_id, client_secret=client_secret)
+
+        # TODO: must be moved out of tools (on dev BE side)
+        # TODO: think on logic how to exchange refresh with access tokens (on BE side and update secrets properly)
+        auth_helper = SharepointAuthorizationHelper(**kwargs)
+
+        sharepoint_wrapper = SharepointWrapper(access_token=auth_helper.get_access_token(), **kwargs)
+
+        # uncomment after the deliver from dev team: it is expected that ONLY token will be provided
+        # sharepoint_wrapper = SharepointWrapper(**kwargs)
         # defining tools and scopes
         available_tools = sharepoint_wrapper.get_available_tools()
         tools = []
-        scopes = set()
+
         for tool in available_tools:
             if selected_tools:
                 if tool["name"] not in selected_tools:
@@ -40,12 +50,6 @@ class AlitaSharePointToolkit(BaseToolkit):
                 description=tool["description"],
                 args_schema=tool["args_schema"]
             ))
-            scopes.add(tool["scope"])
-        scope = " ".join(scopes)
-        auth_helper = SharepointAuthorizationHelper(tenant, client_id, client_secret, scope, token_json)
-        sharepoint_wrapper.access_token = auth_helper.get_access_token()
-        if not sharepoint_wrapper.access_token:
-            raise Exception("Failed to obtain an access token")
         return cls(tools=tools)
 
     def get_tools(self):
