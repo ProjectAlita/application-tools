@@ -24,7 +24,8 @@ create_wi_field = """JSON of the work item fields to create in Azure DevOps, i.e
 # Input models for Azure DevOps operations
 ADOWorkItemsSearch = create_model(
     "AzureDevOpsSearchModel",
-    query=(str, Field(description="WIQL query for searching Azure DevOps work items"))
+    query=(str, Field(description="WIQL query for searching Azure DevOps work items")),
+    fields=(Optional[list[str]], Field(description="Comma-separated list of requested fields", default=None))
 )
 
 ADOCreateWorkItem = create_model(
@@ -32,6 +33,15 @@ ADOCreateWorkItem = create_model(
     work_item_json=(str, Field(description=create_wi_field)),
     wi_type=(str, Field(description="Work item type, e.g. 'Task', 'Issue' or  'EPIC'", default="Task"))
 )
+
+ADOGetWorkItem = create_model(
+    "AzureDevOpsGetWorkItemModel",
+    id=(int, Field(description="The work item id")),
+    fields=(Optional[list[str]], Field(description="Comma-separated list of requested fields", default=None)),
+    as_of=(Optional[str], Field(description="AsOf UTC date time string", default=None)),
+    expand=(Optional[str], Field(description="The expand parameters for work item attributes. Possible options are { None, Relations, Fields, Links, All }.", default=None))
+)
+
 
 class AzureDevOpsApiWrapper(BaseModel):
     organization_url: str
@@ -127,7 +137,7 @@ class AzureDevOpsApiWrapper(BaseModel):
             logger.error(f"Error creating work item: {e}")
             return ToolException(f"Error creating work item: {e}")
 
-    def search_work_items(self, query: str):
+    def search_work_items(self, query: str, fields=None):
         """Search for work items using a WIQL query and dynamically fetch fields based on the query."""
         try:
             # Create a Wiql object with the query
@@ -144,7 +154,7 @@ class AzureDevOpsApiWrapper(BaseModel):
                 return "No work items found."
 
             # Parse the work items and fetch the fields dynamically
-            parsed_work_items = self._parse_work_items(work_items)
+            parsed_work_items = self._parse_work_items(work_items, fields)
 
             # Return the parsed work items
             return parsed_work_items
@@ -154,6 +164,34 @@ class AzureDevOpsApiWrapper(BaseModel):
         except Exception as e:
             logger.error(f"Error searching work items: {e}")
             return ToolException(f"Error searching work items: {e}")
+
+
+    def get_work_item(self, id: int, fields: Optional[list[str]] = None, as_of: Optional[str] = None, expand: Optional[str] = None):
+        """Get a single work item by ID."""
+        try:
+            # Validate that the Azure DevOps client is initialized
+            if not self._client:
+                raise ToolException("Azure DevOps client not initialized.")
+
+            # Fetch the work item
+            work_item = self._client.get_work_item(id=id, project=self.project, fields=fields, as_of=as_of, expand=expand)
+
+            # Parse the fields dynamically
+            fields_data = work_item.fields
+            parsed_item = {"id": work_item.id, "url": f"{self.organization_url}/_workitems/edit/{work_item.id}"}
+
+            # Iterate through the requested fields and add them to the parsed result
+            if fields:
+                for field in fields:
+                    parsed_item[field] = fields_data.get(field, "N/A")
+            else:
+                parsed_item.update(fields_data)
+
+            return parsed_item
+        except Exception as e:
+            logger.error(f"Error getting work item: {e}")
+            return ToolException(f"Error getting work item: {e}")
+
 
     def get_available_tools(self):
         """Return a list of available tools."""
@@ -169,6 +207,12 @@ class AzureDevOpsApiWrapper(BaseModel):
                 "description": self.create_work_item.__doc__,
                 "args_schema": ADOCreateWorkItem,
                 "ref": self.create_work_item,
+            },
+            {
+                "name": "get_work_item",
+                "description": self.get_work_item.__doc__,
+                "args_schema": ADOGetWorkItem,
+                "ref": self.get_work_item,
             }
         ]
 

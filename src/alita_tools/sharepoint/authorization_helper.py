@@ -25,7 +25,7 @@ class SharepointAuthorizationHelper:
             'grant_type': 'refresh_token',
             'client_id': self.client_id,
             'client_secret': self.client_secret,
-            'refresh_token': self.token_json['refresh_token'],
+            'refresh_token': self.token_json,
             'scope': self.scope
         }
         response = requests.post(url, headers=headers, data=data)
@@ -37,7 +37,7 @@ class SharepointAuthorizationHelper:
             return None
 
     def get_access_token(self) -> str:
-        if (self.is_token_valid(self.token_json['access_token'])):
+        if (self.is_token_valid(self.token_json)):
             return self.token_json['access_token']
         else:
             return self.refresh_access_token()
