@@ -25,3 +25,4 @@ azure-devops==7.1.0b4
 msrest==0.7.1
 python-graphql-client~=0.4.3
 zephyr-python-api==0.1.0
+pyral
