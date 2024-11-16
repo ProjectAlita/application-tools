@@ -6,6 +6,7 @@ from .openapi import get_tools as get_openapi
 from .jira import get_tools as get_jira
 from .confluence import get_tools as get_confluence
 from .gitlab import get_tools as get_gitlab
+from .gitlab_workspace import get_tools as get_gitlab_ws
 from .zephyr import get_tools as get_zephyr
 from .browser import get_tools as get_browser
 from .report_portal import get_tools as get_report_portal
@@ -36,6 +37,8 @@ def get_tools(tools_list, *args, **kwargs):
             tools.extend(get_confluence(tool))
         elif tool['type'] == 'gitlab':
             tools.extend(get_gitlab(tool))
+        elif tool['type'] == 'gitlab_workspace':
+            tools.extend(get_gitlab_ws(tool))
         elif tool['type'] == 'zephyr':
             tools.extend(get_zephyr(tool))
         elif tool['type'] == 'browser':

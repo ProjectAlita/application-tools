@@ -55,7 +55,7 @@ TestSuiteGetModel = create_model(
 
 TestCaseAddModel = create_model(
     "TestCaseAddModel",
-    suite_test_case_create_update_parameters=(str, Field(description="JSON of the suite test case create update parameters")),
+    suite_test_case_create_update_parameters=(str, Field(description='JSON array of the suite test case create update parameters. Example: \"[{"work_item":{"id":"23"}}]\"')),
     project=(str, Field(description="Project ID or project name")),
     plan_id=(int, Field(description="ID of the test plan to which test cases are to be added")),
     suite_id=(int, Field(description="ID of the test suite to which test cases are to be added"))
