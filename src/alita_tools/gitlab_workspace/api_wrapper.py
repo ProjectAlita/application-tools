@@ -2,6 +2,7 @@ import logging
 from typing import Optional, Any, List, Dict
 
 from gitlab import GitlabGetError
+from gitlab.v4.objects import Project
 from langchain_core.tools import ToolException
 from pydantic import BaseModel, Field, root_validator, PrivateAttr, create_model
 
@@ -88,6 +89,9 @@ GitLabCreatePullRequestChangeCommentInput = create_model(
     repository=(str, Field(description="Name of the repository", default=None))
 )
 
+_misconfigured_alert = "Misconfigured repositories"
+_undefined_repo_alert = "Unable to get repository"
+
 
 # Toolkit API wrapper
 class GitLabWorkspaceAPIWrapper(BaseModel):
@@ -127,7 +131,7 @@ class GitLabWorkspaceAPIWrapper(BaseModel):
             # Passed repo as None
             if not repository_name:
                 if len(self._repo_instances) == 0:
-                    return ToolException("Repositories are undefined. Please, make sure it is cofigured properly or you explicitly passed it as input")
+                    return _misconfigured_alert
                 else:
                     return list(self._repo_instances.items())[0][1]
             # Defined repo flow
@@ -135,7 +139,7 @@ class GitLabWorkspaceAPIWrapper(BaseModel):
                 self._repo_instances[repository_name] = self.get_repo_instance(repository_name)
             return self._repo_instances.get(repository_name)
         except Exception as e:
-            return ToolException(f"Unable to get repository {repository_name}: {str(e)}")
+            return f"{_undefined_repo_alert} {repository_name}: {str(e)}"
 
     def set_active_branch(self, branch: str) -> str:
         """Set the active branch for the bot."""
@@ -213,6 +217,11 @@ class GitLabWorkspaceAPIWrapper(BaseModel):
 
         try:
             repo = self._get_repo(repository)
+            if not isinstance(repo, Project):
+                if _misconfigured_alert in str(repo):
+                    return ToolException("You haven't configured any repositories. Please, define repository name in chat or add it in tool's configuration.")
+                else:
+                    return ToolException(f"Unable to extract repo: {str(repo)}")
             try:
                 mr = repo.mergerequests.get(pr_number)
             except GitlabGetError as e:
