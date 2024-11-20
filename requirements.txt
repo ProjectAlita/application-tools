@@ -26,3 +26,4 @@ msrest==0.7.1
 python-graphql-client~=0.4.3
 zephyr-python-api==0.1.0
 yarl==1.17.1
+pyral==1.6.0
