@@ -58,12 +58,12 @@ class RallyApiWrapper(BaseModel):
     def validate_toolkit(cls, values):
         """Validate and set up the Rally client."""
         try:
-            if (not values['user'] or not values['password']) and not values['api_key']:
+            if (not values.get('username') or not values.get('password')) and not values.get('api_key'):
                 raise ToolException(
                     "Either user and password or api_key must be defined to establish connection with Rally.")
             # Set up connection to Rally
-            cls._client = Rally(server=values['server'], user=values['username'], password=values['password'],
-                                apikey=values['api_key'], workspace=values.get('workspace'),
+            cls._client = Rally(server=values['server'], user=values.get('username'), password=values.get('password'),
+                                apikey=values.get('api_key'), workspace=values.get('workspace'),
                                 project=values.get('project'))
         except Exception as e:
             raise ToolException(f"Failed to connect to Rally: {e}")
