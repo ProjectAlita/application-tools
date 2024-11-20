@@ -18,6 +18,7 @@ from .sharepoint import get_tools as get_sharepoint
 from .qtest import get_tools as get_qtest
 from .zephyr_scale import get_tools as get_zephyr_scale
 from .ado import get_tools as get_ado
+from .rally import get_tools as get_rally
 
 
 from .yagmail import get_tools as get_yagmail
@@ -63,6 +64,8 @@ def get_tools(tools_list, *args, **kwargs):
             tools.extend(get_qtest(tool))
         elif tool['type'] == 'zephyr_scale':
             tools.extend(get_zephyr_scale(tool))
+        elif tool['type'] == 'rally':
+            tools.extend(get_rally(tool))
         else:
             if tool.get("settings", {}).get("module"):
                 try:
