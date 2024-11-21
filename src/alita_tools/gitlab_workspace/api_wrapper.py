@@ -126,41 +126,50 @@ class GitLabWorkspaceAPIWrapper(BaseModel):
             raise ImportError(f"Failed to connect to GitLab: {e}")
         return values
 
+    def _get_repo_instance(self, repository: str):
+        """Get the repository instance, defaulting to the initialized repository if not provided."""
+        return self._client.projects.get(repository)
+
     def _get_repo(self, repository_name: Optional[str] = None) -> Any:
         try:
             # Passed repo as None
             if not repository_name:
                 if len(self._repo_instances) == 0:
-                    return _misconfigured_alert
+                    raise ToolException(f"{_misconfigured_alert} >> You haven't configured any repositories. Please, define repository name in chat or add it in tool's configuration.")
                 else:
                     return list(self._repo_instances.items())[0][1]
             # Defined repo flow
             if repository_name not in self._repo_instances:
-                self._repo_instances[repository_name] = self.get_repo_instance(repository_name)
+                self._repo_instances[repository_name] = self._get_repo_instance(repository_name)
             return self._repo_instances.get(repository_name)
         except Exception as e:
-            return f"{_undefined_repo_alert} {repository_name}: {str(e)}"
+            if not isinstance(e, ToolException):
+                raise ToolException(f"{_undefined_repo_alert} >> {repository_name}: {str(e)}")
+            else:
+                raise e
 
     def set_active_branch(self, branch: str) -> str:
         """Set the active branch for the bot."""
         self._active_branch = branch
         return f"Active branch set to {branch}"
 
-    def get_repo_instance(self, repository: str):
-        """Get the repository instance, defaulting to the initialized repository if not provided."""
-        return self._client.projects.get(repository)
-
     def list_branches_in_repo(self, repository: Optional[str] = None) -> List[str]:
         """List all branches in the repository."""
+        try:
+            repo_instance = self._get_repo(repository)
+            branches = repo_instance.branches.list()
+            return [branch.name for branch in branches]
+        except Exception as e:
+            return ToolException(f"Unable to list branches due to error: {str(e)}")
 
-        repository = self._get_repo(repository)
-        repo_instance = self.get_repo_instance(repository)
-        branches = repo_instance.branches.list()
-        return [branch.name for branch in branches]
+
 
     def create_branch(self, branch_name: str, repository: Optional[str] = None) -> str:
         """Create a new branch in the repository."""
-        repo_instance = self._get_repo(repository)
+        try:
+            repo_instance = self._get_repo(repository)
+        except Exception as e:
+            return ToolException(e)
         try:
             repo_instance.branches.create(
                 {
@@ -172,30 +181,43 @@ class GitLabWorkspaceAPIWrapper(BaseModel):
             if "Branch already exists" in str(e):
                 self._active_branch = branch_name
                 return f"Branch {branch_name} already exists. set it as active"
-            return f"Unable to create branch due to error:\n{e}"
+            return ToolException(f"Unable to create branch due to error:\n{e}")
         self._active_branch = branch_name
         return f"Branch {branch_name} created successfully and set as active"
 
     def get_issues(self, repository: Optional[str] = None) -> str:
         """Fetches all open issues from the repo."""
-        repo_instance = self._get_repo(repository)
-        issues = repo_instance.issues.list(state="opened")
-        if issues:
-            parsed_issues = [{"title": issue.title, "number": issue.iid} for issue in issues]
-            return f"Found {len(parsed_issues)} issues:\n{parsed_issues}"
-        else:
-            return "No open issues available"
+
+        try:
+            repo_instance = self._get_repo(repository)
+            issues = repo_instance.issues.list(state="opened")
+            if issues:
+                parsed_issues = [{"title": issue.title, "number": issue.iid} for issue in issues]
+                return f"Found {len(parsed_issues)} issues:\n{parsed_issues}"
+            else:
+                return "No open issues available"
+        except Exception as e:
+            return ToolException(e)
 
     def get_issue(self, issue_number: int, repository: Optional[str] = None) -> Dict[str, Any]:
         """Fetches a specific issue and its first 10 comments."""
-        repo_instance = self._get_repo(repository)
-        issue = repo_instance.issues.get(issue_number)
-        comments = [{"body": comment.body, "user": comment.author["username"]} for comment in issue.notes.list()[:10]]
-        return {"title": issue.title, "body": issue.description, "comments": comments}
+
+        try:
+            repo_instance = self._get_repo(repository)
+            issue = repo_instance.issues.get(issue_number)
+            comments = [{"body": comment.body, "user": comment.author["username"]} for comment in issue.notes.list()[:10]]
+            return {"title": issue.title, "body": issue.description, "comments": comments}
+        except Exception as e:
+            return ToolException(e)
 
     def create_pull_request(self, pr_title: str, pr_body: str, repository: Optional[str] = None) -> str:
         """Makes a pull request from the bot's branch to the base branch."""
-        repo_instance = self._get_repo(repository)
+
+        try:
+            repo_instance = self._get_repo(repository)
+        except Exception as e:
+            return ToolException(e)
+
         if self.branch == self._active_branch:
             return f"Cannot make a pull request because commits are already in the {self.branch} branch"
         try:
@@ -210,24 +232,14 @@ class GitLabWorkspaceAPIWrapper(BaseModel):
             )
             return f"Successfully created PR number {pr.iid}"
         except Exception as e:
-            return f"Unable to make pull request due to error:\n{e}"
+            return ToolException(f"Unable to make pull request due to error:\n{e}")
 
     def get_pr_changes(self, pr_number:str, repository: Optional[str] = None):
         """Get pull request changes from the specified pr number and repository."""
 
         try:
-            repo = self._get_repo(repository)
-            if not isinstance(repo, Project):
-                if _misconfigured_alert in str(repo):
-                    return ToolException("You haven't configured any repositories. Please, define repository name in chat or add it in tool's configuration.")
-                else:
-                    return ToolException(f"Unable to extract repo: {str(repo)}")
-            try:
-                mr = repo.mergerequests.get(pr_number)
-            except GitlabGetError as e:
-                if e.response_code == 404:
-                    raise ToolException(f"Merge request number {pr_number} wasn't found: {e}")
-
+            repo_instance = self._get_repo(repository)
+            mr = repo.mergerequests.get(pr_number)
             res = f"""title: {mr.title}\ndescription: {mr.description}\n\n"""
 
             for change in mr.changes()["changes"]:
@@ -235,57 +247,68 @@ class GitLabWorkspaceAPIWrapper(BaseModel):
                 diff = "\n".join([str(line_num) + ":" + line[1] for line_num, line in diff_w_position.items()])
 
                 res = res + f"""diff --git a/{change["old_path"]} b/{change["new_path"]}\n{diff}\n"""
-
             return res
-        except ToolException as te:
-            raise
+        except GitlabGetError as e:
+            if e.response_code == 404:
+                raise ToolException(f"Merge request number {pr_number} wasn't found: {e}")
         except Exception as e:
-            raise ToolException(f"An error occurred: {e}")
+            return ToolException(e)
 
     def comment_on_issue(self, comment_query: str, repository: Optional[str] = None) -> str:
         """Adds a comment to a gitlab issue."""
-        repo_instance = self._get_repo(repository)
-        issue_number = int(comment_query.split("\n\n")[0])
-        comment = comment_query[len(str(issue_number)) + 2 :]
         try:
-            issue = repo_instance.issues.get(issue_number)
-            issue.notes.create({"body": comment})
-            return f"Commented on issue {issue_number}"
+            repo_instance = self._get_repo(repository)
+            issue_number = int(comment_query.split("\n\n")[0])
+            comment = comment_query[len(str(issue_number)) + 2 :]
+            try:
+                issue = repo_instance.issues.get(issue_number)
+                issue.notes.create({"body": comment})
+                return f"Commented on issue {issue_number}"
+            except Exception as e:
+                return f"Unable to make comment due to error:\n{e}"
         except Exception as e:
-            return f"Unable to make comment due to error:\n{e}"
+            return ToolException(e)
 
     def create_file(self, file_path: str, file_contents: str, repository: Optional[str] = None) -> str:
         """Creates a new file on the gitlab repo."""
-        repo_instance = self._get_repo(repository)
         try:
-            repo_instance.files.get(file_path, self._active_branch)
-            return f"File already exists at {file_path}. Use update_file instead"
-        except Exception:
-            data = {
-                "branch": self._active_branch,
-                "commit_message": "Create " + file_path,
-                "file_path": file_path,
-                "content": file_contents,
-            }
-            repo_instance.files.create(data)
-            return "Created file " + file_path
+            repo_instance = self._get_repo(repository)
+            try:
+                repo_instance.files.get(file_path, self._active_branch)
+                return f"File already exists at {file_path}. Use update_file instead"
+            except Exception:
+                data = {
+                    "branch": self._active_branch,
+                    "commit_message": "Create " + file_path,
+                    "file_path": file_path,
+                    "content": file_contents,
+                }
+                repo_instance.files.create(data)
+                return "Created file " + file_path
+        except Exception as e:
+            return ToolException(e)
 
     def read_file(self, file_path: str, repository: Optional[str] = None) -> str:
         """Reads a file from the gitlab repo."""
-        repo_instance = self._get_repo(repository)
-        file = repo_instance.files.get(file_path, self._active_branch)
-        return file.decode().decode("utf-8")
+
+        try:
+            repo_instance = self._get_repo(repository)
+            file = repo_instance.files.get(file_path, self._active_branch)
+            return file.decode().decode("utf-8")
+        except Exception as e:
+            return ToolException(e)
 
     def update_file(self, file_query: str, repository: Optional[str] = None) -> str:
         """Updates a file with new content."""
-        repo_instance = self._get_repo(repository)
-        if self._active_branch == self.branch:
-            return (
-                "You're attempting to commit to the directly"
-                f"to the {self.branch} branch, which is protected. "
-                "Please create a new branch and try again."
-            )
+
         try:
+            repo_instance = self._get_repo(repository)
+            if self._active_branch == self.branch:
+                return (
+                    "You're attempting to commit to the directly"
+                    f"to the {self.branch} branch, which is protected. "
+                    "Please create a new branch and try again."
+                )
             file_path: str = file_query.split("\n")[0]
             file_content = self.read_file(file_path, repository)
             updated_file_content = file_content
@@ -313,18 +336,18 @@ class GitLabWorkspaceAPIWrapper(BaseModel):
             repo_instance.commits.create(commit)
             return "Updated file " + file_path
         except Exception as e:
-            return f"Unable to update file due to error:\n{e}"
+            return ToolException(f"Unable to update file due to error: {str(e)}")
 
     def delete_file(self, file_path: str, repository: Optional[str] = None) -> str:
         """Deletes a file from the repo."""
-        repo_instance = self._get_repo(repository)
         try:
+            repo_instance = self._get_repo(repository)
             repo_instance.files.delete(
                 file_path, self._active_branch, "Delete " + file_path
             )
             return "Deleted file " + file_path
         except Exception as e:
-            return f"Unable to delete file due to error:\n{e}"
+            return ToolException(f"Unable to delete file due to error: {str(e)}")
 
     def extract_old_new_pairs(self, file_query):
         """Extract old and new content pairs from the file query."""
@@ -372,7 +395,7 @@ class GitLabWorkspaceAPIWrapper(BaseModel):
             mr.discussions.create({"body": comment, "position": position})
             return "Comment added"
         except Exception as e:
-            raise ToolException(f"An error occurred: {e}")
+            return ToolException(f"An error occurred: {e}")
 
     def get_available_tools(self):
         """Return a list of available tools."""
