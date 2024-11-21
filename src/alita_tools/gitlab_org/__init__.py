@@ -4,13 +4,12 @@ from langchain_core.tools import BaseToolkit
 from langchain_core.tools import BaseTool
 from ..base.tool import BaseAction
 
-name = "gitlab_workspace"
+name = "gitlab_org"
 
 def get_tools(tool):
     return AlitaGitlabSpaceToolkit().get_toolkit(
         selected_tools=tool['settings'].get('selected_tools', []),
         url=tool['settings']['url'],
-
         repositories=tool['settings'].get('repositories', ''),
         branch=tool['settings']['branch'],
         private_token=tool['settings']['private_token']
