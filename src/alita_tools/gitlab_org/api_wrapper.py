@@ -121,7 +121,7 @@ class GitLabWorkspaceAPIWrapper(BaseModel):
                 import re
                 for repo in re.split(',|;', values.get('repositories')):
                     cls._repo_instances[repo] = g.projects.get(repo)
-            values["_active_branch"] = values.get('branch', 'main')
+            cls._active_branch = values.get('branch', 'main')
         except Exception as e:
             raise ImportError(f"Failed to connect to GitLab: {e}")
         return values
@@ -239,7 +239,7 @@ class GitLabWorkspaceAPIWrapper(BaseModel):
 
         try:
             repo_instance = self._get_repo(repository)
-            mr = repo.mergerequests.get(pr_number)
+            mr = repo_instance.mergerequests.get(pr_number)
             res = f"""title: {mr.title}\ndescription: {mr.description}\n\n"""
 
             for change in mr.changes()["changes"]:
