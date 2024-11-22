@@ -16,7 +16,7 @@ class GitHubAction(BaseTool):
     description: str = ""
     args_schema: Optional[Type[BaseModel]] = None
     
-    @field_validator('name', mode='before', allow_reuse=True)
+    @field_validator('name', mode='before')
     def remove_spaces(cls, v):
         return v.replace(' ', '')
 
