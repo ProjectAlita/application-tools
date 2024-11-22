@@ -1,17 +1,43 @@
 import logging
+import json
+
 from typing import Optional, Any
 
 from pyral import Rally
-from pydantic import model_validator, BaseModel
+from pydantic import BaseModel, model_validator
 from langchain_core.tools import ToolException
 from pydantic import create_model, PrivateAttr
 from pydantic.fields import FieldInfo
 
 logger = logging.getLogger(__name__)
 
+create_entity_field = """JSON of the artifact fields to create in Rally, i.e. for `Defect`
+                     {
+                       "Name":"Random Defect",
+                       "Description":"This is a randomly generated defect for testing purposes.",
+                       "Severity":"Major Problem",
+                       "Priority":"High Attention",
+                       "State":"Open",
+                       "Environment":"Production",
+                       "FoundInBuild":"1.0.0",
+                       "FixedInBuild":"1.0.1",
+                       "ScheduleState":"Defined",
+                       "Owner":"Engineer"
+                       }
+                     """
+
+update_entity_field = """JSON of the artifact fields to update in Rally, i.e.
+                     {
+                        "FormattedID": "DE1234",
+                        "Description": "Updated description of the defect",
+                        "ScheduleState": "In-Progress"
+                     }
+                     """
+
 # Input models for Rally operations
-RallyGetStories = create_model(
+RallyGetEntities = create_model(
     "RallyGetStoriesModel",
+    entity_type=(str, FieldInfo(description="Artifact type, e.g. 'HierarchicalRequirement', 'Defect', 'UserStory'")),
     query=(str, FieldInfo(description="Query for searching Rally stories", default=None)),
     fetch=(bool, FieldInfo(description="Whether to fetch the full details of the stories", default=True)),
     limit=(int, FieldInfo(description="Limit the number of results", default=10))
@@ -37,8 +63,21 @@ RallyGetUser = create_model(
         description="Username of the user to retrieve or default one will be used in case it is not passed"))
 )
 
-RallyGetContext = create_model(
-    "RallyGetContext"
+RallyNoInputModel = create_model(
+    "RallyNoInputModel"
+)
+
+RallyCreateArtifact = create_model(
+    "RallyCreateArtifactModel",
+    entity_json=(str, FieldInfo(description=create_entity_field)),
+    entity_type=(str, FieldInfo(description="Artifact type, e.g. 'HierarchicalRequirement', 'Defect', 'UserStory'"))
+)
+
+RallyUpdateArtifact = create_model(
+    "RallyUpdateArtifactModel",
+    entity_json=(str, FieldInfo(description=update_entity_field)),
+    entity_type=(
+    str, FieldInfo(description="Artifact type, e.g. 'HierarchicalRequirement', 'Defect', 'UserStory'", default=None))
 )
 
 
@@ -56,6 +95,7 @@ class RallyApiWrapper(BaseModel):
         arbitrary_types_allowed = True  # Allow arbitrary types (e.g., Rally)
 
     @model_validator(mode='before')
+    @classmethod
     def validate_toolkit(cls, values):
         """Validate and set up the Rally client."""
         try:
@@ -72,11 +112,25 @@ class RallyApiWrapper(BaseModel):
         return values
 
     # Tool declaration
-    def get_stories(self, query=None, fetch=True, limit=10):
+    def get_types(self):
+        """Get available entity types from Rally."""
+        try:
+            names = []
+            for item in self._client.get("TypeDefinition", fetch='ElementName').content['QueryResult']['Results']:
+                name = item.get('ElementName', "")
+                if name:
+                    names.append(name)
+            return f"Extracted entities: {names}"
+        except Exception as e:
+            logger.error(f"Error getting stories: {e}")
+            return ToolException(f"Error getting stories: {e}")
+
+    def get_entities(self, entity_type: str = "UserStory", query=None, fetch=True, limit=10):
         """Get user stories from Rally."""
         try:
-            response = self._client.get('UserStory', query=query, fetch=fetch, limit=limit)
-            return [story for story in response]
+            response = self._client.get(entity_type, query=query, fetch=fetch, limit=limit)
+            # extra limit since API doesn't limit the results output
+            return f"Extracted entities: {response.content['QueryResult']['Results'][:limit]}"
         except Exception as e:
             logger.error(f"Error getting stories: {e}")
             return ToolException(f"Error getting stories: {e}")
@@ -126,15 +180,65 @@ class RallyApiWrapper(BaseModel):
             logger.error(f"Error getting user: {e}")
             return ToolException(f"Error getting user: {e}")
 
+    def create_entity(self, entity_json: str, entity_type="HierarchicalRequirement"):
+        """Create an artifact in Rally."""
+        try:
+            # Convert the input JSON to a Python dictionary
+            params = json.loads(entity_json)
+        except (json.JSONDecodeError, ValueError) as e:
+            return ToolException(f"Issues during attempt to parse artifact_json: {e}")
+
+        try:
+            # Validate that the Rally client is initialized
+            if not self._client:
+                return ToolException("Rally client not initialized.")
+
+            # Use the params to create the artifact
+            artifact = self._client.create(entity_type, params)
+            return f"Entity {artifact.FormattedID} created successfully."
+        except Exception as e:
+            logger.error(f"Error creating artifact: {e}")
+            return ToolException(f"Error creating artifact: {e}")
+
+    def update_entity(self, entity_json: str, entity_type: str = None):
+        """Update an artifact in Rally."""
+        try:
+            # Convert the input JSON to a Python dictionary
+            params = json.loads(entity_json)
+        except (json.JSONDecodeError, ValueError) as e:
+            return ToolException(f"Issues during attempt to parse artifact_json: {e}")
+
+        if not entity_type:
+            return ToolException(
+                "Please define entity type ('Story', 'UserStory', 'User Story', etc.). Or you can call tool get_types to get available types.")
+
+        try:
+            # Validate that the Rally client is initialized
+            if not self._client:
+                return ToolException("Rally client not initialized.")
+
+            # Use the params to update the artifact
+            artifact = self._client.update(entity_type, params)
+            return f"Artifact {artifact.FormattedID} updated successfully."
+        except Exception as e:
+            logger.error(f"Error updating artifact: {e}")
+            return ToolException(f"Error updating artifact: {e}")
+
     # list of available tools for a toolkit
     def get_available_tools(self):
         """Return a list of available tools."""
         return [
             {
-                "name": "get_stories",
-                "description": self.get_stories.__doc__,
-                "args_schema": RallyGetStories,
-                "ref": self.get_stories,
+                "name": "get_types",
+                "description": self.get_types.__doc__,
+                "args_schema": RallyNoInputModel,
+                "ref": self.get_types,
+            },
+            {
+                "name": "get_entities",
+                "description": self.get_entities.__doc__,
+                "args_schema": RallyGetEntities,
+                "ref": self.get_entities,
             },
             {
                 "name": "get_project",
@@ -157,8 +261,20 @@ class RallyApiWrapper(BaseModel):
             {
                 "name": "get_context",
                 "description": self.get_context.__doc__,
-                "args_schema": RallyGetContext,
+                "args_schema": RallyNoInputModel,
                 "ref": self.get_context,
+            },
+            {
+                "name": "create_artifact",
+                "description": self.create_entity.__doc__,
+                "args_schema": RallyCreateArtifact,
+                "ref": self.create_entity,
+            },
+            {
+                "name": "update_artifact",
+                "description": self.update_entity.__doc__,
+                "args_schema": RallyUpdateArtifact,
+                "ref": self.update_entity,
             }
         ]
 
