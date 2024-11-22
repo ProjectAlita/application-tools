@@ -16,7 +16,7 @@ class QtestAction(BaseTool):
     description: str = ""
     args_schema: Optional[Type[BaseModel]] = None
 
-    @field_validator('name', pre=True, allow_reuse=True)
+    @field_validator('name', mode='before', allow_reuse=True)
     def remove_spaces(cls, v):
         return v.replace(' ', '')
 
