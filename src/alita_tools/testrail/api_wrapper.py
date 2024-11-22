@@ -40,7 +40,8 @@ class TestrailAPIWrapper(BaseModel):
     password: Optional[str] = None,
     email: Optional[str] = None
 
-    @model_validator()
+    @model_validator(mode='before')
+    @classmethod
     def validate_toolkit(cls, values):
         try:
             from testrail_api import TestRailAPI

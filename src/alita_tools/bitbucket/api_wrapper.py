@@ -39,8 +39,9 @@ class BitbucketAPIWrapper(BaseModel):
     """Bitbucket installation type: true for cloud, false for server.
     """
 
-    @model_validator()
-    def validate_environment(cls, values: Dict) -> Dict:
+    @model_validator(mode='before')
+    @classmethod
+    def validate_env(cls, values: Dict) -> Dict:
         """Validate authentication and python package existence in environment."""
         try:
             import atlassian

@@ -10,7 +10,8 @@ class TestIOApiWrapper(BaseModel):
     endpoint: str
     api_key: str
 
-    @model_validator()
+    @model_validator(mode='before')
+    @classmethod
     def validate_toolkit(cls, values):
         endpoint = values.get('endpoint')
         api_key = values.get('api_key')

@@ -27,8 +27,9 @@ class GitLabAPIWrapper(BaseModel):
     """
     
 
-    @model_validator()
-    def validate_environment(cls, values: Dict) -> Dict:
+    @model_validator(mode='before')
+    @classmethod
+    def validate_env(cls, values: Dict) -> Dict:
         """Validate that api key and python package exists in environment."""
         try:
             import gitlab

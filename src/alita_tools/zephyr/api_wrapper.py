@@ -37,7 +37,8 @@ class ZephyrV1ApiWrapper(BaseModel):
     username: str
     password: str
 
-    @model_validator()
+    @model_validator(mode='before')
+    @classmethod
     def validate_toolkit(cls, values):
         base_url = values['base_url']
         username = values['username']

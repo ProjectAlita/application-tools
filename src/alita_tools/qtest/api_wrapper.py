@@ -69,9 +69,10 @@ class QtestApiWrapper(BaseModel):
     qtest_api_token: str
     no_of_items_per_page: int = 100
     page: int = 1
-    no_of_tests_shown_in_dql_search = 10
+    no_of_tests_shown_in_dql_search: int = 10
 
-    @model_validator()
+    @model_validator(mode='before')
+    @classmethod
     def validate_toolkit(cls, values):
         try:
             import swagger_client  # noqa: F401

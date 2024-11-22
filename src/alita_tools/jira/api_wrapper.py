@@ -110,7 +110,8 @@ class JiraApiWrapper(BaseModel):
     additional_fields: list[str] | str | None = []
     verify_ssl: Optional[bool] = True
 
-    @model_validator()
+    @model_validator(mode='before')
+    @classmethod
     def validate_toolkit(cls, values):
         try:
             from atlassian import Jira  # noqa: F401

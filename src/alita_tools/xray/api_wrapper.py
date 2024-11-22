@@ -104,7 +104,8 @@ class XrayApiWrapper(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
-    @model_validator()
+    @model_validator(mode='before')
+    @classmethod
     def validate_toolkit(cls, values):
         try:
             from python_graphql_client import GraphqlClient

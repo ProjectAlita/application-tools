@@ -19,7 +19,8 @@ class SharepointWrapper(BaseModel):
     client_secret: str
     access_token: Optional[str] = None
 
-    @model_validator()
+    @model_validator(mode='before')
+    @classmethod
     def validate_toolkit(cls, values):
         tenant = values['tenant']
         client_id = values['client_id']

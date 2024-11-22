@@ -108,7 +108,8 @@ class AdvancedJiraMiningWrapper(BaseModel):
     verify_ssl: Optional[bool] = True
     """Indicates if SSL verification should be performed. Default is True."""
 
-    @model_validator()
+    @model_validator(mode='before')
+    @classmethod
     def validate_toolkit(cls, values):
         """
         Validates and initializes the toolkit for interacting with Jira and the language model.

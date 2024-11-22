@@ -162,7 +162,7 @@ class GetPullRequesChanges(BaseTool):
     args_schema: Type[BaseModel] = create_model(
         "GetPullRequesChangesInput",
         pr_number=(str, FieldInfo(description="GitLab Merge Request (Pull Request) number")))
-    handle_tool_error = True
+    handle_tool_error: bool = True
 
     def _run(self, pr_number: str):
         try:
@@ -201,7 +201,7 @@ class CreatePullRequestChangeComment(BaseTool):
     description: str = """This tool is a wrapper for the GitLab API, useful when you need to create a comment on a pull request change.
     """
     args_schema: Type[BaseModel] = CreatePullRequestChangeCommentInput
-    handle_tool_error = True
+    handle_tool_error: bool = True
 
     def _run(self, pr_number: str, file_path: str, line_number: int, comment: str, *args):
         repo = self.api_wrapper.repo_instance
@@ -228,7 +228,7 @@ class UpdateFileTool(BaseTool):
     name: str = "update_file"
     description: str = UPDATE_FILE_PROMPT
     args_schema: Type[BaseModel] = UpdateFileToolModel
-    handle_tool_error = True
+    handle_tool_error: bool = True
     
     def _run(self, file_query: str):
         try:

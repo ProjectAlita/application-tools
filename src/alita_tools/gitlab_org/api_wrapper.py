@@ -107,6 +107,7 @@ class GitLabWorkspaceAPIWrapper(BaseModel):
         arbitrary_types_allowed = True
 
     @model_validator(mode='before')
+    @classmethod
     def validate_toolkit(cls, values):
         """Validate and set up the GitLab client."""
         try:

@@ -110,7 +110,8 @@ class LocalGit(BaseModel):
     commit_sha: str = None
     path_pattern: str = '**/*.py'
 
-    @model_validator()
+    @model_validator(mode='before')
+    @classmethod
     def validate_toolkit(cls, values):
         repo_path = values['repo_path']
         base_path = values['base_path']

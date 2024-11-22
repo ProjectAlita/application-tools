@@ -103,6 +103,7 @@ pageId = create_model(
 )
 
 class ConfluenceAPIWrapper(BaseModel):
+    client: Any #: :meta private:
     base_url: str
     api_key: Optional[str] = None,
     username: Optional[str] = None
@@ -122,7 +123,8 @@ class ConfluenceAPIWrapper(BaseModel):
     ocr_languages: Optional[str] = None
     keep_newlines: Optional[bool] = True
 
-    @model_validator()
+    @model_validator(mode='before')
+    @classmethod
     def validate_toolkit(cls, values):
         try:
             from atlassian import Confluence  # noqa: F401

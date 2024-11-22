@@ -157,7 +157,8 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
     
     
     @model_validator(mode='before')
-    def validate_environment(cls, values: Dict) -> Dict:
+    @classmethod
+    def validate_env(cls, values: Dict) -> Dict:
          
         github_app_id = get_from_dict_or_env(values, 
                                              "github_app_id", 

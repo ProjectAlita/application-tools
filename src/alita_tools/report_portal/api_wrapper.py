@@ -54,7 +54,8 @@ class ReportPortalApiWrapper(BaseModel):
     api_key: str
     project: str
 
-    @model_validator()
+    @model_validator(mode='before')
+    @classmethod
     def validate_toolkit(cls, values):
 
         endpoint = values.get('endpoint')
