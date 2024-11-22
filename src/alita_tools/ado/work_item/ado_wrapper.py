@@ -54,7 +54,7 @@ class AzureDevOpsApiWrapper(BaseModel):
     class Config:
         arbitrary_types_allowed = True  # Allow arbitrary types (e.g., WorkItemTrackingClient)
 
-    @model_validator(pre=True)
+    @model_validator(mode='before')
     def validate_toolkit(cls, values):
         """Validate and set up the Azure DevOps client."""
         try:

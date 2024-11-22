@@ -156,7 +156,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
     github_app_private_key: Optional[str] = None
     
     
-    @model_validator(pre=True)
+    @model_validator(mode='before')
     def validate_environment(cls, values: Dict) -> Dict:
          
         github_app_id = get_from_dict_or_env(values, 

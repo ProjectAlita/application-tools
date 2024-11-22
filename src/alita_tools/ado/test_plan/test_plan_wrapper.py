@@ -85,7 +85,7 @@ class TestPlanApiWrapper(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
-    @model_validator(pre=True)
+    @model_validator(mode='before')
     def validate_toolkit(cls, values):
         try:
             credentials = BasicAuthentication('', values['token'])

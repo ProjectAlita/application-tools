@@ -55,7 +55,7 @@ class RallyApiWrapper(BaseModel):
     class Config:
         arbitrary_types_allowed = True  # Allow arbitrary types (e.g., Rally)
 
-    @model_validator(pre=True)
+    @model_validator(mode='before')
     def validate_toolkit(cls, values):
         """Validate and set up the Rally client."""
         try:
