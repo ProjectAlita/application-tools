@@ -4,7 +4,8 @@ from typing import Optional, Any, List, Dict
 from gitlab import GitlabGetError
 from gitlab.v4.objects import Project
 from langchain_core.tools import ToolException
-from pydantic import BaseModel, Field, root_validator, PrivateAttr, create_model
+from pydantic import BaseModel,  model_validator, PrivateAttr, create_model
+from pydantic.fields import FieldInfo as Field
 
 from ..gitlab.utils import get_diff_w_position, get_position
 
@@ -105,7 +106,7 @@ class GitLabWorkspaceAPIWrapper(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
-    @root_validator(pre=True)
+    @model_validator(pre=True)
     def validate_toolkit(cls, values):
         """Validate and set up the GitLab client."""
         try:

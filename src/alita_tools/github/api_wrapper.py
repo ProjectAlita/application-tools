@@ -2,7 +2,7 @@ import os
 from json import dumps
 from typing import Dict, Any, Optional, List
 import tiktoken
-from pydantic import root_validator, create_model
+from pydantic import model_validator, create_model
 from pydantic.fields import FieldInfo
 from langchain.utils import get_from_dict_or_env
 
@@ -156,7 +156,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
     github_app_private_key: Optional[str] = None
     
     
-    @root_validator(pre=True)
+    @model_validator(pre=True)
     def validate_environment(cls, values: Dict) -> Dict:
          
         github_app_id = get_from_dict_or_env(values, 

@@ -13,7 +13,7 @@ from langchain_core.documents import Document
 from langchain_core.messages import BaseMessage
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.pydantic_v1 import root_validator, BaseModel
+from pydantic import model_validator, BaseModel
 from langchain_core.runnables import RunnableLambda, RunnableParallel, RunnablePassthrough
 from langchain_text_splitters import MarkdownHeaderTextSplitter
 from pydantic import create_model
@@ -108,7 +108,7 @@ class AdvancedJiraMiningWrapper(BaseModel):
     verify_ssl: Optional[bool] = True
     """Indicates if SSL verification should be performed. Default is True."""
 
-    @root_validator()
+    @model_validator()
     def validate_toolkit(cls, values):
         """
         Validates and initializes the toolkit for interacting with Jira and the language model.

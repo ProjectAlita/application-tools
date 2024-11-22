@@ -2,37 +2,38 @@ import logging
 from typing import Optional, Any
 
 from pyral import Rally
-from langchain_core.pydantic_v1 import root_validator, BaseModel
+from pydantic import model_validator, BaseModel
 from langchain_core.tools import ToolException
-from pydantic import create_model, Field, PrivateAttr
+from pydantic import create_model, PrivateAttr
+from pydantic.fields import FieldInfo
 
 logger = logging.getLogger(__name__)
 
 # Input models for Rally operations
 RallyGetStories = create_model(
     "RallyGetStoriesModel",
-    query=(str, Field(description="Query for searching Rally stories", default=None)),
-    fetch=(bool, Field(description="Whether to fetch the full details of the stories", default=True)),
-    limit=(int, Field(description="Limit the number of results", default=10))
+    query=(str, FieldInfo(description="Query for searching Rally stories", default=None)),
+    fetch=(bool, FieldInfo(description="Whether to fetch the full details of the stories", default=True)),
+    limit=(int, FieldInfo(description="Limit the number of results", default=10))
 )
 
 RallyGetProject = create_model(
     "RallyGetProjectModel",
-    project_name=(Optional[str], Field(
+    project_name=(Optional[str], FieldInfo(
         description="Name of the project to retrieve or default one will be used in case it is not passed",
         default=None))
 )
 
 RallyGetWorkspace = create_model(
     "RallyGetWorkspaceModel",
-    workspace_name=(Optional[str], Field(
+    workspace_name=(Optional[str], FieldInfo(
         description="Name of the workspace to retrieve or default one will be used in case it is not passed",
         default=None))
 )
 
 RallyGetUser = create_model(
     "RallyGetUserModel",
-    user_name=(Optional[str], Field(
+    user_name=(Optional[str], FieldInfo(
         description="Username of the user to retrieve or default one will be used in case it is not passed"))
 )
 
@@ -54,7 +55,7 @@ class RallyApiWrapper(BaseModel):
     class Config:
         arbitrary_types_allowed = True  # Allow arbitrary types (e.g., Rally)
 
-    @root_validator(pre=True)
+    @model_validator(pre=True)
     def validate_toolkit(cls, values):
         """Validate and set up the Rally client."""
         try:

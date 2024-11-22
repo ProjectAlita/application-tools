@@ -2,7 +2,7 @@ import json
 import logging
 from typing import Optional, Any
 
-from langchain_core.pydantic_v1 import root_validator, BaseModel
+from pydantic import model_validator, BaseModel
 from langchain_core.tools import ToolException
 from pydantic import create_model
 from pydantic.fields import FieldInfo
@@ -40,7 +40,7 @@ class TestrailAPIWrapper(BaseModel):
     password: Optional[str] = None,
     email: Optional[str] = None
 
-    @root_validator()
+    @model_validator()
     def validate_toolkit(cls, values):
         try:
             from testrail_api import TestRailAPI

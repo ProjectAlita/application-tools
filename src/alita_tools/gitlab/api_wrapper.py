@@ -4,8 +4,7 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from pydantic import BaseModel, root_validator
-from langchain_core.utils import get_from_dict_or_env
+from pydantic import BaseModel, model_validator
 
 if TYPE_CHECKING:
     from gitlab.v4.objects import Issue
@@ -28,7 +27,7 @@ class GitLabAPIWrapper(BaseModel):
     """
     
 
-    @root_validator()
+    @model_validator()
     def validate_environment(cls, values: Dict) -> Dict:
         """Validate that api key and python package exists in environment."""
         try:

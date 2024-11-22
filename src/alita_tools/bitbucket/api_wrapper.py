@@ -5,7 +5,7 @@ import logging
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from langchain_core.tools import ToolException
-from pydantic import BaseModel, root_validator
+from pydantic import BaseModel, model_validator
 from .bitbucket_constants import create_pr_data
 from .cloud_api_wrapper import BitbucketCloudApi, BitbucketServerApi
 
@@ -39,7 +39,7 @@ class BitbucketAPIWrapper(BaseModel):
     """Bitbucket installation type: true for cloud, false for server.
     """
 
-    @root_validator()
+    @model_validator()
     def validate_environment(cls, values: Dict) -> Dict:
         """Validate authentication and python package existence in environment."""
         try:

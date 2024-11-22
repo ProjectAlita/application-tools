@@ -1,6 +1,6 @@
 import logging
 from typing import List, Any, Optional
-from langchain_core.pydantic_v1 import root_validator, BaseModel
+from pydantic import model_validator, BaseModel
 from pydantic import create_model
 from pydantic.fields import FieldInfo
 import yagmail
@@ -27,7 +27,7 @@ class YagmailWrapper(BaseModel):
     password: str
     host: Optional[str] = SMTP_SERVER
 
-    @root_validator()
+    @model_validator()
     def validate_toolkit(cls, values):
         username = values['username']
         password = values['password']

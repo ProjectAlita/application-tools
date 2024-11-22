@@ -1,5 +1,5 @@
 from typing import List, Any
-from langchain_core.pydantic_v1 import root_validator, BaseModel
+from pydantic import model_validator, BaseModel
 import json
 import logging
 from pydantic import create_model
@@ -37,7 +37,7 @@ class ZephyrV1ApiWrapper(BaseModel):
     username: str
     password: str
 
-    @root_validator()
+    @model_validator()
     def validate_toolkit(cls, values):
         base_url = values['base_url']
         username = values['username']

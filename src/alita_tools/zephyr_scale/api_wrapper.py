@@ -2,7 +2,7 @@ import json
 import logging
 from typing import Any, Optional
 
-from langchain_core.pydantic_v1 import root_validator, BaseModel
+from pydantic import model_validator, BaseModel
 from langchain_core.tools import ToolException
 from pydantic import create_model, PrivateAttr
 from pydantic.fields import FieldInfo
@@ -68,7 +68,7 @@ class ZephyrScaleApiWrapper(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
-    @root_validator()
+    @model_validator()
     def validate_toolkit(cls, values):
         try:
             from zephyr import ZephyrScale

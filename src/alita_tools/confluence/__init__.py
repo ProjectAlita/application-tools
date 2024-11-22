@@ -1,5 +1,4 @@
 from typing import Optional, List
-from langchain_core.pydantic_v1 import root_validator
 from langchain_community.agent_toolkits.base import BaseToolkit
 from .api_wrapper import ConfluenceAPIWrapper
 from langchain_core.tools import BaseTool

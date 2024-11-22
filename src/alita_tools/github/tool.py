@@ -1,7 +1,7 @@
 from typing import Optional, Type
 
 from langchain_core.callbacks import CallbackManagerForToolRun
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, field_validator, Field
 from langchain_core.tools import BaseTool
 from traceback import format_exc
 from .api_wrapper import AlitaGitHubAPIWrapper
@@ -16,7 +16,7 @@ class GitHubAction(BaseTool):
     description: str = ""
     args_schema: Optional[Type[BaseModel]] = None
     
-    @validator('name', pre=True, allow_reuse=True)
+    @field_validator('name', pre=True, allow_reuse=True)
     def remove_spaces(cls, v):
         return v.replace(' ', '')
 

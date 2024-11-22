@@ -2,9 +2,9 @@ import logging
 from typing import Any
 
 import swagger_client
-from langchain_core.pydantic_v1 import root_validator, BaseModel
+from pydantic import model_validator, BaseModel
 from langchain_core.tools import ToolException
-from pydantic import create_model
+from pydantic import create_model, model_validator, BaseModel
 from pydantic.fields import FieldInfo
 from sklearn.feature_extraction.text import strip_tags
 from swagger_client import TestCaseApi, SearchApi, PropertyResource
@@ -71,7 +71,7 @@ class QtestApiWrapper(BaseModel):
     page: int = 1
     no_of_tests_shown_in_dql_search = 10
 
-    @root_validator()
+    @model_validator()
     def validate_toolkit(cls, values):
         try:
             import swagger_client  # noqa: F401

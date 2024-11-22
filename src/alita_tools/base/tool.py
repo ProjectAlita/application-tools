@@ -2,7 +2,8 @@
 from typing import Optional, Type, Any
 
 from langchain_core.callbacks import CallbackManagerForToolRun
-from langchain_core.pydantic_v1 import BaseModel, Field
+from pydantic import BaseModel
+from pydantic import Field
 from langchain_core.tools import BaseTool
 
 

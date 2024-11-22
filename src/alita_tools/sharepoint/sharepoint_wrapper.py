@@ -1,11 +1,12 @@
 import requests
 from typing import List, Any, Optional, Dict
-from pydantic import Field, create_model
-from langchain_core.pydantic_v1 import root_validator, BaseModel
+from pydantic import create_model
+from pydantic import model_validator, BaseModel
+from pydantic.fields import FieldInfo
 
 GetFilesInput = create_model(
     "GetFilesInputModel",
-    folder_path=(str, Field(description="The path to the folder in SharePoint whose files you want to retrieve, e.g., '/Documents/Folder1'.")),
+    folder_path=(str, FieldInfo(description="The path to the folder in SharePoint whose files you want to retrieve, e.g., '/Documents/Folder1'.")),
 )
 
 NoInput = create_model(
@@ -18,7 +19,7 @@ class SharepointWrapper(BaseModel):
     client_secret: str
     access_token: Optional[str] = None
 
-    @root_validator()
+    @model_validator()
     def validate_toolkit(cls, values):
         tenant = values['tenant']
         client_id = values['client_id']

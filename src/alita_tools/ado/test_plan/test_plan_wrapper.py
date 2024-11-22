@@ -6,10 +6,10 @@ from azure.devops.connection import Connection
 from azure.devops.v7_0.test_plan.models import TestPlanCreateParams, TestSuiteCreateParams, \
     SuiteTestCaseCreateUpdateParameters
 from azure.devops.v7_0.test_plan.test_plan_client import TestPlanClient
-from langchain_core.pydantic_v1 import root_validator, BaseModel
 from langchain_core.tools import ToolException
 from msrest.authentication import BasicAuthentication
-from pydantic import create_model, Field, PrivateAttr
+from pydantic import create_model, PrivateAttr, BaseModel, model_validator
+from pydantic.fields import FieldInfo as Field
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +85,7 @@ class TestPlanApiWrapper(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
-    @root_validator(pre=True)
+    @model_validator(pre=True)
     def validate_toolkit(cls, values):
         try:
             credentials = BasicAuthentication('', values['token'])

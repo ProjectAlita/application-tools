@@ -1,6 +1,6 @@
 import logging
 from typing import List, Dict
-from langchain_core.pydantic_v1 import BaseModel
+from pydantic import BaseModel
 from googleapiclient.discovery import Resource
 from langchain_community.tools import GmailSendMessage
 from langchain_community.tools import GmailCreateDraft

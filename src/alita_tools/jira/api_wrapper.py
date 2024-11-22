@@ -3,7 +3,7 @@ from traceback import format_exc
 import json
 from typing import List, Optional, Any, Dict
 from langchain_core.tools import ToolException
-from langchain_core.pydantic_v1 import root_validator, BaseModel
+from pydantic import model_validator, BaseModel
 from pydantic import create_model
 from pydantic.fields import FieldInfo
 
@@ -110,7 +110,7 @@ class JiraApiWrapper(BaseModel):
     additional_fields: list[str] | str | None = []
     verify_ssl: Optional[bool] = True
 
-    @root_validator()
+    @model_validator()
     def validate_toolkit(cls, values):
         try:
             from atlassian import Jira  # noqa: F401

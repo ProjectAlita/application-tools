@@ -4,7 +4,7 @@ from typing import List, Optional, Any
 from pydantic import create_model
 from pydantic.fields import FieldInfo
 from langchain_core.documents import Document
-from langchain_core.pydantic_v1 import root_validator, BaseModel
+from pydantic import model_validator, BaseModel
 from langchain_community.document_loaders.confluence import ContentFormat
 from tenacity import (
     before_sleep_log,
@@ -122,7 +122,7 @@ class ConfluenceAPIWrapper(BaseModel):
     ocr_languages: Optional[str] = None
     keep_newlines: Optional[bool] = True
 
-    @root_validator()
+    @model_validator()
     def validate_toolkit(cls, values):
         try:
             from atlassian import Confluence  # noqa: F401

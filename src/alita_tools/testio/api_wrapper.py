@@ -1,6 +1,6 @@
 from typing import Any, Optional, List
 
-from pydantic import BaseModel, root_validator, create_model
+from pydantic import BaseModel, model_validator, create_model
 from pydantic.fields import FieldInfo
 
 from .testio_client import TestIOClient
@@ -10,7 +10,7 @@ class TestIOApiWrapper(BaseModel):
     endpoint: str
     api_key: str
 
-    @root_validator()
+    @model_validator()
     def validate_toolkit(cls, values):
         endpoint = values.get('endpoint')
         api_key = values.get('api_key')

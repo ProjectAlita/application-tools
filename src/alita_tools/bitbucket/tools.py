@@ -3,7 +3,7 @@ import traceback
 from typing import Type
 
 from langchain_core.tools import BaseTool
-from pydantic import create_model, BaseModel, Field
+from pydantic import create_model, Field, BaseModel
 from pydantic.fields import FieldInfo
 from .bitbucket_constants import create_pr_data
 
@@ -13,8 +13,7 @@ logger = logging.getLogger(__name__)
 
 branchInput = create_model(
     "BranchInput",
-    branch_name=(str,
-                 FieldInfo(description="The name of the branch, e.g. `my_branch`.")))
+    branch_name=(str, FieldInfo(description="The name of the branch, e.g. `my_branch`.")))
 
 
 class CreateBitbucketBranchTool(BaseTool):
@@ -41,7 +40,7 @@ class CreatePRTool(BaseTool):
     """
     args_schema: Type[BaseModel] = create_model(
         "CreatePRInput",
-        pr_json_data=(str, FieldInfo(description=create_pr_data)))
+        pr_json_data=(str, Field(description=create_pr_data)))
 
     def _run(self, pr_json_data: str):
         try:

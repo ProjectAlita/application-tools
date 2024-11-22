@@ -5,7 +5,7 @@ from traceback import format_exc
 from typing import Any
 
 from git import Repo
-from langchain_core.pydantic_v1 import root_validator, BaseModel, create_model
+from pydantic import model_validator, BaseModel, create_model
 from langchain_core.tools import ToolException
 from pydantic.fields import FieldInfo
 
@@ -110,7 +110,7 @@ class LocalGit(BaseModel):
     commit_sha: str = None
     path_pattern: str = '**/*.py'
 
-    @root_validator()
+    @model_validator()
     def validate_toolkit(cls, values):
         repo_path = values['repo_path']
         base_path = values['base_path']
