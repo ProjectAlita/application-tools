@@ -18,9 +18,8 @@ from .sharepoint import get_tools as get_sharepoint
 from .qtest import get_tools as get_qtest
 from .zephyr_scale import get_tools as get_zephyr_scale
 from .ado import get_tools as get_ado
-
-
 from .yagmail import get_tools as get_yagmail
+from .gdrive import get_tools as get_gdrive
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +62,8 @@ def get_tools(tools_list, *args, **kwargs):
             tools.extend(get_qtest(tool))
         elif tool['type'] == 'zephyr_scale':
             tools.extend(get_zephyr_scale(tool))
+        elif tool['type'] == 'gdrive':
+            tools.extend(get_gdrive(tool))
         else:
             if tool.get("settings", {}).get("module"):
                 try:
