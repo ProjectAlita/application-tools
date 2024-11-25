@@ -152,7 +152,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
     github_access_token: Optional[str] = None
     github_username: Optional[str] = None
     github_password: Optional[str] = None
-    # github_app_id: Optional[str] = None
+    github_app_id: Optional[str] = None
     github_app_private_key: Optional[str] = None
 
 

@@ -1,11 +1,9 @@
 import logging
 from importlib import import_module
 
-from .github import get_tools as get_github
-from .github import AlitaGitHubToolkit
+from .github import get_tools as get_github, AlitaGitHubToolkit
 from .openapi import get_tools as get_openapi
-from .jira import get_tools as get_jira
-from .jira import JiraToolkit
+from .jira import get_tools as get_jira, JiraToolkit
 from .confluence import get_tools as get_confluence
 from .gitlab import get_tools as get_gitlab
 from .gitlab_org import get_tools as get_gitlab_org
