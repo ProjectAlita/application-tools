@@ -20,7 +20,6 @@ class BitbucketAPIWrapper(BaseModel):
     """Wrapper for Bitbucket API."""
 
     bitbucket: Any  #: :meta private:
-    repo_instance: Any #: :meta private:
     active_branch: Any  #: :meta private:
     url: str = ''
     project: str = ''

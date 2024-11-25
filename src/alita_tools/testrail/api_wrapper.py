@@ -2,10 +2,11 @@ import json
 import logging
 from typing import Optional, Any
 
+from testrail_api import TestRailAPI
 from pydantic import model_validator, BaseModel
 from langchain_core.tools import ToolException
 from pydantic import create_model
-from pydantic.fields import FieldInfo
+from pydantic.fields import FieldInfo, PrivateAttr
 from testrail_api import StatusCodeError
 
 logger = logging.getLogger(__name__)
@@ -38,7 +39,8 @@ addCase = create_model(
 class TestrailAPIWrapper(BaseModel):
     url: str
     password: Optional[str] = None,
-    email: Optional[str] = None
+    email: Optional[str] = None,
+    _client: Optional[TestRailAPI] = PrivateAttr()  # Private attribute for the Rally client
 
     @model_validator(mode='before')
     @classmethod
@@ -54,13 +56,13 @@ class TestrailAPIWrapper(BaseModel):
         url = values['url']
         password = values.get('password')
         email = values.get('email')
-        values['client'] = TestRailAPI(url, email, password)
+        cls._client = TestRailAPI(url, email, password)
         return values
 
     def add_case(self, section_id: str, title: str, case_properties: dict):
         """ Adds new test case into Testrail"""
         try:
-            created_case = self.client.cases.add_case(section_id=section_id, title=title, **case_properties)
+            created_case = self._client.cases.add_case(section_id=section_id, title=title, **case_properties)
         except StatusCodeError as e:
             return f"Unable to add new testcase {e}"
         return f"New test case has been created: id - {created_case['id']} at '{created_case['created_on']}')"
@@ -68,7 +70,7 @@ class TestrailAPIWrapper(BaseModel):
     def get_case(self, testcase_id: str):
         """ Extracts information about single test case from Testrail"""
         try:
-            extracted_case = self.client.cases.get_case(testcase_id)
+            extracted_case = self._client.cases.get_case(testcase_id)
         except StatusCodeError as e:
             return ToolException(f"Unable to extract testcase {e}")
         return f"Extracted test case:\n{str(extracted_case)}"
@@ -76,7 +78,7 @@ class TestrailAPIWrapper(BaseModel):
     def get_cases(self, project_id: str):
         """ Extracts list of test cases in format `case_id - title` from specified project"""
         try:
-            extracted_cases = self.client.cases.get_cases(project_id=project_id)
+            extracted_cases = self._client.cases.get_cases(project_id=project_id)
             extracted_cases_data = []
             for case in extracted_cases['cases']:
                 extracted_cases_data.append({"id": case['id'], "title": case['title']})
@@ -89,7 +91,7 @@ class TestrailAPIWrapper(BaseModel):
         """Extracts test cases from specified project and per given case attributes provided as json"""
         try:
             params = json.loads(json_case_arguments)
-            extracted_cases = self.client.cases.get_cases(project_id=project_id, **params)
+            extracted_cases = self._client.cases.get_cases(project_id=project_id, **params)
             steps_list = [str(case) for case in extracted_cases]
             all_cases_concatenated = '\n'.join(steps_list)
         except StatusCodeError as e:

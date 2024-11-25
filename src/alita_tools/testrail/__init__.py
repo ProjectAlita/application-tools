@@ -1,7 +1,8 @@
 from typing import List
 
-from langchain_community.agent_toolkits.base import BaseToolkit
-from langchain_core.tools import BaseTool
+from langchain_core.tools import BaseTool, BaseToolkit
+from pydantic import BaseModel, create_model
+from pydantic.fields import FieldInfo
 
 from .api_wrapper import TestrailAPIWrapper
 from ..base.tool import BaseAction
@@ -19,6 +20,15 @@ def get_tools(tool):
 
 class TestrailToolkit(BaseToolkit):
     tools: List[BaseTool] = []
+
+    @staticmethod
+    def toolkit_config_schema() -> BaseModel:
+        return create_model(
+            name,
+            url=(str, FieldInfo(description="Testrail URL")),
+            email=(str, FieldInfo(description="User's email")),
+            password=(str, FieldInfo(description="User's password")),
+        )
 
     @classmethod
     def get_toolkit(cls, selected_tools: list[str] | None = None, **kwargs):
