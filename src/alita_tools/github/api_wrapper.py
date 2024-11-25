@@ -59,7 +59,7 @@ SearchCode = create_model(
     "SearchCodeModel",
     query=(str, FieldInfo(description=("A keyword-focused natural language "
                                        "search query for code, e.g. `MyFunctionName()`.")))
-    )
+)
 
 GetIssue = create_model(
     "GetIssue",
@@ -154,27 +154,27 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
     github_password: Optional[str] = None
     github_app_id: Optional[str] = None
     github_app_private_key: Optional[str] = None
-    
-    
+
+
     @model_validator(mode='before')
     @classmethod
-    def validate_env(cls, values: Dict) -> Dict:
-         
-        github_app_id = get_from_dict_or_env(values, 
-                                             "github_app_id", 
+    def validate_environment(cls, values: Dict) -> Dict:
+
+        github_app_id = get_from_dict_or_env(values,
+                                             "github_app_id",
                                              "GITHUB_APP_ID",
                                              default='')
-        
+
         github_app_private_key = get_from_dict_or_env(
-            values, 
-            "github_app_private_key", 
-            "GITHUB_APP_PRIVATE_KEY", 
+            values,
+            "github_app_private_key",
+            "GITHUB_APP_PRIVATE_KEY",
             default=''
         )
-        
+
         github_access_token = get_from_dict_or_env(
             values, "github_access_token",  "GITHUB_ACCESS_TOKEN", default='')
-        
+
         github_username = get_from_dict_or_env(
             values, "github_username", "GITHUB_USERNAME", default='')
         github_password = get_from_dict_or_env(
@@ -188,12 +188,12 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         github_base_branch = get_from_dict_or_env(
             values, "github_base_branch", "GITHUB_BASE_BRANCH", default="main")
 
-        if github_app_private_key and os.path.exists(github_app_private_key):    
+        if github_app_private_key and os.path.exists(github_app_private_key):
             with open(github_app_private_key, "r") as f:
                 private_key = f.read()
         else:
             private_key = github_app_private_key
-        
+
         try:
             from github import Auth, GithubIntegration, Github
             from github.Consts import DEFAULT_BASE_URL
@@ -202,9 +202,9 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                 "PyGithub is not installed. "
                 "Please install it with `pip install PyGithub`"
             )
-            
+
         github_base_url = get_from_dict_or_env(
-            values, "github_base_url", "GITHUB_BASE_URL", default=DEFAULT_BASE_URL)        
+            values, "github_base_url", "GITHUB_BASE_URL", default=DEFAULT_BASE_URL)
         if github_access_token:
             print(github_access_token)
             auth = Auth.Token(github_access_token)
@@ -214,7 +214,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             auth = Auth.AppAuth(github_app_id, private_key)
         else:
             auth = None
-            
+
         if auth is None:
             g = Github(base_url=github_base_url)
         elif github_app_id and private_key:
@@ -230,13 +230,13 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         values["github_repository"] = github_repository
         values["active_branch"] = active_branch
         values["github_base_branch"] = github_base_branch
-        
+
         return values
-    
-    
+
+
     def _get_files(self, directory_path: str, ref: str) -> List[str]:
         from github import GithubException
-        
+
         files: List[str] = []
         try:
             contents = self.github_repo_instance.get_contents(
@@ -252,7 +252,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             else:
                 files.append(file_content)
         return str(files)
-    
+
     def get_files_from_directory(self, directory_path: str) -> str:
         """
         Recursively fetches files from a directory in the repo.
@@ -263,7 +263,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         Returns:
             str: List of file paths, or an error message.
         """
-        
+
         return self._get_files(directory_path, self.active_branch)
 
     def get_issue(self, issue_number: str) -> str:
@@ -274,7 +274,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             str: A dictionary containing information about the issue.
         """
         return dumps(super().get_issue(int(issue_number)))
-    
+
 
     def list_files_in_main_branch(self) -> str:
         """
@@ -372,7 +372,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                     "path": path,
                     "patch": patch
                 }
-            )    
+            )
         return dumps(data)
 
     def create_branch(self, proposed_branch_name: str) -> str:
@@ -458,22 +458,22 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             return "Created file " + file_path
         except Exception as e:
             return "Unable to make file due to error:\n" + str(e)
-    
+
     def extract_old_new_pairs(self, file_query):
         # Split the file content by lines
         code_lines = file_query.split("\n")
-        
+
         # Initialize lists to hold the contents of OLD and NEW sections
         old_contents = []
         new_contents = []
-        
+
         # Initialize variables to track whether the current line is within an OLD or NEW section
         in_old_section = False
         in_new_section = False
-        
+
         # Temporary storage for the current section's content
         current_section_content = []
-        
+
         # Iterate through each line in the file content
         for line in code_lines:
             # Check for OLD section start
@@ -481,36 +481,36 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                 in_old_section = True
                 current_section_content = []  # Reset current section content
                 continue  # Skip the line with the marker
-            
+
             # Check for OLD section end
             if ">>>> OLD" in line:
                 in_old_section = False
                 old_contents.append("\n".join(current_section_content).strip())  # Add the captured content
                 current_section_content = []  # Reset current section content
                 continue  # Skip the line with the marker
-            
+
             # Check for NEW section start
             if "NEW <<<" in line:
                 in_new_section = True
                 current_section_content = []  # Reset current section content
                 continue  # Skip the line with the marker
-            
+
             # Check for NEW section end
             if ">>>> NEW" in line:
                 in_new_section = False
                 new_contents.append("\n".join(current_section_content).strip())  # Add the captured content
                 current_section_content = []  # Reset current section content
                 continue  # Skip the line with the marker
-            
+
             # If currently in an OLD or NEW section, add the line to the current section content
             if in_old_section or in_new_section:
                 current_section_content.append(line)
-        
+
         # Pair the OLD and NEW contents
         paired_contents = list(zip(old_contents, new_contents))
-        
+
         return paired_contents
-    
+
     def update_file(self, file_query: str) -> str:
         """
         Updates a file with new content.
@@ -536,9 +536,9 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                 "Please create a new branch and try again."
             )
         try:
-            
+
             file_path: str = file_query.split("\n")[0]
-            
+
             file_content = self.read_file(file_path)
             updated_file_content = file_content
             for old, new in self.extract_old_new_pairs(file_query):
@@ -682,7 +682,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                 "args_schema": DirectoryPath,
             }
         ]
-        
+
     def run(self, name: str, *args: Any, **kwargs: Any):
         for tool in self.get_available_tools():
             if tool["name"] == name:

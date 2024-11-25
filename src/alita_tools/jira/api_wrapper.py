@@ -5,7 +5,8 @@ from typing import List, Optional, Any, Dict
 from langchain_core.tools import ToolException
 from pydantic import model_validator, BaseModel
 from pydantic import create_model
-from pydantic.fields import FieldInfo
+from pydantic.fields import FieldInfo, PrivateAttr
+from atlassian import Jira
 
 logger = logging.getLogger(__name__)
 
@@ -37,14 +38,14 @@ JiraUpdateIssue = create_model(
     "JiraUpdateIssueModel",
     issue_json=(str, FieldInfo(
         description=("JSON of body to update an issue for JIRA. "
-                        "You must follow the atlassian-python-api's Jira "
-                        "`update_issue` function's input format. For example,"
-                        " to update a task with "
-                        "key XXX-123 with new summary, description and custom field, "
-                        "you would pass in the following STRING dictionary: "
-                        "{'key': 'issue key', 'fields': {'summary': 'updated issue', "
-                        "'description': 'updated description', 'customfield_xxx': 'updated custom field'}}}")
-        ))
+                     "You must follow the atlassian-python-api's Jira "
+                     "`update_issue` function's input format. For example,"
+                     " to update a task with "
+                     "key XXX-123 with new summary, description and custom field, "
+                     "you would pass in the following STRING dictionary: "
+                     "{'key': 'issue key', 'fields': {'summary': 'updated issue', "
+                     "'description': 'updated description', 'customfield_xxx': 'updated custom field'}}}")
+    ))
 )
 
 AddCommentInput = create_model(
@@ -97,7 +98,7 @@ LinkIssues = create_model(
                                     To link test to another issue ( test 'test' story, story 'is tested by test'). 
                                     Use the appropriate issue link type (e.g., "Test", "Relates", "Blocks").
                                     If we use "Test" linktype, the test is inward issue, the story/other issue is outward issue."""))
-                              )
+)
 
 
 class JiraApiWrapper(BaseModel):
@@ -109,6 +110,7 @@ class JiraApiWrapper(BaseModel):
     limit: Optional[int] = 5
     additional_fields: list[str] | str | None = []
     verify_ssl: Optional[bool] = True
+    _client: Jira = PrivateAttr()
 
     @model_validator(mode='before')
     @classmethod
@@ -130,9 +132,9 @@ class JiraApiWrapper(BaseModel):
         if isinstance(additional_fields, str):
             values['additional_fields'] = [i.strip() for i in additional_fields.split(',')]
         if token:
-            values['client'] = Jira(url=url, token=token, cloud=cloud, verify_ssl=values['verify_ssl'])
+            cls._client = Jira(url=url, token=token, cloud=cloud, verify_ssl=values['verify_ssl'])
         else:
-            values['client'] = Jira(url=url, username=username, password=api_key, cloud=cloud, verify_ssl=values['verify_ssl'])
+            cls._client = Jira(url=url, username=username, password=api_key, cloud=cloud, verify_ssl=values['verify_ssl'])
         return values
 
     def _parse_issues(self, issues: Dict) -> List[dict]:
@@ -151,7 +153,7 @@ class JiraApiWrapper(BaseModel):
             priority = issue_fields["priority"]["name"]
             status = issue_fields["status"]["name"]
             projectId = issue_fields["project"]["id"]
-            issue_url = f"{self.client.url}browse/{key}"
+            issue_url = f"{self._client.url}browse/{key}"
             try:
                 assignee = issue_fields["assignee"]["displayName"]
             except Exception:
@@ -166,7 +168,7 @@ class JiraApiWrapper(BaseModel):
                     rel_type = related_issue["type"]["outward"]
                     rel_key = related_issue["outwardIssue"]["key"]
                     # rel_summary = related_issue["outwardIssue"]["fields"]["summary"]
-                rel_issues = {"type": rel_type, "key": rel_key, "url": f"{self.client.url}browse/{rel_key}"}
+                rel_issues = {"type": rel_type, "key": rel_key, "url": f"{self._client.url}browse/{rel_key}"}
 
             parsed_issue = {
                 "key": key,
@@ -232,37 +234,37 @@ class JiraApiWrapper(BaseModel):
 
     def search_using_jql(self, jql: str):
         """ Search for Jira issues using JQL."""
-        parsed = self._parse_issues(self.client.jql(jql))
+        parsed = self._parse_issues(self._client.jql(jql))
         if len(parsed) == 0:
             return "No Jira issues found"
         return "Found " + str(len(parsed)) + " Jira issues:\n" + str(parsed)
-    
+
     def link_issues(self, inward_issue_key: str, outward_issue_key: str, linktype:str ):
-        """ Link issues functionality for Jira issues. To link test to another issue ( test 'test' story, story 'is tested by test'). 
+        """ Link issues functionality for Jira issues. To link test to another issue ( test 'test' story, story 'is tested by test').
         Use the appropriate issue link type (e.g., "Test", "Relates", "Blocks").
         If we use "Test" linktype, the test is inward issue, the story/other issue is outward issue.."""
-        
+
         link_data = {
-    "type": {"name": f"{linktype}"},  
-    "inwardIssue": {"key": f"{inward_issue_key}"},
-    "outwardIssue": {"key": f"{outward_issue_key}"},
-    "comment": {
-        "body": "This test is linked to the story."
-    }
-}
-        self.client.create_issue_link(link_data)
+            "type": {"name": f"{linktype}"},
+            "inwardIssue": {"key": f"{inward_issue_key}"},
+            "outwardIssue": {"key": f"{outward_issue_key}"},
+            "comment": {
+                "body": "This test is linked to the story."
+            }
+        }
+        self._client.create_issue_link(link_data)
         """ Get the remote links from the specified jira issue key"""
         return f"Link created using following data: {link_data}."
 
     def get_specific_field_info(self, jira_issue_key: str, field_name: str):
         """ Get the specific field information from Jira by jira issue key and field name """
-        jira_issue = self.client.issue(jira_issue_key, fields=field_name)
+        jira_issue = self._client.issue(jira_issue_key, fields=field_name)
         field_info = jira_issue['fields'][field_name]
         return f"Got the data from following Jira issue - {jira_issue_key} and field - {field_name}. The data is:\n{field_info}"
 
     def get_remote_links(self, jira_issue_key: str):
         """ Get the remote links from the specified jira issue key"""
-        remote_links = self.client.get_issue_remotelinks(jira_issue_key)
+        remote_links = self._client.get_issue_remotelinks(jira_issue_key)
         return f"Jira issue - {jira_issue_key} has the following remote links:\n{str(remote_links)}"
 
     def create_issue(self, issue_json: str):
@@ -273,8 +275,8 @@ class JiraApiWrapper(BaseModel):
             self.create_issue_validate(params)
             # used in case linkage via `update` is required
             update = dict(params["update"]) if (params.get("update")) is not None else None
-            issue = self.client.create_issue(fields=dict(params["fields"]), update=update)
-            issue_url = f"{self.client.url}browse/{issue['key']}"
+            issue = self._client.create_issue(fields=dict(params["fields"]), update=update)
+            issue_url = f"{self._client.url}browse/{issue['key']}"
             logger.info(f"issue is created: {issue}")
             return f"Done. Issue {issue['key']} is created successfully. You can view it at {issue_url}. Details: {str(issue)}"
         except ToolException as e:
@@ -294,10 +296,10 @@ class JiraApiWrapper(BaseModel):
             fields_data = dict(fields["update"]) if (fields.get("update")) is not None else None
             # prepare update block
             update = dict(fields["update"]) if (fields.get("update")) is not None else None
-            self.client.set_issue_status(issue_key=issue_key, status_name=status_name, fields=fields_data,
-                                                         update=update)
+            self._client.set_issue_status(issue_key=issue_key, status_name=status_name, fields=fields_data,
+                                          update=update)
             logger.info(f"issue is updated: {issue_key} with status {status_name}")
-            issue_url = f"{self.client.url}browse/{issue_key}"
+            issue_url = f"{self._client.url}browse/{issue_key}"
             return f"Done. Status for issue {issue_key} was updated successfully. You can view it at {issue_url}."
         except ToolException as e:
             raise e
@@ -313,8 +315,8 @@ class JiraApiWrapper(BaseModel):
             self.update_issue_validate(params)
             key = params["key"]
             fields = {"fields": dict(params["fields"])}
-            issue = self.client.update_issue(issue_key=key, update=dict(fields))
-            issue_url = f"{self.client.url}browse/{key}"
+            issue = self._client.update_issue(issue_key=key, update=dict(fields))
+            issue_url = f"{self._client.url}browse/{key}"
             output = f"Done. Issue {key} has been updated successfully. You can view it at {issue_url}. Details: {str(issue)}"
             logger.info(output)
             return output
@@ -328,7 +330,7 @@ class JiraApiWrapper(BaseModel):
     def list_comments(self, issue_key: str):
         """ Extract the comments related to specified Jira issue """
         try:
-            comments = self.client.issue_get_comments(issue_key)
+            comments = self._client.issue_get_comments(issue_key)
             comments_list = []
             for comment in comments['comments']:
                 comments_list.append(
@@ -345,8 +347,8 @@ class JiraApiWrapper(BaseModel):
     def add_comments(self, issue_key: str, comment: str):
         """ Add a comment to a Jira issue."""
         try:
-            self.client.issue_add_comment(issue_key, comment)
-            issue_url = f"{self.client.url}browse/{issue_key}"
+            self._client.issue_add_comment(issue_key, comment)
+            issue_url = f"{self._client.url}browse/{issue_key}"
             output = f"Done. Comment is added for issue {issue_key}. You can view it at {issue_url}"
             logger.info(output)
             return output
@@ -358,7 +360,7 @@ class JiraApiWrapper(BaseModel):
     def list_projects(self):
         """ List all projects in Jira. """
         try:
-            projects = self.client.projects()
+            projects = self._client.projects()
             parsed_projects = self._parse_projects(projects)
             parsed_projects_str = (
                     "Found " + str(len(parsed_projects)) + " projects:\n" + str(parsed_projects)

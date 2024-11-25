@@ -1,8 +1,9 @@
-from typing import List
-from langchain_community.agent_toolkits.base import BaseToolkit
+from typing import List, Optional
 from .api_wrapper import JiraApiWrapper
-from langchain_core.tools import BaseTool
+from langchain_core.tools import BaseTool, BaseToolkit
 from ..base.tool import BaseAction
+from pydantic import BaseModel, create_model
+from pydantic.fields import FieldInfo
 
 name = "jira"
 
@@ -20,6 +21,17 @@ def get_tools(tool):
 
 class JiraToolkit(BaseToolkit):
     tools: List[BaseTool] = []
+
+    @staticmethod
+    def toolkit_config_schema() -> BaseModel:
+        return create_model(
+            name,
+            base_url=(str, FieldInfo(description="Jira URL")),
+            cloud=(Optional[str], FieldInfo(description="Jira type")),
+            api_key=(Optional[str], FieldInfo(description="API key")),
+            username=(Optional[str], FieldInfo(description="Jira Username")),
+            token=(Optional[str], FieldInfo(description="Jira token")),
+        )
 
     @classmethod
     def get_toolkit(cls, selected_tools: list[str] | None = None, **kwargs):

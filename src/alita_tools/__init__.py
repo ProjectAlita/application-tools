@@ -1,9 +1,9 @@
 import logging
 from importlib import import_module
 
-from .github import get_tools as get_github
+from .github import get_tools as get_github, AlitaGitHubToolkit
 from .openapi import get_tools as get_openapi
-from .jira import get_tools as get_jira
+from .jira import get_tools as get_jira, JiraToolkit
 from .confluence import get_tools as get_confluence
 from .gitlab import get_tools as get_gitlab
 from .gitlab_org import get_tools as get_gitlab_org
@@ -11,7 +11,7 @@ from .zephyr import get_tools as get_zephyr
 from .browser import get_tools as get_browser
 from .report_portal import get_tools as get_report_portal
 from .bitbucket import get_tools as get_bitbucket
-from .testrail import get_tools as get_testrail
+from .testrail import get_tools as get_testrail, TestrailToolkit
 from .testio import get_tools as get_testio
 from .xray import get_tools as get_xray_cloud
 from .sharepoint import get_tools as get_sharepoint
@@ -77,3 +77,10 @@ def get_tools(tools_list, *args, **kwargs):
                 except Exception as e:
                     logger.error(f"Error in getting toolkit: {e}")
     return tools
+
+def get_toolkits():
+    return [
+        AlitaGitHubToolkit.toolkit_config_schema(),
+        TestrailToolkit.toolkit_config_schema(),
+        JiraToolkit.toolkit_config_schema()
+    ]
