@@ -19,19 +19,19 @@ GetWikiInput = create_model(
 GetPageByPathInput = create_model(
     "GetPageByPathInput",
     wiki_identified=(str, Field(description="Wiki ID or wiki name")),
-    page_path=(str, Field(description="Wiki page path"))
+    page_name=(str, Field(description="Wiki page path"))
 )
 
 GetPageByIdInput = create_model(
     "GetPageByIdInput",
     wiki_identified=(str, Field(description="Wiki ID or wiki name")),
-    page_id=(str, Field(description="Wiki page ID"))
+    page_id=(int, Field(description="Wiki page ID"))
 )
 
 ModifyPageInput = create_model(
     "GetPageByPathInput",
     wiki_identified=(str, Field(description="Wiki ID or wiki name")),
-    page_path=(str, Field(description="Wiki page path")),
+    page_name=(str, Field(description="Wiki page name")),
     page_content=(str, Field(description="Wiki page content"))
 )
 
@@ -70,16 +70,16 @@ class AzureDevOpsApiWrapper(BaseModel):
             logger.error(f"Error during the attempt to extract wiki: {str(e)}")
             return ToolException(f"Error during the attempt to extract wiki: {str(e)}")
 
-    def get_wiki_page_by_path(self, wiki_identified: str, page_path: str):
+    def get_wiki_page_by_path(self, wiki_identified: str, page_name: str):
         """Extract ADO wiki page content."""
         try:
-            return self._client.get_page(project=self.project, wiki_identifier=wiki_identified, path=page_path,
+            return self._client.get_page(project=self.project, wiki_identifier=wiki_identified, path=page_name,
                                          include_content=True).page.content
         except Exception as e:
             logger.error(f"Error during the attempt to extract wiki page: {str(e)}")
             return ToolException(f"Error during the attempt to extract wiki page: {str(e)}")
 
-    def get_wiki_page_by_id(self, wiki_identified: str, page_id: str):
+    def get_wiki_page_by_id(self, wiki_identified: str, page_id: int):
         """Extract ADO wiki page content."""
         try:
             return (self._client.get_page_by_id(project=self.project, wiki_identifier=wiki_identified, id=page_id,
@@ -88,11 +88,11 @@ class AzureDevOpsApiWrapper(BaseModel):
             logger.error(f"Error during the attempt to extract wiki page: {str(e)}")
             return ToolException(f"Error during the attempt to extract wiki page: {str(e)}")
 
-    def delete_page_by_path(self, wiki_identified: str, page_path: str):
+    def delete_page_by_path(self, wiki_identified: str, page_name: str):
         """Extract ADO wiki page content."""
         try:
-            self._client.delete_page(project=self.project, wiki_identifier=wiki_identified, path=page_path)
-            return f"Page '{page_path}' in wiki '{wiki_identified}' has been deleted"
+            self._client.delete_page(project=self.project, wiki_identifier=wiki_identified, path=page_name)
+            return f"Page '{page_name}' in wiki '{wiki_identified}' has been deleted"
         except Exception as e:
             logger.error(f"Unable to delete wiki page: {str(e)}")
             return ToolException(f"Unable to delete wiki page: {str(e)}")
@@ -106,7 +106,7 @@ class AzureDevOpsApiWrapper(BaseModel):
             logger.error(f"Unable to delete wiki page: {str(e)}")
             return ToolException(f"Unable to delete wiki page: {str(e)}")
 
-    def modify_wiki_page(self, wiki_identified: str, page_path: str, page_content: str):
+    def modify_wiki_page(self, wiki_identified: str, page_name: str, page_content: str):
         """Create or Update ADO wiki page content."""
         try:
             all_wikis = [wiki.name for wiki in self._client.get_all_wikis(project=self.project)]
@@ -117,17 +117,17 @@ class AzureDevOpsApiWrapper(BaseModel):
                 except Exception as create_wiki_e:
                     return ToolException(f"Unable to create new wiki due to error: {create_wiki_e}")
             try:
-                page = self._client.get_page(project=self.project, wiki_identifier=wiki_identified, path=page_path)
+                page = self._client.get_page(project=self.project, wiki_identifier=wiki_identified, path=page_name)
                 version = page.eTag
             except Exception as get_page_e:
                 if "Ensure that the path of the page is correct and the page exists" in str(get_page_e):
                     logger.info(f"Path is not found. New page will be created")
                     version = None
                 else:
-                    return ToolException(f"Unable to extract page by path {page_path}: {str(get_page_e)}")
+                    return ToolException(f"Unable to extract page by path {page_name}: {str(get_page_e)}")
 
             return self._client.create_or_update_page(project=self.project, wiki_identifier=wiki_identified,
-                                                      path=page_path,
+                                                      path=page_name,
                                                       parameters=WikiPageCreateOrUpdateParameters(content=page_content),
                                                       version=version)
         except Exception as e:

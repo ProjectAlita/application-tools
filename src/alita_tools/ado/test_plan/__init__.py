@@ -1,7 +1,8 @@
-from typing import List
+from typing import List, Optional
 
-from langchain_community.agent_toolkits.base import BaseToolkit
-from langchain_core.tools import BaseTool
+from langchain_core.tools import BaseTool, BaseToolkit
+from pydantic import BaseModel, create_model
+from pydantic.fields import FieldInfo
 
 from .test_plan_wrapper import TestPlanApiWrapper
 from ...base.tool import BaseAction
@@ -10,6 +11,16 @@ name = "azure_devops_plans"
 
 class AzureDevOpsPlansToolkit(BaseToolkit):
     tools: List[BaseTool] = []
+
+    @staticmethod
+    def toolkit_config_schema() -> BaseModel:
+        return create_model(
+            name,
+            organization_url=(str, FieldInfo(description="ADO organization url")),
+            token=(str, FieldInfo(description="ADO token")),
+
+            limit=(Optional[str], FieldInfo(description="ADO plans limit used for limitation of the list with results"))
+        )
 
     @classmethod
     def get_toolkit(cls, selected_tools: list[str] | None = None, **kwargs):

@@ -1,5 +1,7 @@
 from typing import List
-from langchain_community.agent_toolkits.base import BaseToolkit
+from langchain_core.tools import BaseToolkit
+from pydantic import BaseModel, create_model
+from pydantic.fields import FieldInfo
 from .api_wrapper import RallyApiWrapper
 from langchain_core.tools import BaseTool
 from ..base.tool import BaseAction
@@ -17,6 +19,18 @@ def get_tools(tool):
 
 class RallyToolkit(BaseToolkit):
     tools: List[BaseTool] = []
+
+    @staticmethod
+    def toolkit_config_schema() -> BaseModel:
+        return create_model(
+            name,
+            server=(str, FieldInfo(description="Rally server url")),
+            api_key=(str, FieldInfo(description="User's API key")),
+            username=(str, FieldInfo(description="Username")),
+            password=(str, FieldInfo(description="User's password")),
+            workspace=(str, FieldInfo(description="Rally workspace")),
+            project=(str, FieldInfo(description="Rally project")),
+        )
 
     @classmethod
     def get_toolkit(cls, selected_tools: list[str] | None = None, **kwargs):

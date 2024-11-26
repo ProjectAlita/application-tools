@@ -1,6 +1,6 @@
 
 
-from ..base.tool import BaseAction
+from langchain_core.tools import BaseTool
 from typing import Type
 from pydantic import create_model, BaseModel
 from pydantic.fields import FieldInfo
@@ -8,7 +8,7 @@ from langchain_community.utilities.google_search import GoogleSearchAPIWrapper
 from .utils import webRag
 
 
-class GoogleSearchResults(BaseAction):
+class GoogleSearchResults(BaseTool):
     """Tool that queries the Google Search API and gets back json."""
     api_wrapper: GoogleSearchAPIWrapper = None
     name: str = "google_search_results_json"
@@ -19,22 +19,22 @@ class GoogleSearchResults(BaseAction):
     )
     num_results: int = 4
     args_schema: Type[BaseModel] = create_model(
-        "GoogleSearchResultsModel", 
+        "GoogleSearchResultsModel",
         query=(str, FieldInfo(description="Query text to search pages")))
-    
+
     def _run(self, query: str, run_manager = None,) -> str:
         """Use the tool."""
         return str(self.api_wrapper.results(query, self.num_results))
 
 
-class GoogleSearchRag(BaseAction):
+class GoogleSearchRag(BaseTool):
     googleApiWrapper: GoogleSearchAPIWrapper = None
     max_response_size: int = 3000
     name: str = "google_search_with_scrapper"
     description: str = "Searches Google for 5 top results, reads the pages and searches for relevant content"
     num_results: int = 5
     args_schema: Type[BaseModel] = create_model(
-        "GoogleSearchRagModel", 
+        "GoogleSearchRagModel",
         query=(str, FieldInfo(description="Query text to search pages")))
 
     def _run(self, query: str, run_manager=None) -> str:

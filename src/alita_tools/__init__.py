@@ -18,7 +18,10 @@ from .sharepoint import get_tools as get_sharepoint
 from .qtest import get_tools as get_qtest
 from .zephyr_scale import get_tools as get_zephyr_scale
 from .ado import get_tools as get_ado
-from .rally import get_tools as get_rally
+from .ado.test_plan import AzureDevOpsPlansToolkit
+from .ado.work_item import AzureDevOpsWorkItemsToolkit
+from .ado.wiki import AzureDevOpsWikiToolkit
+from .rally import get_tools as get_rally, RallyToolkit
 
 
 from .yagmail import get_tools as get_yagmail
@@ -82,5 +85,9 @@ def get_toolkits():
     return [
         AlitaGitHubToolkit.toolkit_config_schema(),
         TestrailToolkit.toolkit_config_schema(),
-        JiraToolkit.toolkit_config_schema()
+        JiraToolkit.toolkit_config_schema(),
+        AzureDevOpsPlansToolkit.toolkit_config_schema(),
+        AzureDevOpsWikiToolkit.toolkit_config_schema(),
+        AzureDevOpsWorkItemsToolkit.toolkit_config_schema(),
+        RallyToolkit.toolkit_config_schema()
     ]

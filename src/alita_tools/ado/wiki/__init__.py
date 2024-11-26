@@ -1,13 +1,23 @@
-from typing import List
-from langchain_community.agent_toolkits.base import BaseToolkit
+from typing import List, Optional
 from .ado_wrapper import AzureDevOpsApiWrapper  # Import the API wrapper for Azure DevOps
-from langchain_core.tools import BaseTool
+from langchain_core.tools import BaseTool, BaseToolkit
+from pydantic import BaseModel, create_model
+from pydantic.fields import FieldInfo
 from ...base.tool import BaseAction
 
 name = "azure_devops_wiki"
 
 class AzureDevOpsWikiToolkit(BaseToolkit):
     tools: List[BaseTool] = []
+
+    @staticmethod
+    def toolkit_config_schema() -> BaseModel:
+        return create_model(
+            name,
+            organization_url=(str, FieldInfo(description="ADO organization url")),
+            project=(str, FieldInfo(description="ADO project")),
+            token=(str, FieldInfo(description="ADO token")),
+        )
 
     @classmethod
     def get_toolkit(cls, selected_tools: list[str] | None = None, **kwargs):
