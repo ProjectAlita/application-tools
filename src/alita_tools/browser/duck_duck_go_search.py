@@ -2,7 +2,8 @@ from langchain_community.document_loaders import AsyncChromiumLoader
 from langchain_community.document_transformers import BeautifulSoupTransformer
 from langchain.text_splitter import CharacterTextSplitter
 from duckduckgo_search import DDGS
-from ..base.tool import BaseAction
+from langchain_core.tools import BaseTool
+
 from langchain_chroma import Chroma
 from pydantic import BaseModel, Field
 
@@ -13,7 +14,7 @@ from langchain_community.embeddings.sentence_transformer import (
 class searchPages(BaseModel):
     query: str = Field(..., title="Query text to search pages")
 
-class DuckDuckGoSearch(BaseAction):
+class DuckDuckGoSearch(BaseTool):
     name: str = "DuckDuckGo_Search"
     max_response_size: int = 3000
     description: str = "Searches DuckDuckGo for the query and returns the top 5 results, and them provide summary documents"
@@ -26,7 +27,7 @@ class DuckDuckGoSearch(BaseAction):
         for result in results:
             url = result['href']
             urls.append(url)
-    
+
         text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
         docs = text_splitter.split_documents(self.get_page(urls))
         embedding_function = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
@@ -38,7 +39,7 @@ class DuckDuckGoSearch(BaseAction):
             if len(text) > self.max_response_size:
                 break
         return text
-    
+
     # retrieves pages and extracts text by tag
     def get_page(self, urls):
         loader = AsyncChromiumLoader(urls)
