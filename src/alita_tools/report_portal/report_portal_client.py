@@ -61,7 +61,7 @@ class RPClient():
         return response.json()
 
     def get_user_information(self, username: str):
-        url = f"{self.endpoint}/api/v1/user/{username}"
+        url = f"{self.endpoint}/api/users/{username}"
         response = requests.request("GET", url, headers=self.headers)
         response.raise_for_status()
 
