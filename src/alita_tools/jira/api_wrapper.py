@@ -44,7 +44,8 @@ JiraUpdateIssue = create_model(
                      "key XXX-123 with new summary, description and custom field, "
                      "you would pass in the following STRING dictionary: "
                      "{'key': 'issue key', 'fields': {'summary': 'updated issue', "
-                     "'description': 'updated description', 'customfield_xxx': 'updated custom field'}}}")
+                     "'description': 'updated description', 'customfield_xxx': 'updated custom field'}, "
+                     "'update': {'labels': [ { 'add': 'test' } ]}}")
     ))
 )
 
@@ -52,6 +53,13 @@ AddCommentInput = create_model(
     "AddCommentInputModel",
     issue_key=(str, FieldInfo(description="The issue key of the Jira issue to which the comment is to be added, e.g. 'TEST-123'.")),
     comment=(str, FieldInfo(description="The comment to be added to the Jira issue, e.g. 'This is a test comment.'"))
+)
+
+ModifyLabels = create_model(
+    "AddCommentInputModel",
+    issue_key=(str, FieldInfo(description="The issue key of the Jira issue to which the comment is to be added, e.g. 'TEST-123'.")),
+    add_labels=(list[str], FieldInfo(description="List of labels required to be added", default=None)),
+    remove_labels=(list[str], FieldInfo(description="List of labels required to be removed", default=None))
 )
 
 SetIssueStatus = create_model(
@@ -224,9 +232,9 @@ class JiraApiWrapper(BaseModel):
     def update_issue_validate(self, params: Dict[str, Any]):
         if params.get("key") is None:
             raise ToolException("Jira issue key is required to update an issue. Ask user to provide it.")
-        if params.get("fields") is None:
+        if params.get("fields") is None and params.get("update") is None:
             raise ToolException("""
-        Jira fields are provided in a wrong way.
+        Jira fields are provided in a wrong way. It should have at least any of nodes `fields` or `update`
         For example, to update a task with key XXX-123 with new summary, description and custom field, you would pass in the following STRING dictionary: 
         {"key": "issue key", "fields": {"summary": "updated issue", "description": "updated description", "customfield_xxx": "updated custom field"}}
         """)
@@ -314,8 +322,9 @@ class JiraApiWrapper(BaseModel):
             params = json.loads(issue_json)
             self.update_issue_validate(params)
             key = params["key"]
-            fields = {"fields": dict(params["fields"])}
-            issue = self._client.update_issue(issue_key=key, update=dict(fields))
+            update_body = {"fields": dict(params["fields"])} if params.get("fields") else {}
+            update_body = update_body | {"update": dict(params["update"])} if params.get('update') else update_body
+            issue = self._client.update_issue(issue_key=key, update=dict(update_body))
             issue_url = f"{self._client.url}browse/{key}"
             output = f"Done. Issue {key} has been updated successfully. You can view it at {issue_url}. Details: {str(issue)}"
             logger.info(output)
@@ -326,6 +335,23 @@ class JiraApiWrapper(BaseModel):
             stacktrace = format_exc()
             logger.error(f"Error updating Jira issue: {stacktrace}")
             return f"Error updating Jira issue: {stacktrace}"
+
+    def modify_labels(self, issue_key: str, add_labels: list[str] = None, remove_labels: list[str] = None):
+        """Updates labels of an issue in Jira."""
+
+        if add_labels is None and remove_labels is None:
+            return ToolException("You must provide at least 1 label to be added or removed")
+        update_issue_json = {"key": issue_key, "update": {"labels": []}}
+        # Add labels to the update_issue_json
+        if add_labels:
+            for label in add_labels:
+                update_issue_json["update"]["labels"].append({"add": label})
+
+        # Remove labels from the update_issue_json
+        if remove_labels:
+            for label in remove_labels:
+                update_issue_json["update"]["labels"].append({"remove": label})
+        return self.update_issue(update_issue_json)
 
     def list_comments(self, issue_key: str):
         """ Extract the comments related to specified Jira issue """
@@ -393,6 +419,12 @@ class JiraApiWrapper(BaseModel):
                 "description": self.update_issue.__doc__,
                 "args_schema": JiraUpdateIssue,
                 "ref": self.update_issue,
+            },
+            {
+                "name": "modify_labels",
+                "description": self.modify_labels.__doc__,
+                "args_schema": ModifyLabels,
+                "ref": self.modify_labels,
             },
             {
                 "name": "list_comments",

@@ -5,7 +5,7 @@ import swagger_client
 from pydantic import model_validator, BaseModel
 from langchain_core.tools import ToolException
 from pydantic import create_model, model_validator, BaseModel
-from pydantic.fields import FieldInfo
+from pydantic.fields import FieldInfo, PrivateAttr
 from sklearn.feature_extraction.text import strip_tags
 from swagger_client import TestCaseApi, SearchApi, PropertyResource
 from swagger_client.rest import ApiException
@@ -70,6 +70,7 @@ class QtestApiWrapper(BaseModel):
     no_of_items_per_page: int = 100
     page: int = 1
     no_of_tests_shown_in_dql_search: int = 10
+    _client: Any = PrivateAttr()
 
     @model_validator(mode='before')
     @classmethod
@@ -89,12 +90,12 @@ class QtestApiWrapper(BaseModel):
             configuration.host = url
             configuration.api_key['Authorization'] = api_token
             configuration.api_key_prefix['Authorization'] = 'Bearer'
-            values['client'] = swagger_client.ApiClient(configuration)
+            cls._client = swagger_client.ApiClient(configuration)
         return values
 
     def __instantiate_test_api_instance(self) -> TestCaseApi:
         # Instantiate the TestCaseApi instance according to the qtest api documentation and swagger client
-        return swagger_client.TestCaseApi(self.client)
+        return swagger_client.TestCaseApi(self._client)
 
     def __convert_markdown_test_steps_data_to_dict(self, test_cases: str) -> list[dict]:
         # Split the table into lines
@@ -207,7 +208,7 @@ class QtestApiWrapper(BaseModel):
             parsed_data.append(parsed_data_row)
 
     def __perform_search_by_dql(self, dql: str) -> list:
-        search_instance: SearchApi = swagger_client.SearchApi(self.client)
+        search_instance: SearchApi = swagger_client.SearchApi(self._client)
         body = swagger_client.ArtifactSearchParams(object_type='test-cases', fields=['*'],
                                                    query=dql)
         append_test_steps = 'true'
