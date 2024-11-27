@@ -1,6 +1,8 @@
 from typing import List
 
 from langchain_core.tools import BaseToolkit, BaseTool
+from pydantic import BaseModel, create_model
+from pydantic.fields import FieldInfo
 
 from .api_wrapper import QtestApiWrapper
 from .tool import QtestAction
@@ -19,6 +21,15 @@ def get_tools(tool):
 
 class QtestToolkit(BaseToolkit):
     tools: List[BaseTool] = []
+
+    @staticmethod
+    def toolkit_config_schema() -> BaseModel:
+        return create_model(
+            name,
+            base_url=(str, FieldInfo(description="QTest base url")),
+            project_id=(str, FieldInfo(description="QTest project id")),
+            qtest_api_token=(str, FieldInfo(description="QTest API token")),
+        )
 
     @classmethod
     def get_toolkit(cls, selected_tools: list[str] | None = None, **kwargs):

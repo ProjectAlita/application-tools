@@ -9,13 +9,13 @@ from .gitlab import get_tools as get_gitlab
 from .gitlab_org import get_tools as get_gitlab_org
 from .zephyr import get_tools as get_zephyr
 from .browser import get_tools as get_browser
-from .report_portal import get_tools as get_report_portal
+from .report_portal import get_tools as get_report_portal, ReportPortalToolkit
 from .bitbucket import get_tools as get_bitbucket
 from .testrail import get_tools as get_testrail, TestrailToolkit
 from .testio import get_tools as get_testio
 from .xray import get_tools as get_xray_cloud
 from .sharepoint import get_tools as get_sharepoint
-from .qtest import get_tools as get_qtest
+from .qtest import get_tools as get_qtest, QtestToolkit
 from .zephyr_scale import get_tools as get_zephyr_scale
 from .ado import get_tools as get_ado
 from .ado.test_plan import AzureDevOpsPlansToolkit
@@ -89,5 +89,7 @@ def get_toolkits():
         AzureDevOpsPlansToolkit.toolkit_config_schema(),
         AzureDevOpsWikiToolkit.toolkit_config_schema(),
         AzureDevOpsWorkItemsToolkit.toolkit_config_schema(),
-        RallyToolkit.toolkit_config_schema()
+        RallyToolkit.toolkit_config_schema(),
+        QtestToolkit.toolkit_config_schema(),
+        ReportPortalToolkit.toolkit_config_schema()
     ]

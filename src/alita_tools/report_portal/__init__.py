@@ -1,5 +1,8 @@
 from langchain_core.tools import BaseToolkit, BaseTool
 
+from pydantic import BaseModel, create_model
+from pydantic.fields import FieldInfo
+
 from .api_wrapper import ReportPortalApiWrapper
 from ..base.tool import BaseAction
 
@@ -17,6 +20,15 @@ def get_tools(tool):
 
 class ReportPortalToolkit(BaseToolkit):
     tools: list[BaseTool] = []
+
+    @staticmethod
+    def toolkit_config_schema() -> BaseModel:
+        return create_model(
+            name,
+            endpoint=(str, FieldInfo(description="Report Portal endpoint")),
+            project=(str, FieldInfo(description="Report Portal project")),
+            api_key=(str, FieldInfo(description="User API key")),
+        )
 
     @classmethod
     def get_toolkit(cls, selected_tools: list[str] | None = None, **kwargs):
