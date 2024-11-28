@@ -1,4 +1,6 @@
 from langchain_core.tools import BaseToolkit, BaseTool
+from pydantic import BaseModel, create_model
+from pydantic.fields import FieldInfo
 
 from .api_wrapper import TestIOApiWrapper
 from ..base.tool import BaseAction
@@ -16,6 +18,14 @@ def get_tools(tool):
 
 class TestIOToolkit(BaseToolkit):
     tools: list[BaseTool] = []
+
+    @staticmethod
+    def toolkit_config_schema() -> BaseModel:
+        return create_model(
+            name,
+            endpoint=(str, FieldInfo(description="TestIO endpoint")),
+            api_key=(str, FieldInfo(description="API key")),
+        )
 
     @classmethod
     def get_toolkit(cls, selected_tools: list[str] | None = None, **kwargs):

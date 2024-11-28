@@ -12,7 +12,7 @@ from .browser import get_tools as get_browser
 from .report_portal import get_tools as get_report_portal, ReportPortalToolkit
 from .bitbucket import get_tools as get_bitbucket
 from .testrail import get_tools as get_testrail, TestrailToolkit
-from .testio import get_tools as get_testio
+from .testio import get_tools as get_testio, TestIOToolkit
 from .xray import get_tools as get_xray_cloud
 from .sharepoint import get_tools as get_sharepoint
 from .qtest import get_tools as get_qtest, QtestToolkit
@@ -91,5 +91,6 @@ def get_toolkits():
         AzureDevOpsWorkItemsToolkit.toolkit_config_schema(),
         RallyToolkit.toolkit_config_schema(),
         QtestToolkit.toolkit_config_schema(),
-        ReportPortalToolkit.toolkit_config_schema()
+        ReportPortalToolkit.toolkit_config_schema(),
+        TestIOToolkit.toolkit_config_schema()
     ]
