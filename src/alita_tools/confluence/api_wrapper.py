@@ -353,12 +353,22 @@ class ConfluenceAPIWrapper(BaseModel):
 
     def get_pages_with_label(self, label: str):
         """ Gets pages with specific label in the Confluence space."""
+        return str(self._get_labeled_page(label))
+
+    def list_pages_with_label(self, label: str):
+        """ Lists the pages with specific label in the Confluence space."""
+        return [{'id': page['page_id'], 'title': page['page_title']} for page in self._get_labeled_page(label)]
+
+    def _get_labeled_page(self, label: str):
+        """Gets pages with specific label in the Confluence space."""
+
         start = 0
         pages_info = []
-        for _ in range(self.max_pages // self.limit):
+        for _ in range((self.max_pages + self.limit - 1) // self.limit):
             pages = self.client.get_all_pages_by_label(label, start=start, limit=self.limit) #, expand="body.view.value"
             if not pages:
                 break
+
             pages_info += [{
                 'page_id': page.metadata['id'],
                 'page_title': page.metadata['title'],
@@ -366,16 +376,16 @@ class ConfluenceAPIWrapper(BaseModel):
                 'content': page.page_content
             } for page in self.get_pages_by_id([page["id"] for page in pages])]
             start += self.limit
-        return str(pages_info)
+        return pages_info
 
     def is_public_page(self, page: dict) -> bool:
         """Check if a page is publicly accessible."""
         restrictions = self.client.get_all_restrictions_for_content(page["id"])
 
         return (
-            page["status"] == "current"
-            and not restrictions["read"]["restrictions"]["user"]["results"]
-            and not restrictions["read"]["restrictions"]["group"]["results"]
+                page["status"] == "current"
+                and not restrictions["read"]["restrictions"]["user"]["results"]
+                and not restrictions["read"]["restrictions"]["group"]["results"]
         )
 
     def get_pages_by_id(self, page_ids: List[str]):
@@ -399,16 +409,16 @@ class ConfluenceAPIWrapper(BaseModel):
             if not self.include_restricted_content and not self.is_public_page(page):
                 continue
             yield self.process_page(page)
-    
+
     def read_page_by_id(self, page_id: str):
         """Reads a page by its id in the Confluence space."""
         result = list(self.get_pages_by_id([page_id]))
         return result[0].page_content if result else "Page not found"
-    
+
     def _process_search(self, cql):
         start = 0
         pages_info = []
-        for _ in range(self.max_pages // self.limit):
+        for _ in range((self.max_pages + self.limit - 1) // self.limit):
             pages = self.client.cql(cql, start=start, limit=self.limit).get("results", [])
             if not pages:
                 break
@@ -523,11 +533,11 @@ class ConfluenceAPIWrapper(BaseModel):
             page_content=text,
             metadata=metadata,
         )
-    
+
     def process_attachment(
-        self,
-        page_id: str,
-        ocr_languages: Optional[str] = None,
+            self,
+            page_id: str,
+            ocr_languages: Optional[str] = None,
     ) -> List[str]:
         try:
             from PIL import Image  # noqa: F401
@@ -548,14 +558,14 @@ class ConfluenceAPIWrapper(BaseModel):
                 if media_type == "application/pdf":
                     text = title + self.process_pdf(absolute_url, ocr_languages)
                 elif (
-                    media_type == "image/png"
-                    or media_type == "image/jpg"
-                    or media_type == "image/jpeg"
+                        media_type == "image/png"
+                        or media_type == "image/jpg"
+                        or media_type == "image/jpeg"
                 ):
                     text = title + self.process_image(absolute_url, ocr_languages)
                 elif (
-                    media_type == "application/vnd.openxmlformats-officedocument"
-                    ".wordprocessingml.document"
+                        media_type == "application/vnd.openxmlformats-officedocument"
+                                      ".wordprocessingml.document"
                 ):
                     text = title + self.process_doc(absolute_url)
                 elif media_type == "application/vnd.ms-excel":
@@ -573,7 +583,7 @@ class ConfluenceAPIWrapper(BaseModel):
                     raise
 
         return texts
-    
+
     def get_available_tools(self):
         return [
             {
@@ -637,6 +647,12 @@ class ConfluenceAPIWrapper(BaseModel):
                 "args_schema": getPagesWithLabel,
             },
             {
+                "name": "list_pages_with_label",
+                "ref": self.list_pages_with_label,
+                "description": self.list_pages_with_label.__doc__,
+                "args_schema": getPagesWithLabel,
+            },
+            {
                 "name": "read_page_by_id",
                 "ref": self.read_page_by_id,
                 "description": self.read_page_by_id.__doc__,
@@ -661,7 +677,7 @@ class ConfluenceAPIWrapper(BaseModel):
                 "args_schema": siteSearch,
             }
         ]
-    
+
     def run(self, mode: str, *args: Any, **kwargs: Any):
         for tool in self.get_available_tools():
             if tool["name"] == mode:
