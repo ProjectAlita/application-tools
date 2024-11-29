@@ -17,7 +17,8 @@ from pydantic import model_validator, BaseModel
 from langchain_core.runnables import RunnableLambda, RunnableParallel, RunnablePassthrough
 from langchain_text_splitters import MarkdownHeaderTextSplitter
 from pydantic import create_model
-from pydantic.fields import FieldInfo
+from pydantic.fields import FieldInfo, PrivateAttr
+from atlassian import Jira
 
 from ..llm.llm_utils import get_model, summarize
 
@@ -108,6 +109,8 @@ class AdvancedJiraMiningWrapper(BaseModel):
     verify_ssl: Optional[bool] = True
     """Indicates if SSL verification should be performed. Default is True."""
 
+    _client: Optional[Jira] = PrivateAttr()
+
     @model_validator(mode='before')
     @classmethod
     def validate_toolkit(cls, values):
@@ -143,9 +146,9 @@ class AdvancedJiraMiningWrapper(BaseModel):
         token = values.get('jira_token')
         is_cloud = values.get('is_jira_cloud')
         if token:
-            values['client'] = Jira(url=url, token=token, cloud=is_cloud, verify_ssl=values['verify_ssl'])
+            cls._client = Jira(url=url, token=token, cloud=is_cloud, verify_ssl=values['verify_ssl'])
         else:
-            values['client'] = Jira(url=url, username=username, password=api_key, cloud=is_cloud,
+            cls._client = Jira(url=url, username=username, password=api_key, cloud=is_cloud,
                                     verify_ssl=values['verify_ssl'])
         values['llm'] = get_model(model_type, llm_settings)
         return values
@@ -186,7 +189,7 @@ class AdvancedJiraMiningWrapper(BaseModel):
         Returns:
             List[str]: A list of Confluence page IDs extracted from the remote links.
         """
-        remote_links = self.client.get_issue_remote_links(jira_issue_key)
+        remote_links = self._client.get_issue_remote_links(jira_issue_key)
         confluence_remote_links = [link['object']['url'] for link in remote_links if
                                    (link['application'].get('type') is not None and
                                     link['application']['type'] == 'com.atlassian.confluence')]
@@ -208,7 +211,7 @@ class AdvancedJiraMiningWrapper(BaseModel):
             Set[str]: A set of linked Jira issue keys that are not of type Bug, Task, or Sub-task.
         """
         linked_issues_keys = set()
-        jira_issue = self.client.issue(jira_issue_key, fields='issuelinks')
+        jira_issue = self._client.issue(jira_issue_key, fields='issuelinks')
         linked_links = [link for link in jira_issue['fields']['issuelinks']]
         for link in linked_links:
             if link.get('outwardIssue') is not None:
@@ -235,7 +238,7 @@ class AdvancedJiraMiningWrapper(BaseModel):
         Returns:
             List[str]: A list of Jira issues with the specified fields.
         """
-        issues = self.client.bulk_issue(jira_issue_keys, fields=fields)
+        issues = self._client.bulk_issue(jira_issue_keys, fields=fields)
         return issues
 
     def __get_all_jira_issue_keys_from_issue_description(self, jira_issue_key: str) -> List[str]:
@@ -252,7 +255,7 @@ class AdvancedJiraMiningWrapper(BaseModel):
         Returns:
             List[str]: A list of unique Jira issue keys extracted from the issue description.
         """
-        jira_issue = self.client.issue(jira_issue_key, 'description')
+        jira_issue = self._client.issue(jira_issue_key, 'description')
         description = jira_issue['fields']['description']
         return list(set(re.findall(r'[A-Z]{1,5}-\d{1,5}', description, re.DOTALL)))
 
@@ -271,7 +274,7 @@ class AdvancedJiraMiningWrapper(BaseModel):
         Returns:
             List[str]: A list of unique Jira issue keys extracted from the AC field.
         """
-        jira_issue = self.client.issue(jira_issue_key, 'customfield_10300')
+        jira_issue = self._client.issue(jira_issue_key, 'customfield_10300')
         ac = jira_issue['fields']['customfield_10300']
         return list(set(re.findall(r'[A-Z]{1,5}-\d{1,5}', ac, re.DOTALL)))
 
@@ -332,7 +335,7 @@ class AdvancedJiraMiningWrapper(BaseModel):
         Note:
             This method is intended for internal use within the class and should not be called directly from outside the class.
         """
-        self.client.add_attachment(jira_issue_key, filename=file_name)
+        self._client.add_attachment(jira_issue_key, filename=file_name)
 
     def __get_confluence_documents_by_jira_ticket(self, jira_issue_id: str) -> List[Document]:
         """
@@ -623,7 +626,7 @@ class AdvancedJiraMiningWrapper(BaseModel):
         Note:
             This method is intended for internal use within the class and should not be called directly from outside the class.
         """
-        attachment_ids = self.client.get_attachments_ids_from_issue(jira_issue_key)
+        attachment_ids = self._client.get_attachments_ids_from_issue(jira_issue_key)
         filtered_ids = list(filter(lambda attachment: attachment['filename'] == file_name, attachment_ids))
         print(f"Filtered attachment ids len: {len(filtered_ids)} and value: {filtered_ids}")
         if len(filtered_ids) > 0:
@@ -656,11 +659,11 @@ class AdvancedJiraMiningWrapper(BaseModel):
         Note:
             This method is intended for internal use within the class and should not be called directly from outside the class.
         """
-        attachment_json = self.client.get_attachment(self.__get_attachment_id(jira_issue_key, file_name))
+        attachment_json = self._client.get_attachment(self.__get_attachment_id(jira_issue_key, file_name))
         url_to_download = attachment_json['content']
 
         # Download the content
-        content_to_download = self.client._session.get(url_to_download).content
+        content_to_download = self._client._session.get(url_to_download).content
 
         # Save the downloaded content to a file
         with open(os.path.join('.', file_name), 'wb') as f:

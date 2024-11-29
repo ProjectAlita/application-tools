@@ -32,11 +32,8 @@ class MultiURLCrawler(BaseTool):
                                                 query=(str, FieldInfo(description="Query text to search pages")),
                                                 urls=(str, FieldInfo(description="list of URLs to search like ['url1', 'url2']")))
 
-    def _run(self, query: str, urls: str, run_manager=None):
-        try:
-            urls = loads(urls)
-        except:
-            urls = [url.strip() for url in urls.split(",")]
+    def _run(self, query: str, urls: list[str], run_manager=None):
+        urls = [url.strip() for url in urls]
         return webRag(urls, self.max_response_size, query)
 
 
