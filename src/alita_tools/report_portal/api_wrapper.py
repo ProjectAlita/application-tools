@@ -3,7 +3,7 @@ from typing import Any, Optional
 
 import pymupdf
 from pydantic import BaseModel, model_validator, create_model
-from pydantic.fields import FieldInfo
+from pydantic.fields import FieldInfo, PrivateAttr
 
 from .report_portal_client import RPClient
 
@@ -53,6 +53,7 @@ class ReportPortalApiWrapper(BaseModel):
     endpoint: str
     api_key: str
     project: str
+    _client: Optional[RPClient] = PrivateAttr()
 
     @model_validator(mode='before')
     @classmethod
@@ -61,7 +62,7 @@ class ReportPortalApiWrapper(BaseModel):
         endpoint = values.get('endpoint')
         api_key = values.get('api_key')
         project = values.get('project')
-        values['client'] = RPClient(endpoint=endpoint, api_key=api_key, project=project)
+        cls._client = RPClient(endpoint=endpoint, api_key=api_key, project=project)
         return values
 
     def export_specified_launch(self, launch_id: str, format: str = 'html') -> str | None:
@@ -71,7 +72,7 @@ class ReportPortalApiWrapper(BaseModel):
         defect density, and test execution trends.
         Returns content of the report.
         """
-        response = self.client.export_specified_launch(launch_id, format)
+        response = self._client.export_specified_launch(launch_id, format)
 
         if not response.headers['Content-Disposition']:
             logger.warning(f"Exported data for launch {launch_id} is empty.")
@@ -95,7 +96,7 @@ class ReportPortalApiWrapper(BaseModel):
         By analyzing the launch details, the AI can identify patterns in test failures and suggest areas
         of the application that may require additional attention or testing.
         """
-        return self.client.get_launch_details(launch_id)
+        return self._client.get_launch_details(launch_id)
 
     def get_all_launches(self, page_number: int = 1) -> dict:
         """
@@ -104,7 +105,7 @@ class ReportPortalApiWrapper(BaseModel):
         stability, and the impact of new code changes on the overall quality.
         if page.totalPages > 1, you can use page_number to get the next page.
         """
-        return self.client.get_all_launches(page_number)
+        return self._client.get_all_launches(page_number)
 
     def find_test_item_by_id(self, item_id: str) -> dict:
         """
@@ -112,7 +113,7 @@ class ReportPortalApiWrapper(BaseModel):
         the historical performance of the test, identify flaky tests, and suggest improvements
         or optimizations to the test suite.
         """
-        return self.client.find_test_item_by_id(item_id)
+        return self._client.find_test_item_by_id(item_id)
 
     def get_test_items_for_launch(self, launch_id: str, page_number: int = 1) -> dict:
         """
@@ -121,7 +122,7 @@ class ReportPortalApiWrapper(BaseModel):
         and provide recommendations for test prioritization in future test cycles.
         if page.totalPages > 1, you can use page_number to get the next page.
         """
-        return self.client.get_test_items_for_launch(launch_id, page_number)
+        return self._client.get_test_items_for_launch(launch_id, page_number)
 
     def get_logs_for_test_items(self, item_id: str, page_number: int = 1) -> dict:
         """
@@ -130,14 +131,14 @@ class ReportPortalApiWrapper(BaseModel):
         correlate errors with source code changes, and assist developers in pinpointing issues.
         if page.totalPages > 1, you can use page_number to get the next page.
         """
-        return self.client.get_logs_for_test_items(item_id, page_number)
+        return self._client.get_logs_for_test_items(item_id, page_number)
 
     def get_user_information(self, username: str) -> dict:
         """
         Use user information to personalize dashboards and reports. It can also analyze user activity to optimize
         test assignment and load balancing among QA team members based on their expertise and past performance.
         """
-        return self.client.get_user_information(username)
+        return self._client.get_user_information(username)
 
     def get_dashboard_data(self, dashboard_id: str) -> dict:
         """
@@ -145,7 +146,7 @@ class ReportPortalApiWrapper(BaseModel):
         overall project health, and areas requiring immediate attention.
         It can also provide predictive analytics for future test planning.
         """
-        return self.client.get_dashboard_data(dashboard_id)
+        return self._client.get_dashboard_data(dashboard_id)
 
     def get_available_tools(self):
         return [

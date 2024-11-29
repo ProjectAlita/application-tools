@@ -1,9 +1,9 @@
-from typing import List, Any
+from typing import List, Any, Optional
 from pydantic import model_validator, BaseModel
 import json
 import logging
 from pydantic import create_model
-from pydantic.fields import FieldInfo
+from pydantic.fields import FieldInfo, PrivateAttr
 
 from .Zephyr import Zephyr
 
@@ -36,6 +36,7 @@ class ZephyrV1ApiWrapper(BaseModel):
     base_url: str
     username: str
     password: str
+    _client: Optional[Zephyr] = PrivateAttr()
 
     @model_validator(mode='before')
     @classmethod
@@ -43,7 +44,7 @@ class ZephyrV1ApiWrapper(BaseModel):
         base_url = values['base_url']
         username = values['username']
         password = values['password']
-        values['client'] = Zephyr(base_url=base_url,
+        cls._client = Zephyr(base_url=base_url,
                                   username=username,
                                   password=password)
         return values
@@ -68,14 +69,14 @@ class ZephyrV1ApiWrapper(BaseModel):
 
     def get_test_case_steps(self, issue_id: int, project_id: int):
         """ Get test case steps by issue_id."""
-        parsed = self._parse_test_steps(self.client.get_test_case_steps(issue_id, project_id).json())
+        parsed = self._parse_test_steps(self._client.get_test_case_steps(issue_id, project_id).json())
         if len(parsed) == 0:
             return "No Zephyr test steps found"
         return "Found " + str(len(parsed)) + " test steps:\n" + str(parsed)
 
     def add_new_test_case_step(self, issue_id: int, project_id: int, step: str, data: str, result: str):
         """ Adds new test case step by issue_id."""
-        return "New test step created: " + self.client.add_new_test_case_step(issue_id, project_id, step, data,
+        return "New test step created: " + self._client.add_new_test_case_step(issue_id, project_id, step, data,
                                                                               result).text
 
     def add_test_case(self, issue_id: int, project_id: int, steps_data: str):
