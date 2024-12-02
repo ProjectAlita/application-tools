@@ -30,7 +30,7 @@ class MultiURLCrawler(BaseTool):
     description: str = "Crawls multiple URLs and returns the content related to query"
     args_schema: Type[BaseModel] = create_model("MultiURLCrawlerModel",
                                                 query=(str, FieldInfo(description="Query text to search pages")),
-                                                urls=(str, FieldInfo(description="list of URLs to search like ['url1', 'url2']")))
+                                                urls=(list[str], FieldInfo(description="list of URLs to search like ['url1', 'url2']")))
 
     def _run(self, query: str, urls: list[str], run_manager=None):
         urls = [url.strip() for url in urls]
