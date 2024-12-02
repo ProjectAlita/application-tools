@@ -52,6 +52,13 @@ class ApiTool(BaseTool):
     callable: Operation
 
     def _run(self, **kwargs):
+        # set in query parameter from header (actual for authentication)
+        rq_args = self.args.keys()
+        headers = self.callable.requestor.headers
+        for arg in rq_args:
+            arg_value = headers.get(arg)
+            if arg_value:
+                kwargs.update({arg : arg_value})
         return self.callable(**kwargs).content
 
 
@@ -80,7 +87,7 @@ class AlitaOpenAPIToolkit(BaseToolkit):
                 tools.append(create_api_tool(i, tool))
             except KeyError:
                 ...
-        return cls(requests_session=c, tools=tools)
+        return cls(request_session=c, tools=tools)
 
     def get_tools(self):
         return self.tools
