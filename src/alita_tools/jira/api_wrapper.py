@@ -351,7 +351,7 @@ class JiraApiWrapper(BaseModel):
         if remove_labels:
             for label in remove_labels:
                 update_issue_json["update"]["labels"].append({"remove": label})
-        return self.update_issue(update_issue_json)
+        return self.update_issue(json.dumps(update_issue_json))
 
     def list_comments(self, issue_key: str):
         """ Extract the comments related to specified Jira issue """
