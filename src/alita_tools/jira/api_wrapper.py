@@ -325,7 +325,7 @@ class JiraApiWrapper(BaseModel):
             update_body = {"fields": dict(params["fields"])} if params.get("fields") else {}
             update_body = update_body | {"update": dict(params["update"])} if params.get('update') else update_body
             issue = self._client.update_issue(issue_key=key, update=dict(update_body))
-            issue_url = f"{self._client.url}browse/{key}"
+            issue_url = f"{self._client.url.rstrip('/')}/browse/{key}"
             output = f"Done. Issue {key} has been updated successfully. You can view it at {issue_url}. Details: {str(issue)}"
             logger.info(output)
             return output
