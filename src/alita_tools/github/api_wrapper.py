@@ -63,12 +63,12 @@ SearchCode = create_model(
 
 GetIssue = create_model(
     "GetIssue",
-    issue_number=(str, FieldInfo(description="Issue number as an integer, e.g. `42`"))
+    issue_number=(str, FieldInfo(description="Issue number as a string, e.g. `42`"))
 )
 
 GetPR = create_model(
     "GetPR",
-    pr_number=(str, FieldInfo(description="The PR number as an integer, e.g. `12`"))
+    pr_number=(str, FieldInfo(description="The PR number as a string, e.g. `12`"))
 )
 DirectoryPath = create_model(
     "DirectoryPath",

@@ -1,8 +1,7 @@
 import json
+import re
 from typing import List, Any, Optional, Dict
-from langchain_community.agent_toolkits.base import BaseToolkit
-from langchain_core.tools import BaseTool
-
+from langchain_core.tools import BaseTool, BaseToolkit
 from requests_openapi import Operation, Client, Server
 
 from pydantic import create_model
@@ -41,7 +40,9 @@ def create_api_tool(name: str, op: Operation):
     return ApiTool(
         name=name,
         description=op.spec.description if op.spec.description else op.spec.summary,
-        args_schema=create_model("request_params", **fields),
+        args_schema=create_model("request_params",
+                                 **fields,
+                                 regexp = (Optional[str], FieldInfo(description="Regular expression used to remove from final output if any", default=None))),
         callable=op
     )
 
@@ -51,7 +52,7 @@ class ApiTool(BaseTool):
     description: str
     callable: Operation
 
-    def _run(self, **kwargs):
+    def _run(self, regexp: str = None, **kwargs):
         # set in query parameter from header (actual for authentication)
         rq_args = self.args.keys()
         headers = self.callable.requestor.headers
@@ -59,8 +60,12 @@ class ApiTool(BaseTool):
             arg_value = headers.get(arg)
             if arg_value:
                 kwargs.update({arg : arg_value})
-        return self.callable(**kwargs).content
-
+        output = self.callable(**kwargs).content
+        try:
+            if regexp is not None:
+                output = re.sub(rf'{regexp}', "", str(output))
+        finally:
+            return output
 
 class AlitaOpenAPIToolkit(BaseToolkit):
     request_session: Any  #: :meta private:
