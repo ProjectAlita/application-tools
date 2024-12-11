@@ -40,9 +40,9 @@ new contents
 >>>> NEW"""
 
 branchInput = create_model(
-        "BranchInput", 
-        branch_name=(str, 
-                     FieldInfo(description="The name of the branch, e.g. `my_branch`.")))
+    "BranchInput",
+    branch_name=(str,
+                 FieldInfo(description="The name of the branch, e.g. `my_branch`.")))
 
 class CreateGitLabBranchTool(BaseTool):
 
@@ -88,7 +88,7 @@ class DeleteFileTool(BaseTool):
     description: str = """This tool is a wrapper for the GitLab API, useful when you need to delete a file in a GitLab repository. 
     Simply pass in the full file path of the file you would like to delete. **IMPORTANT**: the path must not start with a slash"""
     args_schema: Type[BaseModel] = create_model(
-        "DeleteFileInput", 
+        "DeleteFileInput",
         file_path=(str, FieldInfo(description="File path of file to be deleted. e.g. `src/agents/developer/tools/git/github_tools.py`. **IMPORTANT**: the path must not start with a slash")
                    ))
 
@@ -106,7 +106,7 @@ class CreateFileTool(BaseTool):
     description: str = """This tool is a wrapper for the GitLab API, useful when you need to create a file in a GitLab repository.
     """
     args_schema: Type[BaseModel] = create_model(
-        "CreateFileInput", 
+        "CreateFileInput",
         file_path=(str, FieldInfo(description="File path of file to be created. e.g. `src/agents/developer/tools/git/github_tools.py`. **IMPORTANT**: the path must not start with a slash")),
         file_contents=(str, FieldInfo(description="""
     Full file content to be created. It must be without any escapes, just raw content to CREATE in GIT.
@@ -204,6 +204,8 @@ class CreatePullRequestChangeComment(BaseTool):
     handle_tool_error: bool = True
 
     def _run(self, pr_number: str, file_path: str, line_number: int, comment: str, *args):
+        if line_number == 0:
+            raise ToolException("Line number for comment must be greater than 0")
         repo = self.api_wrapper.repo_instance
         try:
             mr = repo.mergerequests.get(pr_number)
@@ -223,13 +225,32 @@ class CreatePullRequestChangeComment(BaseTool):
 class UpdateFileToolModel(BaseModel):
     file_query: str = Field(description="Strictly follow the provided rules.")
 
+class ListFilesModel(BaseModel):
+    path: str = Field(description="Repository path/package to extract files from.")
+    branch: str = Field(description="Repository branch.", default=None)
+
+class ListFilesTool(BaseTool):
+    api_wrapper: GitLabAPIWrapper = Field(default_factory=GitLabAPIWrapper)
+    name: str = "list_files"
+    description: str = "Lists files per defined path and branch"
+    args_schema: Type[BaseModel] = ListFilesModel
+    handle_tool_error: bool = True
+
+    def _run(self, path: str = None, branch: str = None):
+        try:
+            return self.api_wrapper.list_files(path, branch)
+        except Exception as e:
+            stacktrace = traceback.format_exc()
+            logger.error(f"Unable to update file: {stacktrace}")
+            raise ToolException(f"Unable to update file: {stacktrace}")
+
 class UpdateFileTool(BaseTool):
     api_wrapper: GitLabAPIWrapper = Field(default_factory=GitLabAPIWrapper)
     name: str = "update_file"
     description: str = UPDATE_FILE_PROMPT
     args_schema: Type[BaseModel] = UpdateFileToolModel
     handle_tool_error: bool = True
-    
+
     def _run(self, file_query: str):
         try:
             return self.api_wrapper.update_file(file_query)
@@ -245,11 +266,11 @@ class ReadFileTool(BaseTool):
     Simply pass in the full
     file path of the file you would like to read. **IMPORTANT**: the path must not start with a slash"""
     args_schema: Type[BaseModel] = create_model(
-        "ReadFileInput", 
+        "ReadFileInput",
         file_path=(str, FieldInfo(description="File path of file to be read. e.g. `src/agents/developer/tools/git/github_tools.py`. **IMPORTANT**: the path must not start with a slash")
                    )
     )
-    
+
     def _run(self, file_path: str):
         try:
             return self.api_wrapper.read_file(file_path)
@@ -265,6 +286,7 @@ __all__ = [
     {"name": "delete_file", "tool": DeleteFileTool},
     {"name": "create_file", "tool": CreateFileTool},
     {"name": "update_file", "tool": UpdateFileTool},
+    {"name": "list_files", "tool": ListFilesTool},
     {"name": "set_active_branch", "tool": SetActiveBranchTool},
     {"name": "list_branches_in_repo", "tool": ListBranchesTool},
     {"name": "get_pr_changes", "tool": GetPullRequesChanges},

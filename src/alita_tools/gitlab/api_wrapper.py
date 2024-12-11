@@ -25,7 +25,7 @@ class GitLabAPIWrapper(BaseModel):
     """The specific branch in the GitLab repository where the bot will make 
         its commits. Defaults to 'main'.
     """
-    
+
 
     @model_validator(mode='before')
     @classmethod
@@ -57,13 +57,21 @@ class GitLabAPIWrapper(BaseModel):
         """Set the active branch for the bot."""
         self.active_branch = branch
         return f"Active branch set to {branch}"
-    
-    
+
+
     def list_branches_in_repo(self) -> List[str]:
         """List all branches in the repository."""
         branches = self.repo_instance.branches.list()
         return json.dumps([branch.name for branch in branches])
-    
+
+    def list_files(self, path: str = None, branch: str = None) -> List[str]:
+        """List files by defined path."""
+
+        files = self.repo_instance.repository_tree(path=path, ref=branch if branch else self.active_branch,
+                                                   recursive=True)
+        paths = [file['path'] for file in files if file['type'] == 'blob']
+        return f"Files: {paths}"
+
     def create_branch(self, branch_name: str) -> None:
         """Create a new branch in the repository."""
         try:
@@ -75,12 +83,12 @@ class GitLabAPIWrapper(BaseModel):
             )
         except Exception as e:
             if "Branch already exists" in str(e):
-                self.active_branch = branch_name        
+                self.active_branch = branch_name
                 return f"Branch {branch_name} already exists. set it as active"
             return f"Unable to create branch due to error:\n{e}"
         self.active_branch = branch_name
         return f"Branch {branch_name} created successfully and set as active"
-    
+
     def parse_issues(self, issues: List[Issue]) -> List[dict]:
         """
         Extracts title and number from each Issue and puts them in a dictionary
@@ -108,7 +116,7 @@ class GitLabAPIWrapper(BaseModel):
         if len(issues) > 0:
             parsed_issues = self.parse_issues(issues)
             parsed_issues_str = (
-                "Found " + str(len(parsed_issues)) + " issues:\n" + str(parsed_issues)
+                    "Found " + str(len(parsed_issues)) + " issues:\n" + str(parsed_issues)
             )
             return parsed_issues_str
         else:
@@ -256,7 +264,7 @@ class GitLabAPIWrapper(BaseModel):
             )
         try:
             file_path: str = file_query.split("\n")[0]
-            
+
             file_content = self.read_file(file_path)
             updated_file_content = file_content
             for old, new in self.extract_old_new_pairs(file_query):
@@ -270,7 +278,7 @@ class GitLabAPIWrapper(BaseModel):
                     "It may be helpful to use the read_file action to get "
                     "the current file contents."
                 )
-                
+
             commit = {
                 "branch": self.active_branch,
                 "commit_message": "Create " + file_path,
@@ -288,8 +296,8 @@ class GitLabAPIWrapper(BaseModel):
         except Exception as e:
             return "Unable to update file due to error:\n" + str(e)
 
-        
-        
+
+
     def delete_file(self, file_path: str) -> str:
         """
         Deletes a file from the repo
@@ -305,22 +313,22 @@ class GitLabAPIWrapper(BaseModel):
             return "Deleted file " + file_path
         except Exception as e:
             return "Unable to delete file due to error:\n" + str(e)
-    
+
     def extract_old_new_pairs(self, file_query):
         # Split the file content by lines
         code_lines = file_query.split("\n")
-        
+
         # Initialize lists to hold the contents of OLD and NEW sections
         old_contents = []
         new_contents = []
-        
+
         # Initialize variables to track whether the current line is within an OLD or NEW section
         in_old_section = False
         in_new_section = False
-        
+
         # Temporary storage for the current section's content
         current_section_content = []
-        
+
         # Iterate through each line in the file content
         for line in code_lines:
             # Check for OLD section start
@@ -328,32 +336,32 @@ class GitLabAPIWrapper(BaseModel):
                 in_old_section = True
                 current_section_content = []  # Reset current section content
                 continue  # Skip the line with the marker
-            
+
             # Check for OLD section end
             if ">>>> OLD" in line:
                 in_old_section = False
                 old_contents.append("\n".join(current_section_content).strip())  # Add the captured content
                 current_section_content = []  # Reset current section content
                 continue  # Skip the line with the marker
-            
+
             # Check for NEW section start
             if "NEW <<<" in line:
                 in_new_section = True
                 current_section_content = []  # Reset current section content
                 continue  # Skip the line with the marker
-            
+
             # Check for NEW section end
             if ">>>> NEW" in line:
                 in_new_section = False
                 new_contents.append("\n".join(current_section_content).strip())  # Add the captured content
                 current_section_content = []  # Reset current section content
                 continue  # Skip the line with the marker
-            
+
             # If currently in an OLD or NEW section, add the line to the current section content
             if in_old_section or in_new_section:
                 current_section_content.append(line)
-        
+
         # Pair the OLD and NEW contents
         paired_contents = list(zip(old_contents, new_contents))
-        
+
         return paired_contents
