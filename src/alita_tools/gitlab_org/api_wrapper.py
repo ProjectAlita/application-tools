@@ -81,6 +81,13 @@ GitLabGetPRChanges = create_model(
     repository=(str, Field(description="Name of the repository", default=None))
 )
 
+ListFilesModel = create_model(
+    "ListFilesModel",
+    path=(str, Field(description="Repository path/package to extract files from.")),
+    branch=(str, Field(description="Repository branch. If None then active branch will be selected.", default=None)),
+    repository=(str, Field(description="Name of the repository", default=None))
+)
+
 GitLabCreatePullRequestChangeCommentInput = create_model(
     "CreatePullRequestChangeCommentInput",
     pr_number=(str, Field(description="Pull request number")),
@@ -399,6 +406,14 @@ class GitLabWorkspaceAPIWrapper(BaseModel):
         except Exception as e:
             return ToolException(f"An error occurred: {e}")
 
+    def list_files(self, path: str, repository: str = None, branch: str = None) -> List[str]:
+        """List files by defined path."""
+
+        files = self._get_repo(repository).repository_tree(path=path, ref=branch if branch else self._active_branch,
+                                                           recursive=True)
+        paths = [file['path'] for file in files if file['type'] == 'blob']
+        return f"Files: {paths}"
+
     def get_available_tools(self):
         """Return a list of available tools."""
         return [
@@ -479,10 +494,14 @@ class GitLabWorkspaceAPIWrapper(BaseModel):
                 "description": self.create_pr_change_comment.__doc__,
                 "args_schema": GitLabCreatePullRequestChangeCommentInput,
                 "ref": self.create_pr_change_comment,
+            },
+            {
+                "name": "list_files",
+                "description": self.list_files.__doc__,
+                "args_schema": ListFilesModel,
+                "ref": self.list_files,
             }
         ]
-
-    #     {"name": "create_pr_change_comment", "tool": CreatePullRequestChangeComment},
 
     def run(self, mode: str, *args: Any, **kwargs: Any):
         """Run the tool based on the selected mode."""

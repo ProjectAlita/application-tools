@@ -166,7 +166,13 @@ class RallyApiWrapper(BaseModel):
             else:
                 user_name_query = f'UserName = "{user_name}"'
             response = self._client.get('User', query=user_name_query)
-            return str(response.content['User'])
+            if response.content is not None:
+                if 'User' in response.content:
+                    return str(response.content['User'])
+                else:
+                    return str(response.content)
+            else:
+                return "Undefined"
         except Exception as e:
             logger.error(f"Error getting user: {e}")
             return ToolException(f"Error getting user: {e}")
