@@ -1,43 +1,52 @@
-from typing import Any, Optional, Union, Dict, List
+import logging
+from typing import Union, Optional
 
-from pydantic import BaseModel, model_validator, create_model, FieldInfo, PrivateAttr
+from pydantic import BaseModel, create_model, model_validator, PrivateAttr
+from pydantic.fields import FieldInfo
 from sqlalchemy import create_engine, text, inspect, Engine
 from sqlalchemy.orm import sessionmaker
 
 from .models import SQLConfig, SQLDialect
 
+logger = logging.getLogger(__name__)
 
 class SQLApiWrapper(BaseModel):
-    sql_config: SQLConfig
-    _engine: Optional[Engine] = PrivateAttr()
+    dialect: str
+    host: str
+    port: str
+    username: str
+    password: str
+    database_name: str
+    _client: Optional[Engine] = PrivateAttr()
 
     @model_validator(mode='before')
     @classmethod
     def validate_toolkit(cls, values):
-        sql_config = values.get('sql_config')
-        if not sql_config:
-            raise ValueError("SQL configuration is required.")
+        for field in SQLConfig.model_fields:
+            if field not in values or not values[field]:
+                raise ValueError(f"{field} is a required field and must be provided.")
 
-        host = sql_config.host
-        username = sql_config.username
-        password = sql_config.password
-        database_name = sql_config.database_name
-        port = sql_config.port
-        dialect = sql_config.dialect
+        dialect = values['dialect']
+        host = values['host']
+        username = values['username']
+        password = values['password']
+        database_name = values['database_name']
+        port = values['port']
 
         if dialect == SQLDialect.POSTGRES:
-            connection_string = f'postgresql+psycopg://{username}:{password}@{host}:{port}/{database_name}'
+            connection_string = f'postgresql+psycopg2://{username}:{password}@{host}:{port}/{database_name}'
         elif dialect == SQLDialect.MYSQL:
             connection_string = f'mysql+pymysql://{username}:{password}@{host}:{port}/{database_name}'
         else:
             raise ValueError(f"Unsupported database type. Supported types are: {[e.value for e in SQLDialect]}")
 
-        cls._engine = create_engine(connection_string)
+        cls._client = create_engine(connection_string)
         return values
 
-    def execute_sql(self, sql_query: str) -> Union[List[Dict[str, Any]], str]:
-        """Executes the provided SQL query and returns the result."""
-        maker_session = sessionmaker(bind=self._engine)
+    def execute_sql(self, sql_query: str) -> Union[list, str]:
+        """Executes the provided SQL query on the configured database."""
+        engine = self._client
+        maker_session = sessionmaker(bind=engine)
         session = maker_session()
         try:
             result = session.execute(text(sql_query))
@@ -57,9 +66,9 @@ class SQLApiWrapper(BaseModel):
         finally:
             session.close()
 
-    def list_tables_and_columns(self) -> Dict[str, Any]:
-        """Lists all tables and their columns in the database."""
-        inspector = inspect(self._engine)
+    def list_tables_and_columns(self) -> dict:
+        """Lists all tables and their columns in the configured database."""
+        inspector = inspect(self._client)
         data = {}
         tables = inspector.get_table_names()
         for table in tables:
@@ -80,26 +89,19 @@ class SQLApiWrapper(BaseModel):
         return [
             {
                 "name": "execute_sql",
+                "ref": self.execute_sql,
                 "description": self.execute_sql.__doc__,
                 "args_schema": create_model(
                     "ExecuteSQLModel",
-                    sql_query=(str, FieldInfo(description="The SQL query to execute"))
+                    sql_query=(str, FieldInfo(description="The SQL query to execute."))
                 ),
-                "ref": self.execute_sql,
             },
             {
                 "name": "list_tables_and_columns",
+                "ref": self.list_tables_and_columns,
                 "description": self.list_tables_and_columns.__doc__,
                 "args_schema": create_model(
                     "ListTablesAndColumnsModel"
                 ),
-                "ref": self.list_tables_and_columns,
             }
         ]
-
-    def run(self, mode: str, *args: Any, **kwargs: Any):
-        for tool in self.get_available_tools():
-            if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
-        else:
-            raise ValueError(f"Unknown mode: {mode}")

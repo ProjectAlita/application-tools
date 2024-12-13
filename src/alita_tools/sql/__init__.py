@@ -1,18 +1,22 @@
 from langchain_core.tools import BaseToolkit, BaseTool
-from pydantic import BaseModel, create_model, FieldInfo
+from pydantic import BaseModel, create_model
+from pydantic.fields import FieldInfo
 
 from .api_wrapper import SQLApiWrapper
 from ..base.tool import BaseAction
 
 name = "sql"
 
-
 def get_tools(tool):
     return SQLToolkit().get_toolkit(
         selected_tools=tool['settings'].get('selected_tools', []),
-        sql_config=tool['settings']['sql_config']
+        dialect=tool['settings']['dialect'],
+        host=tool['settings']['host'],
+        port=tool['settings']['port'],
+        username=tool['settings']['username'],
+        password=tool['settings']['password'],
+        database_name=tool['settings']['database_name']
     ).get_tools()
-
 
 class SQLToolkit(BaseToolkit):
     tools: list[BaseTool] = []
@@ -21,7 +25,12 @@ class SQLToolkit(BaseToolkit):
     def toolkit_config_schema() -> BaseModel:
         return create_model(
             name,
-            sql_config=(SQLConfig, FieldInfo(description="SQL configuration"))
+            dialect=(str, FieldInfo(description="Database dialect (mysql or postgres)")),
+            host=(str, FieldInfo(description="Database server address")),
+            port=(str, FieldInfo(description="Database server port")),
+            username=(str, FieldInfo(description="Database username")),
+            password=(str, FieldInfo(description="Database password")),
+            database_name=(str, FieldInfo(description="Database name")),
         )
 
     @classmethod

@@ -38,3 +38,5 @@ azure-mgmt-core==1.4.0
 azure-mgmt-resource==23.0.1
 azure-mgmt-storage==21.1.0
 azure-storage-blob==12.23.1
+PyMySQL==1.1.1
+psycopg2-binary==2.9.10
