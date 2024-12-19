@@ -22,6 +22,9 @@ from .ado.test_plan import AzureDevOpsPlansToolkit
 from .ado.work_item import AzureDevOpsWorkItemsToolkit
 from .ado.wiki import AzureDevOpsWikiToolkit
 from .rally import get_tools as get_rally, RallyToolkit
+from .sql import get_tools as get_sql, SQLToolkit
+from .code.sonar import get_tools as get_sonar, SonarToolkit
+from .google_places import get_tools as get_google_places, GooglePlacesToolkit
 
 
 from .yagmail import get_tools as get_yagmail
@@ -69,6 +72,12 @@ def get_tools(tools_list, *args, **kwargs):
             tools.extend(get_zephyr_scale(tool))
         elif tool['type'] == 'rally':
             tools.extend(get_rally(tool))
+        elif tool['type'] == 'sql':
+            tools.extend(get_sql(tool))
+        elif tool['type'] == 'sonar':
+            tools.extend(get_sonar(tool))
+        elif tool['type'] == 'google_places':
+            tools.extend(get_google_places(tool))
         else:
             if tool.get("settings", {}).get("module"):
                 try:
@@ -92,5 +101,8 @@ def get_toolkits():
         RallyToolkit.toolkit_config_schema(),
         QtestToolkit.toolkit_config_schema(),
         ReportPortalToolkit.toolkit_config_schema(),
-        TestIOToolkit.toolkit_config_schema()
+        TestIOToolkit.toolkit_config_schema(),
+        SQLToolkit.toolkit_config_schema(),
+        SonarToolkit.toolkit_config_schema(),
+        GooglePlacesToolkit.toolkit_config_schema()
     ]
