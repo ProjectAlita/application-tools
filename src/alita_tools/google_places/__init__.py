@@ -11,7 +11,7 @@ name = "google_places"
 def get_tools(tool):
     return GooglePlacesToolkit().get_toolkit(
         selected_tools=tool['settings'].get('selected_tools', []),
-        gplaces_api_key=tool['settings']['gplaces_api_key']
+        api_key=tool['settings']['api_key']
     ).get_tools()
 
 
@@ -22,7 +22,7 @@ class GooglePlacesToolkit(BaseToolkit):
     def toolkit_config_schema() -> BaseModel:
         return create_model(
             name,
-            gplaces_api_key=(str, FieldInfo(description="Google Places API key")),
+            api_key=(str, FieldInfo(description="Google Places API key")),
         )
 
     @classmethod

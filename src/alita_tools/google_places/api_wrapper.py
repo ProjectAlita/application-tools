@@ -1,23 +1,25 @@
 import logging
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, FieldInfo, create_model, model_validator, PrivateAttr
+from pydantic import BaseModel, create_model, model_validator, PrivateAttr
+from pydantic.fields import FieldInfo
 import googlemaps
 
 logger = logging.getLogger(__name__)
 
+
 # TODO: review langchain-google-community: places_api.py
 class GooglePlacesAPIWrapper(BaseModel):
-    gplaces_api_key: Optional[str] = None
-    top_k_results: Optional[int] = None
+    api_key: Optional[str] = None
+    results_count: Optional[int] = None
     _client: Optional[googlemaps.Client] = PrivateAttr()
 
     @model_validator(mode="before")
     @classmethod
     def validate_toolkit(cls, values: Dict[str, Any]) -> Dict[str, Any]:
-        gplaces_api_key = values.get("gplaces_api_key")
-        if gplaces_api_key:
-            cls._client = googlemaps.Client(key=gplaces_api_key)
+        api_key = values.get("api_key")
+        if api_key:
+            cls._client = googlemaps.Client(key=api_key)
         return values
 
     def places(self, query: str) -> str:
@@ -29,7 +31,7 @@ class GooglePlacesAPIWrapper(BaseModel):
         if num_to_return == 0:
             return "Google Places did not find any places that match the description."
 
-        num_to_return = min(num_to_return, self.top_k_results) if self.top_k_results else num_to_return
+        num_to_return = min(num_to_return, self.results_count) if self.results_count else num_to_return
 
         places: List[str] = [
             self.fetch_place_details(result["place_id"])
@@ -100,7 +102,8 @@ class GooglePlacesAPIWrapper(BaseModel):
                 "description": self.find_near.__doc__,
                 "args_schema": create_model(
                     "GooglePlacesFindNearSchema",
-                    current_location_query=(str, FieldInfo(description="Detailed user query of current user location or where to start from")),
+                    current_location_query=(
+                    str, FieldInfo(description="Detailed user query of current user location or where to start from")),
                     target=(str, FieldInfo(description="The target location or query which user wants to find")),
                     radius=(Optional[int], FieldInfo(description="The radius of the search. This is optional field"))
                 ),

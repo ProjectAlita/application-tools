@@ -58,8 +58,8 @@ class OpenApiWrapper(BaseModel):
                     "InvokeRestApiBySpecModel",
                     method=(str, FieldInfo(description="The HTTP method to use")),
                     url=(str, FieldInfo(description="The URL to send the request to")),
-                    headers=(Optional[str], FieldInfo(description="The headers to include in the request")),
-                    fields=(Optional[str], FieldInfo(description="The query parameters to include in the request")),
+                    headers=(Optional[str], FieldInfo(description="The headers to include in the request in JSON format")),
+                    fields=(Optional[str], FieldInfo(description="The query parameters to include in the request in JSON format")),
                     body=(Optional[str], FieldInfo(description="The body of the request"))
                 ),
                 "ref": self.invoke_rest_api_by_spec,
