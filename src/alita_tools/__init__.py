@@ -77,7 +77,7 @@ def get_tools(tools_list, *args, **kwargs):
         elif tool['type'] == 'sonar':
             tools.extend(get_sonar(tool))
         elif tool['type'] == 'google_places':
-            tools.extend(get_sonar(tool))
+            tools.extend(get_google_places(tool))
         else:
             if tool.get("settings", {}).get("module"):
                 try:
