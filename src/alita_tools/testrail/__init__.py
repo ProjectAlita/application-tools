@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import List
 
 from langchain_core.tools import BaseTool, BaseToolkit
@@ -23,11 +24,17 @@ class TestrailToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
+        selected_tools = [x['name'] for x in TestrailAPIWrapper.construct().get_available_tools()]
         return create_model(
             name,
             url=(str, FieldInfo(description="Testrail URL")),
             email=(str, FieldInfo(description="User's email")),
-            password=(str, FieldInfo(description="User's password")),
+            password=(str, FieldInfo(description="User's password", json_schema_extra={'secret': True})),
+            selected_tools=(
+                List[
+                    Enum('TestrailSelectedTools', {n: n for n in selected_tools})
+                ], [])
+
         )
 
     @classmethod

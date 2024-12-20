@@ -25,6 +25,10 @@ from .rally import get_tools as get_rally, RallyToolkit
 from .sql import get_tools as get_sql, SQLToolkit
 from .code.sonar import get_tools as get_sonar, SonarToolkit
 from .google_places import get_tools as get_google_places, GooglePlacesToolkit
+from .browser import BrowserToolkit
+from .xray import XrayToolkit
+from .gitlab import AlitaGitlabToolkit
+from .confluence import ConfluenceToolkit
 
 
 from .yagmail import get_tools as get_yagmail
@@ -104,5 +108,9 @@ def get_toolkits():
         TestIOToolkit.toolkit_config_schema(),
         SQLToolkit.toolkit_config_schema(),
         SonarToolkit.toolkit_config_schema(),
-        GooglePlacesToolkit.toolkit_config_schema()
+        GooglePlacesToolkit.toolkit_config_schema(),
+        BrowserToolkit.toolkit_config_schema(),
+        XrayToolkit.toolkit_config_schema(),
+        AlitaGitlabToolkit.toolkit_config_schema(),
+        ConfluenceToolkit.toolkit_config_schema(),
     ]
