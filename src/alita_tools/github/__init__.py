@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import Dict, List, Optional
 
 from langchain_core.tools import BaseTool, BaseToolkit
@@ -31,19 +32,24 @@ class AlitaGitHubToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
+        selected_tools = [x['name'] for x in AlitaGitHubAPIWrapper.construct().get_available_tools()]
         return create_model(
             name,
-            github_app_id=(Optional[str], FieldInfo(description="Github APP ID")),
-            github_app_private_key=(Optional[str], FieldInfo(description="Github APP private key")),
+            app_id=(Optional[str], FieldInfo(description="Github APP ID", default=None)),
+            app_private_key=(Optional[str], FieldInfo(description="Github APP private key", default=None, json_schema_extra={'secret': True})),
 
-            github_access_token=(Optional[str], FieldInfo(description="Github Access Token")),
+            access_token=(Optional[str], FieldInfo(description="Github Access Token", default=None, json_schema_extra={'secret': True})),
 
-            github_username=(Optional[str], FieldInfo(description="Github Username")),
-            github_password=(Optional[str], FieldInfo(description="Github Password")),
+            username=(Optional[str], FieldInfo(description="Github Username", default=None)),
+            password=(Optional[str], FieldInfo(description="Github Password", default=None, json_schema_extra={'secret': True})),
 
-            github_repository=(str, FieldInfo(description="Github repository")),
-            active_branch=(Optional[str], FieldInfo(description="Active repository", default="ai")),
-            github_base_branch=(Optional[str], FieldInfo(description="Github Base branch", default="main"))
+            repository=(str, FieldInfo(description="Github repository")),
+            active_branch=(Optional[str], FieldInfo(description="Active branch", default="main")),
+            base_branch=(Optional[str], FieldInfo(description="Github Base branch", default="main")),
+            selected_tools=(
+                List[
+                    Enum('GitHubSelectedTools', {n: n for n in selected_tools})
+                ], [])
         )
 
     @classmethod

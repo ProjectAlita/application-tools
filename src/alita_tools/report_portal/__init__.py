@@ -1,3 +1,6 @@
+from enum import Enum
+from typing import List
+
 from langchain_core.tools import BaseToolkit, BaseTool
 
 from pydantic import BaseModel, create_model
@@ -23,11 +26,16 @@ class ReportPortalToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
+        selected_tools = [x['name'] for x in ReportPortalApiWrapper.construct().get_available_tools()]
         return create_model(
             name,
             endpoint=(str, FieldInfo(description="Report Portal endpoint")),
             project=(str, FieldInfo(description="Report Portal project")),
-            api_key=(str, FieldInfo(description="User API key")),
+            api_key=(str, FieldInfo(description="User API key", json_schema_extra={'secret': True})),
+            selected_tools=(
+                List[
+                    Enum('ReportPortalSelectedTools', {n: n for n in selected_tools})
+                ], [])
         )
 
     @classmethod
