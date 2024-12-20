@@ -1,6 +1,7 @@
+import json
 import logging
 import requests
-from typing import List, Optional, Any
+from typing import List, Optional, Any, Dict
 from pydantic import create_model
 from pydantic.fields import FieldInfo
 from langchain_core.documents import Document
@@ -30,7 +31,7 @@ createPage = create_model(
 createPages = create_model(
     "createPages",
     space=(str, FieldInfo(description="Confluence space that is used for pages creation", default=None)),
-    pages_info=(dict, FieldInfo(description="Content in key-value format: Title=Body")),
+    pages_info=(str, FieldInfo(description="""JSON string containing information about page name and its content per syntax: [{"page1_name": "page1_content"}, {"page2_name": "page2_content"}]""")),
     parent_id=(str, FieldInfo(description="Page parent id (optional)", default=None)),
     status=(str, FieldInfo(description="Page publishing option: 'current' for publish page, 'draft' to create draft.", default='current')),
 )
@@ -196,16 +197,17 @@ class ConfluenceAPIWrapper(BaseModel):
 
         return f"The page '{title}' was created under the parent page '{parent_id_filled}': '{page_details['link']}'. \nDetails: {str(page_details)}"
 
-    def create_pages(self, pages_info: dict, status: str = 'current', space: str = None, parent_id: str = None):
+    def create_pages(self, pages_info: str, status: str = 'current', space: str = None, parent_id: str = None):
         """ Creates a batch of pages in the Confluence space."""
         created_pages = []
         user_space = space if space else self.space
         logger.info(f"Pages will be created within the space {user_space}")
         # duplicate action to avoid extra api calls in downstream function
         parent_id_filled = parent_id if parent_id else self.client.get_space(user_space)['homepage']['id']
-        for title, body in pages_info.items():
-            created_page = self.create_page(title=title, body=body, status=status, parent_id=parent_id_filled, space=user_space)
-            created_pages.append(created_page)
+        for page_item in json.loads(pages_info):
+            for title, body in page_item.items():
+                created_page = self.create_page(title=title, body=body, status=status, parent_id=parent_id_filled, space=user_space)
+                created_pages.append(created_page)
         return str(created_pages)
 
     # delete after https://github.com/atlassian-api/atlassian-python-api/pull/1452 will be merged
