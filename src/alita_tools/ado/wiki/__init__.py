@@ -1,22 +1,31 @@
-from typing import List, Optional
+from enum import Enum
+from typing import List
 from .ado_wrapper import AzureDevOpsApiWrapper  # Import the API wrapper for Azure DevOps
 from langchain_core.tools import BaseTool, BaseToolkit
 from pydantic import BaseModel, create_model
 from pydantic.fields import FieldInfo
 from ...base.tool import BaseAction
 
+
 name = "azure_devops_wiki"
+name_alias = 'ado_wiki'
+
 
 class AzureDevOpsWikiToolkit(BaseToolkit):
     tools: List[BaseTool] = []
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
+        selected_tools = [x['name'] for x in AzureDevOpsApiWrapper.construct().get_available_tools()]
         return create_model(
-            name,
+            name_alias,
             organization_url=(str, FieldInfo(description="ADO organization url")),
             project=(str, FieldInfo(description="ADO project")),
-            token=(str, FieldInfo(description="ADO token")),
+            token=(str, FieldInfo(description="ADO token", json_schema_extra={'secret': True})),
+            selected_tools=(
+                List[
+                    Enum('AzureDevOpsWikiSelectedTools', {n: n for n in selected_tools})
+                ], [])
         )
 
     @classmethod

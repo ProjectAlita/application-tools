@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import List, Optional
 
 from langchain_core.tools import BaseTool, BaseToolkit
@@ -7,19 +8,26 @@ from pydantic.fields import FieldInfo
 from .test_plan_wrapper import TestPlanApiWrapper
 from ...base.tool import BaseAction
 
+
 name = "azure_devops_plans"
+name_alias = "ado_plans"
+
 
 class AzureDevOpsPlansToolkit(BaseToolkit):
     tools: List[BaseTool] = []
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
+        selected_tools = [x['name'] for x in TestPlanApiWrapper.construct().get_available_tools()]
         return create_model(
-            name,
+            name_alias,
             organization_url=(str, FieldInfo(description="ADO organization url")),
-            token=(str, FieldInfo(description="ADO token")),
-
-            limit=(Optional[str], FieldInfo(description="ADO plans limit used for limitation of the list with results"))
+            limit=(Optional[int], FieldInfo(description="ADO plans limit used for limitation of the list with results", default=5)),
+            token=(str, FieldInfo(description="ADO token", json_schema_extra={'secret': True})),
+            selected_tools=(
+                List[
+                    Enum('AzureDevOpsWikiSelectedTools', {n: n for n in selected_tools})
+                ], [])
         )
 
     @classmethod
