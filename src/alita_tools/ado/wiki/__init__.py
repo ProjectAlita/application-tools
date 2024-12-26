@@ -1,8 +1,7 @@
-from enum import Enum
-from typing import List
+from typing import List, Literal
 from .ado_wrapper import AzureDevOpsApiWrapper  # Import the API wrapper for Azure DevOps
 from langchain_core.tools import BaseTool, BaseToolkit
-from pydantic import BaseModel, create_model
+from pydantic import BaseModel, create_model, ConfigDict
 from pydantic.fields import FieldInfo
 from ...base.tool import BaseAction
 
@@ -16,16 +15,14 @@ class AzureDevOpsWikiToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
-        selected_tools = [x['name'] for x in AzureDevOpsApiWrapper.construct().get_available_tools()]
+        selected_tools = (x['name'] for x in AzureDevOpsApiWrapper.construct().get_available_tools())
         return create_model(
             name_alias,
             organization_url=(str, FieldInfo(description="ADO organization url")),
             project=(str, FieldInfo(description="ADO project")),
             token=(str, FieldInfo(description="ADO token", json_schema_extra={'secret': True})),
-            selected_tools=(
-                List[
-                    Enum('AzureDevOpsWikiSelectedTools', {n: n for n in selected_tools})
-                ], [])
+            selected_tools=(List[Literal[tuple(selected_tools)]], []),
+            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "ADO wiki", "icon_url": None}})
         )
 
     @classmethod

@@ -1,8 +1,7 @@
-from enum import Enum
-from typing import List
+from typing import List, Literal
 
 from langchain_core.tools import BaseTool, BaseToolkit
-from pydantic import BaseModel, create_model
+from pydantic import BaseModel, create_model, ConfigDict
 from pydantic.fields import FieldInfo
 
 from .api_wrapper import TestrailAPIWrapper
@@ -24,17 +23,14 @@ class TestrailToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
-        selected_tools = [x['name'] for x in TestrailAPIWrapper.construct().get_available_tools()]
+        selected_tools = (x['name'] for x in TestrailAPIWrapper.construct().get_available_tools())
         return create_model(
             name,
             url=(str, FieldInfo(description="Testrail URL")),
             email=(str, FieldInfo(description="User's email")),
             password=(str, FieldInfo(description="User's password", json_schema_extra={'secret': True})),
-            selected_tools=(
-                List[
-                    Enum('TestrailSelectedTools', {n: n for n in selected_tools})
-                ], [])
-
+            selected_tools=(List[Literal[tuple(selected_tools)]], []),
+            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Testrail", "icon_url": None}})
         )
 
     @classmethod

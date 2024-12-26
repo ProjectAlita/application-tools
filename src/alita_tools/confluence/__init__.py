@@ -1,10 +1,9 @@
-from enum import Enum
-from typing import List
+from typing import List, Literal
 from langchain_community.agent_toolkits.base import BaseToolkit
 from .api_wrapper import ConfluenceAPIWrapper
 from langchain_core.tools import BaseTool
 from ..base.tool import BaseAction
-from pydantic import BaseModel, create_model
+from pydantic import BaseModel, create_model, ConfigDict
 from pydantic.fields import FieldInfo
 
 
@@ -30,7 +29,7 @@ class ConfluenceToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
-        selected_tools = [x['name'] for x in ConfluenceAPIWrapper.construct().get_available_tools()]
+        selected_tools = (x['name'] for x in ConfluenceAPIWrapper.construct().get_available_tools())
         return create_model(
             name,
             base_url=(str, FieldInfo(description="Confluence URL")),
@@ -44,10 +43,8 @@ class ConfluenceToolkit(BaseToolkit):
             number_of_retries=(int, FieldInfo(description="Number of retries", default=2)),
             min_retry_seconds=(int, FieldInfo(description="Min retry, sec", default=10)),
             max_retry_seconds=(int, FieldInfo(description="Max retry, sec", default=60)),
-            selected_tools=(
-                List[
-                    Enum('ConfluenceSelectedTools', {n: n for n in selected_tools})
-                ], [])
+            selected_tools=(List[Literal[tuple(selected_tools)]], []),
+            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Confluence", "icon_url": None}})
         )
 
     @classmethod

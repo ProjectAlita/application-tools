@@ -1,9 +1,8 @@
-from enum import Enum
-from typing import List, Optional
+from typing import List, Optional, Literal
 
 from langchain_community.agent_toolkits.base import BaseToolkit
 from langchain_core.tools import BaseTool
-from pydantic import BaseModel, create_model
+from pydantic import BaseModel, create_model, ConfigDict
 from pydantic.fields import FieldInfo
 
 from .api_wrapper import XrayApiWrapper
@@ -28,17 +27,15 @@ class XrayToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
-        selected_tools = [x['name'] for x in XrayApiWrapper.construct().get_available_tools()]
+        selected_tools = (x['name'] for x in XrayApiWrapper.construct().get_available_tools())
         return create_model(
             name,
             base_url=(str, FieldInfo(description="Xray URL")),
             client_id=(str, FieldInfo(description="Client ID")),
             client_secret=(str, FieldInfo(description="Client secret", json_schema_extra={'secret': True})),
             limit=(Optional[int], FieldInfo(description="Limit", default=100)),
-            selected_tools=(
-                List[
-                    Enum('XraySelectedTools', {n: n for n in selected_tools})
-                ], [])
+            selected_tools=(List[Literal[tuple(selected_tools)]], []),
+            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "XRAY cloud", "icon_url": None}})
         )
 
     @classmethod

@@ -1,9 +1,8 @@
-from enum import Enum
-from typing import List, Optional
+from typing import List, Optional, Literal
 from .api_wrapper import JiraApiWrapper
 from langchain_core.tools import BaseTool, BaseToolkit
 from ..base.tool import BaseAction
-from pydantic import BaseModel, create_model
+from pydantic import BaseModel, create_model, ConfigDict
 from pydantic.fields import FieldInfo
 
 name = "jira"
@@ -25,7 +24,7 @@ class JiraToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
-        selected_tools = [x['name'] for x in JiraApiWrapper.construct().get_available_tools()]
+        selected_tools = (x['name'] for x in JiraApiWrapper.construct().get_available_tools())
         return create_model(
             name,
             base_url=(str, FieldInfo(description="Jira URL")),
@@ -36,10 +35,8 @@ class JiraToolkit(BaseToolkit):
             limit=(int, FieldInfo(description="Limit issues", default=5)),
             verify_ssl=(bool, FieldInfo(description="Verify SSL", default=True)),
             additional_fields=(Optional[str], FieldInfo(description="Additional fields", default="")),
-            selected_tools=(
-                List[
-                    Enum('JiraSelectedTools', {n: n for n in selected_tools})
-                ], [])
+            selected_tools=(List[Literal[tuple(selected_tools)]], []),
+            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Jira", "icon_url": None}})
         )
 
     @classmethod
