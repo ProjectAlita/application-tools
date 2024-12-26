@@ -1,14 +1,23 @@
 import logging
-from typing import Union, Optional
+from typing import Optional, Any
 
-from pydantic import BaseModel, create_model, model_validator, PrivateAttr
-from pydantic.fields import FieldInfo
+from pydantic import BaseModel, create_model, model_validator
+from pydantic.fields import FieldInfo, PrivateAttr
 from sqlalchemy import create_engine, text, inspect, Engine
 from sqlalchemy.orm import sessionmaker
 
 from .models import SQLConfig, SQLDialect
 
 logger = logging.getLogger(__name__)
+
+ExecuteSQLModel = create_model(
+    "ExecuteSQLModel",
+    sql_query=(str, FieldInfo(description="The SQL query to execute."))
+)
+
+SQLNoInput = create_model(
+    "ListTablesAndColumnsModel"
+)
 
 class SQLApiWrapper(BaseModel):
     dialect: str
@@ -43,7 +52,7 @@ class SQLApiWrapper(BaseModel):
         cls._client = create_engine(connection_string)
         return values
 
-    def execute_sql(self, sql_query: str) -> Union[list, str]:
+    def execute_sql(self, sql_query: str):
         """Executes the provided SQL query on the configured database."""
         engine = self._client
         maker_session = sessionmaker(bind=engine)
@@ -66,7 +75,7 @@ class SQLApiWrapper(BaseModel):
         finally:
             session.close()
 
-    def list_tables_and_columns(self) -> dict:
+    def list_tables_and_columns(self):
         """Lists all tables and their columns in the configured database."""
         inspector = inspect(self._client)
         data = {}
@@ -91,17 +100,19 @@ class SQLApiWrapper(BaseModel):
                 "name": "execute_sql",
                 "ref": self.execute_sql,
                 "description": self.execute_sql.__doc__,
-                "args_schema": create_model(
-                    "ExecuteSQLModel",
-                    sql_query=(str, FieldInfo(description="The SQL query to execute."))
-                ),
+                "args_schema": ExecuteSQLModel,
             },
             {
                 "name": "list_tables_and_columns",
                 "ref": self.list_tables_and_columns,
                 "description": self.list_tables_and_columns.__doc__,
-                "args_schema": create_model(
-                    "ListTablesAndColumnsModel"
-                ),
+                "args_schema": SQLNoInput,
             }
         ]
+
+    def run(self, mode: str, *args: Any, **kwargs: Any):
+        for tool in self.get_available_tools():
+            if tool["name"] == mode:
+                return tool["ref"](*args, **kwargs)
+        else:
+            raise ValueError(f"Unknown mode: {mode}")
