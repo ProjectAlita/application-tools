@@ -6,7 +6,7 @@ from .openapi import get_tools as get_openapi
 from .jira import get_tools as get_jira, JiraToolkit
 from .confluence import get_tools as get_confluence, ConfluenceToolkit
 from .gitlab import get_tools as get_gitlab, AlitaGitlabToolkit
-from .gitlab_org import get_tools as get_gitlab_org
+from .gitlab_org import get_tools as get_gitlab_org, AlitaGitlabSpaceToolkit
 from .zephyr import get_tools as get_zephyr
 from .browser import get_tools as get_browser, BrowserToolkit
 from .report_portal import get_tools as get_report_portal, ReportPortalToolkit
@@ -110,4 +110,5 @@ def get_toolkits():
         AlitaGitlabToolkit.toolkit_config_schema(),
         ConfluenceToolkit.toolkit_config_schema(),
         AlitaBitbucketToolkit.toolkit_config_schema(),
+        AlitaGitlabSpaceToolkit.toolkit_config_schema(),
     ]
