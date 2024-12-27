@@ -4,16 +4,16 @@ from importlib import import_module
 from .github import get_tools as get_github, AlitaGitHubToolkit
 from .openapi import get_tools as get_openapi
 from .jira import get_tools as get_jira, JiraToolkit
-from .confluence import get_tools as get_confluence
-from .gitlab import get_tools as get_gitlab
+from .confluence import get_tools as get_confluence, ConfluenceToolkit
+from .gitlab import get_tools as get_gitlab, AlitaGitlabToolkit
 from .gitlab_org import get_tools as get_gitlab_org
 from .zephyr import get_tools as get_zephyr
-from .browser import get_tools as get_browser
+from .browser import get_tools as get_browser, BrowserToolkit
 from .report_portal import get_tools as get_report_portal, ReportPortalToolkit
-from .bitbucket import get_tools as get_bitbucket
+from .bitbucket import get_tools as get_bitbucket, AlitaBitbucketToolkit
 from .testrail import get_tools as get_testrail, TestrailToolkit
 from .testio import get_tools as get_testio, TestIOToolkit
-from .xray import get_tools as get_xray_cloud
+from .xray import get_tools as get_xray_cloud, XrayToolkit
 from .sharepoint import get_tools as get_sharepoint
 from .qtest import get_tools as get_qtest, QtestToolkit
 from .zephyr_scale import get_tools as get_zephyr_scale
@@ -25,10 +25,6 @@ from .rally import get_tools as get_rally, RallyToolkit
 from .sql import get_tools as get_sql, SQLToolkit
 from .code.sonar import get_tools as get_sonar, SonarToolkit
 from .google_places import get_tools as get_google_places, GooglePlacesToolkit
-from .browser import BrowserToolkit
-from .xray import XrayToolkit
-from .gitlab import AlitaGitlabToolkit
-from .confluence import ConfluenceToolkit
 
 
 from .yagmail import get_tools as get_yagmail
@@ -113,4 +109,5 @@ def get_toolkits():
         XrayToolkit.toolkit_config_schema(),
         AlitaGitlabToolkit.toolkit_config_schema(),
         ConfluenceToolkit.toolkit_config_schema(),
+        AlitaBitbucketToolkit.toolkit_config_schema(),
     ]
