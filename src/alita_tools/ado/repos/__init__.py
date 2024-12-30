@@ -1,14 +1,15 @@
 from typing import List
 
 from azure.devops.v7_0.git import GitClient
+from langchain_core.tools import BaseTool, BaseToolkit
 from pydantic import create_model
 from pydantic.fields import FieldInfo
-from langchain_core.tools import BaseTool, BaseToolkit
 
-from .repos_wrapper import ReposApiWrapper, RepoConfig
 from ...base.tool import BaseAction
+from .repos_wrapper import RepoConfig, ReposApiWrapper
 
 name = "azure_devops_repos"
+
 
 class AzureDevOpsReposToolkit(BaseToolkit):
     tools: List[BaseTool] = []
@@ -26,8 +27,9 @@ class AzureDevOpsReposToolkit(BaseToolkit):
     @classmethod
     def get_toolkit(cls, selected_tools: list[str] | None = None, **kwargs):
         from os import environ
-        if not environ.get('AZURE_DEVOPS_CACHE_DIR', None):
-            environ['AZURE_DEVOPS_CACHE_DIR'] = '/tmp/.azure-devops'
+
+        if not environ.get("AZURE_DEVOPS_CACHE_DIR", None):
+            environ["AZURE_DEVOPS_CACHE_DIR"] = "/tmp/.azure-devops"
         if selected_tools is None:
             selected_tools = []
         azure_devops_repos_wrapper = ReposApiWrapper(**kwargs)
@@ -38,12 +40,14 @@ class AzureDevOpsReposToolkit(BaseToolkit):
                 if tool["name"] not in selected_tools:
                     continue
             print(tool)
-            tools.append(BaseAction(
-                api_wrapper=azure_devops_repos_wrapper,
-                name=tool["name"],
-                description=tool["description"],
-                args_schema=tool["args_schema"]
-            ))
+            tools.append(
+                BaseAction(
+                    api_wrapper=azure_devops_repos_wrapper,
+                    name=tool["name"],
+                    description=tool["description"],
+                    args_schema=tool["args_schema"],
+                )
+            )
         return cls(tools=tools)
 
     def get_tools(self):
