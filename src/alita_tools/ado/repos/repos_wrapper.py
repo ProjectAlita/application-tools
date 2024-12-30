@@ -316,33 +316,6 @@ class ReposApiWrapper(GitClient):
             directory_path=directory_path, branch_name=self.active_branch
         )
 
-    def get_pull_request_comment_threads(
-        self, project: str, repository_id: str, pull_request_id: int
-    ) -> List[GitPullRequestCommentThread]:
-        """
-        Fetches comment threads for a given pull request.
-
-        Parameters:
-            project (str): The project ID or project name.
-            repository_id (str): The ID of the repository.
-            pull_request_id (int): The ID of the pull request.
-
-        Returns:
-            List[GitPullRequestCommentThread]: A list of comment threads associated with the pull request.
-        """
-        try:
-            comment_threads = self.get_threads(
-                repository_id=repository_id,
-                pull_request_id=pull_request_id,
-                project=project,
-            )
-        except Exception as e:
-            msg = f"Error during attempt to get comment threads for pull request: {str(e)}"
-            logger.error(msg)
-            return ToolException(msg)
-
-        return comment_threads
-
     def parse_pull_request_comments(
         self, comment_threads: List[GitPullRequestCommentThread]
     ) -> List[dict]:
@@ -443,32 +416,38 @@ class ReposApiWrapper(GitClient):
             pull_requests = [pull_requests]
 
         parsed = []
-        for pull_request in pull_requests:
-            comment_threads = self.get_pull_request_comment_threads(
-                repository_id=self.repository_id,
-                project=self.project,
-                pull_request_id=pull_request.pull_request_id,
-            )
+        try:
+            for pull_request in pull_requests:
+                comment_threads: List[GitPullRequestCommentThread] = self.get_threads(
+                    repository_id=self.repository_id,
+                    pull_request_id=pull_request.pull_request_id,
+                    project=self.project,
+                )
 
-            commits = self.get_pull_request_commits(
-                repository_id=self.repository_id,
-                project=self.project,
-                pull_request_id=pull_request.pull_request_id,
-            )
+                commits: List[GitCommitRef] = self.get_pull_request_commits(
+                    repository_id=self.repository_id,
+                    project=self.project,
+                    pull_request_id=pull_request.pull_request_id,
+                )
 
-            commit_details = [
-                {"commit_id": commit.commit_id, "comment": commit.comment}
-                for commit in commits
-            ]
+                commit_details = [
+                    {"commit_id": commit.commit_id, "comment": commit.comment}
+                    for commit in commits
+                ]
 
-            parsed.append(
-                {
-                    "title": pull_request.title,
-                    "pull_request_id": pull_request.pull_request_id,
-                    "commits": commit_details,
-                    "comments": self.parse_pull_request_comments(comment_threads),
-                }
-            )
+                parsed.append(
+                    {
+                        "title": pull_request.title,
+                        "pull_request_id": pull_request.pull_request_id,
+                        "commits": commit_details,
+                        "comments": self.parse_pull_request_comments(comment_threads),
+                    }
+                )
+        except Exception as e:
+            msg = f"Failed to parse pull requests. Error: {str(e)}"
+            logger.error(msg)
+            return ToolException(msg)
+
         return parsed
 
     def list_pull_request_diffs(self, pull_request_id: str) -> str:
@@ -478,23 +457,31 @@ class ReposApiWrapper(GitClient):
         Returns:
             str: A list of files and diffs included in the pull request.
         """
-        pull_request_id = int(pull_request_id)
+        try:
+            pull_request_id = int(pull_request_id)
+        except Exception as e:
+            return ToolException(f"Passed argument is not INT type: {pull_request_id}.\nError: {str(e)}")
 
-        pr_iterations = self.get_pull_request_iterations(
-            repository_id=self.repository_id,
-            project=self.project,
-            pull_request_id=pull_request_id,
-        )
-        last_iteration_id = pr_iterations[-1].id
+        try:
+            pr_iterations = self.get_pull_request_iterations(
+                repository_id=self.repository_id,
+                project=self.project,
+                pull_request_id=pull_request_id,
+            )
+            last_iteration_id = pr_iterations[-1].id
 
-        changes = self.get_pull_request_iteration_changes(
-            repository_id=self.repository_id,
-            project=self.project,
-            pull_request_id=pull_request_id,
-            last_iteration_id=last_iteration_id,
-        )
+            changes = self.get_pull_request_iteration_changes(
+                repository_id=self.repository_id,
+                project=self.project,
+                pull_request_id=pull_request_id,
+                iteration_id=last_iteration_id,
+            )
+        except Exception as e:
+            msg = f"Error during attempt to get Pull Request iterations and changes.\nError: {str(e)}"
+            logger.error(msg)
+            return ToolException(msg)
+
         data = []
-
         source_commit_id = pr_iterations[-1].source_ref_commit.commit_id
         target_commit_id = pr_iterations[-1].target_ref_commit.commit_id
 
