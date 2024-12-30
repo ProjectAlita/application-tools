@@ -381,11 +381,10 @@ class ReposApiWrapper(GitClient):
 
     def get_pull_request(self, pull_request_id: str) -> str:
         """
-        Fetches all open pull requests from the Azure DevOps repository.
+        Fetches particular pull request from the Azure DevOps repository.
 
         Returns:
-            str: A plaintext report containing the number of PRs
-            and each PR's title and ID.
+            str: A plaintext report containing PR by ID.
         """
         try:
             pull_request = self.get_pull_request_by_id(
