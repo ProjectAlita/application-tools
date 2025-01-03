@@ -1,7 +1,7 @@
-from typing import List
+from typing import List, Literal
 
 from langchain_core.tools import BaseToolkit, BaseTool
-from pydantic import BaseModel, create_model
+from pydantic import BaseModel, create_model, ConfigDict
 from pydantic.fields import FieldInfo
 
 from .api_wrapper import QtestApiWrapper
@@ -19,16 +19,20 @@ def get_tools(tool):
         qtest_api_token=tool['settings'].get('qtest_api_token', None),
     ).get_tools()
 
+
 class QtestToolkit(BaseToolkit):
     tools: List[BaseTool] = []
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
+        selected_tools = (x['name'] for x in QtestApiWrapper.construct().get_available_tools())
         return create_model(
             name,
             base_url=(str, FieldInfo(description="QTest base url")),
-            project_id=(str, FieldInfo(description="QTest project id")),
-            qtest_api_token=(str, FieldInfo(description="QTest API token")),
+            project_id=(int, FieldInfo(description="QTest project id")),
+            qtest_api_token=(str, FieldInfo(description="QTest API token", json_schema_extra={'secret': True})),
+            selected_tools=(List[Literal[tuple(selected_tools)]], []),
+            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "QTest", "icon_url": None}})
         )
 
     @classmethod

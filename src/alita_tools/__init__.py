@@ -7,7 +7,7 @@ from .jira import get_tools as get_jira, JiraToolkit
 from .confluence import get_tools as get_confluence, ConfluenceToolkit
 from .gitlab import get_tools as get_gitlab, AlitaGitlabToolkit
 from .gitlab_org import get_tools as get_gitlab_org, AlitaGitlabSpaceToolkit
-from .zephyr import get_tools as get_zephyr
+from .zephyr import get_tools as get_zephyr, ZephyrToolkit
 from .browser import get_tools as get_browser, BrowserToolkit
 from .report_portal import get_tools as get_report_portal, ReportPortalToolkit
 from .bitbucket import get_tools as get_bitbucket, AlitaBitbucketToolkit
@@ -16,7 +16,7 @@ from .testio import get_tools as get_testio, TestIOToolkit
 from .xray import get_tools as get_xray_cloud, XrayToolkit
 from .sharepoint import get_tools as get_sharepoint
 from .qtest import get_tools as get_qtest, QtestToolkit
-from .zephyr_scale import get_tools as get_zephyr_scale
+from .zephyr_scale import get_tools as get_zephyr_scale, ZephyrScaleToolkit
 from .ado import get_tools as get_ado
 from .ado.test_plan import AzureDevOpsPlansToolkit
 from .ado.work_item import AzureDevOpsWorkItemsToolkit
@@ -111,4 +111,6 @@ def get_toolkits():
         ConfluenceToolkit.toolkit_config_schema(),
         AlitaBitbucketToolkit.toolkit_config_schema(),
         AlitaGitlabSpaceToolkit.toolkit_config_schema(),
+        ZephyrScaleToolkit.toolkit_config_schema(),
+        ZephyrToolkit.toolkit_config_schema(),
     ]
