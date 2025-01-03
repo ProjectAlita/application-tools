@@ -1,6 +1,7 @@
 from .test_plan import AzureDevOpsPlansToolkit
 from .wiki import AzureDevOpsWikiToolkit
 from .work_item import AzureDevOpsWorkItemsToolkit
+from .repos import AzureDevOpsReposToolkit
 
 name = "azure_devops"
 
@@ -17,5 +18,7 @@ def get_tools(tool_type, tool):
         return AzureDevOpsPlansToolkit().get_toolkit(**config_dict).get_tools()
     elif tool_type == 'ado_wiki':
         return AzureDevOpsWikiToolkit().get_toolkit(**config_dict).get_tools()
+    elif tool_type == 'ado_repos':
+        return AzureDevOpsReposToolkit().get_toolkit(**config_dict).get_tools()
     else:
         return AzureDevOpsWorkItemsToolkit().get_toolkit(**config_dict).get_tools()
