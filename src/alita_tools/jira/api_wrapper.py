@@ -108,9 +108,17 @@ LinkIssues = create_model(
                                     If we use "Test" linktype, the test is inward issue, the story/other issue is outward issue."""))
 )
 
+SUPPORTED_ATTACHMENT_MIME_TYPES = (
+    "text/csv",
+    "text/plain",
+    "text/html",
+    "application/json"
+    # Add new supported types
+)
 
 class JiraApiWrapper(BaseModel):
     base_url: str
+    api_version: Optional[str] = "2",
     api_key: Optional[str] = None,
     username: Optional[str] = None
     token: Optional[str] = None
@@ -136,13 +144,14 @@ class JiraApiWrapper(BaseModel):
         username = values.get('username')
         token = values.get('token')
         cloud = values.get('cloud')
+        api_version = values.get('api_version', '2')
         additional_fields = values.get('additional_fields')
         if isinstance(additional_fields, str):
             values['additional_fields'] = [i.strip() for i in additional_fields.split(',')]
         if token:
-            cls._client = Jira(url=url, token=token, cloud=cloud, verify_ssl=values['verify_ssl'])
+            cls._client = Jira(url=url, token=token, cloud=cloud, verify_ssl=values['verify_ssl'], api_version=api_version)
         else:
-            cls._client = Jira(url=url, username=username, password=api_key, cloud=cloud, verify_ssl=values['verify_ssl'])
+            cls._client = Jira(url=url, username=username, password=api_key, cloud=cloud, verify_ssl=values['verify_ssl'], api_version=api_version)
         return values
 
     def _parse_issues(self, issues: Dict) -> List[dict]:
@@ -288,11 +297,11 @@ class JiraApiWrapper(BaseModel):
             logger.info(f"issue is created: {issue}")
             return f"Done. Issue {issue['key']} is created successfully. You can view it at {issue_url}. Details: {str(issue)}"
         except ToolException as e:
-            raise e
-        except Exception as e:
+            return ToolException(e)
+        except Exception:
             stacktrace = format_exc()
             logger.error(f"Error creating Jira issue: {stacktrace}")
-            raise ToolException(f"Error creating Jira issue: {stacktrace}")
+            return ToolException(f"Error creating Jira issue: {stacktrace}")
 
     def set_issue_status(self, issue_key: str, status_name: str, mandatory_fields_json: str):
         """Set new status for the issue in Jira. Used to move ticket through the defined workflow."""
@@ -310,11 +319,11 @@ class JiraApiWrapper(BaseModel):
             issue_url = f"{self._client.url}browse/{issue_key}"
             return f"Done. Status for issue {issue_key} was updated successfully. You can view it at {issue_url}."
         except ToolException as e:
-            raise e
+            return ToolException(e)
         except Exception:
             stacktrace = format_exc()
             logger.error(f"Error creating Jira issue: {stacktrace}")
-            raise ToolException(f"Error creating Jira issue: {stacktrace}")
+            return ToolException(f"Error creating Jira issue: {stacktrace}")
 
     def update_issue(self, issue_json: str):
         """ Update an issue in Jira."""
@@ -330,8 +339,8 @@ class JiraApiWrapper(BaseModel):
             logger.info(output)
             return output
         except ToolException as e:
-            raise e
-        except Exception as e:
+            return ToolException(e)
+        except Exception:
             stacktrace = format_exc()
             logger.error(f"Error updating Jira issue: {stacktrace}")
             return f"Error updating Jira issue: {stacktrace}"
@@ -381,7 +390,7 @@ class JiraApiWrapper(BaseModel):
         except Exception as e:
             stacktrace = format_exc()
             logger.error(f"Error adding comment to Jira issue: {stacktrace}")
-            raise ToolException(f"Error adding comment to Jira issue: {stacktrace}")
+            return ToolException(f"Error adding comment to Jira issue: {stacktrace}")
 
     def list_projects(self):
         """ List all projects in Jira. """
@@ -393,12 +402,34 @@ class JiraApiWrapper(BaseModel):
             )
             logger.info(f"parsed_projects_str: {parsed_projects_str}")
             return parsed_projects_str
-        except Exception as e:
+        except Exception:
             stacktrace = format_exc()
             logger.error(f"Error creating Jira issue: {stacktrace}")
-            return f"Error creating Jira issue: {stacktrace}"
+            return ToolException(f"Error creating Jira issue: {stacktrace}")
 
+    def get_attachments_content(self, jira_issue_key: str):
+        """ Extract content of all attachments related to specified Jira issue key.
+         NOTE: only parsable attachments will be considered """
 
+        attachment_data = []
+        attachments = self._client.get_attachments_ids_from_issue(issue=jira_issue_key)
+        for attachment in attachments:
+            if self.api_version == "3":
+                attachment_data.append(self._client.get_attachment_content(attachment['attachment_id']))
+            else:
+                extracted_attachment = self._client.get_attachment(attachment_id=attachment['attachment_id'])
+                if extracted_attachment['mimeType'] in SUPPORTED_ATTACHMENT_MIME_TYPES:
+                    attachment_data.append(self._extract_attachment_content(extracted_attachment))
+        return "\n\n".join(attachment_data)
+
+    def _extract_attachment_content(self, attachment):
+        """Extract attachment's content if possible (used for api v.2)"""
+
+        try:
+            content = self._client.get(attachment['content'].replace(self.base_url, ''))
+        except Exception as e:
+            content = f"Unable to parse content of '{attachment['filename']}' due to: {str(e)}"
+        return f"filename: {attachment['filename']}\ncontent: {content}"
 
     def get_available_tools(self):
         return [
@@ -469,6 +500,13 @@ class JiraApiWrapper(BaseModel):
                 "description": self.link_issues.__doc__,
                 "args_schema": LinkIssues,
                 "ref": self.link_issues,
+
+            },
+            {
+                "name": "get_attachments_content",
+                "description": self.get_attachments_content.__doc__,
+                "args_schema": GetRemoteLinks,
+                "ref": self.get_attachments_content,
 
             }
         ]
