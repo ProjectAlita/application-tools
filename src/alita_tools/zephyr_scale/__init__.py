@@ -1,7 +1,9 @@
-from typing import List
+from typing import Optional, List, Literal
 
 from langchain_community.agent_toolkits.base import BaseToolkit
 from langchain_core.tools import BaseTool
+from pydantic import BaseModel, create_model, ConfigDict
+from pydantic.fields import FieldInfo
 
 from .api_wrapper import ZephyrScaleApiWrapper
 from ..base.tool import BaseAction
@@ -23,6 +25,21 @@ def get_tools(tool):
 
 class ZephyrScaleToolkit(BaseToolkit):
     tools: List[BaseTool] = []
+
+    @staticmethod
+    def toolkit_config_schema() -> BaseModel:
+        selected_tools = (x['name'] for x in ZephyrScaleApiWrapper.construct().get_available_tools())
+        return create_model(
+            name,
+            base_url=(Optional[str], FieldInfo(default=None, description="Base URL")),
+            token=(Optional[str], FieldInfo(default=None, description="Token", json_schema_extra={'secret': True})),
+            username=(Optional[str], FieldInfo(default=None, description="Username")),
+            password=(Optional[str], FieldInfo(default=None, description="Password", json_schema_extra={'secret': True})),
+            cookies=(Optional[str], FieldInfo(default=None, description="Cookies", json_schema_extra={'secret': True})),
+            max_results=(int, FieldInfo(default=100, description="Results count to show")),
+            selected_tools=(List[Literal[tuple(selected_tools)]], []),
+            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Zephyr Scale", "icon_url": None}})
+        )
 
     @classmethod
     def get_toolkit(cls, selected_tools: list[str] | None = None, **kwargs):

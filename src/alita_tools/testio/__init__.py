@@ -1,5 +1,7 @@
+from typing import List, Literal
+
 from langchain_core.tools import BaseToolkit, BaseTool
-from pydantic import BaseModel, create_model
+from pydantic import BaseModel, create_model, ConfigDict
 from pydantic.fields import FieldInfo
 
 from .api_wrapper import TestIOApiWrapper
@@ -21,10 +23,13 @@ class TestIOToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
+        selected_tools = (x['name'] for x in TestIOApiWrapper.construct().get_available_tools())
         return create_model(
             name,
             endpoint=(str, FieldInfo(description="TestIO endpoint")),
-            api_key=(str, FieldInfo(description="API key")),
+            api_key=(str, FieldInfo(description="API key", json_schema_extra={'secret': True})),
+            selected_tools=(List[Literal[tuple(selected_tools)]], []),
+            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "TestIO", "icon_url": None}})
         )
 
     @classmethod
