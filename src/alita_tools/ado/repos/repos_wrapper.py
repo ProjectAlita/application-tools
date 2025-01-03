@@ -60,9 +60,9 @@ class ArgsSchema(Enum):
             ),
         ),
     )
-    DirectoryPath = (
+    ListFilesModel = (
         create_model(
-            "DirectoryPath",
+            "ListFilesModel",
             directory_path=(
                 str,
                 FieldInfo(
@@ -73,12 +73,21 @@ class ArgsSchema(Enum):
                     ),
                 ),
             ),
+            branch_name=(
+                str,
+                FieldInfo(
+                    default="",
+                    description=(
+                        "Repository branch. If None then active branch will be selected."
+                    ),
+                ),
+            ),
         ),
     )
     CreateBranchName = (
         create_model(
             "CreateBranchName",
-            proposed_branch_name=(
+            branch_name=(
                 str,
                 FieldInfo(description="The name of the branch, e.g. `my_branch`."),
             ),
@@ -101,6 +110,10 @@ class ArgsSchema(Enum):
     CreateFile = (
         create_model(
             "CreateFile",
+            branch_name=(
+                str,
+                FieldInfo(description="The name of the branch, e.g. `my_branch`."),
+            ),
             file_path=(str, FieldInfo(description="Path of a file to be created.")),
             file_contents=(
                 str,
@@ -161,6 +174,9 @@ class RepoConfig(BaseModel):
     base_branch: str = Field(
         default_factory=lambda: os.getenv("AZURE_DEVOPS_BASE_BRANCH", "master")
     )
+    active_branch: str = Field(
+        default_factory=lambda: os.getenv("AZURE_DEVOPS_ACTIVE_BRANCH", None)
+    )
 
 
 class ReposApiWrapper(GitClient):
@@ -168,6 +184,7 @@ class ReposApiWrapper(GitClient):
         self.project = config.project
         self.repository_id = config.repository_id
         self.base_branch = config.base_branch
+        self.active_branch = config.active_branch
         credentials = BasicAuthentication("", config.token)
         try:
             super().__init__(base_url=config.base_url, creds=credentials)
@@ -284,25 +301,7 @@ class ReposApiWrapper(GitClient):
             logger.error(msg)
             return ToolException(msg)
 
-    def list_files_in_main_branch(self) -> str:
-        """
-        Fetches all files in the main branch of the repo.
-
-        Returns:
-            str: A plaintext report containing the paths and names of the files.
-        """
-        return self._get_files("", branch_name=self.base_branch)
-
-    def list_files_in_bot_branch(self) -> str:
-        """
-        Fetches all files in the current working branch.
-
-        Returns:
-            str: A plaintext report containing the paths and names of the files.
-        """
-        return self._get_files("", self.active_branch)
-
-    def get_files_from_directory(self, directory_path: str) -> str:
+    def list_files(self, directory_path: str, branch_name: str = None) -> str:
         """
         Recursively fetches files from a directory in the repo.
 
@@ -312,8 +311,10 @@ class ReposApiWrapper(GitClient):
         Returns:
             str: List of file paths, or an error message.
         """
+        self.active_branch = branch_name if branch_name else self.active_branch
         return self._get_files(
-            directory_path=directory_path, branch_name=self.active_branch
+            directory_path=directory_path,
+            branch_name=self.active_branch if self.active_branch else self.base_branch,
         )
 
     def parse_pull_request_comments(
@@ -459,7 +460,9 @@ class ReposApiWrapper(GitClient):
         try:
             pull_request_id = int(pull_request_id)
         except Exception as e:
-            return ToolException(f"Passed argument is not INT type: {pull_request_id}.\nError: {str(e)}")
+            return ToolException(
+                f"Passed argument is not INT type: {pull_request_id}.\nError: {str(e)}"
+            )
 
         try:
             pr_iterations = self.get_pull_request_iterations(
@@ -520,50 +523,58 @@ class ReposApiWrapper(GitClient):
 
         return content
 
-    def create_branch(self, proposed_branch_name: str) -> str:
+    def create_branch(self, branch_name: str) -> str:
         """
         Create a new branch in Azure DevOps, and set it as the active bot branch.
-        Equivalent to `git switch -c proposed_branch_name`
-        If the proposed branch already exists, we append _v1 then _v2...
-        until a unique name is found.
+        Equivalent to `git switch -c branch_name`.
 
         Returns:
-            str: A plaintext success message.
+            str: A plaintext success message or raises an exception if the branch already exists.
         """
-        i = 0
-        new_branch_name = proposed_branch_name
+        self.active_branch = self.active_branch if self.active_branch else self.base_branch
+        new_branch_name = branch_name
+
+        # Check if the branch already exists
+        existing_branch = None 
+        try:
+            existing_branch = self.get_branch(
+                repository_id=self.repository_id,
+                name=new_branch_name,
+                project=self.project,
+            )
+        except Exception:
+            # expected exception
+            pass
+        
+        if existing_branch:
+            msg = f"Branch '{new_branch_name}' already exists."
+            logger.error(msg)
+            raise ToolException(msg)
+
         base_branch = self.get_branch(
             repository_id=self.repository_id,
-            name=self.active_branch if self.active_branch else self.base_branch,
+            name=self.active_branch,
             project=self.project,
         )
-        for i in range(1000):
-            try:
-                ref_update = GitRefUpdate(
-                    name=f"refs/heads/{new_branch_name}",
-                    old_object_id=None,
-                    new_object_id=base_branch.commit.commit_id,
-                )
-                ref_update_list = [ref_update]
-                self.update_refs(
-                    ref_updates=ref_update_list,
-                    repository_id=self.repository_id,
-                    project=self.project,
-                )
-                self.active_branch = new_branch_name
-                return f"Branch '{new_branch_name}' created successfully, and set as current active branch."
-            except Exception as e:
-                if "Reference already exists" in str(e):
-                    i += 1
-                    new_branch_name = f"{proposed_branch_name}_v{i}"
-                else:
-                    msg = f"Failed to create branch. Error: {str(e)}"
-                    logger.error(msg)
-                    return ToolException(msg)
-        return (
-            "Unable to create branch. At least 1000 branches exist with names derived from "
-            f"proposed_branch_name: `{proposed_branch_name}`"
-        )
+
+        try:
+            ref_update = GitRefUpdate(
+                name=f"refs/heads/{new_branch_name}",
+                old_object_id="0000000000000000000000000000000000000000",
+                new_object_id=base_branch.commit.commit_id,
+            )
+            ref_update_list = [ref_update]
+            self.update_refs(
+                ref_updates=ref_update_list,
+                repository_id=self.repository_id,
+                project=self.project,
+            )
+            self.active_branch = new_branch_name
+            return f"Branch '{new_branch_name}' created successfully, and set as current active branch."
+        except Exception as e:
+            msg = f"Failed to create branch. Error: {str(e)}"
+            logger.error(msg)
+            raise ToolException(msg)
 
     def create_file(self, branch_name: str, file_path: str, file_contents: str) -> str:
         """
@@ -838,98 +849,78 @@ class ReposApiWrapper(GitClient):
             {
                 "ref": self.list_branches_in_repo,
                 "name": "list_branches_in_repo",
-                "mode": "list_branches_in_repo",
                 "description": self.list_branches_in_repo.__doc__,
                 "args_schema": ArgsSchema.NoInput.value,
             },
             {
                 "ref": self.set_active_branch,
                 "name": "set_active_branch",
-                "mode": "set_active_branch",
                 "description": self.set_active_branch.__doc__,
                 "args_schema": ArgsSchema.BranchName.value,
             },
             {
-                "ref": self.list_files_in_main_branch,
-                "name": "list_files_in_main_branch",
-                "mode": "list_files_in_main_branch",
-                "description": self.list_files_in_main_branch.__doc__,
-                "args_schema": ArgsSchema.NoInput.value,
-            },
-            {
-                "ref": self.get_files_from_directory,
-                "name": "get_files_from_directory",
-                "mode": "get_files_from_directory",
-                "description": self.get_files_from_directory.__doc__,
-                "args_schema": ArgsSchema.DirectoryPath.value,
+                "ref": self.list_files,
+                "name": "list_files",
+                "description": self.list_files.__doc__,
+                "args_schema": ArgsSchema.ListFilesModel.value,
             },
             {
                 "ref": self.list_open_pull_requests,
                 "name": "list_open_pull_requests",
-                "mode": "list_open_pull_requests",
                 "description": self.list_open_pull_requests.__doc__,
                 "args_schema": ArgsSchema.NoInput.value,
             },
             {
                 "ref": self.get_pull_request,
                 "name": "get_pull_request",
-                "mode": "get_pull_request",
                 "description": self.get_pull_request.__doc__,
                 "args_schema": ArgsSchema.GetPR.value,
             },
             {
                 "ref": self.list_pull_request_diffs,
                 "name": "list_pull_request_files",
-                "mode": "list_pull_request_files",
                 "description": self.list_pull_request_diffs.__doc__,
                 "args_schema": ArgsSchema.GetPR.value,
             },
             {
                 "ref": self.create_branch,
                 "name": "create_branch",
-                "mode": "create_branch",
                 "description": self.create_branch.__doc__,
                 "args_schema": ArgsSchema.CreateBranchName.value,
             },
             {
                 "ref": self.read_file,
                 "name": "read_file",
-                "mode": "read_file",
                 "description": self.read_file.__doc__,
                 "args_schema": ArgsSchema.ReadFile.value,
             },
             {
                 "ref": self.create_file,
                 "name": "create_file",
-                "mode": "create_file",
                 "description": self.create_file.__doc__,
                 "args_schema": ArgsSchema.CreateFile.value,
             },
             {
                 "ref": self.update_file,
                 "name": "update_file",
-                "mode": "update_file",
                 "description": self.update_file.__doc__,
                 "args_schema": ArgsSchema.UpdateFile.value,
             },
             {
                 "ref": self.delete_file,
                 "name": "delete_file",
-                "mode": "delete_file",
                 "description": self.delete_file.__doc__,
                 "args_schema": ArgsSchema.DeleteFile.value,
             },
             {
                 "ref": self.get_work_items,
                 "name": "get_work_items",
-                "mode": "get_work_items",
                 "description": self.get_work_items.__doc__,
                 "args_schema": ArgsSchema.GetWorkItems.value,
             },
             {
                 "ref": self.comment_on_pull_request,
                 "name": "comment_on_pull_request",
-                "mode": "comment_on_pull_request",
                 "description": self.comment_on_pull_request.__doc__,
                 "args_schema": ArgsSchema.CommentOnPullRequest.value,
             },
