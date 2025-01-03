@@ -27,7 +27,7 @@ from .code.sonar import get_tools as get_sonar, SonarToolkit
 from .google_places import get_tools as get_google_places, GooglePlacesToolkit
 
 
-from .yagmail import get_tools as get_yagmail
+from .yagmail import get_tools as get_yagmail, AlitaYagmailToolkit
 
 logger = logging.getLogger(__name__)
 
@@ -113,4 +113,5 @@ def get_toolkits():
         AlitaGitlabSpaceToolkit.toolkit_config_schema(),
         ZephyrScaleToolkit.toolkit_config_schema(),
         ZephyrToolkit.toolkit_config_schema(),
+        AlitaYagmailToolkit.toolkit_config_schema(),
     ]
