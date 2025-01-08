@@ -35,6 +35,12 @@ ADOCreateWorkItem = create_model(
     wi_type=(str, Field(description="Work item type, e.g. 'Task', 'Issue' or  'EPIC'", default="Task"))
 )
 
+ADOUpdateWorkItem = create_model(
+    "AzureDevOpsUpdateWorkItemModel",
+    id=(str, Field(description="ID of work item required to be updated")),
+    work_item_json=(str, Field(description=create_wi_field))
+)
+
 ADOGetWorkItem = create_model(
     "AzureDevOpsGetWorkItemModel",
     id=(int, Field(description="The work item id")),
@@ -99,32 +105,35 @@ class AzureDevOpsApiWrapper(BaseModel):
 
         return parsed_items
 
-    def create_work_item(self, work_item_json: str, wi_type="Task"):
-        """Create a work item in Azure DevOps."""
+    def _transform_work_item(self, work_item_json: str):
         try:
             # Convert the input JSON to a Python dictionary
             params = json.loads(work_item_json)
         except (json.JSONDecodeError, ValueError) as e:
-            return ToolException(f"Issues during attempt to parse work_item_json: {e}")
+            raise ToolException(f"Issues during attempt to parse work_item_json: {e}")
 
-        try:
-            if 'fields' not in params:
-                raise ToolException("The 'fields' property is missing from the work_item_json.")
+        if 'fields' not in params:
+            raise ToolException("The 'fields' property is missing from the work_item_json.")
 
             # Transform the dictionary into a list of JsonPatchOperation objects
-            patch_document = [
-                {
-                    "op": "add",
-                    "path": f"/fields/{field}",
-                    "value": value
-                }
-                for field, value in params["fields"].items()
-            ]
+        patch_document = [
+            {
+                "op": "add",
+                "path": f"/fields/{field}",
+                "value": value
+            }
+            for field, value in params["fields"].items()
+        ]
+        return patch_document
 
-            # Validate that the Azure DevOps client is initialized
-            if not self._client:
-                return ToolException("Azure DevOps client not initialized.")
+    def create_work_item(self, work_item_json: str, wi_type="Task"):
+        """Create a work item in Azure DevOps."""
+        try:
+            patch_document = self._transform_work_item(work_item_json)
+        except Exception as e:
+            return ToolException(f"Issues during attempt to parse work_item_json: {str(e)}")
 
+        try:
             # Use the transformed patch_document to create the work item
             work_item = self._client.create_work_item(
                 document=patch_document,
@@ -135,9 +144,19 @@ class AzureDevOpsApiWrapper(BaseModel):
         except Exception as e:
             if "unknown value" in str(e):
                 logger.error(f"Unable to create work item due to incorrect assignee: {e}")
-                raise ToolException(f"Unable to create work item due to incorrect assignee: {e}")
+                return ToolException(f"Unable to create work item due to incorrect assignee: {e}")
             logger.error(f"Error creating work item: {e}")
             return ToolException(f"Error creating work item: {e}")
+
+    def update_work_item(self, id: str, work_item_json: str):
+        """Updates existing work item per defined data"""
+
+        try:
+            patch_document = self._transform_work_item(work_item_json)
+            work_item = self._client.update_work_item(id=id, document=patch_document, project=self.project)
+        except Exception as e:
+            return ToolException(f"Issues during attempt to parse work_item_json: {str(e)}")
+        return f"Work item ({work_item.id}) was updated."
 
     def search_work_items(self, query: str, fields=None):
         """Search for work items using a WIQL query and dynamically fetch fields based on the query."""
@@ -209,6 +228,12 @@ class AzureDevOpsApiWrapper(BaseModel):
                 "description": self.create_work_item.__doc__,
                 "args_schema": ADOCreateWorkItem,
                 "ref": self.create_work_item,
+            },
+            {
+                "name": "update_work_item",
+                "description": self.update_work_item.__doc__,
+                "args_schema": ADOUpdateWorkItem,
+                "ref": self.update_work_item,
             },
             {
                 "name": "get_work_item",
