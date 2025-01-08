@@ -4,6 +4,7 @@ from .tools import __all__
 from langchain_core.tools import BaseToolkit
 from langchain_core.tools import BaseTool
 
+
 name = "bitbucket"
 
 
@@ -14,18 +15,20 @@ def get_tools(tool):
         repository=tool['settings']['repository'],
         username=tool['settings']['username'],
         password=tool['settings']['password'],
-        branch=tool['settings']['branch']
+        branch=tool['settings']['branch'],
+        cloud=tool['settings'].get('cloud')
     ).get_tools()
+
 
 class AlitaBitbucketToolkit(BaseToolkit):
     tools: List[BaseTool] = []
-    
+
     @classmethod
     def get_toolkit(cls, selected_tools: list[str] | None = None, **kwargs):
         if selected_tools is None:
             selected_tools = []
-        if "cloud" not in kwargs and ("bitbucket.org" in kwargs.get('url')):
-            kwargs["cloud"] = True
+        if kwargs["cloud"] is None:
+            kwargs["cloud"] = True if "bitbucket.org" in kwargs.get('url') else False
         bitbucket_api_wrapper = BitbucketAPIWrapper(**kwargs)
         available_tools: List[Dict] = __all__
         tools = []
