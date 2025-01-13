@@ -155,11 +155,30 @@ class ArgsSchema(Enum):
             ),
         ),
     )
-    GetWorkItems = create_model(
-        "GetWorkItems",
-        pull_request_id=(
-            str,
-            FieldInfo(description="The PR number as a string, e.g. `12`"),
+    GetWorkItems = (
+        create_model(
+            "GetWorkItems",
+            pull_request_id=(
+                str,
+                FieldInfo(description="The PR number as a string, e.g. `12`"),
+            ),
+        ),
+    )
+    CreatePullRequest = (
+        create_model(
+            "CreatePullRequest",
+            pull_request_title=(
+                str, 
+                FieldInfo(description="Title of the pull request")
+            ),
+            pull_request_body=(
+                str,
+                FieldInfo(description="Body of the pull request")
+            ),
+            branch_name=(
+                str,
+                FieldInfo(description="The name of the branch, e.g. `my_branch`."),
+            ),
         ),
     )
 
@@ -842,6 +861,42 @@ class ReposApiWrapper(GitClient):
             msg = f"Unable to make comment due to error:\n{str(e)}"
             logger.error(msg)
             return ToolException(msg)
+        
+    def create_pr(self, pull_request_title: str, pull_request_body: str, branch_name: str) -> str:
+        """
+        Creates a pull request in Azure DevOps from the active branch to the base branch mentioned in params.
+
+        Parameters:
+            pull_request_title (str): Title of the pull request.
+            pull_request_body (str): Description/body of the pull request.
+            branch_name (str): The name of the branch which is used as target branch for pull request.
+
+        Returns:
+            str: A success or failure message.
+        """
+        if self.active_branch == branch_name:
+            return f"Cannot create a pull request because the source branch '{self.active_branch}' is the same as the target branch '{branch_name}'"
+
+        try:
+            pull_request = {
+                "sourceRefName": f"refs/heads/{self.active_branch}",
+                "targetRefName": f"refs/heads/{branch_name}",
+                "title": pull_request_title,
+                "description": pull_request_body,
+                "reviewers": []
+            }
+
+            response = self.create_pull_request(
+                git_pull_request_to_create=pull_request,
+                repository_id=self.repository_id,
+                project=self.project
+            )
+
+            return f"Successfully created PR with ID {response.pull_request_id}"
+        except Exception as e:
+            msg = f"Unable to create pull request due to error: {str(e)}"
+            logger.error(msg)
+            raise ToolException(msg)
 
     def get_available_tools(self):
         """Return a list of available tools."""
@@ -923,6 +978,12 @@ class ReposApiWrapper(GitClient):
                 "name": "comment_on_pull_request",
                 "description": self.comment_on_pull_request.__doc__,
                 "args_schema": ArgsSchema.CommentOnPullRequest.value,
+            },
+            {
+                "ref": self.create_pr,
+                "name": "create_pull_request",
+                "description": self.create_pr.__doc__,
+                "args_schema": ArgsSchema.CreatePullRequest.value,
             },
         ]
 
