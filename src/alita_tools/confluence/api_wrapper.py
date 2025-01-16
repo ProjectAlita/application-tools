@@ -1,7 +1,9 @@
 import json
 import logging
+import re
+
 import requests
-from typing import List, Optional, Any, Dict
+from typing import List, Optional, Any
 from pydantic import create_model
 from pydantic.fields import FieldInfo
 from langchain_core.documents import Document
@@ -101,6 +103,7 @@ siteSearch = create_model(
 pageId = create_model(
     "pageId",
     page_id=(str, FieldInfo(description="Id of page to be read")),
+    skip_images=(bool, FieldInfo(description="Whether we need to skip existing images or not")),
 )
 
 class ConfluenceAPIWrapper(BaseModel):
@@ -390,7 +393,7 @@ class ConfluenceAPIWrapper(BaseModel):
                 and not restrictions["read"]["restrictions"]["group"]["results"]
         )
 
-    def get_pages_by_id(self, page_ids: List[str]):
+    def get_pages_by_id(self, page_ids: List[str], skip_images: bool = False):
         """ Gets pages by id in the Confluence space."""
         for page_id in page_ids:
             get_page = retry(
@@ -410,12 +413,20 @@ class ConfluenceAPIWrapper(BaseModel):
             )
             if not self.include_restricted_content and not self.is_public_page(page):
                 continue
-            yield self.process_page(page)
+            yield self.process_page(page, skip_images)
 
-    def read_page_by_id(self, page_id: str):
+    def read_page_by_id(self, page_id: str, skip_images: bool = False):
         """Reads a page by its id in the Confluence space."""
-        result = list(self.get_pages_by_id([page_id]))
-        return result[0].page_content if result else "Page not found"
+
+        result = list(self.get_pages_by_id([page_id], skip_images))
+        if not result:
+            "Page not found"
+        return result[0].page_content
+        # return self._strip_base64_images(result[0].page_content) if skip_images else result[0].page_content
+
+    def _strip_base64_images(self, content):
+        base64_md_pattern = r'data:image/(png|jpeg|gif);base64,[a-zA-Z0-9+/=]+'
+        return re.sub(base64_md_pattern, "[Image Removed]", content)
 
     def _process_search(self, cql):
         start = 0
@@ -473,7 +484,7 @@ class ConfluenceAPIWrapper(BaseModel):
             content.append(page_data)
         return '---'.join([str(page_data) for page_data in content])
 
-    def process_page(self, page: dict) -> Document:
+    def process_page(self, page: dict, skip_images: bool = False) -> Document:
         if self.keep_markdown_format:
             try:
                 from markdownify import markdownify
@@ -532,7 +543,7 @@ class ConfluenceAPIWrapper(BaseModel):
             metadata["when"] = page["version"]["when"]
 
         return Document(
-            page_content=text,
+            page_content=self._strip_base64_images(text) if skip_images else text,
             metadata=metadata,
         )
 
