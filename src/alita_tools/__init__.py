@@ -14,7 +14,7 @@ from .bitbucket import get_tools as get_bitbucket
 from .testrail import get_tools as get_testrail, TestrailToolkit
 from .testio import get_tools as get_testio, TestIOToolkit
 from .xray import get_tools as get_xray_cloud
-from .sharepoint import get_tools as get_sharepoint
+from .sharepoint import get_tools as get_sharepoint, SharepointToolkit
 from .qtest import get_tools as get_qtest, QtestToolkit
 from .zephyr_scale import get_tools as get_zephyr_scale
 from .ado import get_tools as get_ado
@@ -104,5 +104,6 @@ def get_toolkits():
         TestIOToolkit.toolkit_config_schema(),
         SQLToolkit.toolkit_config_schema(),
         SonarToolkit.toolkit_config_schema(),
-        GooglePlacesToolkit.toolkit_config_schema()
+        GooglePlacesToolkit.toolkit_config_schema(),
+        SharepointToolkit.toolkit_config_schema()
     ]
