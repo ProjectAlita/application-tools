@@ -31,14 +31,22 @@ class GitChange:
     Custom GitChange class introduced because not found in azure.devops.v7_0.git.models
     """
 
-    def __init__(self, change_type, item_path, content=None, content_type=None):
+    def __init__(self, change_type, item_path, content=None, content_type="rawtext"):
         self.changeType = change_type
         self.item = {"path": item_path}
         if content and content_type:
             self.newContent = {"content": content, "contentType": content_type}
         else:
             self.newContent = None
-
+    
+    def to_dict(self):
+        change_dict = {
+            "changeType": self.changeType,
+            "item": self.item
+        }
+        if self.newContent:
+            change_dict["newContent"] = self.newContent
+        return change_dict
 
 class ArgsSchema(Enum):
     NoInput = (create_model("NoInput"),)
@@ -649,7 +657,7 @@ class ReposApiWrapper(GitClient):
 
             latest_commit_id = branch.commit.commit_id
 
-            change = GitChange("add", file_path, file_contents)
+            change = GitChange("add", file_path, file_contents).to_dict()
 
             ref_update = GitRefUpdate(
                 name=f"refs/heads/{self.active_branch}", old_object_id=latest_commit_id
