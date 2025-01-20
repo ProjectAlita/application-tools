@@ -192,7 +192,7 @@ class ArgsSchema(Enum):
 
 
 class RepoConfig(BaseModel):
-    base_url: str = Field(default_factory=lambda: os.getenv("AZURE_DEVOPS_BASE_URL"))
+    organization_url: str = Field(default_factory=lambda: os.getenv("AZURE_DEVOPS_BASE_URL"))
     project: str = Field(default_factory=lambda: os.getenv("AZURE_DEVOPS_PROJECT"))
     repository_id: str = Field(
         default_factory=lambda: os.getenv("AZURE_DEVOPS_REPOSITORY_ID")
@@ -214,7 +214,7 @@ class ReposApiWrapper(GitClient):
         self.active_branch = config.active_branch
         credentials = BasicAuthentication("", config.token)
         try:
-            super().__init__(base_url=config.base_url, creds=credentials)
+            super().__init__(base_url=config.organization_url, creds=credentials)
         except Exception as e:
             raise ImportError(f"Failed to connect to Azure DevOps: {e}")
 

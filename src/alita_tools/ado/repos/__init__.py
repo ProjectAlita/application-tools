@@ -32,7 +32,7 @@ class AzureDevOpsReposToolkit(BaseToolkit):
             environ["AZURE_DEVOPS_CACHE_DIR"] = "/tmp/.azure-devops"
         if selected_tools is None:
             selected_tools = []
-        azure_devops_repos_wrapper = ReposApiWrapper(**kwargs)
+        azure_devops_repos_wrapper = ReposApiWrapper(RepoConfig(**kwargs))
         available_tools = azure_devops_repos_wrapper.get_available_tools()
         tools = []
         for tool in available_tools:

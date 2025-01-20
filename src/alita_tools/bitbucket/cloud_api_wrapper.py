@@ -69,7 +69,7 @@ class BitbucketServerApi(BitbucketApiAbstract):
                                                    )
 
     def get_file(self, file_path: str, branch: str) -> str:
-        return self.api_client.get_content_of_file(project_key=self.project, repository_slug=self.repository,
+        return self.api_client.get_content_of_file(project_key=self.project, repository_slug=self.repository, at=branch,
                                                    filename=file_path)
 
     def create_file(self, file_path: str, file_contents: str, branch: str) -> str:
