@@ -93,6 +93,7 @@ getPagesWithLabel = create_model(
 searchPages = create_model(
     "searchPages",
     query=(str, FieldInfo(description="Query text to search pages")),
+    skip_images=(bool, FieldInfo(description="Whether we need to skip existing images or not"))
 )
 
 siteSearch = create_model(
@@ -428,7 +429,7 @@ class ConfluenceAPIWrapper(BaseModel):
         base64_md_pattern = r'data:image/(png|jpeg|gif);base64,[a-zA-Z0-9+/=]+'
         return re.sub(base64_md_pattern, "[Image Removed]", content)
 
-    def _process_search(self, cql):
+    def _process_search(self, cql, skip_images:bool = False):
         start = 0
         pages_info = []
         for _ in range((self.max_pages + self.limit - 1) // self.limit):
@@ -436,7 +437,7 @@ class ConfluenceAPIWrapper(BaseModel):
             if not pages:
                 break
             page_ids = [page['content']['id'] for page in pages]
-            for page in self.get_pages_by_id(page_ids):
+            for page in self.get_pages_by_id(page_ids, skip_images):
                 page_info = {
                     'content': page.page_content,
                     'page_id': page.metadata['id'],
@@ -447,21 +448,21 @@ class ConfluenceAPIWrapper(BaseModel):
             start += self.limit
         return str(pages_info)
 
-    def search_pages(self, query: str):
+    def search_pages(self, query: str, skip_images: bool = False):
         """Search pages in Confluence by query text in title or page content."""
         if not self.space:
             cql = f'(type=page) and (title~"{query}" or text~"{query}")'
         else:
             cql = f'(type=page and space={self.__sanitize_confluence_space()}) and (title~"{query}" or text~"{query}")'
-        return self._process_search(cql)
+        return self._process_search(cql, skip_images)
 
-    def search_by_title(self, query: str):
+    def search_by_title(self, query: str, skip_images: bool = False):
         """Search pages in Confluence by query text in title."""
         if not self.space:
             cql = f'(type=page) and (title~"{query}")'
         else:
             cql = f'(type=page and space={self.__sanitize_confluence_space()}) and (title~"{query}")'
-        return self._process_search(cql)
+        return self._process_search(cql, skip_images)
 
     def site_search(self, query: str):
         """Search for pages in Confluence using site search by query text."""
