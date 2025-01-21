@@ -58,7 +58,7 @@ def get_tools(tools_list, *args, **kwargs):
             tools.extend(get_bitbucket(tool))
         elif tool['type'] == 'testrail':
             tools.extend(get_testrail(tool))
-        elif tool['type'] == 'ado_boards' or tool['type'] == 'ado_wiki' or tool['type'] == 'ado_plans':
+        elif tool['type'] in ['ado_boards', 'ado_wiki', 'ado_plans', 'ado_repos']:
             tools.extend(get_ado(tool['type'], tool))
         elif tool['type'] == 'testio':
             tools.extend(get_testio(tool))
