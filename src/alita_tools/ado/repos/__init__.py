@@ -6,7 +6,7 @@ from pydantic import create_model
 from pydantic.fields import FieldInfo
 
 from ...base.tool import BaseAction
-from .repos_wrapper import RepoConfig, ReposApiWrapper
+from .repos_wrapper import ReposApiWrapper
 
 name = "azure_devops_repos"
 
@@ -32,14 +32,13 @@ class AzureDevOpsReposToolkit(BaseToolkit):
             environ["AZURE_DEVOPS_CACHE_DIR"] = "/tmp/.azure-devops"
         if selected_tools is None:
             selected_tools = []
-        azure_devops_repos_wrapper = ReposApiWrapper(RepoConfig(**kwargs))
+        azure_devops_repos_wrapper = ReposApiWrapper(**kwargs)
         available_tools = azure_devops_repos_wrapper.get_available_tools()
         tools = []
         for tool in available_tools:
             if selected_tools:
                 if tool["name"] not in selected_tools:
                     continue
-            print(tool)
             tools.append(
                 BaseAction(
                     api_wrapper=azure_devops_repos_wrapper,

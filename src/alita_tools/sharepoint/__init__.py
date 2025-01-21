@@ -9,10 +9,12 @@ from ..base.tool import BaseAction
 name = "sharepoint"
 
 def get_tools(tool):
-    return SharepointToolkit().get_toolkit(
+    return (SharepointToolkit().get_toolkit(
+        selected_tools=tool['settings'].get('selected_tools', []),
         site_url=tool['settings'].get('site_url', None),
         client_id=tool['settings'].get('client_id', None),
-        client_secret=tool['settings'].get('client_secret', None)).get_tools()
+        client_secret=tool['settings'].get('client_secret', None))
+            .get_tools())
 
 
 class SharepointToolkit(BaseToolkit):

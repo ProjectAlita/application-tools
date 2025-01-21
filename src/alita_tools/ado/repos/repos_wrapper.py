@@ -1,10 +1,9 @@
 import difflib
 import logging
-import os
 import re
 from enum import Enum
 from json import dumps
-from typing import Any, List, Union
+from typing import Any, List, Union, Optional
 
 from azure.devops.v7_0.git.git_client import GitClient
 from azure.devops.v7_0.git.models import (
@@ -20,7 +19,7 @@ from azure.devops.v7_0.git.models import (
 )
 from langchain_core.tools import ToolException
 from msrest.authentication import BasicAuthentication
-from pydantic import BaseModel, Field, create_model
+from pydantic import BaseModel, create_model, PrivateAttr, model_validator
 from pydantic.fields import FieldInfo
 
 logger = logging.getLogger(__name__)
@@ -38,7 +37,7 @@ class GitChange:
             self.newContent = {"content": content, "contentType": content_type}
         else:
             self.newContent = None
-    
+
     def to_dict(self):
         change_dict = {
             "changeType": self.changeType,
@@ -48,184 +47,120 @@ class GitChange:
             change_dict["newContent"] = self.newContent
         return change_dict
 
+
 class ArgsSchema(Enum):
-    NoInput = (create_model("NoInput"),)
-    BranchName = (
-        create_model(
-            "BranchName",
-            branch_name=(
-                str,
-                FieldInfo(description="The name of the branch, e.g. `my_branch`."),
-            ),
-        ),
+    NoInput = create_model("NoInput")
+    BranchName = create_model(
+        "BranchName",
+        branch_name=(str, FieldInfo(description="The name of the branch, e.g. `my_branch`.")),
     )
-    GetPR = (
-        create_model(
-            "GetPR",
-            pull_request_id=(
-                str,
-                FieldInfo(description="The PR number as a string, e.g. `12`"),
-            ),
-        ),
+    GetPR = create_model(
+        "GetPR",
+        pull_request_id=(str, FieldInfo(description="The PR number as a string, e.g. `12`")),
     )
-    ListFilesModel = (
-        create_model(
-            "ListFilesModel",
-            directory_path=(
-                str,
-                FieldInfo(
-                    default="",
-                    description=(
-                        "The path of the directory, e.g. `some_dir/inner_dir`."
-                        " Only input a string, do not include the parameter name."
-                    ),
-                ),
-            ),
-            branch_name=(
-                str,
-                FieldInfo(
-                    default="",
-                    description=(
-                        "Repository branch. If None then active branch will be selected."
-                    ),
-                ),
-            ),
-        ),
+    ListFilesModel = create_model(
+        "ListFilesModel",
+        directory_path=(str, FieldInfo(default="", description=(
+            "The path of the directory, e.g. `some_dir/inner_dir`."
+            " Only input a string, do not include the parameter name."
+        )
+                                       )
+                        ),
+        branch_name=(
+        str, FieldInfo(default="", description=("Repository branch. If None then active branch will be selected.")))
     )
-    CreateBranchName = (
-        create_model(
-            "CreateBranchName",
-            branch_name=(
-                str,
-                FieldInfo(description="The name of the branch, e.g. `my_branch`."),
-            ),
-        ),
+    CreateBranchName = create_model(
+        "CreateBranchName",
+        branch_name=(str, FieldInfo(description="The name of the branch, e.g. `my_branch`.")),
     )
-    ReadFile = (
-        create_model(
-            "ReadFile",
-            file_path=(
-                str,
-                FieldInfo(
-                    description=(
-                        "The full file path of the file you would like to read where the "
-                        "path must NOT start with a slash, e.g. `some_dir/my_file.py`."
-                    ),
-                ),
-            ),
-        ),
+    ReadFile = create_model(
+        "ReadFile",
+        file_path=(str, FieldInfo(
+            description=(
+                "The full file path of the file you would like to read where the "
+                "path must NOT start with a slash, e.g. `some_dir/my_file.py`."
+            )
+        )
+                   )
     )
-    CreateFile = (
-        create_model(
-            "CreateFile",
-            branch_name=(
-                str,
-                FieldInfo(description="The name of the branch, e.g. `my_branch`."),
-            ),
-            file_path=(str, FieldInfo(description="Path of a file to be created.")),
-            file_contents=(
-                str,
-                FieldInfo(description="Content of a file to be put into chat."),
-            ),
-        ),
+    CreateFile = create_model(
+        "CreateFile",
+        branch_name=(str, FieldInfo(description="The name of the branch, e.g. `my_branch`.")),
+        file_path=(str, FieldInfo(description="Path of a file to be created.")),
+        file_contents=(str, FieldInfo(description="Content of a file to be put into chat."))
     )
-    UpdateFile = (
-        create_model(
-            "UpdateFile",
-            file_query=(
-                str,
-                FieldInfo(description="Strictly follow the provided rules."),
-            ),
-        ),
+    UpdateFile = create_model(
+        "UpdateFile",
+        file_query=(str, FieldInfo(description="Strictly follow the provided rules.")),
     )
-    DeleteFile = (
-        create_model(
-            "DeleteFile",
-            file_path=(
-                str,
-                FieldInfo(
-                    description=(
-                        "The full file path of the file you would like to delete"
-                        " where the path must NOT start with a slash, e.g."
-                        " `some_dir/my_file.py`. Only input a string,"
-                        " not the param name."
-                    ),
-                ),
-            ),
-        ),
+    DeleteFile = create_model(
+        "DeleteFile",
+        file_path=(str, FieldInfo(
+            description=(
+                "The full file path of the file you would like to delete"
+                " where the path must NOT start with a slash, e.g."
+                " `some_dir/my_file.py`. Only input a string,"
+                " not the param name."
+            )
+        )
+                   ),
     )
-    CommentOnPullRequest = (
-        create_model(
-            "CommentOnPullRequest",
-            comment_query=(
-                str,
-                FieldInfo(default=..., description="Follow the required formatting."),
-            ),
-        ),
+    CommentOnPullRequest = create_model(
+        "CommentOnPullRequest",
+        comment_query=(str, FieldInfo(description="Follow the required formatting.")),
     )
-    GetWorkItems = (
-        create_model(
-            "GetWorkItems",
-            pull_request_id=(
-                str,
-                FieldInfo(description="The PR number as a string, e.g. `12`"),
-            ),
-        ),
+    GetWorkItems = create_model(
+        "GetWorkItems",
+        pull_request_id=(str, FieldInfo(description="The PR number as a string, e.g. `12`")),
     )
-    CreatePullRequest = (
-        create_model(
-            "CreatePullRequest",
-            pull_request_title=(
-                str, 
-                FieldInfo(description="Title of the pull request")
-            ),
-            pull_request_body=(
-                str,
-                FieldInfo(description="Body of the pull request")
-            ),
-            branch_name=(
-                str,
-                FieldInfo(description="The name of the branch, e.g. `my_branch`."),
-            ),
+    CreatePullRequest = create_model(
+        "CreatePullRequest",
+        pull_request_title=(
+            str,
+            FieldInfo(description="Title of the pull request")
+        ),
+        pull_request_body=(
+            str,
+            FieldInfo(description="Body of the pull request")
+        ),
+        branch_name=(
+            str,
+            FieldInfo(description="The name of the branch, e.g. `my_branch`."),
         ),
     )
 
 
-class RepoConfig(BaseModel):
-    organization_url: str = Field(default_factory=lambda: os.getenv("AZURE_DEVOPS_BASE_URL"))
-    project: str = Field(default_factory=lambda: os.getenv("AZURE_DEVOPS_PROJECT"))
-    repository_id: str = Field(
-        default_factory=lambda: os.getenv("AZURE_DEVOPS_REPOSITORY_ID")
-    )
-    token: str = Field(default_factory=lambda: os.getenv("AZURE_DEVOPS_TOKEN"))
-    base_branch: str = Field(
-        default_factory=lambda: os.getenv("AZURE_DEVOPS_BASE_BRANCH", "master")
-    )
-    active_branch: str = Field(
-        default_factory=lambda: os.getenv("AZURE_DEVOPS_ACTIVE_BRANCH", None)
-    )
-
-
-class ReposApiWrapper(GitClient):
-    def __init__(self, config: RepoConfig):
-        self.project = config.project
-        self.repository_id = config.repository_id
-        self.base_branch = config.base_branch
-        self.active_branch = config.active_branch
-        credentials = BasicAuthentication("", config.token)
-        try:
-            super().__init__(base_url=config.organization_url, creds=credentials)
-        except Exception as e:
-            raise ImportError(f"Failed to connect to Azure DevOps: {e}")
+class ReposApiWrapper(BaseModel):
+    organization_url: Optional[str]
+    project: Optional[str]
+    repository_id: Optional[str]
+    base_branch: Optional[str]
+    active_branch: Optional[str]
+    _client: Optional[GitClient] = PrivateAttr()
 
     class Config:
         arbitrary_types_allowed = True
 
+    @model_validator(mode='before')
+    @classmethod
+    def validate_toolkit(cls, values):
+        project = values['project']
+        organization_url = values['organization_url']
+        repository_id = values['repository_id']
+        base_branch = values['base_branch']
+        active_branch = values['active_branch']
+        credentials = BasicAuthentication("", values['token'])
+        try:
+            cls._client = GitClient(base_url=organization_url, creds=credentials)
+        except Exception as e:
+            raise ToolException(f"Failed to connect to Azure DevOps: {e}")
+        return values
+
     def _get_files(
-        self,
-        directory_path: str = "",
-        branch_name: str = "master",
-        recursion_level: str = "Full",
+            self,
+            directory_path: str = "",
+            branch_name: str = "master",
+            recursion_level: str = "Full",
     ) -> str:
         """
         Params:
@@ -236,7 +171,7 @@ class ReposApiWrapper(GitClient):
             version_descriptor = GitVersionDescriptor(
                 version=branch_name, version_type="branch"
             )
-            items = self.get_items(
+            items = self._client.get_items(
                 repository_id=self.repository_id,
                 project=self.project,
                 scope_path=directory_path,
@@ -287,7 +222,7 @@ class ReposApiWrapper(GitClient):
         """
         current_branches = [
             branch.name
-            for branch in self.get_branches(
+            for branch in self._client.get_branches(
                 repository_id=self.repository_id, project=self.project
             )
         ]
@@ -296,8 +231,8 @@ class ReposApiWrapper(GitClient):
             return f"Switched to branch `{branch_name}`"
         else:
             msg = (
-                f"Error {branch_name} does not exist, "
-                + f"in repo with current branches: {str(current_branches)}"
+                    f"Error {branch_name} does not exist, "
+                    + f"in repo with current branches: {str(current_branches)}"
             )
             return ToolException(msg)
 
@@ -311,7 +246,7 @@ class ReposApiWrapper(GitClient):
         try:
             branches = [
                 branch.name
-                for branch in self.get_branches(
+                for branch in self._client.get_branches(
                     repository_id=self.repository_id, project=self.project
                 )
             ]
@@ -345,7 +280,7 @@ class ReposApiWrapper(GitClient):
         )
 
     def parse_pull_request_comments(
-        self, comment_threads: List[GitPullRequestCommentThread]
+            self, comment_threads: List[GitPullRequestCommentThread]
     ) -> List[dict]:
         """
         Extracts comments from each comment thread and puts them in a dictionary.
@@ -383,7 +318,7 @@ class ReposApiWrapper(GitClient):
             and each PR's title and ID.
         """
         try:
-            pull_requests = self.get_pull_requests(
+            pull_requests = self._client.get_pull_requests(
                 repository_id=self.repository_id,
                 search_criteria=GitPullRequestSearchCriteria(
                     repository_id=self.repository_id, status="active"
@@ -398,10 +333,10 @@ class ReposApiWrapper(GitClient):
         if pull_requests:
             parsed_prs = self.parse_pull_requests(pull_requests)
             parsed_prs_str = (
-                "Found "
-                + str(len(parsed_prs))
-                + " open pull requests:\n"
-                + str(parsed_prs)
+                    "Found "
+                    + str(len(parsed_prs))
+                    + " open pull requests:\n"
+                    + str(parsed_prs)
             )
             return parsed_prs_str
         else:
@@ -415,7 +350,7 @@ class ReposApiWrapper(GitClient):
             str: A plaintext report containing PR by ID.
         """
         try:
-            pull_request = self.get_pull_request_by_id(
+            pull_request = self._client.get_pull_request_by_id(
                 project=self.project, pull_request_id=pull_request_id
             )
         except Exception as e:
@@ -430,7 +365,7 @@ class ReposApiWrapper(GitClient):
             return f"Pull request with '{pull_request_id}' ID is not found"
 
     def parse_pull_requests(
-        self, pull_requests: Union[GitPullRequest, List[GitPullRequest]]
+            self, pull_requests: Union[GitPullRequest, List[GitPullRequest]]
     ) -> List[dict]:
         """
         Extracts title and number from each Pull Request and puts them in a dictionary
@@ -445,13 +380,13 @@ class ReposApiWrapper(GitClient):
         parsed = []
         try:
             for pull_request in pull_requests:
-                comment_threads: List[GitPullRequestCommentThread] = self.get_threads(
+                comment_threads: List[GitPullRequestCommentThread] = self._client.get_threads(
                     repository_id=self.repository_id,
                     pull_request_id=pull_request.pull_request_id,
                     project=self.project,
                 )
 
-                commits: List[GitCommitRef] = self.get_pull_request_commits(
+                commits: List[GitCommitRef] = self._client.get_pull_request_commits(
                     repository_id=self.repository_id,
                     project=self.project,
                     pull_request_id=pull_request.pull_request_id,
@@ -492,14 +427,14 @@ class ReposApiWrapper(GitClient):
             )
 
         try:
-            pr_iterations = self.get_pull_request_iterations(
+            pr_iterations = self._client.get_pull_request_iterations(
                 repository_id=self.repository_id,
                 project=self.project,
                 pull_request_id=pull_request_id,
             )
             last_iteration_id = pr_iterations[-1].id
 
-            changes = self.get_pull_request_iteration_changes(
+            changes = self._client.get_pull_request_iteration_changes(
                 repository_id=self.repository_id,
                 project=self.project,
                 pull_request_id=pull_request_id,
@@ -536,7 +471,7 @@ class ReposApiWrapper(GitClient):
             version=commit_id, version_type="commit"
         )
         try:
-            content_generator = self.get_item_text(
+            content_generator = self._client.get_item_text(
                 repository_id=self.repository_id,
                 project=self.project,
                 path=path,
@@ -562,9 +497,9 @@ class ReposApiWrapper(GitClient):
         new_branch_name = branch_name
 
         # Check if the branch already exists
-        existing_branch = None 
+        existing_branch = None
         try:
-            existing_branch = self.get_branch(
+            existing_branch = self._client.get_branch(
                 repository_id=self.repository_id,
                 name=new_branch_name,
                 project=self.project,
@@ -572,13 +507,13 @@ class ReposApiWrapper(GitClient):
         except Exception:
             # expected exception
             pass
-        
+
         if existing_branch:
             msg = f"Branch '{new_branch_name}' already exists."
             logger.error(msg)
             raise ToolException(msg)
 
-        base_branch = self.get_branch(
+        base_branch = self._client.get_branch(
             repository_id=self.repository_id,
             name=self.active_branch,
             project=self.project,
@@ -591,7 +526,7 @@ class ReposApiWrapper(GitClient):
                 new_object_id=base_branch.commit.commit_id,
             )
             ref_update_list = [ref_update]
-            self.update_refs(
+            self._client.update_refs(
                 ref_updates=ref_update_list,
                 repository_id=self.repository_id,
                 project=self.project,
@@ -623,7 +558,7 @@ class ReposApiWrapper(GitClient):
         try:
             # Check if file already exists
             try:
-                self.get_item(
+                self._client.get_item(
                     repository_id=self.repository_id,
                     project=self.project,
                     path=file_path,
@@ -641,15 +576,15 @@ class ReposApiWrapper(GitClient):
                 pass
 
             # Get the latest commit ID of the active branch to use as oldObjectId
-            branch = self.get_branch(
+            branch = self._client.get_branch(
                 repository_id=self.repository_id,
                 project=self.project,
                 name=self.active_branch,
             )
             if (
-                branch is None
-                or not hasattr(branch, "commit")
-                or not hasattr(branch.commit, "commit_id")
+                    branch is None
+                    or not hasattr(branch, "commit")
+                    or not hasattr(branch.commit, "commit_id")
             ):
                 return (
                     f"Branch `{self.active_branch}` does not exist or has no commits."
@@ -664,7 +599,7 @@ class ReposApiWrapper(GitClient):
             )
             new_commit = GitCommit(comment=f"Create {file_path}", changes=[change])
             push = GitPush(commits=[new_commit], ref_updates=[ref_update])
-            self.create_push(
+            self._client.create_push(
                 push=push, repository_id=self.repository_id, project=self.project
             )
             return f"Created file {file_path}"
@@ -690,7 +625,7 @@ class ReposApiWrapper(GitClient):
             version_descriptor = GitVersionDescriptor(
                 version=self.active_branch, version_type="branch"
             )
-            file_content = self.get_item_text(
+            file_content = self._client.get_item_text(
                 repository_id=self.repository_id,
                 project=self.project,
                 path=file_path,
@@ -751,7 +686,7 @@ class ReposApiWrapper(GitClient):
                 )
 
             # Get the latest commit ID of the active branch to use as oldObjectId
-            branch = self.get_branch(
+            branch = self._client.get_branch(
                 repository_id=self.repository_id,
                 project=self.project,
                 name=self.active_branch,
@@ -788,7 +723,7 @@ class ReposApiWrapper(GitClient):
             str: Success or failure message.
         """
         try:
-            branch = self.get_branch(
+            branch = self._client.get_branch(
                 repository_id=self.repository_id, project=self.project, name=branch_name
             )
             if not branch:
@@ -805,7 +740,7 @@ class ReposApiWrapper(GitClient):
                 new_object_id=None,
             )
             push = GitPush(commits=[new_commit], ref_updates=[ref_update])
-            self.create_push(
+            self._client.create_push(
                 push=push, repository_id=self.repository_id, project=self.project
             )
             return "Deleted file " + file_path
@@ -824,7 +759,7 @@ class ReposApiWrapper(GitClient):
                 and the username of the user who created the work item
         """
         try:
-            work_items = self.get_pull_request_work_item_refs(
+            work_items = self._client.get_pull_request_work_item_refs(
                 repository_id=self.repository_id,
                 pull_request_id=pull_request_id,
                 project=self.project,
@@ -852,13 +787,13 @@ class ReposApiWrapper(GitClient):
         """
         try:
             pull_request_id = int(comment_query.split("\n\n")[0])
-            comment_text = comment_query[len(str(pull_request_id)) + 2 :]
+            comment_text = comment_query[len(str(pull_request_id)) + 2:]
 
             comment = Comment(comment_type="text", content=comment_text)
             comment_thread = GitPullRequestCommentThread(
                 comments=[comment], status="active"
             )
-            self.create_thread(
+            self._client.create_thread(
                 comment_thread,
                 repository_id=self.repository_id,
                 pull_request_id=pull_request_id,
@@ -869,7 +804,7 @@ class ReposApiWrapper(GitClient):
             msg = f"Unable to make comment due to error:\n{str(e)}"
             logger.error(msg)
             return ToolException(msg)
-        
+
     def create_pr(self, pull_request_title: str, pull_request_body: str, branch_name: str) -> str:
         """
         Creates a pull request in Azure DevOps from the active branch to the base branch mentioned in params.
@@ -894,7 +829,7 @@ class ReposApiWrapper(GitClient):
                 "reviewers": []
             }
 
-            response = self.create_pull_request(
+            response = self._client.create_pull_request(
                 git_pull_request_to_create=pull_request,
                 repository_id=self.repository_id,
                 project=self.project
@@ -949,7 +884,7 @@ class ReposApiWrapper(GitClient):
                 "ref": self.create_branch,
                 "name": "create_branch",
                 "description": self.create_branch.__doc__,
-                "args_schema": ArgsSchema.CreateBranchName.value,
+                "args_schema": ArgsSchema.BranchName.value,
             },
             {
                 "ref": self.read_file,

@@ -40,3 +40,5 @@ azure-mgmt-storage==21.1.0
 azure-storage-blob==12.23.1
 PyMySQL==1.1.1
 psycopg2-binary==2.9.10
+Office365-REST-Python-Client==2.5.14
+python-docx==1.1.2
