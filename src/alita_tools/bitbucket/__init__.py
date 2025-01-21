@@ -13,6 +13,7 @@ name = "bitbucket"
 
 def get_tools(tool):
     return AlitaBitbucketToolkit.get_toolkit(
+        selected_tools=tool['settings'].get('selected_tools', []),
         url=tool['settings']['url'],
         project=tool['settings']['project'],
         repository=tool['settings']['repository'],

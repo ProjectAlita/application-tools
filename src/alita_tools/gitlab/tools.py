@@ -225,6 +225,10 @@ class CreatePullRequestChangeComment(BaseTool):
 class UpdateFileToolModel(BaseModel):
     file_query: str = Field(description="Strictly follow the provided rules.")
 
+class AppendFileToolModel(BaseModel):
+    file_path: str = Field(description="Path to the file new content will be appended to.")
+    content: str = Field(description="Content to be added to the file.")
+
 class ListFilesModel(BaseModel):
     path: str = Field(description="Repository path/package to extract files from.")
     branch: str = Field(description="Repository branch.", default=None)
@@ -259,6 +263,21 @@ class UpdateFileTool(BaseTool):
             logger.error(f"Unable to update file: {stacktrace}")
             raise ToolException(f"Unable to update file: {stacktrace}")
 
+class AppendFileTool(BaseTool):
+    api_wrapper: GitLabAPIWrapper = Field(default_factory=GitLabAPIWrapper)
+    name: str = "append_file"
+    description: str = """Append Tool used for adding of new content to the end of existing file.
+                        Useful in case file content is greater than model's output tokens"""
+    args_schema: Type[BaseModel] = AppendFileToolModel
+
+    def _run(self, file_path: str, content: str):
+        try:
+            return self.api_wrapper.append_file(file_path, content)
+        except Exception:
+            stacktrace = traceback.format_exc()
+            logger.error(f"Unable to append to the file: {stacktrace}")
+            raise ToolException(f"Unable to append to the file: {stacktrace}")
+
 class ReadFileTool(BaseTool):
     api_wrapper: GitLabAPIWrapper = Field(default_factory=GitLabAPIWrapper)
     name: str = "read_file"
@@ -286,6 +305,7 @@ __all__ = [
     {"name": "delete_file", "tool": DeleteFileTool},
     {"name": "create_file", "tool": CreateFileTool},
     {"name": "update_file", "tool": UpdateFileTool},
+    {"name": "append_file", "tool": AppendFileTool},
     {"name": "list_files", "tool": ListFilesTool},
     {"name": "set_active_branch", "tool": SetActiveBranchTool},
     {"name": "list_branches_in_repo", "tool": ListBranchesTool},

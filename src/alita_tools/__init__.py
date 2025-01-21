@@ -14,7 +14,7 @@ from .bitbucket import get_tools as get_bitbucket, AlitaBitbucketToolkit
 from .testrail import get_tools as get_testrail, TestrailToolkit
 from .testio import get_tools as get_testio, TestIOToolkit
 from .xray import get_tools as get_xray_cloud, XrayToolkit
-from .sharepoint import get_tools as get_sharepoint
+from .sharepoint import get_tools as get_sharepoint, SharepointToolkit
 from .qtest import get_tools as get_qtest, QtestToolkit
 from .zephyr_scale import get_tools as get_zephyr_scale, ZephyrScaleToolkit
 from .ado import get_tools as get_ado
@@ -114,4 +114,6 @@ def get_toolkits():
         ZephyrScaleToolkit.toolkit_config_schema(),
         ZephyrToolkit.toolkit_config_schema(),
         AlitaYagmailToolkit.toolkit_config_schema(),
+        SharepointToolkit.toolkit_config_schema()
     ]
+

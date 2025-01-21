@@ -1,51 +1,45 @@
 from typing import List
 
-from langchain_core.tools import BaseToolkit
-from langchain_core.tools import BaseTool
+from langchain_core.tools import BaseToolkit, BaseTool
+from pydantic import BaseModel, create_model
+from pydantic.fields import FieldInfo
+from .api_wrapper import SharepointApiWrapper
 from ..base.tool import BaseAction
-
-from .authorization_helper import SharepointAuthorizationHelper
-from .sharepoint_wrapper import SharepointWrapper
 
 name = "sharepoint"
 
-
 def get_tools(tool):
-    return AlitaSharePointToolkit().get_toolkit(
-        selected_tools=tool['settings'].get('selected_tools', []),
-        tenant=tool['settings'].get('tenant', None),
+    return SharepointToolkit().get_toolkit(
+        site_url=tool['settings'].get('site_url', None),
         client_id=tool['settings'].get('client_id', None),
-        client_secret=tool['settings'].get('client_secret', None),
-        refresh_token=tool['settings'].get('token_json', None)
-    ).get_tools()
+        client_secret=tool['settings'].get('client_secret', None)).get_tools()
 
 
-class AlitaSharePointToolkit(BaseToolkit):
+class SharepointToolkit(BaseToolkit):
     tools: List[BaseTool] = []
+
+    @staticmethod
+    def toolkit_config_schema() -> BaseModel:
+        return create_model(
+            name,
+            site_url=(str, FieldInfo(description="Sharepoint site's URL")),
+            client_id=(str, FieldInfo(description="Client ID")),
+            client_secret=(str, FieldInfo(description="Client Secret"))
+        )
 
     @classmethod
     def get_toolkit(cls, selected_tools: list[str] | None = None, **kwargs):
         if selected_tools is None:
             selected_tools = []
-
-        # TODO: must be moved out of tools (on dev BE side)
-        # TODO: think on logic how to exchange refresh with access tokens (on BE side and update secrets properly)
-        auth_helper = SharepointAuthorizationHelper(**kwargs)
-
-        sharepoint_wrapper = SharepointWrapper(access_token=auth_helper.get_access_token(), **kwargs)
-
-        # uncomment after the deliver from dev team: it is expected that ONLY token will be provided
-        # sharepoint_wrapper = SharepointWrapper(**kwargs)
-        # defining tools and scopes
-        available_tools = sharepoint_wrapper.get_available_tools()
+        sharepoint_api_wrapper = SharepointApiWrapper(**kwargs)
+        available_tools = sharepoint_api_wrapper.get_available_tools()
         tools = []
-
         for tool in available_tools:
             if selected_tools:
                 if tool["name"] not in selected_tools:
                     continue
             tools.append(BaseAction(
-                api_wrapper=sharepoint_wrapper,
+                api_wrapper=sharepoint_api_wrapper,
                 name=tool["name"],
                 description=tool["description"],
                 args_schema=tool["args_schema"]

@@ -296,6 +296,44 @@ class GitLabAPIWrapper(BaseModel):
         except Exception as e:
             return "Unable to update file due to error:\n" + str(e)
 
+    def append_file(self, file_path: str, content: str) -> str:
+        """
+        Appends new content to the end of file.
+        Parameters:
+            file_path(str): Contains the file path.
+                For example:
+                /test/hello.txt
+            content(str): new content.
+        Returns:
+            A success or failure message
+        """
+        if self.active_branch == self.branch:
+            return (
+                "You're attempting to commit to the directly"
+                f"to the {self.branch} branch, which is protected. "
+                "Please create a new branch and try again."
+            )
+        try:
+            if not content:
+                return "Content to be added is empty. Append file won't be completed"
+            file_content = self.read_file(file_path)
+            updated_file_content = f"{file_content}\n{content}"
+            commit = {
+                "branch": self.active_branch,
+                "commit_message": "Append " + file_path,
+                "actions": [
+                    {
+                        "action": "update",
+                        "file_path": file_path,
+                        "content": updated_file_content,
+                    }
+                ],
+            }
+
+            self.repo_instance.commits.create(commit)
+            return "Updated file " + file_path
+        except Exception as e:
+            return "Unable to update file due to error:\n" + str(e)
 
 
     def delete_file(self, file_path: str) -> str:

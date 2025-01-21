@@ -97,6 +97,12 @@ GitLabCreatePullRequestChangeCommentInput = create_model(
     repository=(str, Field(description="Name of the repository", default=None))
 )
 
+AppendFileInput = create_model(
+    "AppendFileInput",
+    file_path=(str, Field(description="File path where new code should be added")),
+    content=(str, Field(description="Code to be appended to existing file")),
+)
+
 _misconfigured_alert = "Misconfigured repositories"
 _undefined_repo_alert = "Unable to get repository"
 
@@ -108,7 +114,7 @@ class GitLabWorkspaceAPIWrapper(BaseModel):
     branch: Optional[str] = 'main'
     _client: Optional[Any] = PrivateAttr()
     _repo_instances: Dict[str, Any] = {}
-    _active_branch: Optional[str] = PrivateAttr()
+    _active_branch: Optional[str] = PrivateAttr(default='main')
 
     class Config:
         arbitrary_types_allowed = True
@@ -130,7 +136,7 @@ class GitLabWorkspaceAPIWrapper(BaseModel):
                 import re
                 for repo in re.split(',|;', values.get('repositories')):
                     cls._repo_instances[repo] = g.projects.get(repo)
-            cls._active_branch = values.get('branch', 'main')
+            values['_active_branch'] = values.get('branch', 'main')
         except Exception as e:
             raise ImportError(f"Failed to connect to GitLab: {e}")
         return values
@@ -389,6 +395,45 @@ class GitLabWorkspaceAPIWrapper(BaseModel):
                 current_section_content.append(line)
         return list(zip(old_contents, new_contents))
 
+    def append_file(self, file_path: str, content: str) -> str:
+        """
+        Appends new content to the end of file.
+        Parameters:
+            file_path(str): Contains the file path.
+                For example:
+                /test/hello.txt
+            content(str): new content.
+        Returns:
+            A success or failure message
+        """
+        if self.active_branch == self.branch:
+            return (
+                "You're attempting to commit to the directly"
+                f"to the {self.branch} branch, which is protected. "
+                "Please create a new branch and try again."
+            )
+        try:
+            if not content:
+                return "Content to be added is empty. Append file won't be completed"
+            file_content = self.read_file(file_path)
+            updated_file_content = f"{file_content}\n{content}"
+            commit = {
+                "branch": self.active_branch,
+                "commit_message": "Append " + file_path,
+                "actions": [
+                    {
+                        "action": "update",
+                        "file_path": file_path,
+                        "content": updated_file_content,
+                    }
+                ],
+            }
+
+            self.repo_instance.commits.create(commit)
+            return "Updated file " + file_path
+        except Exception as e:
+            return "Unable to update file due to error:\n" + str(e)
+
     def create_pr_change_comment(self, pr_number: str, file_path: str, line_number: int, comment: str, repository: Optional[str] = None):
         """Create a comment on a pull request change in GitLab."""
 
@@ -500,6 +545,12 @@ class GitLabWorkspaceAPIWrapper(BaseModel):
                 "description": self.list_files.__doc__,
                 "args_schema": ListFilesModel,
                 "ref": self.list_files,
+            },
+            {
+                "name": "append_file",
+                "description": self.append_file.__doc__,
+                "args_schema": AppendFileInput,
+                "ref": self.append_file,
             }
         ]
 
