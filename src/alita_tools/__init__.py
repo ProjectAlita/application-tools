@@ -4,19 +4,19 @@ from importlib import import_module
 from .github import get_tools as get_github, AlitaGitHubToolkit
 from .openapi import get_tools as get_openapi
 from .jira import get_tools as get_jira, JiraToolkit
-from .confluence import get_tools as get_confluence
-from .gitlab import get_tools as get_gitlab
-from .gitlab_org import get_tools as get_gitlab_org
-from .zephyr import get_tools as get_zephyr
-from .browser import get_tools as get_browser
+from .confluence import get_tools as get_confluence, ConfluenceToolkit
+from .gitlab import get_tools as get_gitlab, AlitaGitlabToolkit
+from .gitlab_org import get_tools as get_gitlab_org, AlitaGitlabSpaceToolkit
+from .zephyr import get_tools as get_zephyr, ZephyrToolkit
+from .browser import get_tools as get_browser, BrowserToolkit
 from .report_portal import get_tools as get_report_portal, ReportPortalToolkit
-from .bitbucket import get_tools as get_bitbucket
+from .bitbucket import get_tools as get_bitbucket, AlitaBitbucketToolkit
 from .testrail import get_tools as get_testrail, TestrailToolkit
 from .testio import get_tools as get_testio, TestIOToolkit
-from .xray import get_tools as get_xray_cloud
+from .xray import get_tools as get_xray_cloud, XrayToolkit
 from .sharepoint import get_tools as get_sharepoint, SharepointToolkit
 from .qtest import get_tools as get_qtest, QtestToolkit
-from .zephyr_scale import get_tools as get_zephyr_scale
+from .zephyr_scale import get_tools as get_zephyr_scale, ZephyrScaleToolkit
 from .ado import get_tools as get_ado
 from .ado.test_plan import AzureDevOpsPlansToolkit
 from .ado.work_item import AzureDevOpsWorkItemsToolkit
@@ -27,7 +27,7 @@ from .code.sonar import get_tools as get_sonar, SonarToolkit
 from .google_places import get_tools as get_google_places, GooglePlacesToolkit
 
 
-from .yagmail import get_tools as get_yagmail
+from .yagmail import get_tools as get_yagmail, AlitaYagmailToolkit
 
 logger = logging.getLogger(__name__)
 
@@ -105,5 +105,15 @@ def get_toolkits():
         SQLToolkit.toolkit_config_schema(),
         SonarToolkit.toolkit_config_schema(),
         GooglePlacesToolkit.toolkit_config_schema(),
+        BrowserToolkit.toolkit_config_schema(),
+        XrayToolkit.toolkit_config_schema(),
+        AlitaGitlabToolkit.toolkit_config_schema(),
+        ConfluenceToolkit.toolkit_config_schema(),
+        AlitaBitbucketToolkit.toolkit_config_schema(),
+        AlitaGitlabSpaceToolkit.toolkit_config_schema(),
+        ZephyrScaleToolkit.toolkit_config_schema(),
+        ZephyrToolkit.toolkit_config_schema(),
+        AlitaYagmailToolkit.toolkit_config_schema(),
         SharepointToolkit.toolkit_config_schema()
     ]
+
