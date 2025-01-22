@@ -36,7 +36,7 @@ FindTestCaseById = create_model(
 
 DeleteTestCase = create_model(
     "DeleteTestCase",
-    id=(int, FieldInfo(description="Qtest id e.g. 3253490123")),
+    qtest_id=(int, FieldInfo(description="Qtest id e.g. 3253490123")),
 )
 
 TEST_CASES_CONVERSION_PROMPT = """
@@ -47,6 +47,7 @@ TEST_CASES_CONVERSION_PROMPT = """
 ### Output Format:
 Create a table with these columns. For multi-step cases, fill Id, Name, Description, Type, Status, Priority, Test Type, and Precondition only for the first step:
 - **Id**: Unique identifier (e.g., TC-12780).
+- **QTest id**: Unique identifier (e.g., 4626964).
 - **Name**: Brief title.
 - **Description**: Short purpose.
 - **Type**: 'Manual' or 'Automation - UTAF'. Leave blank if unknown.
