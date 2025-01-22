@@ -82,6 +82,18 @@ class BitbucketServerApi(BitbucketApiAbstract):
             filename=file_path
         )
 
+    def update_file(self, file_path: str, file_contents: str, branch: str) -> str:
+        source_commit_generator = self.api_client.get_commits(project_key=self.project, repository_slug=self.repository, hash_newest=branch, limit=1)
+        source_commit = next(source_commit_generator)
+        return self.api_client.update_file(
+            project_key=self.project,
+            repository_slug=self.repository,
+            content=file_contents,
+            message=f"Update {file_path}",
+            branch=branch,
+            filename=file_path,
+            source_commit_id=source_commit['id']
+        )
 
 class BitbucketCloudApi(BitbucketApiAbstract):
     api_client: Cloud
@@ -129,3 +141,6 @@ class BitbucketCloudApi(BitbucketApiAbstract):
             f'{file_path}': f'{file_contents}',
         }
         return self.repository.post(path='src', data=form_data, files={}, headers={'Content-Type': 'application/x-www-form-urlencoded'})
+
+    def update_file(self, file_path: str, file_contents: str, branch: str) -> str:
+        return self.create_file(file_path, file_contents, branch)
