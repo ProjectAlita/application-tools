@@ -120,7 +120,7 @@ class BitbucketAPIWrapper(BaseModel):
             self.bitbucket.create_file(file_path=file_path, file_contents=file_contents, branch=self.active_branch)
             return f"File has been created: {file_path}."
         except Exception as e:
-            return ToolException(e)
+            return str(ToolException(e))
 
     def update_file(self, file_path: str, file_contents: str) -> str:
         """
@@ -135,7 +135,7 @@ class BitbucketAPIWrapper(BaseModel):
             self.bitbucket.update_file(file_path=file_path, file_contents=file_contents, branch=self.active_branch)
             return f"File has been updated: {file_path}."
         except Exception as e:
-            return ToolException(e)
+            return str(ToolException(e))
 
     def read_file(self, file_path: str) -> str:
         """
