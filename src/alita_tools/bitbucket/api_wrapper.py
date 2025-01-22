@@ -109,7 +109,7 @@ class BitbucketAPIWrapper(BaseModel):
 
     def create_file(self, file_path: str, file_contents: str) -> str:
         """
-        Creates a new file on the gitlab repo
+        Creates a new file on the bitbucket repo
         Parameters:
             file_path(str): a string which contains the file path (example: "hello_world.md").
             file_contents(str): a string which the file contents (example: "# Hello World!").
@@ -118,6 +118,21 @@ class BitbucketAPIWrapper(BaseModel):
         """
         try:
             self.bitbucket.create_file(file_path=file_path, file_contents=file_contents, branch=self.active_branch)
+            return f"File has been created: {file_path}."
+        except Exception as e:
+            raise ToolException(e)
+
+    def update_file(self, file_path: str, file_contents: str) -> str:
+        """
+        Updates file on the bitbucket repo
+        Parameters:
+            file_path(str): a string which contains the file path (example: "hello_world.md").
+            file_contents(str): a string which the file contents (example: "# Hello World!").
+        Returns:
+            str: A success or failure message
+        """
+        try:
+            self.bitbucket.update_file(file_path=file_path, file_contents=file_contents, branch=self.active_branch)
             return f"File has been created: {file_path}."
         except Exception as e:
             raise ToolException(e)

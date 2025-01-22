@@ -68,6 +68,21 @@ class CreateFileTool(BaseTool):
     You MUST NOT ignore, skip or comment any details, PROVIDE FULL CONTENT including all content based on all best practices.
     """)))
 
+class UpdateFileTool(BaseTool):
+    api_wrapper: BitbucketAPIWrapper = Field(default_factory=BitbucketAPIWrapper)
+    name: str = "update_file"
+    description: str = """This tool is a wrapper for the Bitbucket API, useful when you need to update a file in a Bitbucket repository.
+    """
+    args_schema: Type[BaseModel] = create_model(
+        "CreateFileInput",
+        file_path=(str, FieldInfo(
+            description="File path of file to be created. e.g. `src/agents/developer/tools/git/bitbucket.py`. **IMPORTANT**: the path must not start with a slash")),
+        file_contents=(str, FieldInfo(description="""
+            Full file content to be inserted instead of initial one. It must be without any escapes, just raw content to CREATE in GIT.
+            Generate full file content for this field without any additional texts, escapes, just raw code content. 
+            You MUST NOT ignore, skip or comment any details, PROVIDE FULL CONTENT including all content based on all best practices.
+            """)))
+
     def _run(self, file_path: str, file_contents: str):
         logger.info(f"Create file in the repository {file_path} with content: {file_contents}")
         return self.api_wrapper.create_file(file_path, file_contents)
@@ -137,5 +152,6 @@ __all__ = [
     {"name": "create_file", "tool": CreateFileTool},
     {"name": "set_active_branch", "tool": SetActiveBranchTool},
     {"name": "list_branches_in_repo", "tool": ListBranchesTool},
-    {"name": "read_file", "tool": ReadFileTool}
+    {"name": "read_file", "tool": ReadFileTool},
+    {"name": "update_file", "tool": UpdateFileTool}
 ]
