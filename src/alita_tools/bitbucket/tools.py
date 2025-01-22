@@ -68,6 +68,10 @@ class CreateFileTool(BaseTool):
     You MUST NOT ignore, skip or comment any details, PROVIDE FULL CONTENT including all content based on all best practices.
     """)))
 
+    def _run(self, file_path: str, file_contents: str):
+        logger.info(f"Create file in the repository {file_path} with content: {file_contents}")
+        return self.api_wrapper.create_file(file_path, file_contents)
+
 class UpdateFileTool(BaseTool):
     api_wrapper: BitbucketAPIWrapper = Field(default_factory=BitbucketAPIWrapper)
     name: str = "update_file"
@@ -84,8 +88,8 @@ class UpdateFileTool(BaseTool):
             """)))
 
     def _run(self, file_path: str, file_contents: str):
-        logger.info(f"Create file in the repository {file_path} with content: {file_contents}")
-        return self.api_wrapper.create_file(file_path, file_contents)
+        logger.info(f"Update file in the repository {file_path} with content: {file_contents}")
+        return self.api_wrapper.update_file(file_path, file_contents)
 
 
 class SetActiveBranchTool(BaseTool):
