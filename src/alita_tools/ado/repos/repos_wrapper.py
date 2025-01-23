@@ -263,7 +263,7 @@ class ReposApiWrapper(BaseModel):
             logger.error(msg)
             return ToolException(msg)
 
-    def list_files(self, directory_path: str, branch_name: str = None) -> str:
+    def list_files(self, directory_path: str = "", branch_name: str = None) -> str:
         """
         Recursively fetches files from a directory in the repo.
 
