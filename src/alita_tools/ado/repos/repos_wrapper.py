@@ -216,7 +216,8 @@ class ReposApiWrapper(BaseModel):
         return "".join(diff)
 
     def set_active_branch(self, branch_name: str) -> str:
-        """Equivalent to `git checkout branch_name` for this Agent.
+        """
+        Equivalent to `git checkout branch_name` for this Agent.
 
         Returns an Error (as a string) if branch doesn't exist.
         """
@@ -269,6 +270,7 @@ class ReposApiWrapper(BaseModel):
 
         Parameters:
             directory_path (str): Path to the directory
+            branch_name (str): The name of the branch where the files to be received.
 
         Returns:
             str: List of file paths, or an error message.
@@ -490,6 +492,9 @@ class ReposApiWrapper(BaseModel):
         Create a new branch in Azure DevOps, and set it as the active bot branch.
         Equivalent to `git switch -c branch_name`.
 
+        Parameters:
+            branch_name (str): The name of the branch to be created.
+
         Returns:
             str: A plaintext success message or raises an exception if the branch already exists.
         """
@@ -542,6 +547,7 @@ class ReposApiWrapper(BaseModel):
         """
         Creates a new file on the Azure DevOps repo
         Parameters:
+            branch_name (str): The name of the branch where to create a file.
             file_path (str): The path of the file to be created
             file_contents (str): The content of the file to be created
         Returns:
@@ -646,6 +652,7 @@ class ReposApiWrapper(BaseModel):
         """
         Updates a file with new content in Azure DevOps.
         Parameters:
+            branch_name (str): The name of the branch where update the file.
             file_query(str): Contains the file path and the file contents.
                 The old file contents is wrapped in OLD <<<< and >>>> OLD
                 The new file contents is wrapped in NEW <<<< and >>>> NEW
@@ -714,10 +721,8 @@ class ReposApiWrapper(BaseModel):
         Deletes a file from the repository in Azure DevOps.
 
         Parameters:
-            repository_id (str): The ID of the repository.
-            project (str): The project ID or project name.
-            file_path (str): The path of the file to delete.
             branch_name (str): The name of the branch where the file will be deleted.
+            file_path (str): The path of the file to delete.
 
         Returns:
             str: Success or failure message.
@@ -753,7 +758,7 @@ class ReposApiWrapper(BaseModel):
         """
         Fetches a specific work item and its first 10 comments from Azure DevOps.
         Parameters:
-            work_item_id (int): The ID for the Azure DevOps work item
+            pull_request_id (int): The ID for Pull Request based on which to get Work Item
         Returns:
             dict: A dictionary containing the work item's title, description, comments as a string,
                 and the username of the user who created the work item
@@ -777,10 +782,8 @@ class ReposApiWrapper(BaseModel):
         Adds a comment to a specific pull request in Azure DevOps based on a formatted query.
 
         Parameters:
-            repository_id (str): The ID of the repository where the pull request exists.
             comment_query (str): A string which contains the pull request ID, two newlines, and the comment.
                                  For example: "1\n\nThis is a test comment" adds the comment "This is a test comment" to PR 1.
-            project (str): The project ID or project name.
 
         Returns:
             str: A success or failure message.
