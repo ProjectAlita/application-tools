@@ -304,7 +304,7 @@ class ReposApiWrapper(BaseModel):
                         )
                         if comment.published_date
                         else None,
-                        "status": thread.status.name if thread.status else None,
+                        "status": thread.status if thread.status else None,
                     }
                 )
         return parsed_comments
