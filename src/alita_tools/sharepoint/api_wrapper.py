@@ -93,7 +93,7 @@ class SharepointApiWrapper(BaseModel):
 
 
     def get_files_list(self, folder_name: str = None, limit_files: int = 100):
-        """ Lists all files in a specific folder under Shared Documents path, limited by limit_files (default is 10)."""
+        """ Lists all files in a specific folder (if it defined) under Shared Documents path, limited by limit_files (default is 10)."""
         try:
             result = []
 

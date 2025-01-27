@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Optional, Any
+from typing import Optional, Any, Dict
 
 from azure.devops.connection import Connection
 from azure.devops.released.work_item_tracking import Wiql
@@ -49,13 +49,26 @@ ADOGetWorkItem = create_model(
     expand=(Optional[str], Field(description="The expand parameters for work item attributes. Possible options are { None, Relations, Fields, Links, All }.", default=None))
 )
 
+ADOLinkWorkItem = create_model(
+    "ADOLinkWorkItem",
+    source_id=(int, Field(description="ID of the work item you plan to add link to", default=None)),
+    target_id=(int, Field(description="ID of the work item linked to source one", default=None)),
+    link_type=(str, Field(description="Link type: System.LinkTypes.Dependency-forward, etc.", default=None)),
+    attributes=(Optional[dict], Field(description="Dict with attributes used for work items linking. Example: `comment`, etc. and syntax 'comment': 'Some linking comment'", default=None))
+)
+
+ADOGetLinkType = create_model(
+    "ADOGetLinkType",
+)
+
 
 class AzureDevOpsApiWrapper(BaseModel):
     organization_url: str
     project: str
     token: str
     limit: Optional[int] = 5
-    _client: Optional[WorkItemTrackingClient] = PrivateAttr()  # Private attribute for the work item tracking client
+    _client: Optional[WorkItemTrackingClient] = PrivateAttr()
+    _relation_types: Dict = PrivateAttr(default_factory=dict) # track actual relation types for instance
 
     class Config:
         arbitrary_types_allowed = True  # Allow arbitrary types (e.g., WorkItemTrackingClient)
@@ -158,6 +171,46 @@ class AzureDevOpsApiWrapper(BaseModel):
             return ToolException(f"Issues during attempt to parse work_item_json: {str(e)}")
         return f"Work item ({work_item.id}) was updated."
 
+    def get_relation_types(self) -> dict:
+        """Returns dict of possible relation types per syntax: 'relation name': 'relation reference name'.
+        NOTE: reference name is used for adding links to the work item"""
+
+        if not self._relation_types:
+            # have to be called only once for session
+            relations = self._client.get_relation_types()
+            for relation in relations:
+                self._relation_types.update({relation.name: relation.reference_name})
+        return self._relation_types
+
+    def link_work_items(self, source_id, target_id, link_type, attributes: dict = None):
+        """Add the relation to the source work item with an appropriate attributes if any. User may pass attributes like name, etc."""
+
+        if not self._relation_types:
+            # check cached relation types and trigger its collection if it is empty by that moment
+            self.get_relation_types()
+        if link_type not in self._relation_types.values():
+            return ToolException(f"Link type is incorrect. You have to use proper relation's reference name NOT relation's name: {self._relation_types}")
+
+        relation = {
+            "rel": link_type,
+            "url": f"{self.organization_url}/_apis/wit/workItems/{target_id}"
+        }
+
+        if attributes:
+            relation.update({"attributes": attributes})
+
+        self._client.update_work_item(
+            document=[
+                {
+                    "op": "add",
+                    "path": "/relations/-",
+                    "value": relation
+                }
+            ],
+            id=source_id
+        )
+        return f"Work item {source_id} linked to {target_id} with link type {link_type}"
+
     def search_work_items(self, query: str, fields=None):
         """Search for work items using a WIQL query and dynamically fetch fields based on the query."""
         try:
@@ -208,6 +261,13 @@ class AzureDevOpsApiWrapper(BaseModel):
             else:
                 parsed_item.update(fields_data)
 
+            # extract relations if any
+            relations_data = work_item.relations
+            if relations_data:
+                parsed_item['relations'] = []
+                for relation in relations_data:
+                    parsed_item['relations'].append(relation.as_dict())
+
             return parsed_item
         except Exception as e:
             logger.error(f"Error getting work item: {e}")
@@ -240,6 +300,18 @@ class AzureDevOpsApiWrapper(BaseModel):
                 "description": self.get_work_item.__doc__,
                 "args_schema": ADOGetWorkItem,
                 "ref": self.get_work_item,
+            },
+            {
+                "name": "link_work_items",
+                "description": self.link_work_items.__doc__,
+                "args_schema": ADOLinkWorkItem,
+                "ref": self.link_work_items,
+            },
+            {
+                "name": "get_relation_types",
+                "description": self.get_relation_types.__doc__,
+                "args_schema": ADOGetLinkType,
+                "ref": self.get_relation_types,
             }
         ]
 
