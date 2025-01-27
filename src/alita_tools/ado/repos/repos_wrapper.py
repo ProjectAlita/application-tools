@@ -500,6 +500,11 @@ class ReposApiWrapper(BaseModel):
         """
         self.active_branch = self.active_branch if self.active_branch else self.base_branch
         new_branch_name = branch_name
+        if (bool(re.search(r"\s", new_branch_name))):
+            msg = f"Branch '{new_branch_name}' contains spaces. Please remove them or use special characters"
+            logger.error(msg)
+            raise ToolException(msg)
+
 
         # Check if the branch already exists
         existing_branch = None
