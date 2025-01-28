@@ -150,10 +150,31 @@ class ReposApiWrapper(BaseModel):
         base_branch = values['base_branch']
         active_branch = values['active_branch']
         credentials = BasicAuthentication("", values['token'])
+
+        if not organization_url or not project or not repository_id:
+            raise ToolException("Parameters: organization_url, project, and repository_id are required.")
+        
         try:
             cls._client = GitClient(base_url=organization_url, creds=credentials)
         except Exception as e:
             raise ToolException(f"Failed to connect to Azure DevOps: {e}")
+        
+        def branch_exists(branch_name):
+            try:
+                branch = cls._client.get_branch(
+                    repository_id=repository_id,
+                    name=branch_name,
+                    project=project
+                )
+                return branch is not None
+            except Exception as e:
+                return False
+        
+        if base_branch and not branch_exists(base_branch):
+            raise ToolException(f"The base branch '{base_branch}' does not exist.")
+        if active_branch and not branch_exists(active_branch):
+            raise ToolException(f"The active branch '{active_branch}' does not exist.")
+        
         return values
 
     def _get_files(
