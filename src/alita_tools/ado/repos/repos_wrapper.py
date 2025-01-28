@@ -39,10 +39,7 @@ class GitChange:
             self.newContent = None
 
     def to_dict(self):
-        change_dict = {
-            "changeType": self.changeType,
-            "item": self.item
-        }
+        change_dict = {"changeType": self.changeType, "item": self.item}
         if self.newContent:
             change_dict["newContent"] = self.newContent
         return change_dict
@@ -52,42 +49,70 @@ class ArgsSchema(Enum):
     NoInput = create_model("NoInput")
     BranchName = create_model(
         "BranchName",
-        branch_name=(str, FieldInfo(description="The name of the branch, e.g. `my_branch`.")),
+        branch_name=(
+            str,
+            FieldInfo(description="The name of the branch, e.g. `my_branch`."),
+        ),
     )
     GetPR = create_model(
         "GetPR",
-        pull_request_id=(str, FieldInfo(description="The PR number as a string, e.g. `12`")),
+        pull_request_id=(
+            str,
+            FieldInfo(description="The PR number as a string, e.g. `12`"),
+        ),
     )
     ListFilesModel = create_model(
         "ListFilesModel",
-        directory_path=(str, FieldInfo(default="", description=(
-            "The path of the directory, e.g. `some_dir/inner_dir`."
-            " Only input a string, do not include the parameter name."
-        )
-                                       )
-                        ),
+        directory_path=(
+            str,
+            FieldInfo(
+                default="",
+                description=(
+                    "The path of the directory, e.g. `some_dir/inner_dir`."
+                    " Only input a string, do not include the parameter name."
+                ),
+            ),
+        ),
         branch_name=(
-        str, FieldInfo(default="", description=("Repository branch. If None then active branch will be selected.")))
+            str,
+            FieldInfo(
+                default="",
+                description=(
+                    "Repository branch. If None then active branch will be selected."
+                ),
+            ),
+        ),
     )
     CreateBranchName = create_model(
         "CreateBranchName",
-        branch_name=(str, FieldInfo(description="The name of the branch, e.g. `my_branch`.")),
+        branch_name=(
+            str,
+            FieldInfo(description="The name of the branch, e.g. `my_branch`."),
+        ),
     )
     ReadFile = create_model(
         "ReadFile",
-        file_path=(str, FieldInfo(
-            description=(
-                "The full file path of the file you would like to read where the "
-                "path must NOT start with a slash, e.g. `some_dir/my_file.py`."
-            )
-        )
-                   )
+        file_path=(
+            str,
+            FieldInfo(
+                description=(
+                    "The full file path of the file you would like to read where the "
+                    "path must NOT start with a slash, e.g. `some_dir/my_file.py`."
+                )
+            ),
+        ),
     )
     CreateFile = create_model(
         "CreateFile",
-        branch_name=(str, FieldInfo(description="The name of the branch, e.g. `my_branch`.")),
+        branch_name=(
+            str,
+            FieldInfo(description="The name of the branch, e.g. `my_branch`."),
+        ),
         file_path=(str, FieldInfo(description="Path of a file to be created.")),
-        file_contents=(str, FieldInfo(description="Content of a file to be put into chat."))
+        file_contents=(
+            str,
+            FieldInfo(description="Content of a file to be put into chat."),
+        ),
     )
     UpdateFile = create_model(
         "UpdateFile",
@@ -95,15 +120,17 @@ class ArgsSchema(Enum):
     )
     DeleteFile = create_model(
         "DeleteFile",
-        file_path=(str, FieldInfo(
-            description=(
-                "The full file path of the file you would like to delete"
-                " where the path must NOT start with a slash, e.g."
-                " `some_dir/my_file.py`. Only input a string,"
-                " not the param name."
-            )
-        )
-                   ),
+        file_path=(
+            str,
+            FieldInfo(
+                description=(
+                    "The full file path of the file you would like to delete"
+                    " where the path must NOT start with a slash, e.g."
+                    " `some_dir/my_file.py`. Only input a string,"
+                    " not the param name."
+                )
+            ),
+        ),
     )
     CommentOnPullRequest = create_model(
         "CommentOnPullRequest",
@@ -111,18 +138,15 @@ class ArgsSchema(Enum):
     )
     GetWorkItems = create_model(
         "GetWorkItems",
-        pull_request_id=(str, FieldInfo(description="The PR number as a string, e.g. `12`")),
+        pull_request_id=(
+            str,
+            FieldInfo(description="The PR number as a string, e.g. `12`"),
+        ),
     )
     CreatePullRequest = create_model(
         "CreatePullRequest",
-        pull_request_title=(
-            str,
-            FieldInfo(description="Title of the pull request")
-        ),
-        pull_request_body=(
-            str,
-            FieldInfo(description="Body of the pull request")
-        ),
+        pull_request_title=(str, FieldInfo(description="Title of the pull request")),
+        pull_request_body=(str, FieldInfo(description="Body of the pull request")),
         branch_name=(
             str,
             FieldInfo(description="The name of the branch, e.g. `my_branch`."),
@@ -141,31 +165,53 @@ class ReposApiWrapper(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
-    @model_validator(mode='before')
+    @model_validator(mode="before")
     @classmethod
     def validate_toolkit(cls, values):
-        project = values['project']
-        organization_url = values['organization_url']
-        repository_id = values['repository_id']
-        base_branch = values['base_branch']
-        active_branch = values['active_branch']
-        credentials = BasicAuthentication("", values['token'])
+        project = values["project"]
+        organization_url = values["organization_url"]
+        repository_id = values["repository_id"]
+        base_branch = values["base_branch"]
+        active_branch = values["active_branch"]
+        credentials = BasicAuthentication("", values["token"])
+
+        if not organization_url or not project or not repository_id:
+            raise ToolException(
+                "Parameters: organization_url, project, and repository_id are required."
+            )
+
         try:
             cls._client = GitClient(base_url=organization_url, creds=credentials)
         except Exception as e:
             raise ToolException(f"Failed to connect to Azure DevOps: {e}")
+
+        def branch_exists(branch_name):
+            try:
+                branch = cls._client.get_branch(
+                    repository_id=repository_id, name=branch_name, project=project
+                )
+                return branch is not None
+            except Exception as e:
+                return False
+
+        if base_branch and not branch_exists(base_branch):
+            raise ToolException(f"The base branch '{base_branch}' does not exist.")
+        if active_branch and not branch_exists(active_branch):
+            raise ToolException(f"The active branch '{active_branch}' does not exist.")
+
         return values
 
     def _get_files(
-            self,
-            directory_path: str = "",
-            branch_name: str = "master",
-            recursion_level: str = "Full",
+        self,
+        directory_path: str = "",
+        branch_name: str = None,
+        recursion_level: str = "Full",
     ) -> str:
         """
         Params:
             recursion_level: OneLevel - includes immediate children, Full - includes all items, None - no recursion
         """
+        branch_name = branch_name if branch_name else self.base_branch
         files: List[str] = []
         try:
             version_descriptor = GitVersionDescriptor(
@@ -216,9 +262,14 @@ class ReposApiWrapper(BaseModel):
         return "".join(diff)
 
     def set_active_branch(self, branch_name: str) -> str:
-        """Equivalent to `git checkout branch_name` for this Agent.
+        """
+        Equivalent to `git checkout branch_name` for this Agent.
 
-        Returns an Error (as a string) if branch doesn't exist.
+        Parameters:
+            branch_name (str): The name of the branch to be the current branch
+
+        Returns:
+            Error (as a string) if branch doesn't exist.
         """
         current_branches = [
             branch.name
@@ -231,8 +282,8 @@ class ReposApiWrapper(BaseModel):
             return f"Switched to branch `{branch_name}`"
         else:
             msg = (
-                    f"Error {branch_name} does not exist, "
-                    + f"in repo with current branches: {str(current_branches)}"
+                f"Error {branch_name} does not exist, "
+                + f"in repo with current branches: {str(current_branches)}"
             )
             return ToolException(msg)
 
@@ -263,12 +314,13 @@ class ReposApiWrapper(BaseModel):
             logger.error(msg)
             return ToolException(msg)
 
-    def list_files(self, directory_path: str, branch_name: str = None) -> str:
+    def list_files(self, directory_path: str = "", branch_name: str = None) -> str:
         """
         Recursively fetches files from a directory in the repo.
 
         Parameters:
             directory_path (str): Path to the directory
+            branch_name (str): The name of the branch where the files to be received.
 
         Returns:
             str: List of file paths, or an error message.
@@ -280,7 +332,7 @@ class ReposApiWrapper(BaseModel):
         )
 
     def parse_pull_request_comments(
-            self, comment_threads: List[GitPullRequestCommentThread]
+        self, comment_threads: List[GitPullRequestCommentThread]
     ) -> List[dict]:
         """
         Extracts comments from each comment thread and puts them in a dictionary.
@@ -304,7 +356,7 @@ class ReposApiWrapper(BaseModel):
                         )
                         if comment.published_date
                         else None,
-                        "status": thread.status.name if thread.status else None,
+                        "status": thread.status if thread.status else None,
                     }
                 )
         return parsed_comments
@@ -333,10 +385,10 @@ class ReposApiWrapper(BaseModel):
         if pull_requests:
             parsed_prs = self.parse_pull_requests(pull_requests)
             parsed_prs_str = (
-                    "Found "
-                    + str(len(parsed_prs))
-                    + " open pull requests:\n"
-                    + str(parsed_prs)
+                "Found "
+                + str(len(parsed_prs))
+                + " open pull requests:\n"
+                + str(parsed_prs)
             )
             return parsed_prs_str
         else:
@@ -365,7 +417,7 @@ class ReposApiWrapper(BaseModel):
             return f"Pull request with '{pull_request_id}' ID is not found"
 
     def parse_pull_requests(
-            self, pull_requests: Union[GitPullRequest, List[GitPullRequest]]
+        self, pull_requests: Union[GitPullRequest, List[GitPullRequest]]
     ) -> List[dict]:
         """
         Extracts title and number from each Pull Request and puts them in a dictionary
@@ -380,10 +432,12 @@ class ReposApiWrapper(BaseModel):
         parsed = []
         try:
             for pull_request in pull_requests:
-                comment_threads: List[GitPullRequestCommentThread] = self._client.get_threads(
-                    repository_id=self.repository_id,
-                    pull_request_id=pull_request.pull_request_id,
-                    project=self.project,
+                comment_threads: List[GitPullRequestCommentThread] = (
+                    self._client.get_threads(
+                        repository_id=self.repository_id,
+                        pull_request_id=pull_request.pull_request_id,
+                        project=self.project,
+                    )
                 )
 
                 commits: List[GitCommitRef] = self._client.get_pull_request_commits(
@@ -490,11 +544,21 @@ class ReposApiWrapper(BaseModel):
         Create a new branch in Azure DevOps, and set it as the active bot branch.
         Equivalent to `git switch -c branch_name`.
 
+        Parameters:
+            branch_name (str): The name of the branch to be created.
+
         Returns:
             str: A plaintext success message or raises an exception if the branch already exists.
         """
-        self.active_branch = self.active_branch if self.active_branch else self.base_branch
+        self.active_branch = (
+            self.active_branch if self.active_branch else self.base_branch
+        )
         new_branch_name = branch_name
+        if bool(re.search(r"\s", new_branch_name)):
+            return (
+                f"Branch '{new_branch_name}' contains spaces."
+                "Please remove them or use special characters"
+            )
 
         # Check if the branch already exists
         existing_branch = None
@@ -542,6 +606,7 @@ class ReposApiWrapper(BaseModel):
         """
         Creates a new file on the Azure DevOps repo
         Parameters:
+            branch_name (str): The name of the branch where to create a file.
             file_path (str): The path of the file to be created
             file_contents (str): The content of the file to be created
         Returns:
@@ -582,9 +647,9 @@ class ReposApiWrapper(BaseModel):
                 name=self.active_branch,
             )
             if (
-                    branch is None
-                    or not hasattr(branch, "commit")
-                    or not hasattr(branch.commit, "commit_id")
+                branch is None
+                or not hasattr(branch, "commit")
+                or not hasattr(branch.commit, "commit_id")
             ):
                 return (
                     f"Branch `{self.active_branch}` does not exist or has no commits."
@@ -646,6 +711,7 @@ class ReposApiWrapper(BaseModel):
         """
         Updates a file with new content in Azure DevOps.
         Parameters:
+            branch_name (str): The name of the branch where update the file.
             file_query(str): Contains the file path and the file contents.
                 The old file contents is wrapped in OLD <<<< and >>>> OLD
                 The new file contents is wrapped in NEW <<<< and >>>> NEW
@@ -714,10 +780,8 @@ class ReposApiWrapper(BaseModel):
         Deletes a file from the repository in Azure DevOps.
 
         Parameters:
-            repository_id (str): The ID of the repository.
-            project (str): The project ID or project name.
-            file_path (str): The path of the file to delete.
             branch_name (str): The name of the branch where the file will be deleted.
+            file_path (str): The path of the file to delete.
 
         Returns:
             str: Success or failure message.
@@ -753,7 +817,7 @@ class ReposApiWrapper(BaseModel):
         """
         Fetches a specific work item and its first 10 comments from Azure DevOps.
         Parameters:
-            work_item_id (int): The ID for the Azure DevOps work item
+            pull_request_id (int): The ID for Pull Request based on which to get Work Item
         Returns:
             dict: A dictionary containing the work item's title, description, comments as a string,
                 and the username of the user who created the work item
@@ -777,17 +841,15 @@ class ReposApiWrapper(BaseModel):
         Adds a comment to a specific pull request in Azure DevOps based on a formatted query.
 
         Parameters:
-            repository_id (str): The ID of the repository where the pull request exists.
             comment_query (str): A string which contains the pull request ID, two newlines, and the comment.
                                  For example: "1\n\nThis is a test comment" adds the comment "This is a test comment" to PR 1.
-            project (str): The project ID or project name.
 
         Returns:
             str: A success or failure message.
         """
         try:
             pull_request_id = int(comment_query.split("\n\n")[0])
-            comment_text = comment_query[len(str(pull_request_id)) + 2:]
+            comment_text = comment_query[len(str(pull_request_id)) + 2 :]
 
             comment = Comment(comment_type="text", content=comment_text)
             comment_thread = GitPullRequestCommentThread(
@@ -805,7 +867,9 @@ class ReposApiWrapper(BaseModel):
             logger.error(msg)
             return ToolException(msg)
 
-    def create_pr(self, pull_request_title: str, pull_request_body: str, branch_name: str) -> str:
+    def create_pr(
+        self, pull_request_title: str, pull_request_body: str, branch_name: str
+    ) -> str:
         """
         Creates a pull request in Azure DevOps from the active branch to the base branch mentioned in params.
 
@@ -826,13 +890,13 @@ class ReposApiWrapper(BaseModel):
                 "targetRefName": f"refs/heads/{branch_name}",
                 "title": pull_request_title,
                 "description": pull_request_body,
-                "reviewers": []
+                "reviewers": [],
             }
 
             response = self._client.create_pull_request(
                 git_pull_request_to_create=pull_request,
                 repository_id=self.repository_id,
-                project=self.project
+                project=self.project,
             )
 
             return f"Successfully created PR with ID {response.pull_request_id}"
