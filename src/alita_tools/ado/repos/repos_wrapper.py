@@ -240,7 +240,11 @@ class ReposApiWrapper(BaseModel):
         """
         Equivalent to `git checkout branch_name` for this Agent.
 
-        Returns an Error (as a string) if branch doesn't exist.
+        Parameters:
+            branch_name (str): The name of the branch to be the current branch
+
+        Returns:
+            Error (as a string) if branch doesn't exist.
         """
         current_branches = [
             branch.name
