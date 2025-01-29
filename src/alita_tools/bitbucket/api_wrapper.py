@@ -107,45 +107,48 @@ class BitbucketAPIWrapper(BaseModel):
                 raise ToolException(f"Make sure your pr_json matches to data json format {create_pr_data}.\nOrigin exception: {e}")
             raise ToolException(e)
 
-    def create_file(self, file_path: str, file_contents: str) -> str:
+    def create_file(self, file_path: str, file_contents: str, branch: str) -> str:
         """
         Creates a new file on the bitbucket repo
         Parameters:
             file_path(str): a string which contains the file path (example: "hello_world.md").
             file_contents(str): a string which the file contents (example: "# Hello World!").
+            branch(str): branch name (by default: active_branch)
         Returns:
             str: A success or failure message
         """
         try:
-            self.bitbucket.create_file(file_path=file_path, file_contents=file_contents, branch=self.active_branch)
+            self.bitbucket.create_file(file_path=file_path, file_contents=file_contents, branch=branch)
             return f"File has been created: {file_path}."
         except Exception as e:
             return ToolException(f"File was not created due to error: {str(e)}")
 
-    def update_file(self, file_path: str, file_contents: str) -> str:
+    def update_file(self, file_path: str, file_contents: str, branch: str) -> str:
         """
         Updates file on the bitbucket repo
         Parameters:
             file_path(str): a string which contains the file path (example: "hello_world.md").
             file_contents(str): a string which the file contents (example: "# Hello World!").
+            branch(str): branch name (by default: active_branch)
         Returns:
             str: A success or failure message
         """
         try:
-            self.bitbucket.update_file(file_path=file_path, file_contents=file_contents, branch=self.active_branch)
+            self.bitbucket.update_file(file_path=file_path, file_contents=file_contents, branch=branch)
             return f"File has been updated: {file_path}."
         except Exception as e:
             return ToolException(f"File was not updated due to error: {str(e)}")
 
-    def read_file(self, file_path: str) -> str:
+    def read_file(self, file_path: str, branch: str) -> str:
         """
         Reads a file from the gitlab repo
         Parameters:
             file_path(str): the file path
+            branch(str): branch name (by default: active_branch)
         Returns:
             str: The file decoded as a string
         """
         try:
-            return self.bitbucket.get_file(file_path=file_path, branch=self.active_branch)
+            return self.bitbucket.get_file(file_path=file_path, branch=branch)
         except Exception as e:
             raise ToolException(f"Can't extract file content (`{file_path}`) due to error:\n{str(e)}")

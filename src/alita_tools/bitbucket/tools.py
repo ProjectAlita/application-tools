@@ -66,11 +66,14 @@ class CreateFileTool(BaseTool):
     Full file content to be created. It must be without any escapes, just raw content to CREATE in GIT.
     Generate full file content for this field without any additional texts, escapes, just raw code content. 
     You MUST NOT ignore, skip or comment any details, PROVIDE FULL CONTENT including all content based on all best practices.
-    """)))
+    """)),
+        branch=(str, FieldInfo(
+            description="branch - name of the branch file should be read from. e.g. `feature-1`. **IMPORTANT**: if branch not specified, try to determine from the chat history or clarify with user."))
+    )
 
-    def _run(self, file_path: str, file_contents: str):
+    def _run(self, file_path: str, file_contents: str, branch: str):
         logger.info(f"Create file in the repository {file_path} with content: {file_contents}")
-        return self.api_wrapper.create_file(file_path, file_contents)
+        return self.api_wrapper.create_file(file_path, file_contents, branch)
 
 class UpdateFileTool(BaseTool):
     api_wrapper: BitbucketAPIWrapper = Field(default_factory=BitbucketAPIWrapper)
@@ -85,11 +88,14 @@ class UpdateFileTool(BaseTool):
             Full file content to be inserted instead of initial one. It must be without any escapes, just raw content to CREATE in GIT.
             Generate full file content for this field without any additional texts, escapes, just raw code content. 
             You MUST NOT ignore, skip or comment any details, PROVIDE FULL CONTENT including all content based on all best practices.
-            """)))
+            """)),
+        branch=(str, FieldInfo(
+            description="branch - name of the branch file should be read from. e.g. `feature-1`. **IMPORTANT**: if branch not specified, try to determine from the chat history or clarify with user."))
+    )
 
-    def _run(self, file_path: str, file_contents: str):
+    def _run(self, file_path: str, file_contents: str, branch: str):
         logger.info(f"Update file in the repository {file_path} with content: {file_contents}")
-        return self.api_wrapper.update_file(file_path, file_contents)
+        return self.api_wrapper.update_file(file_path, file_contents, branch)
 
 
 class SetActiveBranchTool(BaseTool):
@@ -137,13 +143,14 @@ class ReadFileTool(BaseTool):
     args_schema: Type[BaseModel] = create_model(
         "ReadFileInput",
         file_path=(str, FieldInfo(
-            description="File path of file to be read. e.g. `src/agents/developer/tools/git/github_tools.py`. **IMPORTANT**: the path must not start with a slash")
-                   )
+            description="File path of file to be read. e.g. `src/agents/developer/tools/git/github_tools.py`. **IMPORTANT**: the path must not start with a slash")),
+        branch=(str, FieldInfo(
+            description="branch - name of the branch file should be read from. e.g. `feature-1`. **IMPORTANT**: if branch not specified, try to determine from the chat history or clarify with user."))
     )
 
-    def _run(self, file_path: str):
+    def _run(self, file_path: str, branch: str):
         try:
-            return self.api_wrapper.read_file(file_path)
+            return self.api_wrapper.read_file(file_path, branch)
         except Exception:
             stacktrace = traceback.format_exc()
             logger.error(f"Unable to read file: {stacktrace}")
