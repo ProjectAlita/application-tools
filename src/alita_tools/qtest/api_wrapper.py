@@ -99,6 +99,10 @@ class QtestApiWrapper(BaseModel):
         return swagger_client.TestCaseApi(self._client)
 
     def __convert_markdown_test_steps_data_to_dict(self, test_cases: str) -> list[dict]:
+        # Correct markdown table. It should have pipe at the end.
+        # This issue can appear on big table when LLM just "forget" to send the final pipe symbol.
+        if not test_cases.endswith("|"):
+            test_cases = test_cases + "|"
         # Split the table into lines
         lines = test_cases.strip().split('\n')
 
