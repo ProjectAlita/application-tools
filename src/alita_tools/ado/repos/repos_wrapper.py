@@ -116,10 +116,12 @@ class ArgsSchema(Enum):
     )
     UpdateFile = create_model(
         "UpdateFile",
+        branch_name=(str, FieldInfo(description="The name of the branch, e.g. `my_branch`.")),
         file_query=(str, FieldInfo(description="Strictly follow the provided rules.")),
     )
     DeleteFile = create_model(
         "DeleteFile",
+        branch_name=(str, FieldInfo(description="The name of the branch, e.g. `my_branch`.")),
         file_path=(
             str,
             FieldInfo(
@@ -602,7 +604,7 @@ class ReposApiWrapper(BaseModel):
             logger.error(msg)
             raise ToolException(msg)
 
-    def create_file(self, branch_name: str, file_path: str, file_contents: str) -> str:
+    def create_file(self, file_path: str, file_contents: str, branch_name: str = None) -> str:
         """
         Creates a new file on the Azure DevOps repo
         Parameters:

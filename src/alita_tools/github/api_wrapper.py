@@ -54,7 +54,6 @@ existing contents
 new contents
 >>>> NEW"""
 
-
 SearchCode = create_model(
     "SearchCodeModel",
     query=(str, FieldInfo(description=("A keyword-focused natural language "
@@ -155,7 +154,6 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
     github_app_id: Optional[str] = None
     github_app_private_key: Optional[str] = None
 
-
     @model_validator(mode='before')
     @classmethod
     def validate_environment(cls, values: Dict) -> Dict:
@@ -173,7 +171,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         )
 
         github_access_token = get_from_dict_or_env(
-            values, "github_access_token",  "GITHUB_ACCESS_TOKEN", default='')
+            values, "github_access_token", "GITHUB_ACCESS_TOKEN", default='')
 
         github_username = get_from_dict_or_env(
             values, "github_username", "GITHUB_USERNAME", default='')
@@ -233,7 +231,6 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
 
         return values
 
-
     def _get_files(self, directory_path: str, ref: str) -> List[str]:
         from github import GithubException
 
@@ -275,7 +272,6 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         """
         return dumps(super().get_issue(int(issue_number)))
 
-
     def list_files_in_main_branch(self) -> str:
         """
         Fetches all files in the main branch of the repo.
@@ -294,11 +290,10 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         """
         return self._get_files("", self.active_branch)
 
-
     def get_pull_request(self, pr_number: str) -> str:
         """
         Fetches information about a specific pull request.
-        
+
         Returns:
             str: A dictionary containing information about the pull request.
         """
@@ -320,6 +315,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         add_to_dict(response_dict, "title", pull.title)
         add_to_dict(response_dict, "number", str(pr_number))
         add_to_dict(response_dict, "body", str(pull.body))
+        add_to_dict(response_dict, "pr_url", str(pull.html_url))
 
         comments: List[str] = []
         page = 0
@@ -355,7 +351,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
     def list_pull_request_diffs(self, pr_number: str) -> str:
         """
         Fetches the files included in a pull request.
-        
+
         Returns:
             str: A list of files and pathes to then included in the pull request.
         """
@@ -566,7 +562,6 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         except Exception as e:
             return "Unable to update file due to error:\n" + str(e)
 
-
     def get_available_tools(self):
         return [
             {
@@ -579,7 +574,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             {
                 "ref": self.get_issue,
                 "name": "get_issue",
-                "mode":  "get_issue",
+                "mode": "get_issue",
                 "description": GET_ISSUE_PROMPT,
                 "args_schema": GetIssue,
             },
