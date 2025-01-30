@@ -117,7 +117,8 @@ class ArgsSchema(Enum):
     UpdateFile = create_model(
         "UpdateFile",
         branch_name=(str, FieldInfo(description="The name of the branch, e.g. `my_branch`.")),
-        file_query=(str, FieldInfo(description="Strictly follow the provided rules.")),
+        file_path=(str, FieldInfo(description="Path of a file to be updated.")),
+        update_query=(str, FieldInfo(description="Update query used to adjust target file.")),
     )
     DeleteFile = create_model(
         "DeleteFile",
@@ -709,16 +710,16 @@ class ReposApiWrapper(BaseModel):
             logger.error(msg)
             return ToolException(msg)
 
-    def update_file(self, branch_name: str, file_query: str) -> str:
+    def update_file(self, branch_name: str, file_path: str, update_query: str) -> str:
         """
         Updates a file with new content in Azure DevOps.
         Parameters:
             branch_name (str): The name of the branch where update the file.
-            file_query(str): Contains the file path and the file contents.
+            file_path (str): Path to the file for update.
+            update_query(str): Contains the file contents requried to be updated.
                 The old file contents is wrapped in OLD <<<< and >>>> OLD
                 The new file contents is wrapped in NEW <<<< and >>>> NEW
                 For example:
-                /test/hello.txt
                 OLD <<<<
                 Hello Earth!
                 >>>> OLD
@@ -737,11 +738,10 @@ class ReposApiWrapper(BaseModel):
                 "Please create a new branch and try again."
             )
         try:
-            file_path = file_query.split("\n")[0]
             file_content = self.read_file(file_path)
 
             updated_file_content = file_content
-            for old, new in self.extract_old_new_pairs(file_query):
+            for old, new in self.extract_old_new_pairs(update_query):
                 if not old.strip():
                     continue
                 updated_file_content = updated_file_content.replace(old, new)
@@ -761,14 +761,14 @@ class ReposApiWrapper(BaseModel):
             )
             latest_commit_id = branch.commit.commit_id
 
-            change = GitChange("edit", file_path, updated_file_content)
+            change = GitChange("edit", file_path, updated_file_content).to_dict()
 
             ref_update = GitRefUpdate(
                 name=f"refs/heads/{self.active_branch}", old_object_id=latest_commit_id
             )
             new_commit = GitCommit(comment=f"Update {file_path}", changes=[change])
             push = GitPush(commits=[new_commit], ref_updates=[ref_update])
-            self.create_push(
+            self._client.create_push(
                 push=push, repository_id=self.repository_id, project=self.project
             )
             return "Updated file " + file_path
@@ -797,7 +797,7 @@ class ReposApiWrapper(BaseModel):
 
             current_commit_id = branch.commit.commit_id
 
-            change = GitChange("delete", file_path)
+            change = GitChange("delete", file_path).to_dict()
 
             new_commit = GitCommitRef(comment="Delete " + file_path, changes=[change])
             ref_update = GitRefUpdate(
