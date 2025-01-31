@@ -1,4 +1,7 @@
 import logging
+import re
+import traceback
+from json import JSONDecodeError
 from traceback import format_exc
 import json
 from typing import List, Optional, Any, Dict
@@ -15,6 +18,26 @@ NoInput = create_model(
     "NoInput"
 )
 
+JiraInput = create_model(
+    "JiraInput",
+    method=(str, FieldInfo(description="The HTTP method to use for the request (GET, POST, PUT, DELETE, etc.)."
+                                       " Required parameter.")),
+    relative_url=(str, FieldInfo(description="""
+         Required parameter: The relative URI for JIRA REST API V2.
+         URI must start with a forward slash and '/rest/api/2/...'.
+         Do not include query parameters in the URL, they must be provided separately in 'params'.
+         For search/read operations, you MUST always get "key", "summary", "status", "assignee", "issuetype" and 
+         set maxResult, until users ask explicitly for more fields.
+         """
+    )),
+    params=(Optional[str], FieldInfo(
+        default="",
+        description="""
+         Optional JSON of parameters to be sent in request body or query params. MUST be string with valid JSON. 
+         For search/read operations, you MUST always get "key", "summary", "status", "assignee", "issuetype" and 
+         set maxResult, until users ask explicitly for more fields.
+         """
+    )))
 
 JiraSearch = create_model(
     "JiraSearchModel",
@@ -116,6 +139,100 @@ SUPPORTED_ATTACHMENT_MIME_TYPES = (
     # Add new supported types
 )
 
+def clean_json_string(json_string):
+    """
+    Extract JSON object from a string, removing extra characters before '{' and after '}'.
+
+    Args:
+    json_string (str): Input string containing a JSON object.
+
+    Returns:
+    str: Cleaned JSON string or original string if no JSON object found.
+    """
+    pattern = r'^[^{]*({.*})[^}]*$'
+    match = re.search(pattern, json_string, re.DOTALL)
+    if match:
+        return match.group(1)
+    return json_string
+
+def parse_payload_params(params: Optional[str]) -> Dict[str, Any]:
+    if params:
+        try:
+            return json.loads(clean_json_string(params))
+        except JSONDecodeError:
+            stacktrace = traceback.format_exc()
+            logger.error(f"Jira tool: Error parsing payload params: {stacktrace}")
+            return ToolException(f"JIRA tool exception. Passed params are not valid JSON. {stacktrace}")
+    return {}
+
+
+def get_issue_field(issue, field, default=None):
+    field_value = issue.get("fields", {}).get(field, default)
+    return field_value if field_value else default
+
+
+def get_additional_fields(issue, additional_fields):
+    additional_data = {}
+    for field in additional_fields:
+        if field not in additional_data:
+            additional_data[field] = get_issue_field(issue, field)
+    return additional_data
+
+
+def process_issue(jira_base_url, issue, payload_params: Dict[str, Any] = None):
+    issue_key = issue.get('key')
+    jira_link = f"{jira_base_url}/browse/{issue_key}"
+
+    parsed_issue = {
+        "key": issue_key,
+        "url": jira_link,
+        "summary": get_issue_field(issue, "summary", ""),
+        "assignee": get_issue_field(issue, "assignee", {}).get("displayName", "None"),
+        "status": get_issue_field(issue, "status", {}).get("name", ""),
+        "issuetype": get_issue_field(issue, "issuetype", {}).get("name", "")
+    }
+
+    process_payload(issue, payload_params, parsed_issue)
+    return parsed_issue
+
+
+def process_payload(issue, payload_params, parsed_issue):
+    fields_list = extract_fields_list(payload_params)
+
+    if fields_list:
+        update_parsed_issue_with_additional_data(issue, fields_list, parsed_issue)
+
+
+def extract_fields_list(payload_params):
+    if payload_params and 'fields' in payload_params:
+        fields = payload_params['fields']
+        if isinstance(fields, str) and fields.strip():
+            return fields.split(",")
+        elif isinstance(fields, list) and fields:
+            return fields
+    return []
+
+
+def update_parsed_issue_with_additional_data(issue, fields_list, parsed_issue):
+    additional_data = get_additional_fields(issue, fields_list)
+    for field, value in additional_data.items():
+        if field not in parsed_issue and value:
+            parsed_issue[field] = value
+
+
+def process_search_response(jira_url, response, payload_params: Dict[str, Any] = None):
+    if response.status_code != 200:
+        return response.text
+
+    processed_issues = []
+    json_response = response.json()
+
+    for issue in json_response.get('issues', []):
+        processed_issues.append(process_issue(jira_url, issue, payload_params))
+
+    return str(processed_issues)
+
+
 class JiraApiWrapper(BaseModel):
     base_url: str
     api_version: Optional[str] = "2",
@@ -127,6 +244,7 @@ class JiraApiWrapper(BaseModel):
     additional_fields: list[str] | str | None = []
     verify_ssl: Optional[bool] = True
     _client: Jira = PrivateAttr()
+    issue_search_pattern: str = r'/rest/api/\d+/search'
 
     @model_validator(mode='before')
     @classmethod
@@ -422,6 +540,34 @@ class JiraApiWrapper(BaseModel):
                     attachment_data.append(self._extract_attachment_content(extracted_attachment))
         return "\n\n".join(attachment_data)
 
+    def execute_generic_rq(self, method: str, relative_url: str, params: Optional[str] = "", *args):
+        """Executes a generic JIRA tool request."""
+        payload_params = parse_payload_params(params)
+        if method == "GET":
+            response = self._client.request(
+                method=method,
+                path=relative_url,
+                params=payload_params,
+                advanced_mode=True
+            )
+            self._client.raise_for_status(response)
+            if re.match(self.issue_search_pattern, relative_url):
+                response_text = process_search_response(self._client.url, response, payload_params)
+            else:
+                response_text = response.text
+        else:
+            response = self._client.request(
+                method=method,
+                path=relative_url,
+                data=payload_params,
+                advanced_mode=True
+            )
+            self._client.raise_for_status(response)
+            response_text = response.text
+        response_string = f"HTTP: {method} {relative_url} -> {response.status_code} {response.reason} {response_text}"
+        logger.debug(response_string)
+        return response_string
+
     def _extract_attachment_content(self, attachment):
         """Extract attachment's content if possible (used for api v.2)"""
 
@@ -508,6 +654,12 @@ class JiraApiWrapper(BaseModel):
                 "args_schema": GetRemoteLinks,
                 "ref": self.get_attachments_content,
 
+            },
+            {
+                "name": "execute_generic_rq",
+                "ref": self.execute_generic_rq,
+                "description": self.execute_generic_rq.__doc__,
+                "args_schema": JiraInput,
             }
         ]
 

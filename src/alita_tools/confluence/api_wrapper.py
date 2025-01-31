@@ -1,21 +1,24 @@
 import json
 import logging
 import re
+import traceback
+from json import JSONDecodeError
+from typing import List, Optional, Any, Dict
 
 import requests
-from typing import List, Optional, Any
-from pydantic import create_model
-from pydantic.fields import FieldInfo
-from langchain_core.documents import Document
-from pydantic import model_validator, BaseModel
 from langchain_community.document_loaders.confluence import ContentFormat
+from langchain_core.documents import Document
+from langchain_core.tools import ToolException
+from markdownify import markdownify
+from pydantic import create_model
+from pydantic import model_validator, BaseModel
+from pydantic.fields import FieldInfo
 from tenacity import (
     before_sleep_log,
     retry,
     stop_after_attempt,
     wait_exponential,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +109,23 @@ pageId = create_model(
     page_id=(str, FieldInfo(description="Id of page to be read")),
     skip_images=(bool, FieldInfo(description="Whether we need to skip existing images or not")),
 )
+
+сonfluenceInput = create_model(
+     "сonfluenceInput",
+     method=(str, FieldInfo(description="The HTTP method to use for the request (GET, POST, PUT, DELETE, etc.). Required parameter.")),
+     relative_url=(str, FieldInfo(description="Required parameter: The relative URI for Confluence API. URI must start with a forward slash and '/rest/...'. Do not include query parameters in the URL, they must be provided separately in 'params'. For search/read operations, you MUST always get minimum fields and set max results, until users ask explicitly for more fields.")),
+     params=(Optional[str], FieldInfo(default="", description="Optional JSON of parameters to be sent in request body or query params. MUST be string with valid JSON. For search/read operations, you MUST always get minimum fields and set max results, until users ask explicitly for more fields. For search/read operations you must generate CQL query string and pass it as params."))
+ )
+
+
+def parse_payload_params(params: Optional[str]) -> Dict[str, Any]:
+    if params:
+        try:
+            return json.loads(params)
+        except JSONDecodeError:
+            stacktrace = traceback.format_exc()
+            return ToolException(f"Confluence tool exception. Passed params are not valid JSON. {stacktrace}")
+    return {}
 
 class ConfluenceAPIWrapper(BaseModel):
     client: Any #: :meta private:
@@ -598,6 +618,36 @@ class ConfluenceAPIWrapper(BaseModel):
 
         return texts
 
+    def execute_generic_confluence(self, method: str, relative_url: str, params: Optional[str] = "") -> str:
+        """Generic Confluence Tool for Official Atlassian Confluence REST API to call, searching, creating, updating pages, etc."""
+        payload_params = parse_payload_params(params)
+        if method == "GET":
+            response = self.client.request(
+                method=method,
+                path=relative_url,
+                params=payload_params,
+                advanced_mode=True
+            )
+            response_text = self.process_search_response(relative_url, response)
+        else:
+            response = self.client.request(
+                method=method,
+                path=relative_url,
+                data=payload_params,
+                advanced_mode=True
+            )
+            response_text = response.text
+        response_string = f"HTTP: {method}{relative_url} -> {response.status_code}{response.reason}{response_text}"
+        logger.debug(response_string)
+        return response_string
+
+    def process_search_response(self, relative_url: str, response) -> str:
+        page_search_pattern = r'/rest/api/content/\d+'
+        if re.match(page_search_pattern, relative_url):
+            body = markdownify(response.text, heading_style="ATX")
+            return body
+        return response.text
+
     def get_available_tools(self):
         return [
             {
@@ -689,6 +739,12 @@ class ConfluenceAPIWrapper(BaseModel):
                 "ref": self.site_search,
                 "description": self.site_search.__doc__,
                 "args_schema": siteSearch,
+            },
+            {
+                "name": "execute_generic_confluence",
+                "description": self.execute_generic_confluence.__doc__,
+                "args_schema": сonfluenceInput,
+                "ref": self.execute_generic_confluence,
             }
         ]
 
