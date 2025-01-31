@@ -4,7 +4,7 @@ from typing import Optional, Type, Any
 from langchain_core.callbacks import CallbackManagerForToolRun
 from pydantic import BaseModel
 from pydantic import Field
-from langchain_core.tools import BaseTool
+from langchain_core.tools import BaseTool, ToolException
 
 
 class BaseAction(BaseTool):
@@ -20,6 +20,9 @@ class BaseAction(BaseTool):
         *args: Any,
         run_manager: Optional[CallbackManagerForToolRun] = None,
         **kwargs: Any,
-    ) -> str:
+    ) -> ToolException | str:
         """Use the Confluence API to run an operation."""
-        return self.api_wrapper.run(self.name, *args, **kwargs)
+        try:
+            return self.api_wrapper.run(self.name, *args, **kwargs)
+        except Exception as e:
+            return ToolException(f"An exception occurred: {e}")
