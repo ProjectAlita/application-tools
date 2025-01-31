@@ -16,24 +16,24 @@ NoInput = create_model(
 ReadList = create_model(
     "ReadList",
     list_title=(str, FieldInfo(description="Name of a Sharepoint list to be read.")),
-    limit=(int, FieldInfo(description="Limit (maximum number) of items to be returned"))
+    limit=(int, FieldInfo(description="Limit (maximum number) of list items to be returned"))
 )
 
 GetFiles = create_model(
     "GetFiles",
     folder_name=(str, FieldInfo(description="Folder name to get list of the files.")),
-    limit_files=(int, FieldInfo(description="Limit (maximum number) of files to be returned. Can be called with synonyms, such as First, Top, etc., or can be reflected just by a number for example Top 10 files'. Use default value if not specified in a query WITH NO EXTRA CONFIRMATION FROM A USER")),
+    limit_files=(int, FieldInfo(description="Limit (maximum number) of files to be returned. Can be called with synonyms, such as First, Top, etc., or can be reflected just by a number for example 'Top 10 files'. Use default value if not specified in a query WITH NO EXTRA CONFIRMATION FROM A USER")),
 )
 
 ReadDocument = create_model(
     "ReadDocument",
-    path=(str, FieldInfo(description="Contains the server-relative path of the  for reading."))
+    path=(str, FieldInfo(description="Contains the server-relative path of a document for reading."))
 )
 
 
 class SharepointApiWrapper(BaseModel):
     site_url: str
-    client_id: str
+    client_id: str = None
     client_secret: str = None
     token: str = None
     _client: Optional[ClientContext] = PrivateAttr()  # Private attribute for the office365 client
@@ -52,13 +52,12 @@ class SharepointApiWrapper(BaseModel):
             )
 
         site_url = values.get('site_url')
-        client_id = values.get('client_id')
+        client_id = values.get('client_id', None)
         client_secret = values.get('client_secret', None)
         token = values.get('token', None)
 
         try:
-            ctx_auth = AuthenticationContext(site_url)
-            if client_secret:
+            if client_id and client_secret:
                 credentials = ClientCredential(client_id, client_secret)
                 cls._client = ClientContext(site_url).with_credentials(credentials)
                 logging.info("Authenticated with secret id")
@@ -69,7 +68,7 @@ class SharepointApiWrapper(BaseModel):
                 })())
                 logging.info("Authenticated with token")
             else:
-                raise ToolException("You have to define token or secret id")
+                raise ToolException("You have to define token or client id&secret.")
             logging.info("Successfully authenticated to SharePoint.")
         except Exception as e:
                 logging.error(f"Failed to authenticate with SharePoint: {str(e)}")
@@ -77,7 +76,7 @@ class SharepointApiWrapper(BaseModel):
 
 
     def read_list(self, list_title, limit: int = 1000):
-        """ Reads a specified List in sharepoint site """
+        """ Reads a specified List in sharepoint site. Number of list items is limited by limit (default is 1000). """
         try:
             target_list = self._client.web.lists.get_by_title(list_title)
             self._client.load(target_list)
@@ -90,10 +89,11 @@ class SharepointApiWrapper(BaseModel):
             return result
         except Exception as e:
             logging.error(f"Failed to load items from sharepoint: {e}")
+            return ToolException("Can not list items. Please, double check List name and read permissions.")
 
 
     def get_files_list(self, folder_name: str = None, limit_files: int = 100):
-        """ Lists all files in a specific folder (if it defined) under Shared Documents path, limited by limit_files (default is 10)."""
+        """ If folder name is specified, lists all files in this folder under Shared Documents path. If folder name is empty, lists all files under root catalog (Shared Documents). Number of files is limited by limit_files (default is 100)."""
         try:
             result = []
 
@@ -113,10 +113,13 @@ class SharepointApiWrapper(BaseModel):
                     'Link': file.properties['LinkingUrl']
                 }
                 result.append(temp_props)
-            return result
+            if result:
+                return result
+            else:
+                return ToolException("Can not get files or folder is empty. Please, double check folder name and read permissions.")
         except Exception as e:
             logging.error(f"Failed to load files from sharepoint: {e}")
-            return []
+            return ToolException("Can not get files. Please, double check folder name and read permissions.")
 
     def read_file(self, path):
         """ Reads file located at the specified server-relative path. """
