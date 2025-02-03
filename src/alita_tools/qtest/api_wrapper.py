@@ -26,7 +26,7 @@ UpdateTestCase = create_model(
     "UpdateTestCase",
     test_id=(str, FieldInfo(description="Test ID e.g. TC-1234")),
     test_case_content=(str, FieldInfo(
-        description="Strictly follow the provided instructions."))
+        description="test_case_content should be provided as a markdown table with only plain text both in header and in cells (without any emphasis like bold, italic, strikethrough and so on)."))
 )
 
 FindTestCaseById = create_model(
