@@ -113,10 +113,7 @@ class SharepointApiWrapper(BaseModel):
                     'Link': file.properties['LinkingUrl']
                 }
                 result.append(temp_props)
-            if result:
-                return result
-            else:
-                return ToolException("Can not get files or folder is empty. Please, double check folder name and read permissions.")
+            return result if result else ToolException("Can not get files or folder is empty. Please, double check folder name and read permissions.")
         except Exception as e:
             logging.error(f"Failed to load files from sharepoint: {e}")
             return ToolException("Can not get files. Please, double check folder name and read permissions.")

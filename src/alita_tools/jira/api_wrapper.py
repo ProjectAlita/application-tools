@@ -162,7 +162,7 @@ def parse_payload_params(params: Optional[str]) -> Dict[str, Any]:
         except JSONDecodeError:
             stacktrace = traceback.format_exc()
             logger.error(f"Jira tool: Error parsing payload params: {stacktrace}")
-            return ToolException(f"JIRA tool exception. Passed params are not valid JSON. {stacktrace}")
+            raise ToolException(f"JIRA tool exception. Passed params are not valid JSON. {stacktrace}")
     return {}
 
 
@@ -393,8 +393,11 @@ class JiraApiWrapper(BaseModel):
 
     def get_specific_field_info(self, jira_issue_key: str, field_name: str):
         """ Get the specific field information from Jira by jira issue key and field name """
+
         jira_issue = self._client.issue(jira_issue_key, fields=field_name)
-        field_info = jira_issue['fields'][field_name]
+        field_info = jira_issue.get('fields', {}).get(field_name)
+        if not field_info:
+            return ToolException(f"Unable to find field '{field_name}'. All available fields are {', '.join([key for key, value in self._client.issue(jira_issue_key).get("fields").items() if value is not None])}")
         return f"Got the data from following Jira issue - {jira_issue_key} and field - {field_name}. The data is:\n{field_info}"
 
     def get_remote_links(self, jira_issue_key: str):
@@ -405,7 +408,6 @@ class JiraApiWrapper(BaseModel):
     def create_issue(self, issue_json: str):
         """ Create an issue in Jira."""
         try:
-            print(issue_json)
             params = json.loads(issue_json)
             self.create_issue_validate(params)
             # used in case linkage via `update` is required
@@ -562,7 +564,10 @@ class JiraApiWrapper(BaseModel):
                 data=payload_params,
                 advanced_mode=True
             )
-            self._client.raise_for_status(response)
+            try:
+                self._client.raise_for_status(response)
+            except Exception as e:
+                return ToolException(str(e))
             response_text = response.text
         response_string = f"HTTP: {method} {relative_url} -> {response.status_code} {response.reason} {response_text}"
         logger.debug(response_string)
