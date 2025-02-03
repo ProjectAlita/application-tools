@@ -11,6 +11,8 @@ from ..gitlab.utils import get_diff_w_position, get_position
 
 logger = logging.getLogger(__name__)
 
+branch_description: str = "The name of the branch required to perform corresponding action. e.g. `feature-1`. **IMPORTANT**: if branch not specified, try to determine from the chat history or clarify with user."
+
 GitLabCreateBranch = create_model(
     "GitLabCreateBranchModel",
     branch_name=(str, Field(description="Name of the branch to create")),
@@ -41,6 +43,7 @@ GitLabCreatePullRequest = create_model(
     "GitLabCreatePullRequestModel",
     pr_title=(str, Field(description="Title of the pull request")),
     pr_body=(str, Field(description="Body of the pull request")),
+    branch=(str, Field(description=branch_description)),
     repository=(str, Field(description="Name of the repository", default=None))
 )
 
@@ -54,24 +57,29 @@ GitLabCreateFile = create_model(
     "GitLabCreateFileModel",
     file_path=(str, Field(description="Path of the file to create")),
     file_contents=(str, Field(description="Contents of the file to create")),
+    branch=(str, Field(description=branch_description)),
     repository=(str, Field(description="Name of the repository", default=None))
 )
 
 GitLabReadFile = create_model(
     "GitLabReadFileModel",
     file_path=(str, Field(description="Path of the file to read")),
+    branch=(str, Field(description=branch_description)),
     repository=(str, Field(description="Name of the repository", default=None))
 )
 
 GitLabUpdateFile = create_model(
     "GitLabUpdateFile",
-    file_query=(str, Field(description="File path followed by the old and new contents")),
-    repository=(str, Field(description="Name of the repository", default=None))
+    file_path=(str, Field(description="Path of the file to update")),
+    update_query=(str, Field(description="File path followed by the old and new contents")),
+    repository=(str, Field(description="Name of the repository", default=None)),
+    branch=(str, Field(description=branch_description))
 )
 
 GitLabDeleteFile = create_model(
     "GitLabDeleteFileModel",
     file_path=(str, Field(description="Path of the file to delete")),
+    branch=(str, Field(description=branch_description)),
     repository=(str, Field(description="Name of the repository", default=None))
 )
 
@@ -101,6 +109,8 @@ AppendFileInput = create_model(
     "AppendFileInput",
     file_path=(str, Field(description="File path where new code should be added")),
     content=(str, Field(description="Code to be appended to existing file")),
+    branch=(str, Field(description=branch_description)),
+    repository=(str, Field(description="Name of the repository", default=None))
 )
 
 _misconfigured_alert = "Misconfigured repositories"
@@ -225,7 +235,7 @@ class GitLabWorkspaceAPIWrapper(BaseModel):
         except Exception as e:
             return ToolException(e)
 
-    def create_pull_request(self, pr_title: str, pr_body: str, repository: Optional[str] = None) -> str:
+    def create_pull_request(self, pr_title: str, pr_body: str, branch: str, repository: Optional[str] = None) -> str:
         """Makes a pull request from the bot's branch to the base branch."""
 
         try:
@@ -233,12 +243,10 @@ class GitLabWorkspaceAPIWrapper(BaseModel):
         except Exception as e:
             return ToolException(e)
 
-        if self.branch == self._active_branch:
-            return f"Cannot make a pull request because commits are already in the {self.branch} branch"
         try:
             pr = repo_instance.mergerequests.create(
                 {
-                    "source_branch": self._active_branch,
+                    "source_branch": branch,
                     "target_branch": self.branch,
                     "title": pr_title,
                     "description": pr_body,
@@ -284,16 +292,16 @@ class GitLabWorkspaceAPIWrapper(BaseModel):
         except Exception as e:
             return ToolException(e)
 
-    def create_file(self, file_path: str, file_contents: str, repository: Optional[str] = None) -> str:
+    def create_file(self, file_path: str, file_contents: str, branch: str, repository: Optional[str] = None) -> str:
         """Creates a new file on the gitlab repo."""
         try:
             repo_instance = self._get_repo(repository)
             try:
-                repo_instance.files.get(file_path, self._active_branch)
+                repo_instance.files.get(file_path, branch)
                 return f"File already exists at {file_path}. Use update_file instead"
             except Exception:
                 data = {
-                    "branch": self._active_branch,
+                    "branch": branch,
                     "commit_message": "Create " + file_path,
                     "file_path": file_path,
                     "content": file_contents,
@@ -303,31 +311,37 @@ class GitLabWorkspaceAPIWrapper(BaseModel):
         except Exception as e:
             return ToolException(e)
 
-    def read_file(self, file_path: str, repository: Optional[str] = None) -> str:
+    def read_file(self, file_path: str, branch: str, repository: Optional[str] = None) -> str:
         """Reads a file from the gitlab repo."""
 
         try:
             repo_instance = self._get_repo(repository)
-            file = repo_instance.files.get(file_path, self._active_branch)
+            file = repo_instance.files.get(file_path, branch)
             return file.decode().decode("utf-8")
         except Exception as e:
             return ToolException(e)
 
-    def update_file(self, file_query: str, repository: Optional[str] = None) -> str:
-        """Updates a file with new content."""
-
+    def update_file(self, file_path: str, update_query: str, branch: str, repository: Optional[str] = None) -> str:
+        """Updates a file with new content.
+        Parameters:
+            branch (str): The name of the branch where update the file.
+            update_query(str): Contains file contents.
+                The old file contents is wrapped in OLD <<<< and >>>> OLD
+                The new file contents is wrapped in NEW <<<< and >>>> NEW
+                For example:
+                /test/hello.txt
+                OLD <<<<
+                Hello Earth!
+                >>>> OLD
+                NEW <<<<
+                Hello Mars!
+                >>>> NEW
+        """
         try:
             repo_instance = self._get_repo(repository)
-            if self._active_branch == self.branch:
-                return (
-                    "You're attempting to commit to the directly"
-                    f"to the {self.branch} branch, which is protected. "
-                    "Please create a new branch and try again."
-                )
-            file_path: str = file_query.split("\n")[0]
-            file_content = self.read_file(file_path, repository)
+            file_content = self.read_file(file_path, branch, repository)
             updated_file_content = file_content
-            for old, new in self.extract_old_new_pairs(file_query):
+            for old, new in self.extract_old_new_pairs(update_query):
                 if not old.strip():
                     continue
                 updated_file_content = updated_file_content.replace(old, new)
@@ -338,7 +352,7 @@ class GitLabWorkspaceAPIWrapper(BaseModel):
                     "the current file contents."
                 )
             commit = {
-                "branch": self._active_branch,
+                "branch": branch,
                 "commit_message": "Update " + file_path,
                 "actions": [
                     {
@@ -353,12 +367,12 @@ class GitLabWorkspaceAPIWrapper(BaseModel):
         except Exception as e:
             return ToolException(f"Unable to update file due to error: {str(e)}")
 
-    def delete_file(self, file_path: str, repository: Optional[str] = None) -> str:
+    def delete_file(self, file_path: str, branch: str, repository: Optional[str] = None) -> str:
         """Deletes a file from the repo."""
         try:
             repo_instance = self._get_repo(repository)
             repo_instance.files.delete(
-                file_path, self._active_branch, "Delete " + file_path
+                file_path, branch, "Delete " + file_path
             )
             return "Deleted file " + file_path
         except Exception as e:
@@ -395,7 +409,7 @@ class GitLabWorkspaceAPIWrapper(BaseModel):
                 current_section_content.append(line)
         return list(zip(old_contents, new_contents))
 
-    def append_file(self, file_path: str, content: str) -> str:
+    def append_file(self, file_path: str, content: str, branch: str, repository: Optional[str] = None) -> str:
         """
         Appends new content to the end of file.
         Parameters:
@@ -403,22 +417,17 @@ class GitLabWorkspaceAPIWrapper(BaseModel):
                 For example:
                 /test/hello.txt
             content(str): new content.
+            branch(str): branch name (by default: active_branch)
         Returns:
             A success or failure message
         """
-        if self.active_branch == self.branch:
-            return (
-                "You're attempting to commit to the directly"
-                f"to the {self.branch} branch, which is protected. "
-                "Please create a new branch and try again."
-            )
         try:
             if not content:
                 return "Content to be added is empty. Append file won't be completed"
-            file_content = self.read_file(file_path)
+            file_content = self.read_file(file_path, branch)
             updated_file_content = f"{file_content}\n{content}"
             commit = {
-                "branch": self.active_branch,
+                "branch": branch,
                 "commit_message": "Append " + file_path,
                 "actions": [
                     {
@@ -429,7 +438,7 @@ class GitLabWorkspaceAPIWrapper(BaseModel):
                 ],
             }
 
-            self.repo_instance.commits.create(commit)
+            self._get_repo(repository).commits.create(commit)
             return "Updated file " + file_path
         except Exception as e:
             return "Unable to update file due to error:\n" + str(e)
