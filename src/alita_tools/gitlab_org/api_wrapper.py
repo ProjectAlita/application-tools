@@ -11,7 +11,7 @@ from ..gitlab.utils import get_diff_w_position, get_position
 
 logger = logging.getLogger(__name__)
 
-branch_description: str = "The name of the branch required ti perform corresponding action. e.g. `feature-1`. **IMPORTANT**: if branch not specified, try to determine from the chat history or clarify with user."
+branch_description: str = "The name of the branch required to perform corresponding action. e.g. `feature-1`. **IMPORTANT**: if branch not specified, try to determine from the chat history or clarify with user."
 
 GitLabCreateBranch = create_model(
     "GitLabCreateBranchModel",
