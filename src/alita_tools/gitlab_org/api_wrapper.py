@@ -11,6 +11,8 @@ from ..gitlab.utils import get_diff_w_position, get_position
 
 logger = logging.getLogger(__name__)
 
+branch_description: str = "The name of the branch required ti perform corresponding action. e.g. `feature-1`. **IMPORTANT**: if branch not specified, try to determine from the chat history or clarify with user."
+
 GitLabCreateBranch = create_model(
     "GitLabCreateBranchModel",
     branch_name=(str, Field(description="Name of the branch to create")),
@@ -41,8 +43,7 @@ GitLabCreatePullRequest = create_model(
     "GitLabCreatePullRequestModel",
     pr_title=(str, Field(description="Title of the pull request")),
     pr_body=(str, Field(description="Body of the pull request")),
-    branch=(str, Field(
-            description="branch - name of the branch where the file should be updated. e.g. `feature-1`. **IMPORTANT**: if branch not specified, try to determine from the chat history or clarify with user.")),
+    branch=(str, Field(description=branch_description)),
     repository=(str, Field(description="Name of the repository", default=None))
 )
 
@@ -56,16 +57,14 @@ GitLabCreateFile = create_model(
     "GitLabCreateFileModel",
     file_path=(str, Field(description="Path of the file to create")),
     file_contents=(str, Field(description="Contents of the file to create")),
-    branch=(str, Field(
-            description="branch - name of the branch where the file should be created. e.g. `feature-1`. **IMPORTANT**: if branch not specified, try to determine from the chat history or clarify with user.")),
+    branch=(str, Field(description=branch_description)),
     repository=(str, Field(description="Name of the repository", default=None))
 )
 
 GitLabReadFile = create_model(
     "GitLabReadFileModel",
     file_path=(str, Field(description="Path of the file to read")),
-    branch=(str, Field(
-            description="branch - name of the branch the file should be read from. e.g. `feature-1`. **IMPORTANT**: if branch not specified, try to determine from the chat history or clarify with user.")),
+    branch=(str, Field(description=branch_description)),
     repository=(str, Field(description="Name of the repository", default=None))
 )
 
@@ -74,15 +73,13 @@ GitLabUpdateFile = create_model(
     file_path=(str, Field(description="Path of the file to update")),
     update_query=(str, Field(description="File path followed by the old and new contents")),
     repository=(str, Field(description="Name of the repository", default=None)),
-    branch=(str, Field(
-            description="branch - name of the branch where the file should be updated. e.g. `feature-1`. **IMPORTANT**: if branch not specified, try to determine from the chat history or clarify with user."))
+    branch=(str, Field(description=branch_description))
 )
 
 GitLabDeleteFile = create_model(
     "GitLabDeleteFileModel",
     file_path=(str, Field(description="Path of the file to delete")),
-    branch=(str, Field(
-            description="branch - name of the branch where the file should be updated. e.g. `feature-1`. **IMPORTANT**: if branch not specified, try to determine from the chat history or clarify with user.")),
+    branch=(str, Field(description=branch_description)),
     repository=(str, Field(description="Name of the repository", default=None))
 )
 
@@ -112,8 +109,7 @@ AppendFileInput = create_model(
     "AppendFileInput",
     file_path=(str, Field(description="File path where new code should be added")),
     content=(str, Field(description="Code to be appended to existing file")),
-    branch=(str, Field(
-            description="branch - name of the branch where the file should be updated. e.g. `feature-1`. **IMPORTANT**: if branch not specified, try to determine from the chat history or clarify with user.")),
+    branch=(str, Field(description=branch_description)),
     repository=(str, Field(description="Name of the repository", default=None))
 )
 
