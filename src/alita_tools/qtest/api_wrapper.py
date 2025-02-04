@@ -286,7 +286,7 @@ class QtestApiWrapper(BaseModel):
         try:
             response = test_cases_api_instance.update_test_case(self.project_id, qtest_id, bodies[0])
             return f"""Successfully updated test case in project with id - {self.project_id}.
-            Updated test case id - {response['pid']}.
+            Updated test case id - {response.pid}.
             Test id of updated test case - {test_id}.
             Updated with content:\n{test_case_content}"""
         except ApiException as e:
