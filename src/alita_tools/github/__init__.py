@@ -6,6 +6,7 @@ from pydantic.fields import FieldInfo
 
 from .api_wrapper import AlitaGitHubAPIWrapper
 from .tool import GitHubAction
+import re
 
 name = "github"
 
@@ -56,7 +57,7 @@ class AlitaGitHubToolkit(BaseToolkit):
         github_api_wrapper = AlitaGitHubAPIWrapper(**kwargs)
         available_tools: List[Dict] = github_api_wrapper.get_available_tools()
         tools = []
-        repo = github_api_wrapper.github_repository.split("/")[1]
+        repo = re.sub(r'[^a-zA-Z0-9_-]', '', github_api_wrapper.github_repository.split("/")[1])
         for tool in available_tools:
             if selected_tools:
                 if tool["name"] not in selected_tools:
