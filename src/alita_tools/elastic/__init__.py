@@ -26,7 +26,7 @@ class ElasticToolkit(BaseToolkit):
             name,
             url=(str, FieldInfo(default=None, title="Elasticsearch URL", description="Elasticsearch URL")),
             api_key=(
-                Optional[tuple[str, str]],
+                Optional[str],
                 FieldInfo(
                     default=None,
                     title="Cluster URL",
