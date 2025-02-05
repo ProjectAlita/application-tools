@@ -1,7 +1,8 @@
-from typing import Optional
+from typing import List, Literal, Optional
 
 from langchain_core.tools import BaseToolkit, BaseTool
-from pydantic import BaseModel, create_model, FieldInfo
+from pydantic import BaseModel, ConfigDict, create_model
+from pydantic.fields import FieldInfo
 
 from .api_wrapper import ELITEAElasticApiWrapper
 from ..base.tool import BaseAction
@@ -11,8 +12,8 @@ name = "elastic"
 def get_tools(tool):
     return ElasticToolkit().get_toolkit(
         selected_tools=tool['settings'].get('selected_tools', []),
-        url=tool['settings']['url'],
-        api_key=tool['settings'].get('api_key')
+        url=tool['settings'].get('url', ''),
+        api_key=tool['settings'].get('api_key', None)
     ).get_tools()
 
 class ElasticToolkit(BaseToolkit):
@@ -20,10 +21,25 @@ class ElasticToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
+        available_tools = [
+            x['name'] for x in ELITEAElasticApiWrapper.model_construct().get_available_tools()
+        ]
+        selected_tools = Literal[tuple(available_tools)] if available_tools else Literal[List[str]]
+
         return create_model(
             name,
-            url=(str, FieldInfo(description="Elasticsearch URL")),
-            api_key=(Optional[tuple[str, str]], FieldInfo(description="API Key for Elasticsearch", default=None)),
+            url=(str, FieldInfo(default=None, title="Elasticsearch URL", description="Elasticsearch URL")),
+            api_key=(
+                Optional[tuple[str, str]],
+                FieldInfo(
+                    default=None,
+                    title="Cluster URL",
+                    description="API Key for Elasticsearch",
+                    json_schema_extra={'secret': True}
+                    )
+                ),
+            selected_tools=(List[str], FieldInfo(default_factory=list, title="Selected tools", description="Selected tools", default=selected_tools)),
+            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Elasticsearch", "icon_url": None}})
         )
 
     @classmethod

@@ -1,5 +1,7 @@
+from typing import Any, List, Literal
+
 from langchain_core.tools import BaseToolkit, BaseTool
-from pydantic import BaseModel, create_model
+from pydantic import BaseModel, ConfigDict, create_model
 from pydantic.fields import FieldInfo
 
 from .api_wrapper import CSVToolApiWrapper
@@ -11,7 +13,7 @@ name = "pandas_toolkit"
 def get_tools(tool):
     return PandasToolkit().get_toolkit(
         selected_tools=tool['settings'].get('selected_tools', []),
-        csv_content=tool['settings']['csv_content']
+        csv_content=tool['settings'].get('csv_content', None)
     ).get_tools()
 
 
@@ -20,9 +22,16 @@ class PandasToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
+        available_tools = [
+            x['name'] for x in CSVToolApiWrapper.model_construct().get_available_tools()
+        ]
+        selected_tools = Literal[tuple(available_tools)] if available_tools else Literal[List[str]]
+
         return create_model(
             name,
-            csv_content=(Any, FieldInfo(description="CSV content to be processed")),
+            csv_content=(Any, FieldInfo(default=None, title="CSV content", description="CSV content to be processed")),
+            selected_tools=(List[str], FieldInfo(default_factory=list, title="Selected tools", description="Selected tools", default=selected_tools)),
+            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Pandas", "icon_url": None}})
         )
 
     @classmethod

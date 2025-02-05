@@ -1,5 +1,8 @@
+from typing import List, Literal
+
 from langchain_core.tools import BaseToolkit, BaseTool
-from pydantic import BaseModel, create_model, FieldInfo
+from pydantic import BaseModel, ConfigDict, create_model
+from pydantic.fields import FieldInfo
 
 from .api_wrapper import KeycloakApiWrapper
 from ..base.tool import BaseAction
@@ -9,10 +12,10 @@ name = "keycloak"
 def get_tools(tool):
     return KeycloakToolkit().get_toolkit(
         selected_tools=tool['settings'].get('selected_tools', []),
-        base_url=tool['settings']['base_url'],
-        realm=tool['settings']['realm'],
-        client_id=tool['settings']['client_id'],
-        client_secret=tool['settings']['client_secret']
+        base_url=tool['settings'].get('base_url', ''),
+        realm=tool['settings'].get('realm', ''),
+        client_id=tool['settings'].get('client_id', ''),
+        client_secret=tool['settings'].get('client_secret', '')
     ).get_tools()
 
 class KeycloakToolkit(BaseToolkit):
@@ -20,12 +23,19 @@ class KeycloakToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
+        available_tools = [
+            x['name'] for x in KeycloakApiWrapper.model_construct().get_available_tools()
+        ]
+        selected_tools = Literal[tuple(available_tools)] if available_tools else Literal[List[str]]
+
         return create_model(
             name,
-            base_url=(str, FieldInfo(description="Keycloak server URL")),
-            realm=(str, FieldInfo(description="Keycloak realm")),
-            client_id=(str, FieldInfo(description="Keycloak client ID")),
-            client_secret=(str, FieldInfo(description="Keycloak client secret")),
+            base_url=(str, FieldInfo(default="", title="Server URL", description="Keycloak server URL")),
+            realm=(str, FieldInfo(default="", title="Realm", description="Keycloak realm")),
+            client_id=(str, FieldInfo(default="", title="Client ID", description="Keycloak client ID")),
+            client_secret=(str, FieldInfo(default="", title="Client sercet", description="Keycloak client secret", json_schema_extra={'secret': True})),
+            selected_tools=(List[str], FieldInfo(default_factory=list, title="Selected tools", description="Selected tools", default=selected_tools)),
+            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Keycloak", "icon_url": None}})
         )
 
     @classmethod

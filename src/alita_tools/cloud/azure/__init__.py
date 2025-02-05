@@ -1,5 +1,7 @@
+from typing import List, Literal
+
 from langchain_core.tools import BaseToolkit, BaseTool
-from pydantic import BaseModel, create_model
+from pydantic import BaseModel, create_model, ConfigDict
 from pydantic.fields import FieldInfo
 
 from .api_wrapper import AzureApiWrapper
@@ -11,10 +13,10 @@ name = "azure"
 def get_tools(tool):
     return AzureToolkit().get_toolkit(
         selected_tools=tool['settings'].get('selected_tools', []),
-        subscription_id=tool['settings']['subscription_id'],
-        tenant_id=tool['settings']['tenant_id'],
-        client_id=tool['settings']['client_id'],
-        client_secret=tool['settings']['client_secret']
+        subscription_id=tool['settings'].get('subscription_id', ''),
+        tenant_id=tool['settings'].get('tenant_id', ''),
+        client_id=tool['settings'].get('client_id', ''),
+        client_secret=tool['settings'].get('client_secret', '')
     ).get_tools()
 
 
@@ -23,12 +25,19 @@ class AzureToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
+        available_tools = [
+            x['name'] for x in AzureApiWrapper.model_construct().get_available_tools()
+        ]
+        selected_tools = Literal[tuple(available_tools)] if available_tools else Literal[List[str]]
+
         return create_model(
             name,
-            subscription_id=(str, FieldInfo(description="Azure subscription ID")),
-            tenant_id=(str, FieldInfo(description="Azure tenant ID")),
-            client_id=(str, FieldInfo(description="Azure client ID")),
-            client_secret=(str, FieldInfo(description="Azure client secret")),
+            subscription_id=(str, FieldInfo(default="", title="Subscription ID", description="Azure subscription ID")),
+            tenant_id=(str, FieldInfo(default="", title="Tenant ID", description="Azure tenant ID")),
+            client_id=(str, FieldInfo(default="", title="Client ID", description="Azure client ID")),
+            client_secret=(str, FieldInfo(default="", title="Client secret", description="Azure client secret", json_schema_extra={'secret': True})),
+            selected_tools=(List[str], FieldInfo(default_factory=list, title="Selected tools", description="Selected tools", default=selected_tools)),
+            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Cloud Azure", "icon_url": None}})
         )
 
     @classmethod
