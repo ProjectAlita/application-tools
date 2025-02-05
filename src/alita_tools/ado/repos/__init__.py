@@ -9,15 +9,6 @@ from .repos_wrapper import ReposApiWrapper
 
 name = "azure_devops_repos"
 
-def get_tools(tool):
-    return AzureDevOpsReposToolkit().get_toolkit(
-            selected_tools=tool['settings'].get('selected_tools', []),
-            organization_url=tool['settings'].get('organization_url', ''),
-            project=tool['settings'].get('project', ''),
-            repository_id=tool['settings'].get('repository_id', ''),
-            token=tool['settings'].get('token', '')
-            ).get_tools()
-
 class AzureDevOpsReposToolkit(BaseToolkit):
     tools: List[BaseTool] = []
 

@@ -3,7 +3,7 @@ from langchain_community.agent_toolkits.base import BaseToolkit
 from .api_wrapper import ConfluenceAPIWrapper
 from langchain_core.tools import BaseTool
 from ..base.tool import BaseAction
-from pydantic import BaseModel, create_model, ConfigDict
+from pydantic import create_model, BaseModel, ConfigDict
 from pydantic.fields import FieldInfo
 
 

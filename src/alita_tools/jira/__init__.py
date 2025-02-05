@@ -2,7 +2,7 @@ from typing import List, Optional, Literal
 from .api_wrapper import JiraApiWrapper
 from langchain_core.tools import BaseTool, BaseToolkit
 from ..base.tool import BaseAction
-from pydantic import BaseModel, create_model, ConfigDict
+from pydantic import create_model, BaseModel, ConfigDict
 from pydantic.fields import FieldInfo
 
 name = "jira"
