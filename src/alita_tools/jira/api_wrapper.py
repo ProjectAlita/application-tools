@@ -397,7 +397,9 @@ class JiraApiWrapper(BaseModel):
         jira_issue = self._client.issue(jira_issue_key, fields=field_name)
         field_info = jira_issue.get('fields', {}).get(field_name)
         if not field_info:
-            return ToolException(f"Unable to find field '{field_name}'. All available fields are {', '.join([key for key, value in self._client.issue(jira_issue_key).get("fields").items() if value is not None])}")
+            existing_fields = [key for key, value in self._client.issue(jira_issue_key).get("fields").items() if value is not None]
+            existing_fields_str = ', '.join(existing_fields)
+            return ToolException(f"Unable to find field '{field_name}'. All available fields are '{existing_fields_str}'")
         return f"Got the data from following Jira issue - {jira_issue_key} and field - {field_name}. The data is:\n{field_info}"
 
     def get_remote_links(self, jira_issue_key: str):
