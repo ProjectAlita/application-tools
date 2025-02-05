@@ -23,16 +23,12 @@ class OpenApiToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
-        available_tools = [
-            x['name'] for x in OpenApiWrapper.model_construct().get_available_tools()
-        ]
-        selected_tools = Literal[tuple(available_tools)] if available_tools else Literal[List[str]]
-
+        selected_tools = (x['name'] for x in OpenApiWrapper.model_construct().get_available_tools())
         return create_model(
             name,
             spec=(str, FieldInfo(default="", title="Specification", description="OpenAPI specification")),
             api_key=(str, FieldInfo(default="", title="API key", description="API key", json_schema_extra={'secret': True})),
-            selected_tools=(List[str], FieldInfo(default_factory=list, title="Selected tools", description="Selected tools", default=selected_tools)),
+            selected_tools=(List[Literal[tuple(selected_tools)]], []),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "OpenAPI", "icon_url": None}})
         )
 

@@ -24,17 +24,13 @@ class AWSToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
-        available_tools = [
-            x['name'] for x in AWSToolConfig.model_construct().get_available_tools()
-        ]
-        selected_tools = Literal[tuple(available_tools)] if available_tools else Literal[List[str]]
-
+        selected_tools = (x['name'] for x in AWSToolConfig.model_construct().get_available_tools())
         return create_model(
             name,
             region=(str, FieldInfo(default="", title="Region", description="AWS region")),
             access_key_id=(Optional[str], FieldInfo(default=None, title="Access Key ID", description="AWS access key ID")),
             secret_access_key=(Optional[str], FieldInfo(default=None, title="Secret Access Key", description="AWS secret access key", json_schema_extra={'secret': True})),
-            selected_tools=(List[str], FieldInfo(default_factory=list, title="Selected tools", description="Selected tools", default=selected_tools)),
+            selected_tools=(List[Literal[tuple(selected_tools)]], []),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Cloud AWS", "icon_url": None}})
         )
 

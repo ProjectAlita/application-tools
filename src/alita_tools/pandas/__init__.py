@@ -22,15 +22,11 @@ class PandasToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
-        available_tools = [
-            x['name'] for x in CSVToolApiWrapper.model_construct().get_available_tools()
-        ]
-        selected_tools = Literal[tuple(available_tools)] if available_tools else Literal[List[str]]
-
+        selected_tools = (x['name'] for x in CSVToolApiWrapper.model_construct().get_available_tools())
         return create_model(
             name,
             csv_content=(Any, FieldInfo(default=None, title="CSV content", description="CSV content to be processed")),
-            selected_tools=(List[str], FieldInfo(default_factory=list, title="Selected tools", description="Selected tools", default=selected_tools)),
+            selected_tools=(List[Literal[tuple(selected_tools)]], []),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Pandas", "icon_url": None}})
         )
 

@@ -23,18 +23,14 @@ class KeycloakToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
-        available_tools = [
-            x['name'] for x in KeycloakApiWrapper.model_construct().get_available_tools()
-        ]
-        selected_tools = Literal[tuple(available_tools)] if available_tools else Literal[List[str]]
-
+        selected_tools = (x['name'] for x in KeycloakApiWrapper.model_construct().get_available_tools())
         return create_model(
             name,
             base_url=(str, FieldInfo(default="", title="Server URL", description="Keycloak server URL")),
             realm=(str, FieldInfo(default="", title="Realm", description="Keycloak realm")),
             client_id=(str, FieldInfo(default="", title="Client ID", description="Keycloak client ID")),
             client_secret=(str, FieldInfo(default="", title="Client sercet", description="Keycloak client secret", json_schema_extra={'secret': True})),
-            selected_tools=(List[str], FieldInfo(default_factory=list, title="Selected tools", description="Selected tools", default=selected_tools)),
+            selected_tools=(List[Literal[tuple(selected_tools)]], []),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Keycloak", "icon_url": None}})
         )
 

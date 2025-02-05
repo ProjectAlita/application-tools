@@ -23,11 +23,7 @@ class KubernetesToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
-        available_tools = [
-            x['name'] for x in KubernetesApiWrapper.model_construct().get_available_tools()
-        ]
-        selected_tools = Literal[tuple(available_tools)] if available_tools else Literal[List[str]]
-
+        selected_tools = (x['name'] for x in KubernetesApiWrapper.model_construct().get_available_tools())
         return create_model(
             name,
             url=(str, FieldInfo(default="", title="Cluster URL", description="The URL of the Kubernetes cluster")),
@@ -40,7 +36,7 @@ class KubernetesToolkit(BaseToolkit):
                     json_schema_extra={'secret': True}
                     )
                 ),
-            selected_tools=(List[str], FieldInfo(default_factory=list, title="Selected tools", description="Selected tools", default=selected_tools)),
+            selected_tools=(List[Literal[tuple(selected_tools)]], []),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Cloud Kubernetes", "icon_url": None}})
         )
 

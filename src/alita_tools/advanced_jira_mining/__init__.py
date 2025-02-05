@@ -30,11 +30,7 @@ class AdvancedJiraMiningToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
-        available_tools = [
-            x['name'] for x in AdvancedJiraMiningWrapper.model_construct().get_available_tools()
-        ]
-        selected_tools = Literal[tuple(available_tools)] if available_tools else Literal[List[str]]
-
+        selected_tools = (x['name'] for x in AdvancedJiraMiningWrapper.model_construct().get_available_tools())
         return create_model(
             name,
             jira_base_url=(str, FieldInfo(default="", title="Jira URL", description="Jira URL")),
@@ -48,7 +44,7 @@ class AdvancedJiraMiningToolkit(BaseToolkit):
             jira_token=(Optional[str], FieldInfo(default=None, title="Token", description="JIRA Token", json_schema_extra={'secret': True})),
             is_jira_cloud=(bool, FieldInfo(default=True, title="Cloud", description="JIRA Cloud")),
             verify_ssl=(bool, FieldInfo(default=True, title="Verify SSL", description="Verify SSL")),
-            selected_tools=(List[str], FieldInfo(default_factory=list, title="Selected tools", description="Selected tools", default=selected_tools)),
+            selected_tools=(List[Literal[tuple(selected_tools)]], []),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Advanced JIRA mining", "icon_url": None}})
         )
 

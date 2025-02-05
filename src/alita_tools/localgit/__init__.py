@@ -23,18 +23,14 @@ class AlitaLocalGitToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
-        available_tools = [
-            x['name'] for x in LocalGit.model_construct().get_available_tools()
-        ]
-        selected_tools = Literal[tuple(available_tools)] if available_tools else Literal[List[str]]
-
+        selected_tools = (x['name'] for x in LocalGit.model_construct().get_available_tools())
         return create_model(
             name,
             repo_path=(str, FieldInfo(default="", title="Repository path", description="Local GIT Repository path")),
             base_path=(str, FieldInfo(default="", title="Base path", description="Local GIT Base path")),
             repo_url=(Optional[str], FieldInfo(default=None, title="Repository URL", description="Local GIT Repository URL")),
             commit_sha=(Optional[str], FieldInfo(default=None, title="Commit SHA", description="Local GIT Commit SHA")),
-            selected_tools=(List[str], FieldInfo(default_factory=list, title="Selected tools", description="Selected tools", default=selected_tools)),
+            selected_tools=(List[Literal[tuple(selected_tools)]], []),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Local GIT", "icon_url": None}})
         )
 

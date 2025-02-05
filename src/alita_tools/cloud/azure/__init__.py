@@ -25,18 +25,14 @@ class AzureToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
-        available_tools = [
-            x['name'] for x in AzureApiWrapper.model_construct().get_available_tools()
-        ]
-        selected_tools = Literal[tuple(available_tools)] if available_tools else Literal[List[str]]
-
+        selected_tools = (x['name'] for x in AzureApiWrapper.model_construct().get_available_tools())
         return create_model(
             name,
             subscription_id=(str, FieldInfo(default="", title="Subscription ID", description="Azure subscription ID")),
             tenant_id=(str, FieldInfo(default="", title="Tenant ID", description="Azure tenant ID")),
             client_id=(str, FieldInfo(default="", title="Client ID", description="Azure client ID")),
             client_secret=(str, FieldInfo(default="", title="Client secret", description="Azure client secret", json_schema_extra={'secret': True})),
-            selected_tools=(List[str], FieldInfo(default_factory=list, title="Selected tools", description="Selected tools", default=selected_tools)),
+            selected_tools=(List[Literal[tuple(selected_tools)]], []),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Cloud Azure", "icon_url": None}})
         )
 
