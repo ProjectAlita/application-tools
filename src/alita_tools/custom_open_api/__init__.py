@@ -1,5 +1,7 @@
+from typing import List, Literal
+
 from langchain_core.tools import BaseToolkit, BaseTool
-from pydantic import BaseModel, create_model
+from pydantic import create_model, BaseModel, ConfigDict
 from pydantic.fields import FieldInfo
 
 from .api_wrapper import OpenApiWrapper
@@ -11,8 +13,8 @@ name = "openapi"
 def get_tools(tool):
     return OpenApiToolkit().get_toolkit(
         selected_tools=tool['settings'].get('selected_tools', []),
-        spec=tool['settings']['spec'],
-        api_key=tool['settings']['api_key']
+        spec=tool['settings'].get('spec', ''),
+        api_key=tool['settings'].get('api_key', '')
     ).get_tools()
 
 
@@ -21,10 +23,13 @@ class OpenApiToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
+        selected_tools = (x['name'] for x in OpenApiWrapper.model_construct().get_available_tools())
         return create_model(
             name,
-            spec=(str, FieldInfo(description="OpenAPI specification")),
-            api_key=(str, FieldInfo(description="API key")),
+            spec=(str, FieldInfo(default="", title="Specification", description="OpenAPI specification")),
+            api_key=(str, FieldInfo(default="", title="API key", description="API key", json_schema_extra={'secret': True})),
+            selected_tools=(List[Literal[tuple(selected_tools)]], []),
+            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "OpenAPI", "icon_url": None}})
         )
 
     @classmethod

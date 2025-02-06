@@ -2,7 +2,7 @@ from typing import List, Literal, Optional
 
 from langchain_core.tools import BaseToolkit
 from langchain_core.tools import BaseTool
-from pydantic import BaseModel, create_model, ConfigDict
+from pydantic import create_model, BaseModel, ConfigDict
 from pydantic.fields import FieldInfo
 
 from .yagmail_wrapper import YagmailWrapper, SMTP_SERVER

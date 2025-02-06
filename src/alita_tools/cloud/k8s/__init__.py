@@ -1,7 +1,7 @@
-from typing import Optional
+from typing import List, Literal, Optional
 
 from langchain_core.tools import BaseToolkit, BaseTool
-from pydantic import BaseModel, create_model
+from pydantic import create_model, BaseModel, ConfigDict
 from pydantic.fields import FieldInfo
 
 from .api_wrapper import KubernetesApiWrapper
@@ -13,8 +13,8 @@ name = "kubernetes"
 def get_tools(tool):
     return KubernetesToolkit().get_toolkit(
         selected_tools=tool['settings'].get('selected_tools', []),
-        url=tool['settings'].get('url'),
-        token=tool['settings'].get('token')
+        url=tool['settings'].get('url', ''),
+        token=tool['settings'].get('token', None)
     ).get_tools()
 
 
@@ -23,10 +23,21 @@ class KubernetesToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
+        selected_tools = (x['name'] for x in KubernetesApiWrapper.model_construct().get_available_tools())
         return create_model(
             name,
-            url=(str, FieldInfo(description="The URL of the Kubernetes cluster")),
-            token=(Optional[str], FieldInfo(description="The authentication token used for accessing the Kubernetes cluster")),
+            url=(str, FieldInfo(default="", title="Cluster URL", description="The URL of the Kubernetes cluster")),
+            token=(
+                Optional[str], 
+                FieldInfo(
+                    default=None,
+                    title="Token",
+                    description="The authentication token used for accessing the Kubernetes cluster",
+                    json_schema_extra={'secret': True}
+                    )
+                ),
+            selected_tools=(List[Literal[tuple(selected_tools)]], []),
+            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Cloud Kubernetes", "icon_url": None}})
         )
 
     @classmethod

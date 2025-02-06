@@ -1,8 +1,7 @@
-from typing import List
+from typing import List, Literal, Optional
 
-from azure.devops.v7_0.git import GitClient
 from langchain_core.tools import BaseTool, BaseToolkit
-from pydantic import create_model
+from pydantic import create_model, BaseModel, ConfigDict
 from pydantic.fields import FieldInfo
 
 from ...base.tool import BaseAction
@@ -10,18 +9,22 @@ from .repos_wrapper import ReposApiWrapper
 
 name = "azure_devops_repos"
 
-
 class AzureDevOpsReposToolkit(BaseToolkit):
     tools: List[BaseTool] = []
 
     @staticmethod
-    def toolkit_config_schema() -> GitClient:
+    def toolkit_config_schema() -> BaseModel:
+        selected_tools = (x['name'] for x in ReposApiWrapper.model_construct().get_available_tools())
         return create_model(
             name,
-            organization_url=(str, FieldInfo(description="ADO organization url")),
-            project=(str, FieldInfo(description="ADO project")),
-            repository_id=(str, FieldInfo(description="ADO repository ID")),
-            token=(str, FieldInfo(description="ADO token")),
+            organization_url=(Optional[str], FieldInfo(default="", title="Organization URL", description="ADO organization url")),
+            project=(Optional[str], FieldInfo(default="", title="Project", description="ADO project")),
+            repository_id=(Optional[str], FieldInfo(default="", title="Repository ID", description="ADO repository ID")),
+            token=(Optional[str], FieldInfo(default="", title="Token", description="ADO token", json_schema_extra={'secret': True})),
+            base_branch=(Optional[str], FieldInfo(default="", title="Base branch", description="ADO base branch (e.g., main)")),
+            active_branch=(Optional[str], FieldInfo(default="", title="Active branch", description="ADO active branch (e.g., main)")),
+            selected_tools=(List[Literal[tuple(selected_tools)]], []),
+            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "AzureDevOps Repos", "icon_url": None}})
         )
 
     @classmethod

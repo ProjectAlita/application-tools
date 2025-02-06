@@ -1,6 +1,6 @@
 from typing import List, Literal, Optional
 from langchain_core.tools import BaseToolkit, BaseTool
-from pydantic import BaseModel, create_model, ConfigDict
+from pydantic import create_model, BaseModel, ConfigDict
 from pydantic.fields import FieldInfo
 
 from .api_wrapper import GooglePlacesAPIWrapper

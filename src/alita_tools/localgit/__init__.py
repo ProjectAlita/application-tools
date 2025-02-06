@@ -1,13 +1,38 @@
-from typing import List, Dict
+from typing import List, Dict, Literal, Optional
 
-from alita_tools.base.tool import BaseAction
 from langchain_core.tools import BaseToolkit, BaseTool
+from pydantic import BaseModel, ConfigDict, create_model
+from pydantic.fields import FieldInfo
 
 from .local_git import LocalGit
 from .tool import LocalGitAction
 
+name = "localgit"
+
+def get_tools(tool):
+    return AlitaLocalGitToolkit().get_toolkit(
+        selected_tools=tool['settings'].get('selected_tools', []),
+        repo_path=tool['settings'].get('repo_path', ''),
+        base_path=tool['settings'].get('base_path', ''),
+        repo_url=tool['settings'].get('repo_url', None),
+        commit_sha=tool['settings'].get('commit_sha', None)
+    ).get_tools()
+
 class AlitaLocalGitToolkit(BaseToolkit):
     tools: List[BaseTool] = []
+
+    @staticmethod
+    def toolkit_config_schema() -> BaseModel:
+        selected_tools = (x['name'] for x in LocalGit.model_construct().get_available_tools())
+        return create_model(
+            name,
+            repo_path=(str, FieldInfo(default="", title="Repository path", description="Local GIT Repository path")),
+            base_path=(str, FieldInfo(default="", title="Base path", description="Local GIT Base path")),
+            repo_url=(Optional[str], FieldInfo(default=None, title="Repository URL", description="Local GIT Repository URL")),
+            commit_sha=(Optional[str], FieldInfo(default=None, title="Commit SHA", description="Local GIT Commit SHA")),
+            selected_tools=(List[Literal[tuple(selected_tools)]], []),
+            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Local GIT", "icon_url": None}})
+        )
 
     @classmethod
     def get_toolkit(cls, selected_tools: list[str] | None = None, **kwargs):

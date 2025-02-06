@@ -18,6 +18,7 @@ from .sharepoint import get_tools as get_sharepoint, SharepointToolkit
 from .qtest import get_tools as get_qtest, QtestToolkit
 from .zephyr_scale import get_tools as get_zephyr_scale, ZephyrScaleToolkit
 from .ado import get_tools as get_ado
+from .ado.repos import AzureDevOpsReposToolkit
 from .ado.test_plan import AzureDevOpsPlansToolkit
 from .ado.work_item import AzureDevOpsWorkItemsToolkit
 from .ado.wiki import AzureDevOpsWikiToolkit
@@ -25,9 +26,16 @@ from .rally import get_tools as get_rally, RallyToolkit
 from .sql import get_tools as get_sql, SQLToolkit
 from .code.sonar import get_tools as get_sonar, SonarToolkit
 from .google_places import get_tools as get_google_places, GooglePlacesToolkit
-
-
 from .yagmail import get_tools as get_yagmail, AlitaYagmailToolkit
+from .cloud.aws import AWSToolkit
+from .cloud.azure import AzureToolkit
+from .cloud.gcp import GCPToolkit
+from .cloud.k8s import KubernetesToolkit
+from .custom_open_api import OpenApiToolkit as CustomOpenApiToolkit
+from .elastic import ElasticToolkit
+from .keycloak import KeycloakToolkit
+from .localgit import AlitaLocalGitToolkit
+from .pandas import PandasToolkit
 
 logger = logging.getLogger(__name__)
 
@@ -114,6 +122,15 @@ def get_toolkits():
         ZephyrScaleToolkit.toolkit_config_schema(),
         ZephyrToolkit.toolkit_config_schema(),
         AlitaYagmailToolkit.toolkit_config_schema(),
-        SharepointToolkit.toolkit_config_schema()
+        SharepointToolkit.toolkit_config_schema(),
+        AzureDevOpsReposToolkit.toolkit_config_schema(),
+        AWSToolkit.toolkit_config_schema(),
+        AzureToolkit.toolkit_config_schema(),
+        GCPToolkit.toolkit_config_schema(),
+        KubernetesToolkit.toolkit_config_schema(),
+        CustomOpenApiToolkit.toolkit_config_schema(),
+        ElasticToolkit.toolkit_config_schema(),
+        KeycloakToolkit.toolkit_config_schema(),
+        AlitaLocalGitToolkit.toolkit_config_schema(),
+        PandasToolkit.toolkit_config_schema(),
     ]
-
