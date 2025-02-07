@@ -3,6 +3,7 @@ import logging
 from typing import Optional, Any, Dict
 
 from azure.devops.connection import Connection
+from azure.devops.released.work_item_tracking import TeamContext
 from azure.devops.released.work_item_tracking import Wiql
 from azure.devops.released.work_item_tracking import WorkItemTrackingClient
 from pydantic import model_validator, BaseModel
@@ -222,7 +223,7 @@ class AzureDevOpsApiWrapper(BaseModel):
                 raise ToolException("Azure DevOps client not initialized.")
             logger.info(f"Search for work items using {query}")
             # Execute the WIQL query
-            work_items = self._client.query_by_wiql(wiql, top=self.limit, ).work_items
+            work_items = self._client.query_by_wiql(wiql, top=None if self.limit < 0 else self.limit, team_context=TeamContext(project=self.project)).work_items
 
             if not work_items:
                 return "No work items found."
