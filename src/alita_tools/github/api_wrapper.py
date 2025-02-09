@@ -2,8 +2,7 @@ import os
 from json import dumps
 from typing import Dict, Any, Optional, List
 import tiktoken
-from pydantic import model_validator, create_model
-from pydantic.fields import FieldInfo
+from pydantic import field_validator, create_model, BaseModel, Field
 from langchain.utils import get_from_dict_or_env
 
 from langchain_community.tools.github.prompt import (
@@ -56,22 +55,22 @@ new contents
 
 SearchCode = create_model(
     "SearchCodeModel",
-    query=(str, FieldInfo(description=("A keyword-focused natural language "
-                                       "search query for code, e.g. `MyFunctionName()`.")))
+    query=(str, Field(description=("A keyword-focused natural language "
+                                   "search query for code, e.g. `MyFunctionName()`.")))
 )
 
 GetIssue = create_model(
     "GetIssue",
-    issue_number=(str, FieldInfo(description="Issue number as a string, e.g. `42`"))
+    issue_number=(str, Field(description="Issue number as a string, e.g. `42`"))
 )
 
 GetPR = create_model(
     "GetPR",
-    pr_number=(str, FieldInfo(description="The PR number as a string, e.g. `12`"))
+    pr_number=(str, Field(description="The PR number as a string, e.g. `12`"))
 )
 DirectoryPath = create_model(
     "DirectoryPath",
-    directory_path=(str, FieldInfo(
+    directory_path=(str, Field(
         default="",
         description=(
             "The path of the directory, e.g. `some_dir/inner_dir`."
@@ -86,7 +85,7 @@ NoInput = create_model(
 
 ReadFile = create_model(
     "ReadFile",
-    file_path=(str, FieldInfo(
+    file_path=(str, Field(
         description=(
             "The full file path of the file you would like to read where the "
             "path must NOT start with a slash, e.g. `some_dir/my_file.py`."
@@ -96,37 +95,37 @@ ReadFile = create_model(
 
 CreateBranchName = create_model(
     "CreateBranchName",
-    proposed_branch_name=(str, FieldInfo(
+    proposed_branch_name=(str, Field(
         description="The name of the branch, e.g. `my_branch`."
     ))
 )
 
 UpdateFile = create_model(
     "UpdateFile",
-    file_query=(str, FieldInfo(
+    file_query=(str, Field(
         description="Strictly follow the provided rules."
     ))
 )
 
 CreateFile = create_model(
     "CreateFile",
-    file_path=(str, FieldInfo(description="Path of a file to be created.")),
-    file_contents=(str, FieldInfo(description="Content of a file to be put into chat."))
+    file_path=(str, Field(description="Path of a file to be created.")),
+    file_contents=(str, Field(description="Content of a file to be put into chat."))
 )
 
 CreatePR = create_model(
     "CreatePR",
-    pr_query=(str, FieldInfo(description="Follow the required formatting."))
+    pr_query=(str, Field(description="Follow the required formatting."))
 )
 
 CommentOnIssue = create_model(
     "CommentOnIssue",
-    comment_query=(str, FieldInfo(default=..., description="Follow the required formatting."))
+    comment_query=(str, Field(default=..., description="Follow the required formatting."))
 )
 
 DeleteFile = create_model(
     "DeleteFile",
-    file_path=(str, FieldInfo(
+    file_path=(str, Field(
         description=(
             "The full file path of the file you would like to delete"
             " where the path must NOT start with a slash, e.g."
@@ -138,7 +137,7 @@ DeleteFile = create_model(
 
 BranchName = create_model(
     "BranchName",
-    branch_name=(str, FieldInfo(description="The name of the branch, e.g. `my_branch`."))
+    branch_name=(str, Field(description="The name of the branch, e.g. `my_branch`."))
 )
 
 
@@ -154,7 +153,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
     github_app_id: Optional[str] = None
     github_app_private_key: Optional[str] = None
 
-    @model_validator(mode='before')
+    @field_validator('github_app_id', 'github_app_private_key', 'github_access_token', 'github_username', 'github_password', 'github_repository', 'active_branch', 'github_base_branch', mode='before')
     @classmethod
     def validate_environment(cls, values: Dict) -> Dict:
 

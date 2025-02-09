@@ -1,8 +1,7 @@
 from typing import List, Optional, Literal
 
 from langchain_core.tools import BaseTool, BaseToolkit
-from pydantic import create_model, BaseModel, ConfigDict
-from pydantic.fields import FieldInfo
+from pydantic import create_model, BaseModel, Field
 
 from .test_plan_wrapper import TestPlanApiWrapper
 from ...base.tool import BaseAction
@@ -20,11 +19,11 @@ class AzureDevOpsPlansToolkit(BaseToolkit):
         selected_tools = (x['name'] for x in TestPlanApiWrapper.construct().get_available_tools())
         return create_model(
             name_alias,
-            organization_url=(str, FieldInfo(description="ADO organization url")),
-            limit=(Optional[int], FieldInfo(description="ADO plans limit used for limitation of the list with results", default=5)),
-            token=(str, FieldInfo(description="ADO token", json_schema_extra={'secret': True})),
+            organization_url=(str, Field(description="ADO organization url")),
+            limit=(Optional[int], Field(description="ADO plans limit used for limitation of the list with results", default=5)),
+            token=(str, Field(description="ADO token", json_schema_extra={'secret': True})),
             selected_tools=(List[Literal[tuple(selected_tools)]], []),
-            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "ADO plans", "icon_url": None}})
+            __config__={'json_schema_extra': {'metadata': {"label": "ADO plans", "icon_url": None}}}
         )
 
     @classmethod

@@ -1,8 +1,7 @@
 from typing import List, Literal
 
 from langchain_core.tools import BaseToolkit, BaseTool
-from pydantic import create_model, BaseModel, ConfigDict
-from pydantic.fields import FieldInfo
+from pydantic import create_model, BaseModel, ConfigDict, Field
 
 from .api_wrapper import GCPApiWrapper
 from ...base.tool import BaseAction
@@ -25,7 +24,7 @@ class GCPToolkit(BaseToolkit):
         selected_tools = (x['name'] for x in GCPApiWrapper.model_construct().get_available_tools())
         return create_model(
             name,
-            api_key=(str, FieldInfo(default="", title="API key", description="GCP API key", json_schema_extra={'secret': True})),
+            api_key=(str, Field(default="", title="API key", description="GCP API key", json_schema_extra={'secret': True})),
             selected_tools=(List[Literal[tuple(selected_tools)]], []),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Cloud GCP", "icon_url": None}})
         )

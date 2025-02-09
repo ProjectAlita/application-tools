@@ -1,8 +1,7 @@
 from typing import List, Literal
 
 from langchain_core.tools import BaseToolkit, BaseTool
-from pydantic import create_model, BaseModel, ConfigDict
-from pydantic.fields import FieldInfo
+from pydantic import create_model, BaseModel, ConfigDict, Field
 
 from .api_wrapper import SQLApiWrapper
 from ..base.tool import BaseAction
@@ -31,12 +30,12 @@ class SQLToolkit(BaseToolkit):
         supported_dialects = (d.value for d in SQLDialect)
         return create_model(
             name,
-            dialect=(Literal[tuple(supported_dialects)], FieldInfo(description="Database dialect (mysql or postgres)")),
-            host=(str, FieldInfo(description="Database server address")),
-            port=(str, FieldInfo(description="Database server port")),
-            username=(str, FieldInfo(description="Database username")),
-            password=(str, FieldInfo(description="Database password", json_schema_extra={'secret': True})),
-            database_name=(str, FieldInfo(description="Database name")),
+            dialect=(Literal[tuple(supported_dialects)], Field(description="Database dialect (mysql or postgres)")),
+            host=(str, Field(description="Database server address")),
+            port=(str, Field(description="Database server port")),
+            username=(str, Field(description="Database username")),
+            password=(str, Field(description="Database password", json_schema_extra={'secret': True})),
+            database_name=(str, Field(description="Database name")),
             selected_tools=(List[Literal[tuple(selected_tools)]], []),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "SQL", "icon_url": None}})
         )

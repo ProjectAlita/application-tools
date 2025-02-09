@@ -2,7 +2,7 @@ import logging
 from typing import List, Any, Optional
 from pydantic import model_validator, BaseModel
 from pydantic import create_model
-from pydantic.fields import FieldInfo
+from pydantic.fields import Field
 import yagmail
 
 logger = logging.getLogger(__name__)
@@ -16,10 +16,10 @@ NoInput = create_model(
 
 SendEmail = create_model(
     "GmailSendMessageStep",
-    receiver=(str, FieldInfo(description="Email of the person you are going to send the letter to.")),
-    message=(str, FieldInfo(description="Email message you going to send.")),
-    subject=(str, FieldInfo(description="Email subject.")),
-    cc=(List[str], FieldInfo(description="Persons who you are going to share a copy of email to."))
+    receiver=(str, Field(description="Email of the person you are going to send the letter to.")),
+    message=(str, Field(description="Email message you going to send.")),
+    subject=(str, Field(description="Email subject.")),
+    cc=(List[str], Field(description="Persons who you are going to share a copy of email to."))
 )
 
 class YagmailWrapper(BaseModel):

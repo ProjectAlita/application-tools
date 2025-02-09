@@ -5,9 +5,8 @@ from traceback import format_exc
 from typing import Any
 
 from git import Repo
-from pydantic import model_validator, BaseModel, create_model
+from pydantic import BaseModel, Field, create_model, field_validator
 from langchain_core.tools import ToolException
-from pydantic.fields import FieldInfo
 
 logger = logging.getLogger(__name__)
 CREATE_FILE_PROMPT = """Create new file in your local repository."""
@@ -54,51 +53,51 @@ NoInput = create_model(
 CheckOutCommit = create_model(
     "CheckOutCommit",
     commit_sha=(
-        str, FieldInfo(description="Checkout commit SHA, for example, ac520b146fe3eaa2edbfaedb827f591320911cb0"))
+        str, Field(description="Checkout commit SHA, for example, ac520b146fe3eaa2edbfaedb827f591320911cb0"))
 )
 
 DeleteFile = create_model(
     "DeleteFile",
-    file_path=(str, FieldInfo(description="File path e.g test/inventory.py"))
+    file_path=(str, Field(description="File path e.g test/inventory.py"))
 )
 
 CreateFile = create_model(
     "CreateFile",
-    file_path=(str, FieldInfo(description="File path e.g test/inventory.py")),
-    file_content=(str, FieldInfo(description="Content of a file to be put into chat."))
+    file_path=(str, Field(description="File path e.g test/inventory.py")),
+    file_content=(str, Field(description="Content of a file to be put into chat."))
 )
 
 CommitChanges = create_model(
     "CommitChanges",
-    commit_message=(str, FieldInfo(description="Descriptive commit message e.g changed file"))
+    commit_message=(str, Field(description="Descriptive commit message e.g changed file"))
 )
 
 CheckoutBranch = create_model(
     "CheckoutBranch",
-    branch_name=(str, FieldInfo(description="Branch name to checkout to"))
+    branch_name=(str, Field(description="Branch name to checkout to"))
 )
 
 ReadFile = create_model(
     "ReadFile",
-    file_path=(str, FieldInfo(description="File path e.g test/inventory.py to read content from"))
+    file_path=(str, Field(description="File path e.g test/inventory.py to read content from"))
 )
 
 FolderFiles = create_model(
     "FolderFiles",
-    folder_path=(str, FieldInfo(description="Folder path e.g test/ to list files from"))
+    folder_path=(str, Field(description="Folder path e.g test/ to list files from"))
 )
 
 UpdateFileContentByLines = create_model(
     "UpdateFileCommitByLines",
-    file_path=(str, FieldInfo(description="File path e.g test/inventory.py to update in")),
-    start_line_index=(int, FieldInfo(description="Start line index in the file from where update will start")),
-    end_line_index=(int, FieldInfo(description="End line index in the file from where update will end")),
-    new_content=(str, FieldInfo(description="New content which will be inserted in the file"))
+    file_path=(str, Field(description="File path e.g test/inventory.py to update in")),
+    start_line_index=(int, Field(description="Start line index in the file from where update will start")),
+    end_line_index=(int, Field(description="End line index in the file from where update will end")),
+    new_content=(str, Field(description="New content which will be inserted in the file"))
 )
 
 UpdateFile = create_model(
     "UpdateFile",
-    file_query=(str, FieldInfo(description="""File query by which the entire file content will be updated. 
+    file_query=(str, Field(description="""File query by which the entire file content will be updated. 
                                               It contains file path and update instructions""")),
 )
 
@@ -110,13 +109,13 @@ class LocalGit(BaseModel):
     commit_sha: str = None
     path_pattern: str = '**/*.py'
 
-    @model_validator(mode='before')
+    @field_validator('repo_path', 'base_path', 'repo_url', 'commit_sha', mode='before')
     @classmethod
-    def validate_toolkit(cls, values):
-        repo_path = values['repo_path']
-        base_path = values['base_path']
-        repo_url = values.get('repo_url')
-        commit_sha = values.get('commit_sha')
+    def validate_toolkit(cls, value, field):
+        repo_path = value if field.name == 'repo_path' else None
+        base_path = value if field.name == 'base_path' else None
+        repo_url = value if field.name == 'repo_url' else None
+        commit_sha = value if field.name == 'commit_sha' else None
         os.makedirs(base_path, exist_ok=True)
         full_repo_path = os.path.join(base_path, repo_path)
         if not os.path.exists(full_repo_path) and repo_url:
@@ -125,8 +124,7 @@ class LocalGit(BaseModel):
             repo = Repo(path=str(full_repo_path))
         if commit_sha:
             repo.head.reset(commit=commit_sha, working_tree=True)
-        values['repo'] = repo
-        return values
+        return value
 
     def extract_old_new_pairs(self, file_query):
         # Split the file content by lines

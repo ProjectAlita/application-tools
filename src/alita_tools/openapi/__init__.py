@@ -4,8 +4,7 @@ from typing import List, Any, Optional, Dict
 from langchain_core.tools import BaseTool, BaseToolkit
 from requests_openapi import Operation, Client, Server
 
-from pydantic import create_model
-from pydantic.fields import FieldInfo
+from pydantic import create_model, Field
 from functools import partial
 
 name = "openapi"
@@ -32,8 +31,8 @@ def get_tools(tool):
 def create_api_tool(name: str, op: Operation):
     fields = {}
     for parameter in op.spec.parameters:
-        fields[parameter.name] = (str, FieldInfo(default=parameter.param_schema.default,
-                                                 description=parameter.description))
+        fields[parameter.name] = (str, Field(default=parameter.param_schema.default,
+                                             description=parameter.description))
     op.server = Server.from_openapi_server(op.server)  # patch this
     op.server.get_url = partial(Server.get_url, op.server)
     op.server.set_url = partial(Server.set_url, op.server)
@@ -42,7 +41,7 @@ def create_api_tool(name: str, op: Operation):
         description=op.spec.description if op.spec.description else op.spec.summary,
         args_schema=create_model("request_params",
                                  **fields,
-                                 regexp = (Optional[str], FieldInfo(description="Regular expression used to remove from final output if any", default=None))),
+                                 regexp = (Optional[str], Field(description="Regular expression used to remove from final output if any", default=None))),
         callable=op
     )
 

@@ -2,8 +2,7 @@ import logging
 import subprocess
 from typing import Tuple, Dict, List, Optional, Any
 
-from pydantic import BaseModel, model_validator, create_model
-from pydantic.fields import FieldInfo, PrivateAttr
+from pydantic import BaseModel, field_validator, create_model, Field, PrivateAttr
 
 logger = logging.getLogger(__name__)
 
@@ -11,7 +10,7 @@ class PythonLinter(BaseModel):
     error_codes: str
     _client: Optional['PythonLinter'] = PrivateAttr()
 
-    @model_validator(mode='before')
+    @field_validator('error_codes', mode='before')
     @classmethod
     def validate_toolkit(cls, values):
         error_codes = values.get('error_codes')
@@ -105,8 +104,8 @@ class PythonLinter(BaseModel):
                 "description": self.lint_code_diff.__doc__,
                 "args_schema": create_model(
                     "LintCodeDiffModel",
-                    old_content=(str, FieldInfo(description="The original content of the code")),
-                    new_content=(str, FieldInfo(description="The new content of the code to be linted"))
+                    old_content=(str, Field(description="The original content of the code")),
+                    new_content=(str, Field(description="The new content of the code to be linted"))
                 ),
             }
         ]

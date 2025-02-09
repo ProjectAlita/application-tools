@@ -1,5 +1,5 @@
 from typing import Optional, Dict, Any
-from pydantic import BaseModel, model_validator, create_model, FieldInfo, PrivateAttr
+from pydantic import BaseModel, model_validator, create_model, Field, PrivateAttr
 import requests
 import json
 
@@ -63,9 +63,9 @@ class KeycloakApiWrapper(BaseModel):
                 "description": self.execute.__doc__,
                 "args_schema": create_model(
                     "ExecuteModel",
-                    method=(str, FieldInfo(description="The HTTP method to use for the request (GET, POST, PUT, DELETE, etc.).")),
-                    relative_url=(str, FieldInfo(description="The relative URL of the Keycloak Admin API to call, e.g. '/users'.")),
-                    params=(Optional[str], FieldInfo(description="Optional string dictionary of parameters to be sent in the query string or request body."))
+                    method=(str, Field(description="The HTTP method to use for the request (GET, POST, PUT, DELETE, etc.).")),
+                    relative_url=(str, Field(description="The relative URL of the Keycloak Admin API to call, e.g. '/users'.")),
+                    params=(Optional[str], Field(description="Optional string dictionary of parameters to be sent in the query string or request body."))
                 ),
             }
         ]

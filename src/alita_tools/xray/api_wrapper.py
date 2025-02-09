@@ -5,7 +5,7 @@ import requests
 from pydantic import model_validator, BaseModel
 from langchain_core.tools import ToolException
 from pydantic import create_model, PrivateAttr
-from pydantic.fields import FieldInfo
+from pydantic.fields import Field
 from python_graphql_client import GraphqlClient
 
 logger = logging.getLogger(__name__)
@@ -55,17 +55,17 @@ NoInput = create_model(
 
 XrayGrapql = create_model(
     "XrayGrapql",
-    graphql=(str, FieldInfo(description="""Custom XRAY GraphQL query for execution"""))
+    graphql=(str, Field(description="""Custom XRAY GraphQL query for execution"""))
 )
 
 XrayGetTests = create_model(
     "XrayGetTests",
-    jql=(str, FieldInfo(description="the jql that defines the search"))
+    jql=(str, Field(description="the jql that defines the search"))
 )
 
 XrayCreateTest = create_model(
     "XrayCreateTest",
-    graphql_mutation=(str, FieldInfo(description="""Xray GraphQL mutation to create new test:
+    graphql_mutation=(str, Field(description="""Xray GraphQL mutation to create new test:
      Mutation createTest {
 # Mutation used to create a new Test.
 #

@@ -1,7 +1,6 @@
 from typing import Any, Optional, List, Dict, Union
 
-from pydantic import BaseModel, model_validator, create_model
-from pydantic.fields import FieldInfo, PrivateAttr
+from pydantic import BaseModel, model_validator, create_model, Field, PrivateAttr
 from azure.identity import ClientSecretCredential
 from azure.mgmt.resource import ResourceManagementClient
 import requests
@@ -72,9 +71,9 @@ class AzureApiWrapper(BaseModel):
                 "description": self.execute.__doc__,
                 "args_schema": create_model(
                     "ExecuteModel",
-                    method=(str, FieldInfo(description="The HTTP method to use for the request (GET, POST, PUT, DELETE, etc.). Required parameter.")),
-                    url=(str, FieldInfo(description="Required parameter: always has FQDN part and protocol for Azure Resource Management REST API.")),
-                    optional_args=(Optional[Union[str, Dict[str, Any]]], FieldInfo(description="Optional, valid json ONLY! No comments allowed. JSON object to be sent in request with possible keys: 'data', 'headers', 'files'.")),
+                    method=(str, Field(description="The HTTP method to use for the request (GET, POST, PUT, DELETE, etc.). Required parameter.")),
+                    url=(str, Field(description="Required parameter: always has FQDN part and protocol for Azure Resource Management REST API.")),
+                    optional_args=(Optional[Union[str, Dict[str, Any]]], Field(description="Optional, valid json ONLY! No comments allowed. JSON object to be sent in request with possible keys: 'data', 'headers', 'files'.")),
                 ),
                 "ref": self.execute,
             },

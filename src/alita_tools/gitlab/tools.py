@@ -4,8 +4,8 @@ from typing import Type
 
 from .api_wrapper import GitLabAPIWrapper
 from langchain_core.tools import BaseTool, ToolException
-from pydantic.fields import FieldInfo
-from pydantic import create_model, BaseModel, Field
+from pydantic.fields import Field
+from pydantic import create_model, BaseModel
 from gitlab.exceptions import GitlabGetError
 
 from .utils import get_diff_w_position, get_position
@@ -41,8 +41,7 @@ new contents
 
 branchInput = create_model(
     "BranchInput",
-    branch_name=(str,
-                 FieldInfo(description="The name of the branch, e.g. `my_branch`.")))
+    branch_name=(str, Field(description="The name of the branch, e.g. `my_branch`.")))
 
 class CreateGitLabBranchTool(BaseTool):
 
@@ -68,8 +67,8 @@ class CreatePRTool(BaseTool):
     """
     args_schema: Type[BaseModel] = create_model(
         "CreatePRInput",
-        pr_title=(str, FieldInfo(description="Title of pull request. Maybe generated from made changes in the branch.")),
-        pr_body=(str, FieldInfo(description="Body or description of the pull request of made changes.")))
+        pr_title=(str, Field(description="Title of pull request. Maybe generated from made changes in the branch.")),
+        pr_body=(str, Field(description="Body or description of the pull request of made changes.")))
 
     def _run(self, pr_title: str, pr_body: str):
         try:
@@ -89,7 +88,7 @@ class DeleteFileTool(BaseTool):
     Simply pass in the full file path of the file you would like to delete. **IMPORTANT**: the path must not start with a slash"""
     args_schema: Type[BaseModel] = create_model(
         "DeleteFileInput",
-        file_path=(str, FieldInfo(description="File path of file to be deleted. e.g. `src/agents/developer/tools/git/github_tools.py`. **IMPORTANT**: the path must not start with a slash")
+        file_path=(str, Field(description="File path of file to be deleted. e.g. `src/agents/developer/tools/git/github_tools.py`. **IMPORTANT**: the path must not start with a slash")
                    ))
 
     def _run(self, file_path: str):
@@ -107,8 +106,8 @@ class CreateFileTool(BaseTool):
     """
     args_schema: Type[BaseModel] = create_model(
         "CreateFileInput",
-        file_path=(str, FieldInfo(description="File path of file to be created. e.g. `src/agents/developer/tools/git/github_tools.py`. **IMPORTANT**: the path must not start with a slash")),
-        file_contents=(str, FieldInfo(description="""
+        file_path=(str, Field(description="File path of file to be created. e.g. `src/agents/developer/tools/git/github_tools.py`. **IMPORTANT**: the path must not start with a slash")),
+        file_contents=(str, Field(description="""
     Full file content to be created. It must be without any escapes, just raw content to CREATE in GIT.
     Generate full file content for this field without any additional texts, escapes, just raw code content. 
     You MUST NOT ignore, skip or comment any details, PROVIDE FULL CONTENT including all content based on all best practices.
@@ -161,7 +160,7 @@ class GetPullRequesChanges(BaseTool):
     """
     args_schema: Type[BaseModel] = create_model(
         "GetPullRequesChangesInput",
-        pr_number=(str, FieldInfo(description="GitLab Merge Request (Pull Request) number")))
+        pr_number=(str, Field(description="GitLab Merge Request (Pull Request) number")))
     handle_tool_error: bool = True
 
     def _run(self, pr_number: str):
@@ -286,7 +285,7 @@ class ReadFileTool(BaseTool):
     file path of the file you would like to read. **IMPORTANT**: the path must not start with a slash"""
     args_schema: Type[BaseModel] = create_model(
         "ReadFileInput",
-        file_path=(str, FieldInfo(description="File path of file to be read. e.g. `src/agents/developer/tools/git/github_tools.py`. **IMPORTANT**: the path must not start with a slash")
+        file_path=(str, Field(description="File path of file to be read. e.g. `src/agents/developer/tools/git/github_tools.py`. **IMPORTANT**: the path must not start with a slash")
                    )
     )
 

@@ -10,9 +10,7 @@ from langchain_community.document_loaders.confluence import ContentFormat
 from langchain_core.documents import Document
 from langchain_core.tools import ToolException
 from markdownify import markdownify
-from pydantic import create_model
-from pydantic import model_validator, BaseModel
-from pydantic.fields import FieldInfo
+from pydantic import create_model, BaseModel, Field, field_validator
 from tenacity import (
     before_sleep_log,
     retry,
@@ -24,97 +22,97 @@ logger = logging.getLogger(__name__)
 
 createPage = create_model(
     "createPage",
-    space=(str, FieldInfo(description="Confluence space that is used for page's creation", default=None)),
-    title=(str, FieldInfo(description="Title of the page")),
-    body=(str, FieldInfo(description="Body of the page")),
-    status=(str, FieldInfo(description="Page publishing option: 'current' for publish page, 'draft' to create draft.", default='current')),
-    parent_id=(str, FieldInfo(description="Page parent id (optional)", default=None)),
-    representation=(str, FieldInfo(description="Content representation format: storage for html, wiki for markdown", default='storage')),
-    label=(str, FieldInfo(description="Page label (optional)", default=None)),
+    space=(str, Field(description="Confluence space that is used for page's creation", default=None)),
+    title=(str, Field(description="Title of the page")),
+    body=(str, Field(description="Body of the page")),
+    status=(str, Field(description="Page publishing option: 'current' for publish page, 'draft' to create draft.", default='current')),
+    parent_id=(str, Field(description="Page parent id (optional)", default=None)),
+    representation=(str, Field(description="Content representation format: storage for html, wiki for markdown", default='storage')),
+    label=(str, Field(description="Page label (optional)", default=None)),
 )
 
 createPages = create_model(
     "createPages",
-    space=(str, FieldInfo(description="Confluence space that is used for pages creation", default=None)),
-    pages_info=(str, FieldInfo(description="""JSON string containing information about page name and its content per syntax: [{"page1_name": "page1_content"}, {"page2_name": "page2_content"}]""")),
-    parent_id=(str, FieldInfo(description="Page parent id (optional)", default=None)),
-    status=(str, FieldInfo(description="Page publishing option: 'current' for publish page, 'draft' to create draft.", default='current')),
+    space=(str, Field(description="Confluence space that is used for pages creation", default=None)),
+    pages_info=(str, Field(description="""JSON string containing information about page name and its content per syntax: [{"page1_name": "page1_content"}, {"page2_name": "page2_content"}]""")),
+    parent_id=(str, Field(description="Page parent id (optional)", default=None)),
+    status=(str, Field(description="Page publishing option: 'current' for publish page, 'draft' to create draft.", default='current')),
 )
 
 deletePage = create_model(
     "deletePage",
-    page_id=(str, FieldInfo(description="Page id", default=None)),
-    page_title=(str, FieldInfo(description="Page title", default=None)),
+    page_id=(str, Field(description="Page id", default=None)),
+    page_title=(str, Field(description="Page title", default=None)),
 )
 
 updatePageById = create_model(
     "updatePageById",
-    page_id=(str, FieldInfo(description="Page id")),
-    representation=(str, FieldInfo(description="Content representation format: storage for html, wiki for markdown", default='storage')),
-    new_title=(str, FieldInfo(description="New page title", default=None)),
-    new_body=(str, FieldInfo(description="New page content", default=None)),
-    new_labels=(list, FieldInfo(description="Page labels", default=None)),
+    page_id=(str, Field(description="Page id")),
+    representation=(str, Field(description="Content representation format: storage for html, wiki for markdown", default='storage')),
+    new_title=(str, Field(description="New page title", default=None)),
+    new_body=(str, Field(description="New page content", default=None)),
+    new_labels=(list, Field(description="Page labels", default=None)),
 )
 
 updatePageByTitle = create_model(
     "updatePageByTitle",
-    page_title=(str, FieldInfo(description="Page title")),
-    representation=(str, FieldInfo(description="Content representation format: storage for html, wiki for markdown", default='storage')),
-    new_title=(str, FieldInfo(description="New page title", default=None)),
-    new_body=(str, FieldInfo(description="New page content", default=None)),
-    new_labels=(list, FieldInfo(description="Page labels", default=None)),
+    page_title=(str, Field(description="Page title")),
+    representation=(str, Field(description="Content representation format: storage for html, wiki for markdown", default='storage')),
+    new_title=(str, Field(description="New page title", default=None)),
+    new_body=(str, Field(description="New page content", default=None)),
+    new_labels=(list, Field(description="Page labels", default=None)),
 )
 
 updatePages = create_model(
     "updatePages",
-    page_ids=(list, FieldInfo(description="List of ids of pages to be updated", default=None)),
-    new_contents=(list, FieldInfo(description="List of new contents for each page. If content the same for all the pages then it should be a list with a single entry", default=None)),
-    new_labels=(list, FieldInfo(description="Page labels", default=None)),
+    page_ids=(list, Field(description="List of ids of pages to be updated", default=None)),
+    new_contents=(list, Field(description="List of new contents for each page. If content the same for all the pages then it should be a list with a single entry", default=None)),
+    new_labels=(list, Field(description="Page labels", default=None)),
 )
 
 updateLabels = create_model(
     "updateLabels",
-    page_ids=(list, FieldInfo(description="List of ids of pages to be updated", default=None)),
-    new_labels=(list, FieldInfo(description="Page labels", default=None)),
+    page_ids=(list, Field(description="List of ids of pages to be updated", default=None)),
+    new_labels=(list, Field(description="Page labels", default=None)),
 )
 
 getPageTree = create_model(
     "getPageTree",
-    page_id=(str, FieldInfo(description="Page id")),
+    page_id=(str, Field(description="Page id")),
 )
 
 pageExists = create_model(
     "pageExists",
-    title=(str, FieldInfo(description="Title of the page")),
+    title=(str, Field(description="Title of the page")),
 )
 
 getPagesWithLabel = create_model(
     "getPagesWithLabel",
-    label=(str, FieldInfo(description="Label of the pages")),
+    label=(str, Field(description="Label of the pages")),
 )
 
 searchPages = create_model(
     "searchPages",
-    query=(str, FieldInfo(description="Query text to search pages")),
-    skip_images=(bool, FieldInfo(description="Whether we need to skip existing images or not"))
+    query=(str, Field(description="Query text to search pages")),
+    skip_images=(bool, Field(description="Whether we need to skip existing images or not"))
 )
 
 siteSearch = create_model(
     "siteSearch",
-    query=(str, FieldInfo(description="Query text to execute site search in Confluence")),
+    query=(str, Field(description="Query text to execute site search in Confluence")),
 )
 
 pageId = create_model(
     "pageId",
-    page_id=(str, FieldInfo(description="Id of page to be read")),
-    skip_images=(bool, FieldInfo(description="Whether we need to skip existing images or not")),
+    page_id=(str, Field(description="Id of page to be read")),
+    skip_images=(bool, Field(description="Whether we need to skip existing images or not")),
 )
 
 сonfluenceInput = create_model(
      "сonfluenceInput",
-     method=(str, FieldInfo(description="The HTTP method to use for the request (GET, POST, PUT, DELETE, etc.). Required parameter.")),
-     relative_url=(str, FieldInfo(description="Required parameter: The relative URI for Confluence API. URI must start with a forward slash and '/rest/...'. Do not include query parameters in the URL, they must be provided separately in 'params'. For search/read operations, you MUST always get minimum fields and set max results, until users ask explicitly for more fields.")),
-     params=(Optional[str], FieldInfo(default="", description="Optional JSON of parameters to be sent in request body or query params. MUST be string with valid JSON. For search/read operations, you MUST always get minimum fields and set max results, until users ask explicitly for more fields. For search/read operations you must generate CQL query string and pass it as params."))
+     method=(str, Field(description="The HTTP method to use for the request (GET, POST, PUT, DELETE, etc.). Required parameter.")),
+     relative_url=(str, Field(description="Required parameter: The relative URI for Confluence API. URI must start with a forward slash and '/rest/...'. Do not include query parameters in the URL, they must be provided separately in 'params'.")),
+     params=(Optional[str], Field(default="", description="Optional JSON of parameters to be sent in request body or query params. MUST be string with valid JSON. For search/read operations, you MUST always get minimum fields and set max results, until users ask explicitly for more fields. For search/read operations you must generate CQL query string and pass it as params."))
  )
 
 
@@ -148,7 +146,7 @@ class ConfluenceAPIWrapper(BaseModel):
     ocr_languages: Optional[str] = None
     keep_newlines: Optional[bool] = True
 
-    @model_validator(mode='before')
+    @field_validator('base_url', 'api_key', 'username', 'token', 'cloud', mode='before')
     @classmethod
     def validate_toolkit(cls, values):
         try:

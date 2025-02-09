@@ -1,8 +1,7 @@
 from typing import List, Literal
 
 from langchain_core.tools import BaseTool, BaseToolkit
-from pydantic import create_model, BaseModel, ConfigDict
-from pydantic.fields import FieldInfo
+from pydantic import create_model, BaseModel, ConfigDict, Field
 
 from .api_wrapper import TestrailAPIWrapper
 from ..base.tool import BaseAction
@@ -26,9 +25,9 @@ class TestrailToolkit(BaseToolkit):
         selected_tools = (x['name'] for x in TestrailAPIWrapper.construct().get_available_tools())
         return create_model(
             name,
-            url=(str, FieldInfo(description="Testrail URL")),
-            email=(str, FieldInfo(description="User's email")),
-            password=(str, FieldInfo(description="User's password", json_schema_extra={'secret': True})),
+            url=(str, Field(description="Testrail URL")),
+            email=(str, Field(description="User's email")),
+            password=(str, Field(description="User's password", json_schema_extra={'secret': True})),
             selected_tools=(List[Literal[tuple(selected_tools)]], []),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Testrail", "icon_url": None}})
         )

@@ -3,10 +3,9 @@ import json
 from typing import Optional, Any
 
 from pyral import Rally
-from pydantic import model_validator, BaseModel
+from pydantic import BaseModel, ConfigDict, Field, create_model, model_validator
+from pydantic.fields import PrivateAttr
 from langchain_core.tools import ToolException
-from pydantic import create_model, PrivateAttr
-from pydantic.fields import FieldInfo
 
 logger = logging.getLogger(__name__)
 
@@ -36,29 +35,29 @@ update_entity_field = """JSON of the artifact fields to update in Rally, i.e.
 # Input models for Rally operations
 RallyGetEntities = create_model(
     "RallyGetStoriesModel",
-    entity_type=(str, FieldInfo(description="Artifact type, e.g. 'HierarchicalRequirement', 'Defect', 'UserStory'")),
-    query=(str, FieldInfo(description="Query for searching Rally stories", default=None)),
-    fetch=(bool, FieldInfo(description="Whether to fetch the full details of the stories", default=True)),
-    limit=(int, FieldInfo(description="Limit the number of results", default=10))
+    entity_type=(str, Field(description="Artifact type, e.g. 'HierarchicalRequirement', 'Defect', 'UserStory'")),
+    query=(str, Field(description="Query for searching Rally stories", default=None)),
+    fetch=(bool, Field(description="Whether to fetch the full details of the stories", default=True)),
+    limit=(int, Field(description="Limit the number of results", default=10))
 )
 
 RallyGetProject = create_model(
     "RallyGetProjectModel",
-    project_name=(Optional[str], FieldInfo(
+    project_name=(Optional[str], Field(
         description="Name of the project to retrieve or default one will be used in case it is not passed",
         default=None))
 )
 
 RallyGetWorkspace = create_model(
     "RallyGetWorkspaceModel",
-    workspace_name=(Optional[str], FieldInfo(
+    workspace_name=(Optional[str], Field(
         description="Name of the workspace to retrieve or default one will be used in case it is not passed",
         default=None))
 )
 
 RallyGetUser = create_model(
     "RallyGetUserModel",
-    user_name=(Optional[str], FieldInfo(
+    user_name=(Optional[str], Field(
         description="Username of the user to retrieve or default one will be used in case it is not passed"))
 )
 
@@ -68,15 +67,15 @@ RallyNoInputModel = create_model(
 
 RallyCreateArtifact = create_model(
     "RallyCreateArtifactModel",
-    entity_json=(str, FieldInfo(description=create_entity_field)),
-    entity_type=(str, FieldInfo(description="Artifact type, e.g. 'HierarchicalRequirement', 'Defect', 'UserStory'"))
+    entity_json=(str, Field(description=create_entity_field)),
+    entity_type=(str, Field(description="Artifact type, e.g. 'HierarchicalRequirement', 'Defect', 'UserStory'"))
 )
 
 RallyUpdateArtifact = create_model(
     "RallyUpdateArtifactModel",
-    entity_json=(str, FieldInfo(description=update_entity_field)),
+    entity_json=(str, Field(description=update_entity_field)),
     entity_type=(
-        str, FieldInfo(description="Artifact type, e.g. 'HierarchicalRequirement', 'Defect', 'UserStory'", default=None))
+        str, Field(description="Artifact type, e.g. 'HierarchicalRequirement', 'Defect', 'UserStory'", default=None))
 )
 
 
@@ -90,8 +89,7 @@ class RallyApiWrapper(BaseModel):
     project: Optional[str] = None
     _client: Optional[Rally] = PrivateAttr()  # Private attribute for the Rally client
 
-    class Config:
-        arbitrary_types_allowed = True  # Allow arbitrary types (e.g., Rally)
+    model_config = ConfigDict(arbitrary_types_allowed=True)  # Allow arbitrary types (e.g., Rally)
 
     @model_validator(mode='before')
     @classmethod

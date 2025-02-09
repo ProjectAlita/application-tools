@@ -1,8 +1,8 @@
 from typing import List, Optional, Literal
 from .ado_wrapper import AzureDevOpsApiWrapper  # Import the API wrapper for Azure DevOps
 from langchain_core.tools import BaseTool, BaseToolkit
-from pydantic import create_model, BaseModel, ConfigDict
-from pydantic.fields import FieldInfo
+from pydantic import create_model, BaseModel, Field
+
 from ...base.tool import BaseAction
 
 
@@ -18,12 +18,12 @@ class AzureDevOpsWorkItemsToolkit(BaseToolkit):
         selected_tools = (x['name'] for x in AzureDevOpsApiWrapper.construct().get_available_tools())
         return create_model(
             name_alias,
-            organization_url=(str, FieldInfo(description="ADO organization url")),
-            project=(str, FieldInfo(description="ADO project")),
-            token=(str, FieldInfo(description="ADO token", json_schema_extra={'secret': True})),
-            limit=(Optional[int], FieldInfo(description="ADO plans limit used for limitation of the list with results", default=5)),
+            organization_url=(str, Field(description="ADO organization url")),
+            project=(str, Field(description="ADO project")),
+            token=(str, Field(description="ADO token", json_schema_extra={'secret': True})),
+            limit=(Optional[int], Field(description="ADO plans limit used for limitation of the list with results", default=5)),
             selected_tools=(List[Literal[tuple(selected_tools)]], []),
-            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "ADO boards", "icon_url": None}})
+            __config__={'json_schema_extra': {'metadata': {"label": "ADO boards", "icon_url": None}}}
         )
 
     @classmethod

@@ -3,8 +3,7 @@ from typing import Any, Optional, List, Dict
 
 from google.auth.transport.requests import Request
 from google.oauth2.service_account import Credentials
-from pydantic import BaseModel, model_validator, create_model
-from pydantic.fields import FieldInfo, PrivateAttr
+from pydantic import BaseModel, Field, PrivateAttr, field_validator, create_model
 from requests import Session
 
 
@@ -13,7 +12,7 @@ class GCPApiWrapper(BaseModel):
     _credentials: Optional[Credentials] = PrivateAttr()
     _session: Optional[Session] = PrivateAttr()
 
-    @model_validator(mode='before')
+    @field_validator('api_key', mode='before')
     @classmethod
     def validate_toolkit(cls, values):
         api_key = values.get('api_key')
@@ -64,10 +63,10 @@ class GCPApiWrapper(BaseModel):
                 "description": self.execute_request.__doc__,
                 "args_schema": create_model(
                     "ExecuteRequestModel",
-                    method=(str, FieldInfo(description="The HTTP method to use for the request (GET, POST, PUT, DELETE, etc.).")),
-                    scopes=(List[str], FieldInfo(description="List of OAuth 2.0 Scopes for Google APIs.")),
-                    url=(str, FieldInfo(description="Absolute URI for Google Cloud REST API.")),
-                    optional_args=(Optional[Dict[str, Any]], FieldInfo(description="Optional JSON object to be sent in request with possible keys: 'data', 'json', 'params', 'headers'."))
+                    method=(str, Field(description="The HTTP method to use for the request (GET, POST, PUT, DELETE, etc.).")),
+                    scopes=(List[str], Field(description="List of OAuth 2.0 Scopes for Google APIs.")),
+                    url=(str, Field(description="Absolute URI for Google Cloud REST API.")),
+                    optional_args=(Optional[Dict[str, Any]], Field(description="Optional JSON object to be sent in request with possible keys: 'data', 'json', 'params', 'headers'."))
                 ),
             }
         ]

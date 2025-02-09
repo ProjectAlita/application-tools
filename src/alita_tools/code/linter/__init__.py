@@ -1,6 +1,5 @@
 from langchain_core.tools import BaseToolkit, BaseTool
-from pydantic import BaseModel, create_model
-from pydantic.fields import FieldInfo
+from pydantic import BaseModel, create_model, Field
 
 from .api_wrapper import PythonLinter
 from ...base.tool import BaseAction
@@ -22,7 +21,7 @@ class PythonLinterToolkit(BaseToolkit):
     def toolkit_config_schema() -> BaseModel:
         return create_model(
             name,
-            error_codes=(str, FieldInfo(description="Error codes to be used by the linter")),
+            error_codes=(str, Field(description="Error codes to be used by the linter")),
         )
 
     @classmethod

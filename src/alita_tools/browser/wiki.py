@@ -1,8 +1,7 @@
 """Tool for the Wikipedia API."""
 from typing import Optional, Type
 
-from pydantic import create_model, BaseModel
-from pydantic.fields import FieldInfo
+from pydantic import create_model, BaseModel, Field
 from langchain_core.callbacks import CallbackManagerForToolRun
 from langchain_core.tools import BaseTool
 
@@ -21,7 +20,7 @@ class WikipediaQueryRun(BaseTool):
     )
     api_wrapper: WikipediaAPIWrapper
     args_schema: Type[BaseModel] = create_model("WikipediaQueryRunModel",
-                                 query=(str, FieldInfo(description="Query text to search pages")))
+                                 query=(str, Field(description="Query text to search pages")))
 
     def _run(
         self,

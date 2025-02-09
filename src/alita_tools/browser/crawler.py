@@ -2,13 +2,12 @@ from json import loads
 from typing import Type
 
 from langchain_core.tools import BaseTool
-from pydantic import create_model, BaseModel
-from pydantic.fields import FieldInfo
+from pydantic import create_model, BaseModel, Field
 from .utils import get_page, webRag, getPDFContent
 
 CrawlerModel = create_model(
     "SingleURLCrawlerModel",
-    url=(str, FieldInfo(description="URL to crawl data from"))
+    url=(str, Field(description="URL to crawl data from"))
 )
 
 class SingleURLCrawler(BaseTool):
@@ -29,8 +28,8 @@ class MultiURLCrawler(BaseTool):
     name: str = "multi_url_crawler"
     description: str = "Crawls multiple URLs and returns the content related to query"
     args_schema: Type[BaseModel] = create_model("MultiURLCrawlerModel",
-                                                query=(str, FieldInfo(description="Query text to search pages")),
-                                                urls=(list[str], FieldInfo(description="list of URLs to search like ['url1', 'url2']")))
+                                                query=(str, Field(description="Query text to search pages")),
+                                                urls=(list[str], Field(description="list of URLs to search like ['url1', 'url2']")))
 
     def _run(self, query: str, urls: list[str], run_manager=None):
         urls = [url.strip() for url in urls]
@@ -41,7 +40,7 @@ class GetHTMLContent(BaseTool):
     name: str = "get_html_content"
     description: str = "Get HTML content of the page"
     args_schema: Type[BaseModel] = create_model("GetHTMLContentModel",
-                                                url=(str, FieldInfo(description="URL to get HTML content")))
+                                                url=(str, Field(description="URL to get HTML content")))
 
     def _run(self, url: str, run_manager=None):
         return get_page([url], html_only=True)
@@ -50,7 +49,7 @@ class GetPDFContent(BaseTool):
     name: str = "get_pdf_content"
     description: str = "Get PDF content of the page"
     args_schema: Type[BaseModel] = create_model("GetPDFContentModel",
-                                                url=(str, FieldInfo(description="URL to get PDF content")))
+                                                url=(str, Field(description="URL to get PDF content")))
     def _run(self, url: str, run_manager=None):
         try:
             return getPDFContent(url)

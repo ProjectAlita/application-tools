@@ -9,7 +9,7 @@ from pydantic import model_validator, BaseModel
 from langchain_core.tools import ToolException
 from msrest.authentication import BasicAuthentication
 from pydantic import create_model, PrivateAttr
-from pydantic.fields import FieldInfo as Field
+from pydantic.fields import Field
 
 logger = logging.getLogger(__name__)
 

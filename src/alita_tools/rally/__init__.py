@@ -1,7 +1,6 @@
 from typing import List, Literal, Optional
 from langchain_core.tools import BaseToolkit
-from pydantic import create_model, BaseModel, ConfigDict
-from pydantic.fields import FieldInfo
+from pydantic import BaseModel, ConfigDict, Field, create_model
 from .api_wrapper import RallyApiWrapper
 from langchain_core.tools import BaseTool
 from ..base.tool import BaseAction
@@ -28,12 +27,12 @@ class RallyToolkit(BaseToolkit):
         selected_tools = (x['name'] for x in RallyApiWrapper.construct().get_available_tools())
         return create_model(
             name,
-            server=(str, FieldInfo(description="Rally server url")),
-            api_key=(Optional[str], FieldInfo(default=None, description="User's API key", json_schema_extra={'secret': True})),
-            username=(Optional[str], FieldInfo(default=None, description="Username")),
-            password=(Optional[str], FieldInfo(default=None, description="User's password", json_schema_extra={'secret': True})),
-            workspace=(Optional[str], FieldInfo(default=None, description="Rally workspace")),
-            project=(Optional[str], FieldInfo(default=None, description="Rally project")),
+            server=(str, Field(description="Rally server url")),
+            api_key=(Optional[str], Field(default=None, description="User's API key", json_schema_extra={'secret': True})),
+            username=(Optional[str], Field(default=None, description="Username")),
+            password=(Optional[str], Field(default=None, description="User's password", json_schema_extra={'secret': True})),
+            workspace=(Optional[str], Field(default=None, description="Rally workspace")),
+            project=(Optional[str], Field(default=None, description="Rally project")),
             selected_tools=(List[Literal[tuple(selected_tools)]], []),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Rally", "icon_url": None}})
         )

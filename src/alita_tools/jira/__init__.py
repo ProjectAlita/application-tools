@@ -2,15 +2,14 @@ from typing import List, Optional, Literal
 from .api_wrapper import JiraApiWrapper
 from langchain_core.tools import BaseTool, BaseToolkit
 from ..base.tool import BaseAction
-from pydantic import create_model, BaseModel, ConfigDict
-from pydantic.fields import FieldInfo
+from pydantic import create_model, BaseModel, ConfigDict, Field
 
 name = "jira"
 
 def get_tools(tool):
     return JiraToolkit().get_toolkit(
             selected_tools=tool['settings'].get('selected_tools', []),
-            base_url=tool['settings']['base_url'],
+            base_url=tool['settings'].get('base_url'),
             cloud=tool['settings'].get('cloud', True),
             api_key=tool['settings'].get('api_key', None),
             username=tool['settings'].get('username', None),
@@ -24,17 +23,17 @@ class JiraToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
-        selected_tools = (x['name'] for x in JiraApiWrapper.construct().get_available_tools())
+        selected_tools = (x['name'] for x in JiraApiWrapper.model_construct().get_available_tools())
         return create_model(
             name,
-            base_url=(str, FieldInfo(description="Jira URL")),
-            cloud=(bool, FieldInfo(description="Hosting Option")),
-            api_key=(Optional[str], FieldInfo(description="API key", default=None, json_schema_extra={'secret': True})),
-            username=(Optional[str], FieldInfo(description="Jira Username", default=None)),
-            token=(Optional[str], FieldInfo(description="Jira token", default=None, json_schema_extra={'secret': True})),
-            limit=(int, FieldInfo(description="Limit issues", default=5)),
-            verify_ssl=(bool, FieldInfo(description="Verify SSL", default=True)),
-            additional_fields=(Optional[str], FieldInfo(description="Additional fields", default="")),
+            base_url=(str, Field(description="Jira URL")),
+            cloud=(bool, Field(description="Hosting Option")),
+            api_key=(Optional[str], Field(description="API key", default=None, json_schema_extra={'secret': True})),
+            username=(Optional[str], Field(description="Jira Username", default=None)),
+            token=(Optional[str], Field(description="Jira token", default=None, json_schema_extra={'secret': True})),
+            limit=(int, Field(description="Limit issues", default=5)),
+            verify_ssl=(bool, Field(description="Verify SSL", default=True)),
+            additional_fields=(Optional[str], Field(description="Additional fields", default="")),
             selected_tools=(List[Literal[tuple(selected_tools)]], []),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Jira", "icon_url": None}})
         )
@@ -60,4 +59,3 @@ class JiraToolkit(BaseToolkit):
 
     def get_tools(self):
         return self.tools
-    

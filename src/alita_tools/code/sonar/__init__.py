@@ -1,7 +1,6 @@
 from typing import List, Literal
 from langchain_core.tools import BaseToolkit, BaseTool
-from pydantic import create_model, BaseModel, ConfigDict
-from pydantic.fields import FieldInfo
+from pydantic import create_model, BaseModel, ConfigDict, Field
 
 from .api_wrapper import SonarApiWrapper
 from ...base.tool import BaseAction
@@ -26,9 +25,9 @@ class SonarToolkit(BaseToolkit):
         selected_tools = (x['name'] for x in SonarApiWrapper.construct().get_available_tools())
         return create_model(
             name,
-            url=(str, FieldInfo(description="SonarQube Server URL")),
-            sonar_token=(str, FieldInfo(description="SonarQube user token for authentication", json_schema_extra={'secret': True})),
-            sonar_project_name=(str, FieldInfo(description="Project name of the desired repository")),
+            url=(str, Field(description="SonarQube Server URL")),
+            sonar_token=(str, Field(description="SonarQube user token for authentication", json_schema_extra={'secret': True})),
+            sonar_project_name=(str, Field(description="Project name of the desired repository")),
             selected_tools=(List[Literal[tuple(selected_tools)]], []),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Sonar", "icon_url": None}})
         )

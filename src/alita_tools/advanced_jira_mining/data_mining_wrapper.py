@@ -17,24 +17,24 @@ from pydantic import model_validator, BaseModel
 from langchain_core.runnables import RunnableLambda, RunnableParallel, RunnablePassthrough
 from langchain_text_splitters import MarkdownHeaderTextSplitter
 from pydantic import create_model
-from pydantic.fields import FieldInfo, PrivateAttr
+from pydantic.fields import Field, PrivateAttr
 from atlassian import Jira
 
 from ..llm.llm_utils import get_model, summarize
 
 PrepareDataSchema = create_model(
     "PrepareDataSchema",
-    jira_issue_key=(str, FieldInfo(
+    jira_issue_key=(str, Field(
         description="The issue key of the Jira issue, which will be used to pull data from, e.g. 'TEST-123'.")),
 )
 
 SearchDataSchema = create_model(
     "SearchDataSchema",
-    jira_issue_key=(str, FieldInfo(
+    jira_issue_key=(str, Field(
         description="The issue key of the Jira issue, which will be used to pull data from, e.g. 'TEST-123'.")),
     query=(
         str,
-        FieldInfo(description="The query to search in the data created from jira ticket. Usually it will be an AC")),
+        Field(description="The query to search in the data created from jira ticket. Usually it will be an AC")),
 )
 
 

@@ -1,8 +1,7 @@
 import logging
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, create_model, model_validator, PrivateAttr
-from pydantic.fields import FieldInfo
+from pydantic import BaseModel, create_model, Field, field_validator, PrivateAttr
 import googlemaps
 
 logger = logging.getLogger(__name__)
@@ -14,13 +13,12 @@ class GooglePlacesAPIWrapper(BaseModel):
     results_count: Optional[int] = None
     _client: Optional[googlemaps.Client] = PrivateAttr()
 
-    @model_validator(mode="before")
+    @field_validator('api_key', mode="before")
     @classmethod
-    def validate_toolkit(cls, values: Dict[str, Any]) -> Dict[str, Any]:
-        api_key = values.get("api_key")
+    def validate_toolkit(cls, api_key: Optional[str]) -> Optional[str]:
         if api_key:
             cls._client = googlemaps.Client(key=api_key)
-        return values
+        return api_key
 
     def places(self, query: str) -> str:
         """Retrieve places based on a query using Google Places API."""
@@ -93,7 +91,7 @@ class GooglePlacesAPIWrapper(BaseModel):
                 "description": self.places.__doc__,
                 "args_schema": create_model(
                     "GooglePlacesSchema",
-                    query=(str, FieldInfo(description="Query for google maps"))
+                    query=(str, Field(description="Query for google maps"))
                 ),
             },
             {
@@ -103,9 +101,9 @@ class GooglePlacesAPIWrapper(BaseModel):
                 "args_schema": create_model(
                     "GooglePlacesFindNearSchema",
                     current_location_query=(
-                    str, FieldInfo(description="Detailed user query of current user location or where to start from")),
-                    target=(str, FieldInfo(description="The target location or query which user wants to find")),
-                    radius=(Optional[int], FieldInfo(description="The radius of the search. This is optional field"))
+                    str, Field(description="Detailed user query of current user location or where to start from")),
+                    target=(str, Field(description="The target location or query which user wants to find")),
+                    radius=(Optional[int], Field(description="The radius of the search. This is optional field"))
                 ),
             }
         ]

@@ -2,10 +2,8 @@ import logging
 from typing import Any
 
 import swagger_client
-from pydantic import model_validator, BaseModel
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator, create_model
 from langchain_core.tools import ToolException
-from pydantic import create_model, model_validator, BaseModel
-from pydantic.fields import FieldInfo, PrivateAttr
 from sklearn.feature_extraction.text import strip_tags
 from swagger_client import TestCaseApi, SearchApi, PropertyResource
 from swagger_client.rest import ApiException
@@ -14,29 +12,29 @@ logger = logging.getLogger(__name__)
 
 QtestDataQuerySearch = create_model(
     "QtestDataQuerySearch",
-    dql=(str, FieldInfo(description="Qtest Data Query Language (DQL) query string")))
+    dql=(str, Field(description="Qtest Data Query Language (DQL) query string")))
 
 QtestCreateTestCase = create_model(
     "QtestCreateTestCase",
-    test_case_content=(str, FieldInfo(
+    test_case_content=(str, Field(
         description="Strictly follow the provided instructions."))
 )
 
 UpdateTestCase = create_model(
     "UpdateTestCase",
-    test_id=(str, FieldInfo(description="Test ID e.g. TC-1234")),
-    test_case_content=(str, FieldInfo(
+    test_id=(str, Field(description="Test ID e.g. TC-1234")),
+    test_case_content=(str, Field(
         description="test_case_content should be provided as a markdown table with only plain text both in header and in cells (without any emphasis like bold, italic, strikethrough and so on)."))
 )
 
 FindTestCaseById = create_model(
     "FindTestCaseById",
-    test_id=(str, FieldInfo(description="Test case ID e.g. TC-1234")),
+    test_id=(str, Field(description="Test case ID e.g. TC-1234")),
 )
 
 DeleteTestCase = create_model(
     "DeleteTestCase",
-    qtest_id=(int, FieldInfo(description="Qtest id e.g. 3253490123")),
+    qtest_id=(int, Field(description="Qtest id e.g. 3253490123")),
 )
 
 TEST_CASES_CONVERSION_PROMPT = """

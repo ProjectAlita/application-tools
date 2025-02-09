@@ -4,7 +4,7 @@ from typing import Any, Optional
 
 import chardet
 import pandas as pd
-from pydantic import BaseModel, create_model, FieldInfo, model_validator, PrivateAttr
+from pydantic import BaseModel, create_model, Field, model_validator, PrivateAttr
 
 
 class CSVToolApiWrapper(BaseModel):
@@ -54,9 +54,9 @@ class CSVToolApiWrapper(BaseModel):
                 "description": self.execute.__doc__,
                 "args_schema": create_model(
                     "ExecuteModel",
-                    method_name=(str, FieldInfo(description="Method to be called on the pandas dataframe object generated from the file")),
-                    method_args=(dict, FieldInfo(description="Pandas dataframe arguments to be passed to the method", default={})),
-                    column=(Optional[str], FieldInfo(description="Column to be used for the operation", default=None))
+                    method_name=(str, Field(description="Method to be called on the pandas dataframe object generated from the file")),
+                    method_args=(dict, Field(description="Pandas dataframe arguments to be passed to the method", default={})),
+                    column=(Optional[str], Field(description="Column to be used for the operation", default=None))
                 ),
             }
         ]

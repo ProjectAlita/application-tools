@@ -1,8 +1,7 @@
 from typing import Dict, List, Optional, Literal
 
 from langchain_core.tools import BaseTool, BaseToolkit
-from pydantic import create_model, BaseModel, ConfigDict
-from pydantic.fields import FieldInfo
+from pydantic import create_model, BaseModel, ConfigDict, Field
 
 from .api_wrapper import AlitaGitHubAPIWrapper
 from .tool import GitHubAction
@@ -36,17 +35,17 @@ class AlitaGitHubToolkit(BaseToolkit):
         return create_model(
             name,
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "GitHub", "icon_url": None}}),
-            app_id=(Optional[str], FieldInfo(description="Github APP ID", default=None)),
-            app_private_key=(Optional[str], FieldInfo(description="Github APP private key", default=None, json_schema_extra={'secret': True})),
+            app_id=(Optional[str], Field(description="Github APP ID", default=None)),
+            app_private_key=(Optional[str], Field(description="Github APP private key", default=None, json_schema_extra={'secret': True})),
 
-            access_token=(Optional[str], FieldInfo(description="Github Access Token", default=None, json_schema_extra={'secret': True})),
+            access_token=(Optional[str], Field(description="Github Access Token", default=None, json_schema_extra={'secret': True})),
 
-            username=(Optional[str], FieldInfo(description="Github Username", default=None)),
-            password=(Optional[str], FieldInfo(description="Github Password", default=None, json_schema_extra={'secret': True})),
+            username=(Optional[str], Field(description="Github Username", default=None)),
+            password=(Optional[str], Field(description="Github Password", default=None, json_schema_extra={'secret': True})),
 
-            repository=(str, FieldInfo(description="Github repository")),
-            active_branch=(Optional[str], FieldInfo(description="Active branch", default="main")),
-            base_branch=(Optional[str], FieldInfo(description="Github Base branch", default="main")),
+            repository=(str, Field(description="Github repository")),
+            active_branch=(Optional[str], Field(description="Active branch", default="main")),
+            base_branch=(Optional[str], Field(description="Github Base branch", default="main")),
             selected_tools=(List[Literal[tuple(selected_tools)]], [])
         )
 

@@ -2,8 +2,7 @@ from typing import Optional, Dict, Any, Union
 
 import boto3
 from botocore.config import Config
-from pydantic import BaseModel, model_validator, create_model
-from pydantic.fields import FieldInfo, PrivateAttr
+from pydantic import BaseModel, Field, PrivateAttr, create_model, field_validator
 
 
 class AWSToolConfig(BaseModel):
@@ -12,7 +11,7 @@ class AWSToolConfig(BaseModel):
     secret_access_key: Optional[str] = None
     _client: Optional[boto3.client] = PrivateAttr()
 
-    @model_validator(mode='before')
+    @field_validator('region', 'access_key_id', 'secret_access_key', mode='before')
     @classmethod
     def validate_toolkit(cls, values):
         region = values.get('region')
@@ -49,7 +48,7 @@ class AWSToolConfig(BaseModel):
                 "description": self.execute_aws.__doc__,
                 "args_schema": create_model(
                     "AWSExecuteModel",
-                    query=(Union[str, Dict[str, Any]], FieldInfo(description="Query to execute AWS service method"))
+                    query=(Union[str, Dict[str, Any]], Field(description="Query to execute AWS service method"))
                 ),
             }
         ]

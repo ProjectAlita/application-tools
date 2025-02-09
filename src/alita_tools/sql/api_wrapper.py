@@ -1,8 +1,8 @@
 import logging
 from typing import Optional, Any
 
-from pydantic import BaseModel, create_model, model_validator
-from pydantic.fields import FieldInfo, PrivateAttr
+from pydantic import BaseModel, create_model, field_validator, Field
+from pydantic.fields import PrivateAttr
 from sqlalchemy import create_engine, text, inspect, Engine
 from sqlalchemy.orm import sessionmaker
 
@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 ExecuteSQLModel = create_model(
     "ExecuteSQLModel",
-    sql_query=(str, FieldInfo(description="The SQL query to execute."))
+    sql_query=(str, Field(description="The SQL query to execute."))
 )
 
 SQLNoInput = create_model(
@@ -28,7 +28,7 @@ class SQLApiWrapper(BaseModel):
     database_name: str
     _client: Optional[Engine] = PrivateAttr()
 
-    @model_validator(mode='before')
+    @field_validator('dialect', 'host', 'port', 'username', 'password', 'database_name', mode='before')
     @classmethod
     def validate_toolkit(cls, values):
         for field in SQLConfig.model_fields:

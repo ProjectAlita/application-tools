@@ -1,8 +1,7 @@
 from typing import List, Literal
 
 from langchain_core.tools import BaseToolkit, BaseTool
-from pydantic import create_model, BaseModel, ConfigDict
-from pydantic.fields import FieldInfo
+from pydantic import create_model, BaseModel, ConfigDict, Field
 from .api_wrapper import SharepointApiWrapper
 from ..base.tool import BaseAction
 
@@ -26,9 +25,9 @@ class SharepointToolkit(BaseToolkit):
         selected_tools = (x['name'] for x in SharepointApiWrapper.construct().get_available_tools())
         return create_model(
             name,
-            site_url=(str, FieldInfo(description="Sharepoint site's URL")),
-            client_id=(str, FieldInfo(description="Client ID")),
-            client_secret=(str, FieldInfo(description="Client Secret", json_schema_extra={'secret': True})),
+            site_url=(str, Field(description="Sharepoint site's URL")),
+            client_id=(str, Field(description="Client ID")),
+            client_secret=(str, Field(description="Client Secret", json_schema_extra={'secret': True})),
             selected_tools=(List[Literal[tuple(selected_tools)]], []),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Sharepoint", "icon_url": None}})
         )

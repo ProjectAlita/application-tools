@@ -1,8 +1,7 @@
 from typing import List, Literal
 
 from langchain_core.tools import BaseToolkit, BaseTool
-from pydantic import create_model, BaseModel, ConfigDict
-from pydantic.fields import FieldInfo
+from pydantic import create_model, BaseModel, ConfigDict, Field
 
 from .api_wrapper import AzureApiWrapper
 from ...base.tool import BaseAction
@@ -28,10 +27,10 @@ class AzureToolkit(BaseToolkit):
         selected_tools = (x['name'] for x in AzureApiWrapper.model_construct().get_available_tools())
         return create_model(
             name,
-            subscription_id=(str, FieldInfo(default="", title="Subscription ID", description="Azure subscription ID")),
-            tenant_id=(str, FieldInfo(default="", title="Tenant ID", description="Azure tenant ID")),
-            client_id=(str, FieldInfo(default="", title="Client ID", description="Azure client ID")),
-            client_secret=(str, FieldInfo(default="", title="Client secret", description="Azure client secret", json_schema_extra={'secret': True})),
+            subscription_id=(str, Field(default="", title="Subscription ID", description="Azure subscription ID")),
+            tenant_id=(str, Field(default="", title="Tenant ID", description="Azure tenant ID")),
+            client_id=(str, Field(default="", title="Client ID", description="Azure client ID")),
+            client_secret=(str, Field(default="", title="Client secret", description="Azure client secret", json_schema_extra={'secret': True})),
             selected_tools=(List[Literal[tuple(selected_tools)]], []),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Cloud Azure", "icon_url": None}})
         )

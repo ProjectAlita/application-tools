@@ -1,8 +1,7 @@
 from typing import Any, List, Literal
 
 from langchain_core.tools import BaseToolkit, BaseTool
-from pydantic import BaseModel, ConfigDict, create_model
-from pydantic.fields import FieldInfo
+from pydantic import BaseModel, ConfigDict, create_model, Field
 
 from .api_wrapper import CSVToolApiWrapper
 from ..base.tool import BaseAction
@@ -25,7 +24,7 @@ class PandasToolkit(BaseToolkit):
         selected_tools = (x['name'] for x in CSVToolApiWrapper.model_construct().get_available_tools())
         return create_model(
             name,
-            csv_content=(Any, FieldInfo(default=None, title="CSV content", description="CSV content to be processed")),
+            csv_content=(Any, Field(default=None, title="CSV content", description="CSV content to be processed")),
             selected_tools=(List[Literal[tuple(selected_tools)]], []),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Pandas", "icon_url": None}})
         )

@@ -4,7 +4,6 @@ from typing import Type
 
 from langchain_core.tools import BaseTool
 from pydantic import create_model, Field, BaseModel
-from pydantic.fields import FieldInfo
 from .bitbucket_constants import create_pr_data
 
 from .api_wrapper import BitbucketAPIWrapper
@@ -13,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 branchInput = create_model(
     "BranchInput",
-    branch_name=(str, FieldInfo(description="The name of the branch, e.g. `my_branch`.")))
+    branch_name=(str, Field(description="The name of the branch, e.g. `my_branch`.")))
 
 
 class CreateBitbucketBranchTool(BaseTool):
@@ -60,14 +59,14 @@ class CreateFileTool(BaseTool):
     """
     args_schema: Type[BaseModel] = create_model(
         "CreateFileInput",
-        file_path=(str, FieldInfo(
+        file_path=(str, Field(
             description="File path of file to be created. e.g. `src/agents/developer/tools/git/bitbucket.py`. **IMPORTANT**: the path must not start with a slash")),
-        file_contents=(str, FieldInfo(description="""
+        file_contents=(str, Field(description="""
     Full file content to be created. It must be without any escapes, just raw content to CREATE in GIT.
     Generate full file content for this field without any additional texts, escapes, just raw code content. 
     You MUST NOT ignore, skip or comment any details, PROVIDE FULL CONTENT including all content based on all best practices.
     """)),
-        branch=(str, FieldInfo(
+        branch=(str, Field(
             description="branch - name of the branch file should be read from. e.g. `feature-1`. **IMPORTANT**: if branch not specified, try to determine from the chat history or clarify with user."))
     )
 
@@ -82,14 +81,14 @@ class UpdateFileTool(BaseTool):
     """
     args_schema: Type[BaseModel] = create_model(
         "CreateFileInput",
-        file_path=(str, FieldInfo(
+        file_path=(str, Field(
             description="File path of file to be created. e.g. `src/agents/developer/tools/git/bitbucket.py`. **IMPORTANT**: the path must not start with a slash")),
-        file_contents=(str, FieldInfo(description="""
+        file_contents=(str, Field(description="""
             Full file content to be inserted instead of initial one. It must be without any escapes, just raw content to CREATE in GIT.
             Generate full file content for this field without any additional texts, escapes, just raw code content. 
             You MUST NOT ignore, skip or comment any details, PROVIDE FULL CONTENT including all content based on all best practices.
             """)),
-        branch=(str, FieldInfo(
+        branch=(str, Field(
             description="branch - name of the branch file should be read from. e.g. `feature-1`. **IMPORTANT**: if branch not specified, try to determine from the chat history or clarify with user."))
     )
 
@@ -142,9 +141,9 @@ class ReadFileTool(BaseTool):
     file path of the file you would like to read. **IMPORTANT**: the path must not start with a slash"""
     args_schema: Type[BaseModel] = create_model(
         "ReadFileInput",
-        file_path=(str, FieldInfo(
+        file_path=(str, Field(
             description="File path of file to be read. e.g. `src/agents/developer/tools/git/github_tools.py`. **IMPORTANT**: the path must not start with a slash")),
-        branch=(str, FieldInfo(
+        branch=(str, Field(
             description="branch - name of the branch file should be read from. e.g. `feature-1`. **IMPORTANT**: if branch not specified, try to determine from the chat history or clarify with user."))
     )
 

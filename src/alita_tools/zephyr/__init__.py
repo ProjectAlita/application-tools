@@ -2,8 +2,7 @@ from typing import List, Literal
 
 from langchain_community.agent_toolkits.base import BaseToolkit
 from langchain_core.tools import BaseTool
-from pydantic import create_model, BaseModel, ConfigDict
-from pydantic.fields import FieldInfo
+from pydantic import create_model, BaseModel, Field
 
 from ..base.tool import BaseAction
 from .api_wrapper import ZephyrV1ApiWrapper
@@ -26,11 +25,11 @@ class ZephyrToolkit(BaseToolkit):
         selected_tools = (x['name'] for x in ZephyrV1ApiWrapper.construct().get_available_tools())
         return create_model(
             name,
-            base_url=(str, FieldInfo(description="Base URL")),
-            username=(str, FieldInfo(description="Username")),
-            password=(str, FieldInfo(description="Password", json_schema_extra={'secret': True})),
+            base_url=(str, Field(description="Base URL")),
+            username=(str, Field(description="Username")),
+            password=(str, Field(description="Password", json_schema_extra={'secret': True})),
             selected_tools=(List[Literal[tuple(selected_tools)]], []),
-            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Zephyr", "icon_url": None}})
+            __config__={'json_schema_extra': {'metadata': {"label": "Zephyr", "icon_url": None}}}
         )
 
     @classmethod

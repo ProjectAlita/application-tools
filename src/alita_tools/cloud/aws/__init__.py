@@ -1,8 +1,7 @@
 from typing import List, Literal, Optional
+from pydantic import BaseModel, Field, ConfigDict, create_model
 
 from langchain_core.tools import BaseToolkit, BaseTool
-from pydantic import create_model, BaseModel, ConfigDict
-from pydantic.fields import FieldInfo
 
 from .api_wrapper import AWSToolConfig
 from ...base.tool import BaseAction
@@ -27,9 +26,9 @@ class AWSToolkit(BaseToolkit):
         selected_tools = (x['name'] for x in AWSToolConfig.model_construct().get_available_tools())
         return create_model(
             name,
-            region=(str, FieldInfo(default="", title="Region", description="AWS region")),
-            access_key_id=(Optional[str], FieldInfo(default=None, title="Access Key ID", description="AWS access key ID")),
-            secret_access_key=(Optional[str], FieldInfo(default=None, title="Secret Access Key", description="AWS secret access key", json_schema_extra={'secret': True})),
+            region=(str, Field(default="", title="Region", description="AWS region")),
+            access_key_id=(Optional[str], Field(default=None, title="Access Key ID", description="AWS access key ID")),
+            secret_access_key=(Optional[str], Field(default=None, title="Secret Access Key", description="AWS secret access key", json_schema_extra={'secret': True})),
             selected_tools=(List[Literal[tuple(selected_tools)]], []),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Cloud AWS", "icon_url": None}})
         )

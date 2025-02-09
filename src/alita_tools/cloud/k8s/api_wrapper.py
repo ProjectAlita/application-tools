@@ -2,15 +2,16 @@ import json
 from typing import Tuple, Optional, Dict, Any, Union
 
 from kubernetes import client, config as k8s_config
-from pydantic import BaseModel, model_validator, create_model, FieldInfo, PrivateAttr
+from pydantic import BaseModel, Field, PrivateAttr, ConfigDict, field_validator, create_model
 
 
 class KubernetesApiWrapper(BaseModel):
     url: str
     token: Optional[str] = None
     _client: Optional[client.CoreV1Api] = PrivateAttr()
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    @model_validator(mode='before')
+    @field_validator('url', 'token', mode='before')
     @classmethod
     def validate_toolkit(cls, values):
         url = values.get('url')
@@ -91,10 +92,10 @@ class KubernetesApiWrapper(BaseModel):
                 "description": self.execute_kubernetes.__doc__,
                 "args_schema": create_model(
                     "ExecuteToolModel",
-                    method=(str, FieldInfo(description="The HTTP method to use for the request (GET, POST, PUT, DELETE, etc.).")),
-                    suburl=(str, FieldInfo(description="The relative URI for Kubernetes API. URI must start with a forward slash , example '/api/v1/...'. Do not include query parameters in the URL, they must be provided separately in 'body'.")),
-                    body=(Optional[Union[str, Dict[str, Any]]], FieldInfo(description="Optional JSON object to be sent in request body. No comments allowed.")),
-                    headers=(Optional[Union[str, Dict[str, Any]]], FieldInfo(description="Optional JSON object of headers to be sent in request. No comments allowed."))
+                    method=(str, Field(description="The HTTP method to use for the request (GET, POST, PUT, DELETE, etc.).")),
+                    suburl=(str, Field(description="The relative URI for Kubernetes API. URI must start with a forward slash , example '/api/v1/...'. Do not include query parameters in the URL, they must be provided separately in 'body'.")),
+                    body=(Optional[Union[str, Dict[str, Any]]], Field(description="Optional JSON object to be sent in request body. No comments allowed.")),
+                    headers=(Optional[Union[str, Dict[str, Any]]], Field(description="Optional JSON object of headers to be sent in request. No comments allowed."))
                 ),
                 "ref": self.execute_kubernetes,
             },
@@ -103,8 +104,8 @@ class KubernetesApiWrapper(BaseModel):
                 "description": self.kubernetes_integration_healthcheck.__doc__,
                 "args_schema": create_model(
                     "KubernetesIntegrationHealthcheckModel",
-                    url=(str, FieldInfo(description="The URL of the Kubernetes cluster to test integration with.")),
-                    token=(Optional[str], FieldInfo(description="The authentication token used for accessing the Kubernetes cluster. If not provided, no token will be used."))
+                    url=(str, Field(description="The URL of the Kubernetes cluster to test integration with.")),
+                    token=(Optional[str], Field(description="The authentication token used for accessing the Kubernetes cluster. If not provided, no token will be used."))
                 ),
                 "ref": self.kubernetes_integration_healthcheck,
             }

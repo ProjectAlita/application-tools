@@ -1,8 +1,7 @@
 from typing import List, Literal
 
 from langchain_core.tools import BaseToolkit, BaseTool
-from pydantic import create_model, BaseModel, ConfigDict
-from pydantic.fields import FieldInfo
+from pydantic import create_model, BaseModel, ConfigDict, Field
 
 from .api_wrapper import OpenApiWrapper
 from ..base.tool import BaseAction
@@ -26,8 +25,8 @@ class OpenApiToolkit(BaseToolkit):
         selected_tools = (x['name'] for x in OpenApiWrapper.model_construct().get_available_tools())
         return create_model(
             name,
-            spec=(str, FieldInfo(default="", title="Specification", description="OpenAPI specification")),
-            api_key=(str, FieldInfo(default="", title="API key", description="API key", json_schema_extra={'secret': True})),
+            spec=(str, Field(default="", title="Specification", description="OpenAPI specification")),
+            api_key=(str, Field(default="", title="API key", description="API key", json_schema_extra={'secret': True})),
             selected_tools=(List[Literal[tuple(selected_tools)]], []),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "OpenAPI", "icon_url": None}})
         )

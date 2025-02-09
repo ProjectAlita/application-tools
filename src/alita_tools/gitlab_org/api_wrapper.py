@@ -4,8 +4,8 @@ from typing import Optional, Any, List, Dict
 from gitlab import GitlabGetError
 from gitlab.v4.objects import Project
 from langchain_core.tools import ToolException
-from pydantic import BaseModel,  model_validator, PrivateAttr, create_model
-from pydantic.fields import FieldInfo as Field
+from pydantic import BaseModel, model_validator, PrivateAttr, create_model
+from pydantic.fields import Field
 
 from ..gitlab.utils import get_diff_w_position, get_position
 

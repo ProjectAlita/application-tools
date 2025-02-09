@@ -36,6 +36,7 @@ from .elastic import ElasticToolkit
 from .keycloak import KeycloakToolkit
 from .localgit import AlitaLocalGitToolkit
 from .pandas import PandasToolkit
+from .azure_ai.search import AzureSearchToolkit, get_tools as get_azure_search
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +87,8 @@ def get_tools(tools_list, *args, **kwargs):
             tools.extend(get_sonar(tool))
         elif tool['type'] == 'google_places':
             tools.extend(get_google_places(tool))
+        elif tool['type'] == 'azure_search':
+            tools.extend(get_azure_search(tool))
         else:
             if tool.get("settings", {}).get("module"):
                 try:
@@ -133,4 +136,5 @@ def get_toolkits():
         KeycloakToolkit.toolkit_config_schema(),
         AlitaLocalGitToolkit.toolkit_config_schema(),
         PandasToolkit.toolkit_config_schema(),
+        AzureSearchToolkit.toolkit_config_schema(),
     ]

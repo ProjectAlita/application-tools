@@ -1,7 +1,7 @@
 from typing import List, Literal, Optional
 from langchain_core.tools import BaseToolkit, BaseTool
 from pydantic import create_model, BaseModel, ConfigDict
-from pydantic.fields import FieldInfo
+from pydantic.fields import Field
 
 from .api_wrapper import GooglePlacesAPIWrapper
 from ..base.tool import BaseAction
@@ -25,8 +25,8 @@ class GooglePlacesToolkit(BaseToolkit):
         selected_tools = (x['name'] for x in GooglePlacesAPIWrapper.construct().get_available_tools())
         return create_model(
             name,
-            api_key=(str, FieldInfo(description="Google Places API key", json_schema_extra={'secret': True})),
-            results_count=(Optional[int], FieldInfo(description="Results number to show", default=None)),
+            api_key=(str, Field(description="Google Places API key", json_schema_extra={'secret': True})),
+            results_count=(Optional[int], Field(description="Results number to show", default=None)),
             selected_tools=(List[Literal[tuple(selected_tools)]], []),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Google Places", "icon_url": None}})
         )

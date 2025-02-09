@@ -6,9 +6,7 @@ from traceback import format_exc
 import json
 from typing import List, Optional, Any, Dict
 from langchain_core.tools import ToolException
-from pydantic import model_validator, BaseModel
-from pydantic import create_model
-from pydantic.fields import FieldInfo, PrivateAttr
+from pydantic import BaseModel, Field, PrivateAttr, field_validator, create_model
 from atlassian import Jira
 
 logger = logging.getLogger(__name__)
@@ -20,9 +18,9 @@ NoInput = create_model(
 
 JiraInput = create_model(
     "JiraInput",
-    method=(str, FieldInfo(description="The HTTP method to use for the request (GET, POST, PUT, DELETE, etc.)."
-                                       " Required parameter.")),
-    relative_url=(str, FieldInfo(description="""
+    method=(str, Field(description="The HTTP method to use for the request (GET, POST, PUT, DELETE, etc.)."
+                                   " Required parameter.")),
+    relative_url=(str, Field(description="""
          Required parameter: The relative URI for JIRA REST API V2.
          URI must start with a forward slash and '/rest/api/2/...'.
          Do not include query parameters in the URL, they must be provided separately in 'params'.
@@ -30,7 +28,7 @@ JiraInput = create_model(
          set maxResult, until users ask explicitly for more fields.
          """
     )),
-    params=(Optional[str], FieldInfo(
+    params=(Optional[str], Field(
         default="",
         description="""
          Optional JSON of parameters to be sent in request body or query params. MUST be string with valid JSON. 
@@ -41,11 +39,11 @@ JiraInput = create_model(
 
 JiraSearch = create_model(
     "JiraSearchModel",
-    jql=(str, FieldInfo(description="Jira Query Language (JQL) query string")))
+    jql=(str, Field(description="Jira Query Language (JQL) query string")))
 
 JiraCreateIssue = create_model(
     "JiraCreateIssueModel",
-    issue_json=(str, FieldInfo(
+    issue_json=(str, Field(
         description=("JSON of body to create an issue for JIRA. "
                      "You must follow the atlassian-python-api's Jira "
                      "`issue_create` function's input format. For example,"
@@ -59,7 +57,7 @@ JiraCreateIssue = create_model(
 
 JiraUpdateIssue = create_model(
     "JiraUpdateIssueModel",
-    issue_json=(str, FieldInfo(
+    issue_json=(str, Field(
         description=("JSON of body to update an issue for JIRA. "
                      "You must follow the atlassian-python-api's Jira "
                      "`update_issue` function's input format. For example,"
@@ -74,23 +72,23 @@ JiraUpdateIssue = create_model(
 
 AddCommentInput = create_model(
     "AddCommentInputModel",
-    issue_key=(str, FieldInfo(description="The issue key of the Jira issue to which the comment is to be added, e.g. 'TEST-123'.")),
-    comment=(str, FieldInfo(description="The comment to be added to the Jira issue, e.g. 'This is a test comment.'"))
+    issue_key=(str, Field(description="The issue key of the Jira issue to which the comment is to be added, e.g. 'TEST-123'.")),
+    comment=(str, Field(description="The comment to be added to the Jira issue, e.g. 'This is a test comment.'"))
 )
 
 ModifyLabels = create_model(
     "AddCommentInputModel",
-    issue_key=(str, FieldInfo(description="The issue key of the Jira issue to which the comment is to be added, e.g. 'TEST-123'.")),
-    add_labels=(list[str], FieldInfo(description="List of labels required to be added", default=None)),
-    remove_labels=(list[str], FieldInfo(description="List of labels required to be removed", default=None))
+    issue_key=(str, Field(description="The issue key of the Jira issue to which the comment is to be added, e.g. 'TEST-123'.")),
+    add_labels=(list[str], Field(description="List of labels required to be added", default=None)),
+    remove_labels=(list[str], Field(description="List of labels required to be removed", default=None))
 )
 
 SetIssueStatus = create_model(
     "SetIssueStatusModel",
-    issue_key=(str, FieldInfo(
+    issue_key=(str, Field(
         description="""The issue key of the Jira issue to which the comment is to be added, e.g. "TEST-123".""")),
-    status_name=(str, FieldInfo(description="""Jira issue status name, e.g. "Close", "In progress".""")),
-    mandatory_fields_json=(str, FieldInfo(description="""JSON of body containing mandatory fields required to be updated to change an issue's status.
+    status_name=(str, Field(description="""Jira issue status name, e.g. "Close", "In progress".""")),
+    mandatory_fields_json=(str, Field(description="""JSON of body containing mandatory fields required to be updated to change an issue's status.
      If there are mandatory fields for the transition, these can be set using a dict in 'fields'.
      For updating screen properties that cannot be set/updated via the fields properties,
      they can set using a dict through 'update'.
@@ -99,32 +97,32 @@ SetIssueStatus = create_model(
 
 GetSpecificFieldInfo = create_model(
     "GetSpecificFieldInfoModel",
-    jira_issue_key=(str, FieldInfo(description="Jira issue key specific information will be exctracted from in following format, TEST-1234")),
-    field_name=(str, FieldInfo(description="Field name data from which will be taken. It should be either 'description', 'summary', 'priority' etc or custom field name in following format 'customfield_10300'"))
+    jira_issue_key=(str, Field(description="Jira issue key specific information will be exctracted from in following format, TEST-1234")),
+    field_name=(str, Field(description="Field name data from which will be taken. It should be either 'description', 'summary', 'priority' etc or custom field name in following format 'customfield_10300'"))
 )
 
 GetRemoteLinks = create_model(
     "GetRemoteLinksModel",
-    jira_issue_key=(str, FieldInfo(description="Jira issue key from which remote links will be extracted, e.g. TEST-1234"))
+    jira_issue_key=(str, Field(description="Jira issue key from which remote links will be extracted, e.g. TEST-1234"))
 )
 
 ListCommentsInput = create_model(
     "ListCommentsInputModel",
-    issue_key=(str, FieldInfo(description="The issue key of the Jira issue from which comments will be extracted, e.g. 'TEST-123'."))
+    issue_key=(str, Field(description="The issue key of the Jira issue from which comments will be extracted, e.g. 'TEST-123'."))
 )
 LinkIssues = create_model(
     "LinkIssuesModel",
-    inward_issue_key=(str, FieldInfo(description="""The JIRA issue id  of inward issue.
+    inward_issue_key=(str, Field(description="""The JIRA issue id  of inward issue.
                                     Example: 
                                     To link test to another issue ( test 'test' story, story 'is tested by test'). 
                                     Use the appropriate issue link type (e.g., "Test", "Relates", "Blocks").
                                     If we use "Test" linktype, the test is inward issue, the story/other issue is outward issue.""")),
-    outward_issue_key=(str, FieldInfo(description="""The JIRA issue id  of outward issue. 
+    outward_issue_key=(str, Field(description="""The JIRA issue id  of outward issue. 
                                     Example: 
                                     To link test to another issue ( test 'test' story, story 'is tested by test'). 
                                     Use the appropriate issue link type (e.g., "Test", "Relates", "Blocks").
                                     If we use "Test" linktype, the test is inward issue, the story/other issue is outward issue.""")),
-    linktype=(str, FieldInfo(description="""Use the appropriate issue link type (e.g., "Test", "Relates", "Blocks").
+    linktype=(str, Field(description="""Use the appropriate issue link type (e.g., "Test", "Relates", "Blocks").
                                     Example: 
                                     To link test to another issue ( test 'test' story, story 'is tested by test'). 
                                     Use the appropriate issue link type (e.g., "Test", "Relates", "Blocks").
@@ -246,7 +244,7 @@ class JiraApiWrapper(BaseModel):
     _client: Jira = PrivateAttr()
     issue_search_pattern: str = r'/rest/api/\d+/search'
 
-    @model_validator(mode='before')
+    @field_validator('base_url', 'api_key', 'username', 'token', 'cloud', 'api_version', 'additional_fields', mode='before')
     @classmethod
     def validate_toolkit(cls, values):
         try:

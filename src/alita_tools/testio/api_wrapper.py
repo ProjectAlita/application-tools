@@ -1,7 +1,7 @@
 from typing import Any, Optional, List
 
-from pydantic import BaseModel, model_validator, create_model
-from pydantic.fields import FieldInfo, PrivateAttr
+from pydantic import BaseModel, field_validator, create_model, Field
+from pydantic.fields import PrivateAttr
 
 from .testio_client import TestIOClient
 
@@ -11,7 +11,7 @@ class TestIOApiWrapper(BaseModel):
     api_key: str
     _client: Optional[TestIOClient] = PrivateAttr()
 
-    @model_validator(mode='before')
+    @field_validator('endpoint', 'api_key', mode='before')
     @classmethod
     def validate_toolkit(cls, values):
         endpoint = values.get('endpoint')
@@ -48,8 +48,8 @@ class TestIOApiWrapper(BaseModel):
                 "description": self.get_test_cases_for_test.__doc__,
                 "args_schema": create_model(
                     "GetTestCasesForTestModel",
-                    product_id=(int, FieldInfo(description="The ID of the product")),
-                    test_case_test_id=(int, FieldInfo(description="The ID of the test case test"))
+                    product_id=(int, Field(description="The ID of the product")),
+                    test_case_test_id=(int, Field(description="The ID of the test case test"))
                 ),
                 "ref": self.get_test_cases_for_test,
             },
@@ -58,8 +58,8 @@ class TestIOApiWrapper(BaseModel):
                 "description": self.get_test_cases_statuses_for_test.__doc__,
                 "args_schema": create_model(
                     "GetTestCasesStatusesForTestModel",
-                    product_id=(int, FieldInfo(description="The ID of the product")),
-                    test_case_test_id=(int, FieldInfo(description="The ID of the test case test"))
+                    product_id=(int, Field(description="The ID of the product")),
+                    test_case_test_id=(int, Field(description="The ID of the test case test"))
                 ),
                 "ref": self.get_test_cases_statuses_for_test,
             },
@@ -68,8 +68,8 @@ class TestIOApiWrapper(BaseModel):
                 "description": self.list_bugs_for_test_with_filter.__doc__,
                 "args_schema": create_model(
                     "ListBugsForTestWithFilterModel",
-                    filter_product_ids=(Optional[str], FieldInfo(description="Comma-separated list of product IDs to filter by")),
-                    filter_test_cycle_ids=(Optional[str], FieldInfo(description="Comma-separated list of test cycle IDs to filter by"))
+                    filter_product_ids=(Optional[str], Field(description="Comma-separated list of product IDs to filter by")),
+                    filter_test_cycle_ids=(Optional[str], Field(description="Comma-separated list of test cycle IDs to filter by"))
                 ),
                 "ref": self.list_bugs_for_test_with_filter,
             }

@@ -19,8 +19,7 @@ from azure.devops.v7_0.git.models import (
 )
 from langchain_core.tools import ToolException
 from msrest.authentication import BasicAuthentication
-from pydantic import BaseModel, create_model, PrivateAttr, model_validator
-from pydantic.fields import FieldInfo
+from pydantic import BaseModel, Field, PrivateAttr, create_model, model_validator
 
 logger = logging.getLogger(__name__)
 
@@ -51,21 +50,21 @@ class ArgsSchema(Enum):
         "BranchName",
         branch_name=(
             str,
-            FieldInfo(description="The name of the branch, e.g. `my_branch`."),
+            Field(description="The name of the branch, e.g. `my_branch`."),
         ),
     )
     GetPR = create_model(
         "GetPR",
         pull_request_id=(
             str,
-            FieldInfo(description="The PR number as a string, e.g. `12`"),
+            Field(description="The PR number as a string, e.g. `12`"),
         ),
     )
     ListFilesModel = create_model(
         "ListFilesModel",
         directory_path=(
             str,
-            FieldInfo(
+            Field(
                 default="",
                 description=(
                     "The path of the directory, e.g. `some_dir/inner_dir`."
@@ -75,7 +74,7 @@ class ArgsSchema(Enum):
         ),
         branch_name=(
             str,
-            FieldInfo(
+            Field(
                 default="",
                 description=(
                     "Repository branch. If None then active branch will be selected."
@@ -87,14 +86,14 @@ class ArgsSchema(Enum):
         "CreateBranchName",
         branch_name=(
             str,
-            FieldInfo(description="The name of the branch, e.g. `my_branch`."),
+            Field(description="The name of the branch, e.g. `my_branch`."),
         ),
     )
     ReadFile = create_model(
         "ReadFile",
         file_path=(
             str,
-            FieldInfo(
+            Field(
                 description=(
                     "The full file path of the file you would like to read where the "
                     "path must NOT start with a slash, e.g. `some_dir/my_file.py`."
@@ -106,26 +105,26 @@ class ArgsSchema(Enum):
         "CreateFile",
         branch_name=(
             str,
-            FieldInfo(description="The name of the branch, e.g. `my_branch`."),
+            Field(description="The name of the branch, e.g. `my_branch`."),
         ),
-        file_path=(str, FieldInfo(description="Path of a file to be created.")),
+        file_path=(str, Field(description="Path of a file to be created.")),
         file_contents=(
             str,
-            FieldInfo(description="Content of a file to be put into chat."),
+            Field(description="Content of a file to be put into chat."),
         ),
     )
     UpdateFile = create_model(
         "UpdateFile",
-        branch_name=(str, FieldInfo(description="The name of the branch, e.g. `my_branch`.")),
-        file_path=(str, FieldInfo(description="Path of a file to be updated.")),
-        update_query=(str, FieldInfo(description="Update query used to adjust target file.")),
+        branch_name=(str, Field(description="The name of the branch, e.g. `my_branch`.")),
+        file_path=(str, Field(description="Path of a file to be updated.")),
+        update_query=(str, Field(description="Update query used to adjust target file.")),
     )
     DeleteFile = create_model(
         "DeleteFile",
-        branch_name=(str, FieldInfo(description="The name of the branch, e.g. `my_branch`.")),
+        branch_name=(str, Field(description="The name of the branch, e.g. `my_branch`.")),
         file_path=(
             str,
-            FieldInfo(
+            Field(
                 description=(
                     "The full file path of the file you would like to delete"
                     " where the path must NOT start with a slash, e.g."
@@ -137,22 +136,22 @@ class ArgsSchema(Enum):
     )
     CommentOnPullRequest = create_model(
         "CommentOnPullRequest",
-        comment_query=(str, FieldInfo(description="Follow the required formatting.")),
+        comment_query=(str, Field(description="Follow the required formatting.")),
     )
     GetWorkItems = create_model(
         "GetWorkItems",
         pull_request_id=(
             str,
-            FieldInfo(description="The PR number as a string, e.g. `12`"),
+            Field(description="The PR number as a string, e.g. `12`"),
         ),
     )
     CreatePullRequest = create_model(
         "CreatePullRequest",
-        pull_request_title=(str, FieldInfo(description="Title of the pull request")),
-        pull_request_body=(str, FieldInfo(description="Body of the pull request")),
+        pull_request_title=(str, Field(description="Title of the pull request")),
+        pull_request_body=(str, Field(description="Body of the pull request")),
         branch_name=(
             str,
-            FieldInfo(description="The name of the branch, e.g. `my_branch`."),
+            Field(description="The name of the branch, e.g. `my_branch`."),
         ),
     )
 

@@ -5,26 +5,26 @@ from typing import Any, Optional
 from pydantic import model_validator, BaseModel
 from langchain_core.tools import ToolException
 from pydantic import create_model, PrivateAttr
-from pydantic.fields import FieldInfo
+from pydantic.fields import Field
 
 logger = logging.getLogger(__name__)
 
 ZephyrGetTestCases = create_model(
     "ZephyrGetTestCases",
-    project_key=(str, FieldInfo(description="Jira project key filter")),
-    folder_id=(str, FieldInfo(description="Folder ID filter", default=None))
+    project_key=(str, Field(description="Jira project key filter")),
+    folder_id=(str, Field(description="Folder ID filter", default=None))
 )
 
 ZephyrGetTestCase = create_model(
     "ZephyrGetTestCase",
-    test_case_id=(str, FieldInfo(description="Test case ID")),
+    test_case_id=(str, Field(description="Test case ID")),
 )
 
 ZephyrCreateTestCase = create_model(
     "ZephyrCreateTestCase",
-    project_key=(str, FieldInfo(description="Jira project key")),
-    test_case_name=(str, FieldInfo(description="Test case name")),
-    test_case_json=(str, FieldInfo(
+    project_key=(str, Field(description="Jira project key")),
+    test_case_name=(str, Field(description="Test case name")),
+    test_case_json=(str, Field(
         description="""New test case content in a JSON format: 
         {
            "keyword_argument":"keyword_argument_value",

@@ -1,8 +1,7 @@
 from typing import List, Literal, Optional
 
 from langchain_core.tools import BaseTool, BaseToolkit
-from pydantic import create_model, BaseModel, ConfigDict
-from pydantic.fields import FieldInfo
+from pydantic import BaseModel, Field, create_model
 
 from ...base.tool import BaseAction
 from .repos_wrapper import ReposApiWrapper
@@ -17,14 +16,14 @@ class AzureDevOpsReposToolkit(BaseToolkit):
         selected_tools = (x['name'] for x in ReposApiWrapper.model_construct().get_available_tools())
         return create_model(
             name,
-            organization_url=(Optional[str], FieldInfo(default="", title="Organization URL", description="ADO organization url")),
-            project=(Optional[str], FieldInfo(default="", title="Project", description="ADO project")),
-            repository_id=(Optional[str], FieldInfo(default="", title="Repository ID", description="ADO repository ID")),
-            token=(Optional[str], FieldInfo(default="", title="Token", description="ADO token", json_schema_extra={'secret': True})),
-            base_branch=(Optional[str], FieldInfo(default="", title="Base branch", description="ADO base branch (e.g., main)")),
-            active_branch=(Optional[str], FieldInfo(default="", title="Active branch", description="ADO active branch (e.g., main)")),
+            organization_url=(Optional[str], Field(default="", title="Organization URL", description="ADO organization url")),
+            project=(Optional[str], Field(default="", title="Project", description="ADO project")),
+            repository_id=(Optional[str], Field(default="", title="Repository ID", description="ADO repository ID")),
+            token=(Optional[str], Field(default="", title="Token", description="ADO token", json_schema_extra={'secret': True})),
+            base_branch=(Optional[str], Field(default="", title="Base branch", description="ADO base branch (e.g., main)")),
+            active_branch=(Optional[str], Field(default="", title="Active branch", description="ADO active branch (e.g., main)")),
             selected_tools=(List[Literal[tuple(selected_tools)]], []),
-            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "AzureDevOps Repos", "icon_url": None}})
+            __config__={'json_schema_extra': {'metadata': {"label": "AzureDevOps Repos", "icon_url": None}}}
         )
 
     @classmethod

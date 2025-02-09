@@ -1,0 +1,4 @@
+pytest
+tiktoken==0.8.0
+langchain_community
+python-dotenv~=1.0.1

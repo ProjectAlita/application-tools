@@ -1,7 +1,7 @@
 import json
 from typing import Any, Optional
 
-from pydantic import BaseModel, create_model, FieldInfo, model_validator, PrivateAttr
+from pydantic import BaseModel, create_model, Field, field_validator, PrivateAttr
 
 try:
     from elasticsearch import Elasticsearch
@@ -17,7 +17,7 @@ class ELITEAElasticApiWrapper(BaseModel):
     api_key: Optional[tuple[str, str]] = None
     _client: Optional[Elasticsearch] = PrivateAttr()
 
-    @model_validator(mode='before')
+    @field_validator('url', 'api_key', mode='before')
     @classmethod
     def validate_toolkit(cls, values):
         if Elasticsearch is None:
@@ -46,8 +46,8 @@ class ELITEAElasticApiWrapper(BaseModel):
                 "description": self.search_elastic_index.__doc__,
                 "args_schema": create_model(
                     "SearchElasticIndexModel",
-                    index=(str, FieldInfo(description="Name of the Elastic index to apply the query")),
-                    query=(str, FieldInfo(description="Query to Elastic API in the form of a Query DSL"))
+                    index=(str, Field(description="Name of the Elastic index to apply the query")),
+                    query=(str, Field(description="Query to Elastic API in the form of a Query DSL"))
                 ),
             }
         ]

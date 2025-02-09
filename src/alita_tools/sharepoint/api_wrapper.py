@@ -4,8 +4,7 @@ from typing import Any, Optional
 from langchain_core.tools import ToolException
 from office365.runtime.auth.client_credential import ClientCredential
 from office365.sharepoint.client_context import ClientContext
-from pydantic import create_model, model_validator, BaseModel
-from pydantic.fields import FieldInfo, PrivateAttr
+from pydantic import BaseModel, Field, PrivateAttr, create_model, field_validator
 
 from .utils import read_docx_from_bytes
 
@@ -15,19 +14,19 @@ NoInput = create_model(
 
 ReadList = create_model(
     "ReadList",
-    list_title=(str, FieldInfo(description="Name of a Sharepoint list to be read.")),
-    limit=(int, FieldInfo(description="Limit (maximum number) of list items to be returned"))
+    list_title=(str, Field(description="Name of a Sharepoint list to be read.")),
+    limit=(int, Field(description="Limit (maximum number) of list items to be returned"))
 )
 
 GetFiles = create_model(
     "GetFiles",
-    folder_name=(str, FieldInfo(description="Folder name to get list of the files.")),
-    limit_files=(int, FieldInfo(description="Limit (maximum number) of files to be returned. Can be called with synonyms, such as First, Top, etc., or can be reflected just by a number for example 'Top 10 files'. Use default value if not specified in a query WITH NO EXTRA CONFIRMATION FROM A USER")),
+    folder_name=(str, Field(description="Folder name to get list of the files.")),
+    limit_files=(int, Field(description="Limit (maximum number) of files to be returned. Can be called with synonyms, such as First, Top, etc., or can be reflected just by a number for example 'Top 10 files'. Use default value if not specified in a query WITH NO EXTRA CONFIRMATION FROM A USER")),
 )
 
 ReadDocument = create_model(
     "ReadDocument",
-    path=(str, FieldInfo(description="Contains the server-relative path of a document for reading."))
+    path=(str, Field(description="Contains the server-relative path of a document for reading."))
 )
 
 
@@ -38,9 +37,9 @@ class SharepointApiWrapper(BaseModel):
     token: str = None
     _client: Optional[ClientContext] = PrivateAttr()  # Private attribute for the office365 client
 
-    @model_validator(mode='before')
+    @field_validator('site_url', 'client_id', 'client_secret', 'token', mode='before')
     @classmethod
-    def validate_toolkit(cls, values):
+    def validate_toolkit(cls, value, field):
 
         try:
             from office365.runtime.auth.authentication_context import AuthenticationContext
@@ -51,10 +50,10 @@ class SharepointApiWrapper(BaseModel):
                "`pip install office365-rest-python-client`"
             )
 
-        site_url = values.get('site_url')
-        client_id = values.get('client_id', None)
-        client_secret = values.get('client_secret', None)
-        token = values.get('token', None)
+        site_url = value if field.name == 'site_url' else None
+        client_id = value if field.name == 'client_id' else None
+        client_secret = value if field.name == 'client_secret' else None
+        token = value if field.name == 'token' else None
 
         try:
             if client_id and client_secret:
@@ -72,7 +71,7 @@ class SharepointApiWrapper(BaseModel):
             logging.info("Successfully authenticated to SharePoint.")
         except Exception as e:
                 logging.error(f"Failed to authenticate with SharePoint: {str(e)}")
-        return values
+        return value
 
 
     def read_list(self, list_title, limit: int = 1000):

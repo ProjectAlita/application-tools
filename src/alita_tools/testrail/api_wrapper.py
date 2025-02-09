@@ -6,32 +6,32 @@ from testrail_api import TestRailAPI
 from pydantic import model_validator, BaseModel
 from langchain_core.tools import ToolException
 from pydantic import create_model
-from pydantic.fields import FieldInfo, PrivateAttr
+from pydantic.fields import Field, PrivateAttr
 from testrail_api import StatusCodeError
 
 logger = logging.getLogger(__name__)
 
 getCase = create_model(
     "getCase",
-    testcase_id=(str, FieldInfo(description="Testcase id"))
+    testcase_id=(str, Field(description="Testcase id"))
 )
 
 getCases = create_model(
     "getCases",
-    project_id=(str, FieldInfo(description="Project id"))
+    project_id=(str, Field(description="Project id"))
 )
 
 getCasesByFilter = create_model(
     "getCasesByFilter",
-    project_id=(str, FieldInfo(description="Project id")),
-    json_case_arguments=(str, FieldInfo(description="JSON of the test case arguments used to filter test cases"))
+    project_id=(str, Field(description="Project id")),
+    json_case_arguments=(str, Field(description="JSON of the test case arguments used to filter test cases"))
 )
 
 addCase = create_model(
     "addCase",
-    section_id=(str, FieldInfo(description="Section id")),
-    title=(str, FieldInfo(description="Title")),
-    case_properties=(dict, FieldInfo(
+    section_id=(str, Field(description="Section id")),
+    title=(str, Field(description="Title")),
+    case_properties=(dict, Field(
         description="New test case content in a key-value format: testcase_field_name=testcase_field_value"))
 )
 

@@ -3,8 +3,7 @@ from .api_wrapper import BitbucketAPIWrapper
 from .tools import __all__
 from langchain_core.tools import BaseToolkit
 from langchain_core.tools import BaseTool
-from pydantic import create_model, BaseModel, ConfigDict
-from pydantic.fields import FieldInfo
+from pydantic import BaseModel, Field, ConfigDict, create_model
 
 
 
@@ -32,13 +31,13 @@ class AlitaBitbucketToolkit(BaseToolkit):
         selected_tools = (x['name'] for x in __all__)
         return create_model(
             name,
-            url=(str, FieldInfo(description="Bitbucket URL")),
-            project=(str, FieldInfo(description="Project/Workspace")),
-            repository=(str, FieldInfo(description="Repository")),
-            branch=(str, FieldInfo(description="Main branch", default="main")),
-            username=(str, FieldInfo(description="Username")),
-            password=(str, FieldInfo(description="GitLab private token", json_schema_extra={'secret': True})),
-            cloud=(Optional[bool], FieldInfo(description="Hosting Option", default=None)),
+            url=(str, Field(description="Bitbucket URL")),
+            project=(str, Field(description="Project/Workspace")),
+            repository=(str, Field(description="Repository")),
+            branch=(str, Field(description="Main branch", default="main")),
+            username=(str, Field(description="Username")),
+            password=(str, Field(description="GitLab private token", json_schema_extra={'secret': True})),
+            cloud=(Optional[bool], Field(description="Hosting Option", default=None)),
             selected_tools=(List[Literal[tuple(selected_tools)]], []),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Bitbucket", "icon_url": None}})
         )

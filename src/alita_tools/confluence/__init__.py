@@ -3,8 +3,7 @@ from langchain_community.agent_toolkits.base import BaseToolkit
 from .api_wrapper import ConfluenceAPIWrapper
 from langchain_core.tools import BaseTool
 from ..base.tool import BaseAction
-from pydantic import create_model, BaseModel, ConfigDict
-from pydantic.fields import FieldInfo
+from pydantic import create_model, BaseModel, ConfigDict, Field
 
 
 name = "confluence"
@@ -32,17 +31,17 @@ class ConfluenceToolkit(BaseToolkit):
         selected_tools = (x['name'] for x in ConfluenceAPIWrapper.construct().get_available_tools())
         return create_model(
             name,
-            base_url=(str, FieldInfo(description="Confluence URL")),
-            token=(str, FieldInfo(description="Token", default=None, json_schema_extra={'secret': True})),
-            api_key=(str, FieldInfo(description="API key", default=None, json_schema_extra={'secret': True})),
-            username=(str, FieldInfo(description="Username", default=None)),
-            space=(str, FieldInfo(description="Space", default=None)),
-            cloud=(bool, FieldInfo(description="Hosting Option")),
-            limit=(int, FieldInfo(description="Pages limit per request", default=5)),
-            max_pages=(int, FieldInfo(description="Max total pages", default=10)),
-            number_of_retries=(int, FieldInfo(description="Number of retries", default=2)),
-            min_retry_seconds=(int, FieldInfo(description="Min retry, sec", default=10)),
-            max_retry_seconds=(int, FieldInfo(description="Max retry, sec", default=60)),
+            base_url=(str, Field(description="Confluence URL")),
+            token=(str, Field(description="Token", default=None, json_schema_extra={'secret': True})),
+            api_key=(str, Field(description="API key", default=None, json_schema_extra={'secret': True})),
+            username=(str, Field(description="Username", default=None)),
+            space=(str, Field(description="Space", default=None)),
+            cloud=(bool, Field(description="Hosting Option")),
+            limit=(int, Field(description="Pages limit per request", default=5)),
+            max_pages=(int, Field(description="Max total pages", default=10)),
+            number_of_retries=(int, Field(description="Number of retries", default=2)),
+            min_retry_seconds=(int, Field(description="Min retry, sec", default=10)),
+            max_retry_seconds=(int, Field(description="Max retry, sec", default=60)),
             selected_tools=(List[Literal[tuple(selected_tools)]], []),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Confluence", "icon_url": None}})
         )
@@ -68,4 +67,3 @@ class ConfluenceToolkit(BaseToolkit):
             
     def get_tools(self):
         return self.tools
-    

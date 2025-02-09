@@ -1,9 +1,6 @@
-
-
 from langchain_core.tools import BaseTool
 from typing import Type
-from pydantic import create_model, BaseModel
-from pydantic.fields import FieldInfo
+from pydantic import create_model, BaseModel, Field
 from langchain_community.utilities.google_search import GoogleSearchAPIWrapper
 from .utils import webRag
 
@@ -20,7 +17,7 @@ class GoogleSearchResults(BaseTool):
     num_results: int = 4
     args_schema: Type[BaseModel] = create_model(
         "GoogleSearchResultsModel",
-        query=(str, FieldInfo(description="Query text to search pages")))
+        query=(str, Field(description="Query text to search pages")))
 
     def _run(self, query: str, run_manager = None,) -> str:
         """Use the tool."""
@@ -35,7 +32,7 @@ class GoogleSearchRag(BaseTool):
     num_results: int = 5
     args_schema: Type[BaseModel] = create_model(
         "GoogleSearchRagModel",
-        query=(str, FieldInfo(description="Query text to search pages")))
+        query=(str, Field(description="Query text to search pages")))
 
     def _run(self, query: str, run_manager=None) -> str:
         results = self.googleApiWrapper.results(query, self.num_results)
@@ -45,5 +42,5 @@ class GoogleSearchRag(BaseTool):
             urls.append(result['link'])
             snippets += f"\n\n{result['title']}\n{result['snippet']}"
         return snippets + webRag(urls, self.max_response_size, query)
-        
+
 

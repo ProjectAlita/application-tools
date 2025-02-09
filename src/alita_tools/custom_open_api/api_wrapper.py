@@ -1,8 +1,7 @@
 import json
 from typing import Any, Optional, List
 
-from pydantic import BaseModel, model_validator, create_model
-from pydantic.fields import FieldInfo, PrivateAttr
+from pydantic import BaseModel, Field, PrivateAttr, field_validator, create_model
 
 import urllib3
 
@@ -17,7 +16,7 @@ class OpenApiWrapper(BaseModel):
     api_key: str
     _client: Optional[urllib3.PoolManager] = PrivateAttr()
 
-    @model_validator(mode='before')
+    @field_validator('spec', 'api_key', mode='before')
     @classmethod
     def validate_toolkit(cls, values):
         cls._client = urllib3.PoolManager()
@@ -56,11 +55,11 @@ class OpenApiWrapper(BaseModel):
                 "description": self.invoke_rest_api_by_spec.__doc__,
                 "args_schema": create_model(
                     "InvokeRestApiBySpecModel",
-                    method=(str, FieldInfo(description="The HTTP method to use")),
-                    url=(str, FieldInfo(description="The URL to send the request to")),
-                    headers=(Optional[str], FieldInfo(description="The headers to include in the request in JSON format")),
-                    fields=(Optional[str], FieldInfo(description="The query parameters to include in the request in JSON format")),
-                    body=(Optional[str], FieldInfo(description="The body of the request"))
+                    method=(str, Field(description="The HTTP method to use")),
+                    url=(str, Field(description="The URL to send the request to")),
+                    headers=(Optional[str], Field(description="The headers to include in the request in JSON format")),
+                    fields=(Optional[str], Field(description="The query parameters to include in the request in JSON format")),
+                    body=(Optional[str], Field(description="The body of the request"))
                 ),
                 "ref": self.invoke_rest_api_by_spec,
             },
@@ -69,7 +68,7 @@ class OpenApiWrapper(BaseModel):
                 "description": self.get_open_api_spec.__doc__,
                 "args_schema": create_model(
                     "GetOpenApiSpecModel",
-                    query=(Optional[str], FieldInfo(description="User initial request should be passed as a string"))
+                    query=(Optional[str], Field(description="User initial request should be passed as a string"))
                 ),
                 "ref": self.get_open_api_spec,
             }

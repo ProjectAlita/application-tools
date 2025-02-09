@@ -2,8 +2,7 @@ from typing import Optional, List, Literal
 
 from langchain_community.agent_toolkits.base import BaseToolkit
 from langchain_core.tools import BaseTool
-from pydantic import create_model, BaseModel, ConfigDict
-from pydantic.fields import FieldInfo
+from pydantic import create_model, BaseModel, Field
 
 from .api_wrapper import ZephyrScaleApiWrapper
 from ..base.tool import BaseAction
@@ -31,14 +30,14 @@ class ZephyrScaleToolkit(BaseToolkit):
         selected_tools = (x['name'] for x in ZephyrScaleApiWrapper.construct().get_available_tools())
         return create_model(
             name,
-            base_url=(Optional[str], FieldInfo(default=None, description="Base URL")),
-            token=(Optional[str], FieldInfo(default=None, description="Token", json_schema_extra={'secret': True})),
-            username=(Optional[str], FieldInfo(default=None, description="Username")),
-            password=(Optional[str], FieldInfo(default=None, description="Password", json_schema_extra={'secret': True})),
-            cookies=(Optional[str], FieldInfo(default=None, description="Cookies", json_schema_extra={'secret': True})),
-            max_results=(int, FieldInfo(default=100, description="Results count to show")),
+            base_url=(Optional[str], Field(default=None, description="Base URL")),
+            token=(Optional[str], Field(default=None, description="Token", json_schema_extra={'secret': True})),
+            username=(Optional[str], Field(default=None, description="Username")),
+            password=(Optional[str], Field(default=None, description="Password", json_schema_extra={'secret': True})),
+            cookies=(Optional[str], Field(default=None, description="Cookies", json_schema_extra={'secret': True})),
+            max_results=(int, Field(default=100, description="Results count to show")),
             selected_tools=(List[Literal[tuple(selected_tools)]], []),
-            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Zephyr Scale", "icon_url": None}})
+            __config__={'json_schema_extra': {'metadata': {"label": "Zephyr Scale", "icon_url": None}}}
         )
 
     @classmethod
