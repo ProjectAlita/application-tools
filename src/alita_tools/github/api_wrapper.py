@@ -82,14 +82,15 @@ assignees: user123
 UPDATE_ISSUE_PROMPT = """
 This tool allows you to update an existing issue in a GitHub repository. **VERY IMPORTANT**: Your input to this tool MUST strictly follow 
 these rules:
+- You must specify the repository name where the issue exists.
+- You must specify the issue ID that you wish to update.
 
-- First, you must specify the repository name where the issue exists.
-- Then you must specify the issue ID that you wish to update.
-- Optionally, you can then provide the new title of the issue.
-- Optionally, you can provide a new detailed description or body of the issue.
-- Optionally, you can specify new labels for the issue, each separated by a comma.
-- Optionally, you can specify new assignees for the issue, each separated by a comma.
-- Optionally, you can change the state of the issue to either 'open' or 'closed'.
+Optional fields:
+- You can then provide the new title of the issue.
+- You can provide a new detailed description or body of the issue.
+- You can specify new labels for the issue, each separated by a comma.
+- You can specify new assignees for the issue, each separated by a comma.
+- You can change the state of the issue to either 'open' or 'closed'.
 
 If assignees or labels are not passed or passed as empty lists they will be removed from the issue.
 
