@@ -1,7 +1,11 @@
+from logging import getLogger
 from typing import List, Optional, Literal
 from .api_wrapper import AzureSearchApiWrapper
-from langchain_core.tools import BaseTool, BaseToolkit
+from ...base.tool import BaseAction
+from langchain_core.tools import BaseToolkit, BaseTool
 from pydantic import create_model, BaseModel, ConfigDict, Field
+
+logger = getLogger(__name__)
 
 name = "azure_search"
 
@@ -51,7 +55,7 @@ class AzureSearchToolkit(BaseToolkit):
             if selected_tools:
                 if tool["name"] not in selected_tools:
                     continue
-            tools.append(BaseTool(
+            tools.append(BaseAction(
                 api_wrapper=azure_search_api_wrapper,
                 name=tool["name"],
                 description=tool["description"],

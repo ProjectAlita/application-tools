@@ -16,6 +16,21 @@ class AzureDocumentInput(BaseModel):
     document_id: str = Field(..., description="The ID of the document to retrieve.")
     selected_fields: Optional[List[str]] = Field(None, description="The fields to retrieve from the document.")
 
+class TextSearchInput(BaseModel):
+    search_text: str = Field(..., description="The text to search for in the Azure Search index.")
+    limit: Optional[int] = Field(-1, description="The number of results to return (if no limit needed use -1).")
+    order_by: Optional[List[str]] = Field(None, description="Ordering expression for the search results (if no order needed use empty list).")
+    selected_fields: Optional[List[str]] = Field(None, description="The fields to retrieve from the document (if no fields needed use empty list).")
+
+class VectorSearchInput(BaseModel):
+    vectors: List[Dict[str, Any]] = Field(..., description="The vectors to search for in the Azure Search index.")
+    limit: Optional[int] = Field(None, description="The number of results to return.")
+
+class HybridSearchInput(BaseModel):
+    search_text: str = Field(..., description="The text to search for in the Azure Search index.")
+    vectors: List[Dict[str, Any]] = Field(..., description="The vectors to search for in the Azure Search index.")
+    limit: Optional[int] = Field(None, description="The number of results to return.")
+
 class AzureSearchApiWrapper(BaseModel):
     _client: Any #: :meta private:
     _AzureOpenAIClient: Any #: :meta private:
@@ -38,13 +53,13 @@ class AzureSearchApiWrapper(BaseModel):
         if not values.get('index_name'):
             raise ValueError("Index name is required.")
         
-        values['_client'] = SearchClient(
+        cls._client = SearchClient(
             endpoint=values['endpoint'],
             index_name=values['index_name'],
             credential=AzureKeyCredential(values['api_key'])
         )
         if values.get('openai_api_key') and values.get('model_name'):
-            values['_AzureOpenAIClient'] = AzureOpenAIEmbeddings(
+            cls._AzureOpenAIClient = AzureOpenAIEmbeddings(
                 model=values['model_name'],
                 api_version=values['api_version'],
                 azure_endpoint=values['api_base'],
@@ -126,39 +141,25 @@ class AzureSearchApiWrapper(BaseModel):
                 "name": "text_search",
                 "ref": self.text_search,
                 "description": self.text_search.__doc__,
-                "args_schema": {
-                    "search_text": str,
-                    "limit": Optional[int],
-                    "order_by": Optional[List[str]],
-                    "selected_fields": Optional[List[str]],
-                },
+                "args_schema": TextSearchInput,
             },
             # {
             #     "name": "vector_search",
             #     "ref": self.vector_search,
             #     "description": self.vector_search.__doc__,
-            #     "args_schema": {
-            #         "vectors": List[Dict[str, Any]],
-            #         "limit": Optional[int],
-            #     },
+            #     "args_schema": VectorSearchInput,
             # },
             # {
             #     "name": "hybrid_search",
             #     "ref": self.hybrid_search,
             #     "description": self.hybrid_search.__doc__,
-            #     "args_schema": {
-            #         "search_text": str,
-            #         "vectors": List[Dict[str, Any]],
-            #         "limit": Optional[int],
-            #     },
+            #     "args_schema": HybridSearchInput,
             # },
             {
                 "name": "get_document",
                 "ref": self.get_document,
                 "description": self.get_document.__doc__,
-                "args_schema": {
-                    "document_id": str,
-                },
+                "args_schema": AzureDocumentInput,
             },
         ]
 
