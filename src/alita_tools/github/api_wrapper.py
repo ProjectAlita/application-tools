@@ -1,8 +1,9 @@
 import os
+import re
 from json import dumps
 from typing import Dict, Any, Optional, List
 import tiktoken
-from pydantic import field_validator, create_model, BaseModel, Field
+from pydantic import BaseModel, field_validator, create_model, Field
 from langchain.utils import get_from_dict_or_env
 
 from langchain_community.tools.github.prompt import (
@@ -20,6 +21,7 @@ from langchain_community.tools.github.prompt import (
     OVERVIEW_EXISTING_FILES_IN_MAIN,
     READ_FILE_PROMPT,
     SET_ACTIVE_BRANCH_PROMPT,
+    SEARCH_ISSUES_AND_PRS_PROMPT,
 )
 
 from langchain_community.utilities.github import GitHubAPIWrapper
@@ -52,6 +54,62 @@ NEW <<<<
 existing contents
 new contents
 >>>> NEW"""
+
+CREATE_ISSUE_PROMPT = """
+This tool allows you to create a new issue in a GitHub repository. **VERY IMPORTANT**: Your input to this tool MUST strictly follow these rules:
+
+- First, you must specify the title of the issue.
+
+Optionally you can specify:
+- a detailed description or body of the issue
+- labels for the issue, each separated by a comma. For labels, write `labels:` followed by a comma-separated list of labels.
+- assignees for the issue, each separated by a comma. For assignees, write `assignees:` followed by a comma-separated 
+list of GitHub usernames.
+
+Ensure that each command (`labels:` and `assignees:`) starts in a new line, if used.
+
+For example, if you would like to create an issue titled "Fix login bug" with a body explaining the problem and tagged with `bug` 
+and `urgent` labels, plus assigned to `user123`, you would pass in the following string:
+
+Fix login bug
+
+The login button isn't responding on the main page. Reproduced on various devices.
+
+labels: bug, urgent
+assignees: user123
+"""
+
+UPDATE_ISSUE_PROMPT = """
+This tool allows you to update an existing issue in a GitHub repository. **VERY IMPORTANT**: Your input to this tool MUST strictly follow 
+these rules:
+- You must specify the repository name where the issue exists.
+- You must specify the issue ID that you wish to update.
+
+Optional fields:
+- You can then provide the new title of the issue.
+- You can provide a new detailed description or body of the issue.
+- You can specify new labels for the issue, each separated by a comma.
+- You can specify new assignees for the issue, each separated by a comma.
+- You can change the state of the issue to either 'open' or 'closed'.
+
+If assignees or labels are not passed or passed as empty lists they will be removed from the issue.
+
+For example, to update an issue in the 'octocat/Hello-World' repository with ID 42, changing the title and closing the issue, the input should be:
+
+octocat/Hello-World
+
+42
+
+New Issue Title
+
+New detailed description goes here.
+
+labels: bug, ui
+
+assignees: user1, user2
+
+closed
+"""
 
 SearchCode = create_model(
     "SearchCodeModel",
@@ -140,6 +198,97 @@ BranchName = create_model(
     branch_name=(str, Field(description="The name of the branch, e.g. `my_branch`."))
 )
 
+SearchIssues = create_model(
+    "SearchIssues",
+    search_query=(
+        str,
+        Field(
+            description="Keywords or query for searching issues and PRs in Github (supports GitHub search syntax)"
+        ),
+    ),
+    repo_name=(
+        str,
+        Field(
+            description="Name of the repository to search issues in. If None, use the initialized repository."
+        ),
+    ),
+    max_count=(
+        str,
+        Field(
+            description="Default is 30. This determines max size of returned list with issues"
+        ),
+    ),
+)
+
+CreateIssue = create_model(
+    "CreateIssue",
+    title=(str, Field(description="The title of the issue.")),
+    body=(
+        Optional[str],
+        Field(
+            description="The body or description of the issue providing details and context."
+        ),
+    ),
+    labels=(
+        Optional[List[str]],
+        Field(
+            default=None,
+            description="A list of labels to apply to the issue. This should be a list of strings.",
+        ),
+    ),
+    assignees=(
+        Optional[List[str]],
+        Field(
+            default=None,
+            description="A list of GitHub usernames to whom the issue should be assigned. This should be a list of strings.",
+        ),
+    ),
+    repo_name=(
+        Optional[str],
+        Field(description="The name of the repository where the issue exists."),
+    ),
+)
+
+UpdateIssue = create_model(
+    "UpdateIssue",
+    issue_id=(int, Field(description="The ID of the issue to be updated.")),
+    repo_name=(
+        Optional[str],
+        Field(description="The name of the repository where the issue exists."),
+    ),
+    title=(
+        Optional[str],
+        Field(default=None, description="New title for the issue if updating."),
+    ),
+    body=(
+        Optional[str],
+        Field(
+            default=None,
+            description="New detailed description for the issue if updating.",
+        ),
+    ),
+    labels=(
+        Optional[List[str]],
+        Field(
+            default=None,
+            description="New list of labels to apply to the issue if updating.",
+        ),
+    ),
+    assignees=(
+        Optional[List[str]],
+        Field(
+            default=None,
+            description="New list of GitHub usernames to assign to the issue if updating.",
+        ),
+    ),
+    state=(
+        Optional[str],
+        Field(
+            default=None,
+            description="The new state of the issue ('open' or 'closed') if updating.",
+        ),
+    ),
+)
 
 class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
     github: Any  #: :meta private:
@@ -561,6 +710,147 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         except Exception as e:
             return "Unable to update file due to error:\n" + str(e)
 
+    def validate_search_query(self, query: str) -> bool:
+        """
+        Validates a search query against expected GitHub search syntax using regular expressions.
+
+        Parameters:
+            query (str): The search query to validate.
+
+        Returns:
+            bool: True if valid, False otherwise.
+        """
+        pattern = r"^(\w+:)?[\w\s]+$"
+        return bool(re.match(pattern, query))
+
+    def search_issues(self, search_query: str, repo_name: Optional[str] = None, max_count: int = 30) -> str:
+        """
+        Searches for issues in a specific repository or a default initialized repository
+        based on a search query using GitHub's search feature.
+
+        Parameters:
+            search_query (str): Keywords or query for searching issues and PRs in Github (supports GitHub search syntax).
+            repo_name (Optional[str]): Name of the repository to search issues in. If None, use the initialized repository.
+            max_count (int): Default is 30. This determines max size of returned list with issues
+
+        Returns:
+            str: JSON string containing a list of issues and PRs with their details (id, title, description, status, URL, type)
+        """
+        try:
+            if not self.validate_search_query(search_query):
+                return "Invalid search query. Please ensure it matches expected GitHub search syntax."
+        
+            target_repo = self.github_repo_instance.full_name if repo_name is None else repo_name
+
+            query = f"repo:{target_repo} {search_query}"
+            search_result = self.github.search_issues(query)
+
+            if not search_result.totalCount:
+                return "No issues or PRs found matching your query."
+
+            matching_issues = []
+            
+            count = min(max_count, search_result.totalCount)
+            for issue in search_result[:count]:
+                issue_details = {
+                    "id": issue.number,
+                    "title": issue.title,
+                    "description": issue.body,
+                    "status": issue.state,
+                    "url": issue.html_url,
+                    "type": "PR" if issue.pull_request else "Issue"
+                }
+                matching_issues.append(issue_details)
+
+            return dumps(matching_issues)
+        except Exception as e:
+            return "An error occurred while searching issues:\n" + str(e)
+        
+    def create_issue(self, title: str, body: Optional[str] = None, repo_name: Optional[str] = None, labels: Optional[List[str]] = None, assignees: Optional[List[str]] = None) -> str:
+        """
+        Creates a new issue in the GitHub repository.
+
+        Parameters:
+            title (str): The title of the issue.
+            body (Optional[str]): The detailed description of the issue.
+            labels (Optional[List[str]]): An optional list of labels to attach to the issue.
+            assignees (Optional[List[str]]): An optional list of GitHub usernames to assign the issue to.
+
+        Returns:
+            str: A success or failure message along with the URL to the newly created issue.
+        """
+        try:
+            repo = self.github.get_repo(repo_name) if repo_name else self.github_repo_instance
+
+            if not repo:
+                return "GitHub repository instance is not found or not initialized."
+            
+            issue = repo.create_issue(
+                title=title,
+                body=body,
+                labels=labels if labels else [],
+                assignees=assignees if assignees else []
+            )
+
+            return f"Issue created successfully! ID:{issue.number}, URL: {issue.html_url}"
+        except Exception as e:
+            return f"An error occurred while creating the issue: {str(e)}"
+        
+    def update_issue(self, issue_id: int, title: Optional[str] = None, 
+                 body: Optional[str] = None, labels: Optional[List[str]] = None, 
+                 assignees: Optional[List[str]] = None, state: Optional[str] = None,
+                 repo_name: Optional[str] = None) -> str:
+        """
+        Updates an existing issue in a specified GitHub repository.
+
+        Parameters:
+            issue_id (int): ID of the issue to update.
+            title (str): New title of the issue, if updating.
+            body (Optional[str]): New detailed description of the issue, if updating.
+            labels (Optional[List[str]]): New list of labels to apply to the issue, if updating.
+            assignees (Optional[List[str]]): New list of GitHub usernames to assign to the issue, if updating.
+            state (Optional[str]): New state of the issue ("open" or "closed"), if updating.
+            repo_name (Optional[str]): Name of the repository where the issue exists.
+
+        Returns:
+            str: A confirmation message including the updated issue details, or an error message.
+        """
+        if not issue_id:
+                return "Issue ID is required."
+        try:
+            repo = self.github.get_repo(repo_name) if repo_name else self.github_repo_instance
+            issue = repo.get_issue(number=issue_id)
+
+            if not issue:
+                return f"Issue with #{issue_id} has not been found."
+            
+            if labels is None or labels == []:
+                current_labels = [label.name for label in issue.get_labels()]
+                for label in current_labels:
+                    issue.remove_from_labels(label)
+
+            if not assignees:
+                for assignee in issue.assignees:
+                    issue.remove_from_assignees(assignee)
+
+            update_fields = {}
+            if title:
+                update_fields["title"] = title
+            if body:
+                update_fields["body"] = body
+            if labels:
+                update_fields["labels"] = labels
+            if assignees:
+                update_fields["assignees"] = assignees
+            if state:
+                update_fields["state"] = state
+
+            issue.edit(**update_fields)
+
+            return f"Issue updated successfully! Updated details: ID: {issue.number}, URL: {issue.html_url}"
+        except Exception as e:
+            return f"An error occurred while updating the issue: {str(e)}"
+
     def get_available_tools(self):
         return [
             {
@@ -674,6 +964,27 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                 "mode": "get_files_from_directory",
                 "description": GET_FILES_FROM_DIRECTORY_PROMPT,
                 "args_schema": DirectoryPath,
+            },
+            {
+                "ref": self.search_issues,
+                "name": "search_issues",
+                "mode": "search_issues",
+                "description": SEARCH_ISSUES_AND_PRS_PROMPT,
+                "args_schema": SearchIssues,
+            },
+            {
+                "ref": self.create_issue,
+                "name": "create_issue",
+                "mode": "create_issue",
+                "description": CREATE_ISSUE_PROMPT,
+                "args_schema": CreateIssue,
+            },
+            {
+                "ref": self.update_issue,
+                "name": "update_issue",
+                "mode": "update_issue",
+                "description": UPDATE_ISSUE_PROMPT,
+                "args_schema": UpdateIssue,
             }
         ]
 
