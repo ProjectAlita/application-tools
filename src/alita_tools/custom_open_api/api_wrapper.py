@@ -1,7 +1,7 @@
 import json
 from typing import Any, Optional, List
 
-from pydantic import BaseModel, Field, PrivateAttr, field_validator, create_model
+from pydantic import BaseModel, Field, PrivateAttr, model_validator, create_model
 
 import urllib3
 
@@ -16,7 +16,7 @@ class OpenApiWrapper(BaseModel):
     api_key: str
     _client: Optional[urllib3.PoolManager] = PrivateAttr()
 
-    @field_validator('spec', 'api_key', mode='before')
+    @model_validator(mode='before')
     @classmethod
     def validate_toolkit(cls, values):
         cls._client = urllib3.PoolManager()

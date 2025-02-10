@@ -3,7 +3,7 @@ import re
 from json import dumps
 from typing import Dict, Any, Optional, List
 import tiktoken
-from pydantic import BaseModel, field_validator, create_model, Field
+from pydantic import model_validator, create_model, BaseModel, Field
 from langchain.utils import get_from_dict_or_env
 
 from langchain_community.tools.github.prompt import (
@@ -302,7 +302,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
     github_app_id: Optional[str] = None
     github_app_private_key: Optional[str] = None
 
-    @field_validator('github_app_id', 'github_app_private_key', 'github_access_token', 'github_username', 'github_password', 'github_repository', 'active_branch', 'github_base_branch', mode='before')
+    @model_validator(mode='before')
     @classmethod
     def validate_environment(cls, values: Dict) -> Dict:
 
@@ -547,7 +547,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                     "created successfully, and set as current active branch."
                 )
             except GithubException as e:
-                if e.status == 422 and "Reference already exists" in e.data["message"]:
+                if (e.status == 422 and "Reference already exists" in e.data["message"]):
                     i += 1
                     new_branch_name = f"{proposed_branch_name}_v{i}"
                 else:

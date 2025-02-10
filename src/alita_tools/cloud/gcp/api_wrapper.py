@@ -3,7 +3,7 @@ from typing import Any, Optional, List, Dict
 
 from google.auth.transport.requests import Request
 from google.oauth2.service_account import Credentials
-from pydantic import BaseModel, Field, PrivateAttr, field_validator, create_model
+from pydantic import BaseModel, Field, PrivateAttr, model_validator, create_model
 from requests import Session
 
 
@@ -12,7 +12,7 @@ class GCPApiWrapper(BaseModel):
     _credentials: Optional[Credentials] = PrivateAttr()
     _session: Optional[Session] = PrivateAttr()
 
-    @field_validator('api_key', mode='before')
+    @model_validator(mode='before')
     @classmethod
     def validate_toolkit(cls, values):
         api_key = values.get('api_key')

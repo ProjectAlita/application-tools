@@ -5,7 +5,7 @@ from traceback import format_exc
 from typing import Any
 
 from git import Repo
-from pydantic import BaseModel, Field, create_model, field_validator
+from pydantic import BaseModel, Field, create_model, model_validator
 from langchain_core.tools import ToolException
 
 logger = logging.getLogger(__name__)
@@ -109,13 +109,13 @@ class LocalGit(BaseModel):
     commit_sha: str = None
     path_pattern: str = '**/*.py'
 
-    @field_validator('repo_path', 'base_path', 'repo_url', 'commit_sha', mode='before')
+    @model_validator(mode='before')
     @classmethod
-    def validate_toolkit(cls, value, field):
-        repo_path = value if field.name == 'repo_path' else None
-        base_path = value if field.name == 'base_path' else None
-        repo_url = value if field.name == 'repo_url' else None
-        commit_sha = value if field.name == 'commit_sha' else None
+    def validate_toolkit(cls, values):
+        repo_path = values.get('repo_path')
+        base_path = values.get('base_path')
+        repo_url = values.get('repo_url')
+        commit_sha = values.get('commit_sha')
         os.makedirs(base_path, exist_ok=True)
         full_repo_path = os.path.join(base_path, repo_path)
         if not os.path.exists(full_repo_path) and repo_url:
@@ -124,7 +124,7 @@ class LocalGit(BaseModel):
             repo = Repo(path=str(full_repo_path))
         if commit_sha:
             repo.head.reset(commit=commit_sha, working_tree=True)
-        return value
+        return values
 
     def extract_old_new_pairs(self, file_query):
         # Split the file content by lines

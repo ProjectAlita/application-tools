@@ -6,7 +6,7 @@ from traceback import format_exc
 import json
 from typing import List, Optional, Any, Dict
 from langchain_core.tools import ToolException
-from pydantic import BaseModel, Field, PrivateAttr, field_validator, create_model
+from pydantic import BaseModel, Field, PrivateAttr, model_validator, create_model
 from atlassian import Jira
 
 logger = logging.getLogger(__name__)
@@ -244,7 +244,7 @@ class JiraApiWrapper(BaseModel):
     _client: Jira = PrivateAttr()
     issue_search_pattern: str = r'/rest/api/\d+/search'
 
-    @field_validator('base_url', 'api_key', 'username', 'token', 'cloud', 'api_version', 'additional_fields', mode='before')
+    @model_validator(mode='before')
     @classmethod
     def validate_toolkit(cls, values):
         try:

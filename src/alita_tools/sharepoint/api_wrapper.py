@@ -4,7 +4,7 @@ from typing import Any, Optional
 from langchain_core.tools import ToolException
 from office365.runtime.auth.client_credential import ClientCredential
 from office365.sharepoint.client_context import ClientContext
-from pydantic import BaseModel, Field, PrivateAttr, create_model, field_validator
+from pydantic import BaseModel, Field, PrivateAttr, create_model, model_validator
 
 from .utils import read_docx_from_bytes
 
@@ -37,10 +37,9 @@ class SharepointApiWrapper(BaseModel):
     token: str = None
     _client: Optional[ClientContext] = PrivateAttr()  # Private attribute for the office365 client
 
-    @field_validator('site_url', 'client_id', 'client_secret', 'token', mode='before')
+    @model_validator(mode='before')
     @classmethod
-    def validate_toolkit(cls, value, field):
-
+    def validate_toolkit(cls, values):
         try:
             from office365.runtime.auth.authentication_context import AuthenticationContext
             from office365.sharepoint.client_context import ClientContext
@@ -50,10 +49,10 @@ class SharepointApiWrapper(BaseModel):
                "`pip install office365-rest-python-client`"
             )
 
-        site_url = value if field.name == 'site_url' else None
-        client_id = value if field.name == 'client_id' else None
-        client_secret = value if field.name == 'client_secret' else None
-        token = value if field.name == 'token' else None
+        site_url = values['site_url']
+        client_id = values.get('client_id')
+        client_secret = values.get('client_secret')
+        token = values.get('token')
 
         try:
             if client_id and client_secret:
@@ -71,7 +70,7 @@ class SharepointApiWrapper(BaseModel):
             logging.info("Successfully authenticated to SharePoint.")
         except Exception as e:
                 logging.error(f"Failed to authenticate with SharePoint: {str(e)}")
-        return value
+        return values
 
 
     def read_list(self, list_title, limit: int = 1000):
