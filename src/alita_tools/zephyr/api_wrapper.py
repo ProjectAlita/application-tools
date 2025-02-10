@@ -1,5 +1,5 @@
 from typing import List, Any, Optional
-from pydantic import BaseModel, field_validator, create_model, Field
+from pydantic import BaseModel, model_validator, create_model, Field
 import json
 import logging
 from pydantic.fields import PrivateAttr
@@ -36,7 +36,7 @@ class ZephyrV1ApiWrapper(BaseModel):
     password: str
     _client: Optional[Zephyr] = PrivateAttr()
 
-    @field_validator('base_url', 'username', 'password', mode='before')
+    @model_validator(mode='before')
     @classmethod
     def validate_toolkit(cls, values):
         base_url = values['base_url']

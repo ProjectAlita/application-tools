@@ -1,6 +1,6 @@
 from typing import Any, Optional, List
 
-from pydantic import BaseModel, field_validator, create_model, Field
+from pydantic import BaseModel, model_validator, create_model, Field
 from pydantic.fields import PrivateAttr
 
 from .testio_client import TestIOClient
@@ -11,7 +11,7 @@ class TestIOApiWrapper(BaseModel):
     api_key: str
     _client: Optional[TestIOClient] = PrivateAttr()
 
-    @field_validator('endpoint', 'api_key', mode='before')
+    @model_validator(mode='before')
     @classmethod
     def validate_toolkit(cls, values):
         endpoint = values.get('endpoint')

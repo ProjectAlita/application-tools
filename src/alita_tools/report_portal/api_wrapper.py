@@ -2,7 +2,7 @@ import logging
 from typing import Any, Optional
 
 import pymupdf
-from pydantic import BaseModel, Field, PrivateAttr, create_model, field_validator
+from pydantic import BaseModel, Field, PrivateAttr, create_model, model_validator
 
 from .report_portal_client import RPClient
 
@@ -54,15 +54,14 @@ class ReportPortalApiWrapper(BaseModel):
     project: str
     _client: Optional[RPClient] = PrivateAttr()
 
-    @field_validator('endpoint', 'api_key', 'project', mode='before')
+    @model_validator(mode='before')
     @classmethod
-    def validate_toolkit(cls, value, field):
-
+    def validate_toolkit(cls, values):
         endpoint = values.get('endpoint')
         api_key = values.get('api_key')
         project = values.get('project')
         cls._client = RPClient(endpoint=endpoint, api_key=api_key, project=project)
-        return value
+        return values
 
     def export_specified_launch(self, launch_id: str, format: str = 'html') -> str | None:
         """

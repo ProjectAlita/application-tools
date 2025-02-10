@@ -1,7 +1,7 @@
 import logging
 from typing import Optional, Any
 
-from pydantic import BaseModel, create_model, field_validator, Field
+from pydantic import BaseModel, create_model, model_validator, Field
 from pydantic.fields import PrivateAttr
 from sqlalchemy import create_engine, text, inspect, Engine
 from sqlalchemy.orm import sessionmaker
@@ -28,7 +28,7 @@ class SQLApiWrapper(BaseModel):
     database_name: str
     _client: Optional[Engine] = PrivateAttr()
 
-    @field_validator('dialect', 'host', 'port', 'username', 'password', 'database_name', mode='before')
+    @model_validator(mode='before')
     @classmethod
     def validate_toolkit(cls, values):
         for field in SQLConfig.model_fields:
