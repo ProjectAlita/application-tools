@@ -1,7 +1,7 @@
 import json
 from typing import Any, Optional, Dict
 
-from pydantic import BaseModel, field_validator, create_model, Field, PrivateAttr
+from pydantic import BaseModel, create_model, Field, PrivateAttr, model_validator
 import requests
 from json import JSONDecodeError
 import traceback
@@ -15,7 +15,7 @@ class SonarApiWrapper(BaseModel):
     sonar_project_name: str
     _client: Optional[requests.Session] = PrivateAttr()
 
-    @field_validator('url', 'sonar_token', 'sonar_project_name', mode='before')
+    @model_validator(mode='before')
     @classmethod
     def validate_toolkit(cls, values):
         url = values.get('url')

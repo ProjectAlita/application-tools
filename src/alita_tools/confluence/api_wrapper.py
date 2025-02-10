@@ -10,7 +10,7 @@ from langchain_community.document_loaders.confluence import ContentFormat
 from langchain_core.documents import Document
 from langchain_core.tools import ToolException
 from markdownify import markdownify
-from pydantic import create_model, BaseModel, Field, field_validator
+from pydantic import create_model, BaseModel, Field, model_validator
 from tenacity import (
     before_sleep_log,
     retry,
@@ -146,7 +146,7 @@ class ConfluenceAPIWrapper(BaseModel):
     ocr_languages: Optional[str] = None
     keep_newlines: Optional[bool] = True
 
-    @field_validator('base_url', 'api_key', 'username', 'token', 'cloud', mode='before')
+    @model_validator(mode='before')
     @classmethod
     def validate_toolkit(cls, values):
         try:
