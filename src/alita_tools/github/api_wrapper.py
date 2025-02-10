@@ -302,7 +302,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
     github_app_id: Optional[str] = None
     github_app_private_key: Optional[str] = None
 
-    #@field_validator('github_app_id', 'github_app_private_key', 'github_access_token', 'github_username', 'github_password', 'github_repository', 'active_branch', 'github_base_branch', mode='before')
+    @field_validator('github_app_id', 'github_app_private_key', 'github_access_token', 'github_username', 'github_password', 'github_repository', 'active_branch', 'github_base_branch', mode='before')
     @classmethod
     def validate_environment(cls, values: Dict) -> Dict:
 
