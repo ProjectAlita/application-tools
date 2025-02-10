@@ -2,7 +2,7 @@ from typing import Optional, Dict, Any, Union
 
 import boto3
 from botocore.config import Config
-from pydantic import BaseModel, Field, PrivateAttr, create_model, field_validator
+from pydantic import BaseModel, Field, PrivateAttr, create_model, model_validator
 
 
 class AWSToolConfig(BaseModel):
@@ -11,7 +11,7 @@ class AWSToolConfig(BaseModel):
     secret_access_key: Optional[str] = None
     _client: Optional[boto3.client] = PrivateAttr()
 
-    @field_validator('region', 'access_key_id', 'secret_access_key', mode='before')
+    @model_validator(mode='before')
     @classmethod
     def validate_toolkit(cls, values):
         region = values.get('region')

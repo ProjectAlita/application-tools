@@ -2,7 +2,7 @@ import json
 from typing import Tuple, Optional, Dict, Any, Union
 
 from kubernetes import client, config as k8s_config
-from pydantic import BaseModel, Field, PrivateAttr, ConfigDict, field_validator, create_model
+from pydantic import BaseModel, Field, PrivateAttr, ConfigDict, model_validator, create_model
 
 
 class KubernetesApiWrapper(BaseModel):
@@ -11,7 +11,7 @@ class KubernetesApiWrapper(BaseModel):
     _client: Optional[client.CoreV1Api] = PrivateAttr()
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    @field_validator('url', 'token', mode='before')
+    @model_validator(mode='before')
     @classmethod
     def validate_toolkit(cls, values):
         url = values.get('url')

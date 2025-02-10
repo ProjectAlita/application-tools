@@ -2,7 +2,7 @@ import logging
 import subprocess
 from typing import Tuple, Dict, List, Optional, Any
 
-from pydantic import BaseModel, field_validator, create_model, Field, PrivateAttr
+from pydantic import BaseModel, model_validator, create_model, Field, PrivateAttr
 
 logger = logging.getLogger(__name__)
 
@@ -10,7 +10,7 @@ class PythonLinter(BaseModel):
     error_codes: str
     _client: Optional['PythonLinter'] = PrivateAttr()
 
-    @field_validator('error_codes', mode='before')
+    @model_validator(mode='before')
     @classmethod
     def validate_toolkit(cls, values):
         error_codes = values.get('error_codes')
