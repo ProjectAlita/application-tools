@@ -27,7 +27,7 @@ create_wi_field = """JSON of the work item fields to create in Azure DevOps, i.e
 ADOWorkItemsSearch = create_model(
     "AzureDevOpsSearchModel",
     query=(str, Field(description="WIQL query for searching Azure DevOps work items")),
-    limit=(Optional[int], Field(description="Number of items to return. IMPORTANT: Tool returns all items if limit=-1.", default=-1)),
+    limit=(Optional[int], Field(description="Number of items to return. IMPORTANT: Tool returns all items if limit=-1. If parameter is not provided then the value will be taken from tool configuration.", default=None)),
     fields=(Optional[list[str]], Field(description="Comma-separated list of requested fields", default=None))
 )
 
@@ -213,7 +213,7 @@ class AzureDevOpsApiWrapper(BaseModel):
         )
         return f"Work item {source_id} linked to {target_id} with link type {link_type}"
 
-    def search_work_items(self, query: str, limit: int = -1, fields=None):
+    def search_work_items(self, query: str, limit: int = None, fields=None):
         """Search for work items using a WIQL query and dynamically fetch fields based on the query."""
         try:
             # Create a Wiql object with the query
@@ -224,6 +224,8 @@ class AzureDevOpsApiWrapper(BaseModel):
                 raise ToolException("Azure DevOps client not initialized.")
             logger.info(f"Search for work items using {query}")
             # Execute the WIQL query
+            if not limit:
+                limit = self.limit
             work_items = self._client.query_by_wiql(wiql, top=None if limit < 0 else limit, team_context=TeamContext(project=self.project)).work_items
 
             if not work_items:
