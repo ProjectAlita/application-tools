@@ -3,6 +3,7 @@ from typing import Optional, Any
 
 from azure.devops.connection import Connection
 from azure.devops.v7_0.wiki import WikiClient, WikiPageCreateOrUpdateParameters, WikiCreateParametersV2
+from azure.devops.v7_0.wiki.models import GitVersionDescriptor
 from pydantic import model_validator, BaseModel
 from langchain_core.tools import ToolException
 from msrest.authentication import BasicAuthentication
@@ -32,7 +33,9 @@ ModifyPageInput = create_model(
     "GetPageByPathInput",
     wiki_identified=(str, Field(description="Wiki ID or wiki name")),
     page_name=(str, Field(description="Wiki page name")),
-    page_content=(str, Field(description="Wiki page content"))
+    page_content=(str, Field(description="Wiki page content")),
+    version_identifier=(Optional[str], Field(description="Version string identifier (name of tag/branch, SHA1 of commit)", default="main")),
+    version_type=(Optional[str], Field(description="Version type (branch, tag, or commit). Determines how Id is interpreted", default="branch"))
 )
 
 
@@ -106,7 +109,7 @@ class AzureDevOpsApiWrapper(BaseModel):
             logger.error(f"Unable to delete wiki page: {str(e)}")
             return ToolException(f"Unable to delete wiki page: {str(e)}")
 
-    def modify_wiki_page(self, wiki_identified: str, page_name: str, page_content: str):
+    def modify_wiki_page(self, wiki_identified: str, page_name: str, page_content: str, version_identifier: str, version_type: str):
         """Create or Update ADO wiki page content."""
         try:
             all_wikis = [wiki.name for wiki in self._client.get_all_wikis(project=self.project)]
@@ -129,7 +132,8 @@ class AzureDevOpsApiWrapper(BaseModel):
             return self._client.create_or_update_page(project=self.project, wiki_identifier=wiki_identified,
                                                       path=page_name,
                                                       parameters=WikiPageCreateOrUpdateParameters(content=page_content),
-                                                      version=version)
+                                                      version=version,
+                                                      version_descriptor=GitVersionDescriptor(version=version_identifier, version_type=version_type))
         except Exception as e:
             logger.error(f"Unable to modify wiki page: {str(e)}")
             return ToolException(f"Unable to modify wiki page: {str(e)}")
