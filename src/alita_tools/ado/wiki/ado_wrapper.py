@@ -2,7 +2,9 @@ import logging
 from typing import Optional, Any
 
 from azure.devops.connection import Connection
+from azure.devops.v7_0.core import CoreClient
 from azure.devops.v7_0.wiki import WikiClient, WikiPageCreateOrUpdateParameters, WikiCreateParametersV2
+from azure.devops.v7_0.wiki.models import GitVersionDescriptor
 from pydantic import model_validator, BaseModel
 from langchain_core.tools import ToolException
 from msrest.authentication import BasicAuthentication
@@ -29,10 +31,12 @@ GetPageByIdInput = create_model(
 )
 
 ModifyPageInput = create_model(
-    "GetPageByPathInput",
+    "ModifyPageInput",
     wiki_identified=(str, Field(description="Wiki ID or wiki name")),
     page_name=(str, Field(description="Wiki page name")),
-    page_content=(str, Field(description="Wiki page content"))
+    page_content=(str, Field(description="Wiki page content")),
+    version_identifier=(str, Field(description="Version string identifier (name of tag/branch, SHA1 of commit)", default="master")),
+    version_type=(Optional[str], Field(description="Version type (branch, tag, or commit). Determines how Id is interpreted", default="branch"))
 )
 
 
@@ -40,7 +44,8 @@ class AzureDevOpsApiWrapper(BaseModel):
     organization_url: str
     project: str
     token: str
-    _client: Optional[WikiClient] = PrivateAttr()  # Private attribute for the work item tracking client
+    _client: Optional[WikiClient] = PrivateAttr()  # Private attribute for the wiki client
+    _core_client: Optional[CoreClient] = PrivateAttr()  # Private attribute for the CoreClient client
 
     class Config:
         arbitrary_types_allowed = True  # Allow arbitrary types (e.g., WorkItemTrackingClient)
@@ -56,6 +61,7 @@ class AzureDevOpsApiWrapper(BaseModel):
 
             # Retrieve the work item tracking client and assign it to the private _client attribute
             cls._client = connection.clients.get_wiki_client()
+            cls._core_client = connection.clients.get_core_client()
 
         except Exception as e:
             return ImportError(f"Failed to connect to Azure DevOps: {e}")
@@ -106,14 +112,24 @@ class AzureDevOpsApiWrapper(BaseModel):
             logger.error(f"Unable to delete wiki page: {str(e)}")
             return ToolException(f"Unable to delete wiki page: {str(e)}")
 
-    def modify_wiki_page(self, wiki_identified: str, page_name: str, page_content: str):
+    def modify_wiki_page(self, wiki_identified: str, page_name: str, page_content: str, version_identifier: str, version_type: str):
         """Create or Update ADO wiki page content."""
         try:
             all_wikis = [wiki.name for wiki in self._client.get_all_wikis(project=self.project)]
             if wiki_identified not in all_wikis:
                 logger.info(f"wiki name '{wiki_identified}' doesn't exist. New wiki will be created.")
                 try:
-                    self._client.create_wiki(wiki_create_params=WikiCreateParametersV2(name=wiki_identified))
+                    project_id = None
+                    projects = self._core_client.get_projects()
+
+                    for project in projects:
+                        if project.name == self.project:
+                            project_id = project.id
+                            break
+                    if project_id:
+                        self._client.create_wiki(project=self.project, wiki_create_params=WikiCreateParametersV2(name=wiki_identified, project_id=project_id))
+                    else:
+                        return "Project ID has not been found."
                 except Exception as create_wiki_e:
                     return ToolException(f"Unable to create new wiki due to error: {create_wiki_e}")
             try:
@@ -121,7 +137,7 @@ class AzureDevOpsApiWrapper(BaseModel):
                 version = page.eTag
             except Exception as get_page_e:
                 if "Ensure that the path of the page is correct and the page exists" in str(get_page_e):
-                    logger.info(f"Path is not found. New page will be created")
+                    logger.info("Path is not found. New page will be created")
                     version = None
                 else:
                     return ToolException(f"Unable to extract page by path {page_name}: {str(get_page_e)}")
@@ -129,7 +145,8 @@ class AzureDevOpsApiWrapper(BaseModel):
             return self._client.create_or_update_page(project=self.project, wiki_identifier=wiki_identified,
                                                       path=page_name,
                                                       parameters=WikiPageCreateOrUpdateParameters(content=page_content),
-                                                      version=version)
+                                                      version=version,
+                                                      version_descriptor=GitVersionDescriptor(version=version_identifier, version_type=version_type))
         except Exception as e:
             logger.error(f"Unable to modify wiki page: {str(e)}")
             return ToolException(f"Unable to modify wiki page: {str(e)}")
