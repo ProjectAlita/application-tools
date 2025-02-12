@@ -34,7 +34,7 @@ ModifyPageInput = create_model(
     wiki_identified=(str, Field(description="Wiki ID or wiki name")),
     page_name=(str, Field(description="Wiki page name")),
     page_content=(str, Field(description="Wiki page content")),
-    version_identifier=(Optional[str], Field(description="Version string identifier (name of tag/branch, SHA1 of commit)", default="main")),
+    version_identifier=(str, Field(description="Version string identifier (name of tag/branch, SHA1 of commit)")),
     version_type=(Optional[str], Field(description="Version type (branch, tag, or commit). Determines how Id is interpreted", default="branch"))
 )
 
