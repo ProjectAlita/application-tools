@@ -15,13 +15,13 @@ class AzureDevOpsWikiToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
-        selected_tools = (x['name'] for x in AzureDevOpsApiWrapper.construct().get_available_tools())
+        selected_tools = {x['name']: x['args_schema'].schema() for x in AzureDevOpsApiWrapper.model_construct().get_available_tools()}
         return create_model(
             name_alias,
             organization_url=(str, Field(description="ADO organization url")),
             project=(str, Field(description="ADO project")),
             token=(str, Field(description="ADO token", json_schema_extra={'secret': True})),
-            selected_tools=(List[Literal[tuple(selected_tools)]], []),
+            selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
             __config__={'json_schema_extra': {'metadata': {"label": "ADO wiki", "icon_url": None}}}
         )
 

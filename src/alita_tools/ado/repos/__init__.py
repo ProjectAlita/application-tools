@@ -13,7 +13,7 @@ class AzureDevOpsReposToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
-        selected_tools = (x['name'] for x in ReposApiWrapper.model_construct().get_available_tools())
+        selected_tools = {x['name']: x['args_schema'].schema() for x in ReposApiWrapper.model_construct().get_available_tools()}
         return create_model(
             name,
             organization_url=(Optional[str], Field(default="", title="Organization URL", description="ADO organization url")),
@@ -22,7 +22,7 @@ class AzureDevOpsReposToolkit(BaseToolkit):
             token=(Optional[str], Field(default="", title="Token", description="ADO token", json_schema_extra={'secret': True})),
             base_branch=(Optional[str], Field(default="", title="Base branch", description="ADO base branch (e.g., main)")),
             active_branch=(Optional[str], Field(default="", title="Active branch", description="ADO active branch (e.g., main)")),
-            selected_tools=(List[Literal[tuple(selected_tools)]], []),
+            selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
             __config__={'json_schema_extra': {'metadata': {"label": "AzureDevOps Repos", "icon_url": None}}}
         )
 

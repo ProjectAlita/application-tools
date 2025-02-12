@@ -21,7 +21,7 @@ class AlitaGitlabSpaceToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
-        selected_tools = (x['name'] for x in GitLabWorkspaceAPIWrapper.construct().get_available_tools())
+        selected_tools = {x['name']: x['args_schema'].schema() for x in GitLabWorkspaceAPIWrapper.model_construct().get_available_tools()}
         return create_model(
             name,
             url=(str, Field(description="GitLab URL")),
@@ -31,7 +31,7 @@ class AlitaGitlabSpaceToolkit(BaseToolkit):
             )),
             private_token=(str, Field(description="GitLab private token", json_schema_extra={'secret': True})),
             branch=(str, Field(description="Main branch", default="main")),
-            selected_tools=(List[Literal[tuple(selected_tools)]], []),
+            selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "GitLab Org", "icon_url": None}})
         )
 

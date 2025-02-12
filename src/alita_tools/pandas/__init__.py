@@ -21,11 +21,11 @@ class PandasToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
-        selected_tools = (x['name'] for x in CSVToolApiWrapper.model_construct().get_available_tools())
+        selected_tools = {x['name']: x['args_schema'].schema() for x in CSVToolApiWrapper.model_construct().get_available_tools()}
         return create_model(
             name,
             csv_content=(Any, Field(default=None, title="CSV content", description="CSV content to be processed")),
-            selected_tools=(List[Literal[tuple(selected_tools)]], []),
+            selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Pandas", "icon_url": None}})
         )
 

@@ -24,7 +24,7 @@ class RallyToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
-        selected_tools = (x['name'] for x in RallyApiWrapper.construct().get_available_tools())
+        selected_tools = {x['name']: x['args_schema'].schema() for x in RallyApiWrapper.model_construct().get_available_tools()}
         return create_model(
             name,
             server=(str, Field(description="Rally server url")),
@@ -33,7 +33,7 @@ class RallyToolkit(BaseToolkit):
             password=(Optional[str], Field(default=None, description="User's password", json_schema_extra={'secret': True})),
             workspace=(Optional[str], Field(default=None, description="Rally workspace")),
             project=(Optional[str], Field(default=None, description="Rally project")),
-            selected_tools=(List[Literal[tuple(selected_tools)]], []),
+            selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Rally", "icon_url": None}})
         )
 

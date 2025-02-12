@@ -30,7 +30,7 @@ class AzureSearchToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
-        selected_tools = (x['name'] for x in AzureSearchApiWrapper.model_construct().get_available_tools())
+        selected_tools = {x['name']: x['args_schema'].schema() for x in AzureSearchApiWrapper.model_construct().get_available_tools()}
         return create_model(
             name,
             api_key=(str, Field(description="API key", json_schema_extra={'secret': True})),
@@ -40,7 +40,7 @@ class AzureSearchToolkit(BaseToolkit):
             api_version=(Optional[str], Field(description="API version", default=None)),
             openai_api_key=(Optional[str], Field(description="Azure OpenAI API Key", default=None, json_schema_extra={'secret': True})),
             model_name=(str, Field(description="Model name for Embeddings model", default=None)),
-            selected_tools=(List[Literal[tuple(selected_tools)]], []),
+            selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Azure Search", "icon_url": None}})
         )
 

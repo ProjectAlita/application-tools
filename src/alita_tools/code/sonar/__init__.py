@@ -22,13 +22,13 @@ class SonarToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
-        selected_tools = (x['name'] for x in SonarApiWrapper.construct().get_available_tools())
+        selected_tools = {x['name']: x['args_schema'].schema() for x in SonarApiWrapper.model_construct().get_available_tools()}
         return create_model(
             name,
             url=(str, Field(description="SonarQube Server URL")),
             sonar_token=(str, Field(description="SonarQube user token for authentication", json_schema_extra={'secret': True})),
             sonar_project_name=(str, Field(description="Project name of the desired repository")),
-            selected_tools=(List[Literal[tuple(selected_tools)]], []),
+            selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Sonar", "icon_url": None}})
         )
 

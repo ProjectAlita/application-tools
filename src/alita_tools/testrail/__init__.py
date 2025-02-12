@@ -22,13 +22,13 @@ class TestrailToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
-        selected_tools = (x['name'] for x in TestrailAPIWrapper.construct().get_available_tools())
+        selected_tools = {x['name']: x['args_schema'].schema() for x in TestrailAPIWrapper.model_construct().get_available_tools()}
         return create_model(
             name,
             url=(str, Field(description="Testrail URL")),
             email=(str, Field(description="User's email")),
             password=(str, Field(description="User's password", json_schema_extra={'secret': True})),
-            selected_tools=(List[Literal[tuple(selected_tools)]], []),
+            selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Testrail", "icon_url": None}})
         )
 

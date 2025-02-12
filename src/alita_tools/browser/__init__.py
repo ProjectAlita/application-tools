@@ -5,7 +5,7 @@ from pydantic import create_model, BaseModel, ConfigDict, Field
 
 from langchain_community.utilities.google_search import GoogleSearchAPIWrapper
 from langchain_community.utilities.wikipedia import WikipediaAPIWrapper
-from .google_search_rag import GoogleSearchRag, GoogleSearchResults
+from .google_search_rag import GoogleSearchResults
 from .crawler import SingleURLCrawler, MultiURLCrawler, GetHTMLContent, GetPDFContent
 from .wiki import WikipediaQueryRun
 
@@ -24,21 +24,21 @@ class BrowserToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
-        selected_tools = (
-            'single_url_crawler',
-            'multi_url_crawler',
-            'get_html_content',
-            'get_pdf_content',
-            'google',
-            'wiki'
-        )
+        selected_tools = {
+            'single_url_crawler': SingleURLCrawler.__pydantic_fields__['args_schema'].default.schema(),
+            'multi_url_crawler': MultiURLCrawler.__pydantic_fields__['args_schema'].default.schema(),
+            'get_html_content': GetHTMLContent.__pydantic_fields__['args_schema'].default.schema(),
+            'get_pdf_content': GetPDFContent.__pydantic_fields__['args_schema'].default.schema(),
+            'google': GoogleSearchResults.__pydantic_fields__['args_schema'].default.schema(),
+            'wiki': WikipediaQueryRun.__pydantic_fields__['args_schema'].default.schema()
+        }
 
         return create_model(
             name,
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Browser", "icon_url": None}}),
             google_cse_id=(Optional[str], Field(description="Google CSE id", default=None)),
             google_api_key=(Optional[str], Field(description="Google API key", default=None, json_schema_extra={'secret': True})),
-            selected_tools=(List[Literal[selected_tools]], [])
+            selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
         )
 
     @classmethod
@@ -51,7 +51,7 @@ class BrowserToolkit(BaseToolkit):
                 'single_url_crawler', 
                 'multi_url_crawler', 
                 'get_html_content', 
-                'google', 
+                'google',
                 'wiki']
         for tool in selected_tools:
             if tool == 'single_url_crawler':
@@ -69,7 +69,6 @@ class BrowserToolkit(BaseToolkit):
                         google_cse_id=kwargs.get("google_cse_id"),
                     )
                     tools.append(GoogleSearchResults(api_wrapper=google_api_wrapper))
-                    tools.append(GoogleSearchRag(googleApiWrapper=google_api_wrapper))
                 except Exception as e:
                     print(f"Google API Wrapper failed to initialize: {e}")
             elif tool == 'wiki':
