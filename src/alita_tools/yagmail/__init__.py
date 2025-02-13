@@ -23,13 +23,13 @@ class AlitaYagmailToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
-        selected_tools = (x['name'] for x in YagmailWrapper.construct().get_available_tools())
+        selected_tools = {x['name']: x['args_schema'].schema() for x in YagmailWrapper.model_construct().get_available_tools()}
         return create_model(
             name,
             host=(Optional[str], Field(default=SMTP_SERVER, description="SMTP Host")),
             username=(str, Field(description="Username")),
             password=(str, Field(description="Password", json_schema_extra={'secret': True})),
-            selected_tools=(List[Literal[tuple(selected_tools)]], []),
+            selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
             __config__={'json_schema_extra': {'metadata': {"label": "Yet Another Gmail", "icon_url": None}}}
         )
 

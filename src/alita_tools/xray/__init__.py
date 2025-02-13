@@ -26,14 +26,14 @@ class XrayToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
-        selected_tools = (x['name'] for x in XrayApiWrapper.construct().get_available_tools())
+        selected_tools = {x['name']: x['args_schema'].schema() for x in XrayApiWrapper.model_construct().get_available_tools()}
         return create_model(
             name,
             base_url=(str, Field(description="Xray URL")),
             client_id=(str, Field(description="Client ID")),
             client_secret=(str, Field(description="Client secret", json_schema_extra={'secret': True})),
             limit=(Optional[int], Field(description="Limit", default=100)),
-            selected_tools=(List[Literal[tuple(selected_tools)]], []),
+            selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
             __config__={'json_schema_extra': {'metadata': {"label": "XRAY cloud", "icon_url": None}}}
         )
 

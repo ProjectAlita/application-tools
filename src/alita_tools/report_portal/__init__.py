@@ -24,13 +24,13 @@ class ReportPortalToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
-        selected_tools = (x['name'] for x in ReportPortalApiWrapper.construct().get_available_tools())
+        selected_tools = {x['name']: x['args_schema'].schema() for x in ReportPortalApiWrapper.model_construct().get_available_tools()}
         return create_model(
             name,
             endpoint=(str, Field(description="Report Portal endpoint")),
             project=(str, Field(description="Report Portal project")),
             api_key=(str, Field(description="User API key", json_schema_extra={'secret': True})),
-            selected_tools=(List[Literal[tuple(selected_tools)]], []),
+            selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Report Portal", "icon_url": None}})
         )
 

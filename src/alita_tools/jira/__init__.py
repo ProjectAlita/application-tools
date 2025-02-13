@@ -23,7 +23,7 @@ class JiraToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
-        selected_tools = (x['name'] for x in JiraApiWrapper.model_construct().get_available_tools())
+        selected_tools = {x['name']: x['args_schema'].schema() for x in JiraApiWrapper.model_construct().get_available_tools()}
         return create_model(
             name,
             base_url=(str, Field(description="Jira URL")),
@@ -34,7 +34,7 @@ class JiraToolkit(BaseToolkit):
             limit=(int, Field(description="Limit issues", default=5)),
             verify_ssl=(bool, Field(description="Verify SSL", default=True)),
             additional_fields=(Optional[str], Field(description="Additional fields", default="")),
-            selected_tools=(List[Literal[tuple(selected_tools)]], []),
+            selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Jira", "icon_url": None}})
         )
 

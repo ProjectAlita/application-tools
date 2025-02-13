@@ -31,7 +31,8 @@ class AlitaGitHubToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
-        selected_tools = (x['name'] for x in AlitaGitHubAPIWrapper.construct().get_available_tools())
+        selected_tools = {x['name']: x['args_schema'].schema() for x in AlitaGitHubAPIWrapper.model_construct().get_available_tools()}
+
         return create_model(
             name,
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "GitHub", "icon_url": None}}),
@@ -46,7 +47,7 @@ class AlitaGitHubToolkit(BaseToolkit):
             repository=(str, Field(description="Github repository")),
             active_branch=(Optional[str], Field(description="Active branch", default="main")),
             base_branch=(Optional[str], Field(description="Github Base branch", default="main")),
-            selected_tools=(List[Literal[tuple(selected_tools)]], [])
+            selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools}))
         )
 
     @classmethod

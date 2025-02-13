@@ -22,12 +22,12 @@ class GooglePlacesToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
-        selected_tools = (x['name'] for x in GooglePlacesAPIWrapper.construct().get_available_tools())
+        selected_tools = {x['name']: x['args_schema'].schema() for x in GooglePlacesAPIWrapper.model_construct().get_available_tools()}
         return create_model(
             name,
             api_key=(str, Field(description="Google Places API key", json_schema_extra={'secret': True})),
             results_count=(Optional[int], Field(description="Results number to show", default=None)),
-            selected_tools=(List[Literal[tuple(selected_tools)]], []),
+            selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Google Places", "icon_url": None}})
         )
 

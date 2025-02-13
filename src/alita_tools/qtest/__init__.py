@@ -24,13 +24,13 @@ class QtestToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
-        selected_tools = (x['name'] for x in QtestApiWrapper.construct().get_available_tools())
+        selected_tools = {x['name']: x['args_schema'].schema() for x in QtestApiWrapper.model_construct().get_available_tools()}
         return create_model(
             name,
             base_url=(str, Field(description="QTest base url")),
             project_id=(int, Field(description="QTest project id")),
             qtest_api_token=(str, Field(description="QTest API token", json_schema_extra={'secret': True})),
-            selected_tools=(List[Literal[tuple(selected_tools)]], []),
+            selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "QTest", "icon_url": None}})
         )
 

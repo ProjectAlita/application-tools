@@ -21,11 +21,11 @@ class GCPToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
-        selected_tools = (x['name'] for x in GCPApiWrapper.model_construct().get_available_tools())
+        selected_tools = {x['name']: x['args_schema'].schema() for x in GCPApiWrapper.model_construct().get_available_tools()}
         return create_model(
             name,
             api_key=(str, Field(default="", title="API key", description="GCP API key", json_schema_extra={'secret': True})),
-            selected_tools=(List[Literal[tuple(selected_tools)]], []),
+            selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Cloud GCP", "icon_url": None}})
         )
 

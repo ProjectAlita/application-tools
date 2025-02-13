@@ -24,14 +24,17 @@ class AlitaGitlabToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
-        selected_tools = (x['name'] for x in __all__)
+        selected_tools = {}
+        for t in __all__:
+            default = t['tool'].__pydantic_fields__['args_schema'].default
+            selected_tools[t['name']] = default.schema() if default else default
         return create_model(
             name,
             url=(str, Field(description="GitLab URL")),
             repository=(str, Field(description="GitLab repository")),
             private_token=(str, Field(description="GitLab private token", json_schema_extra={'secret': True})),
             branch=(str, Field(description="Main branch", default="main")),
-            selected_tools=(List[Literal[tuple(selected_tools)]], []),
+            selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "GitLab", "icon_url": None}})
         )
 

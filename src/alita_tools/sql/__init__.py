@@ -26,7 +26,7 @@ class SQLToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
-        selected_tools = (x['name'] for x in SQLApiWrapper.construct().get_available_tools())
+        selected_tools = {x['name']: x['args_schema'].schema() for x in SQLApiWrapper.model_construct().get_available_tools()}
         supported_dialects = (d.value for d in SQLDialect)
         return create_model(
             name,
@@ -36,7 +36,7 @@ class SQLToolkit(BaseToolkit):
             username=(str, Field(description="Database username")),
             password=(str, Field(description="Database password", json_schema_extra={'secret': True})),
             database_name=(str, Field(description="Database name")),
-            selected_tools=(List[Literal[tuple(selected_tools)]], []),
+            selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "SQL", "icon_url": None}})
         )
 
