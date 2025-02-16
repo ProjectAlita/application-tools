@@ -1,6 +1,7 @@
 import os
 import re
 from json import dumps
+import fnmatch
 from typing import Dict, Any, Optional, List
 import tiktoken
 from pydantic import model_validator, create_model, BaseModel, Field
@@ -288,6 +289,13 @@ UpdateIssue = create_model(
             description="The new state of the issue ('open' or 'closed') if updating.",
         ),
     ),
+)
+
+LoaderSchema = create_model(
+    "LoaderSchema",
+    branch=(Optional[str], Field(description="The branch to set as active before listing files. If None, the current active branch is used.")),
+    whitelist=(Optional[List[str]], Field(description="A list of file extensions or paths to include. If None, all files are included.")),
+    blacklist=(Optional[List[str]], Field(description="A list of file extensions or paths to exclude. If None, no files are excluded."))
 )
 
 class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
@@ -850,6 +858,53 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             return f"Issue updated successfully! Updated details: ID: {issue.number}, URL: {issue.html_url}"
         except Exception as e:
             return f"An error occurred while updating the issue: {str(e)}"
+    
+    
+    def loader(self,
+               branch: Optional[str] = None,
+               whitelist: Optional[List[str]] = None, 
+               blacklist: Optional[List[str]] = None) -> str:
+        """
+        Generates file content from the specified branch while honoring whitelist and blacklist patterns.
+
+        Parameters:
+            branch (Optional[str]): The branch to set as active before listing files. If None, the current active branch is used.
+            whitelist (Optional[List[str]]): A list of file extensions or paths to include. If None, all files are included.
+            blacklist (Optional[List[str]]): A list of file extensions or paths to exclude. If None, no files are excluded.
+
+        Returns:
+            generator: A generator that yields the content of files that match the whitelist and do not match the blacklist.
+
+        Example:
+            # Set the active branch to 'feature-branch' and include only '.py' files, excluding 'test_' files
+            file_generator = loader(branch='feature-branch', whitelist=['*.py'], blacklist=['*test_*'])
+            for file_content in file_generator:
+                print(file_content)
+
+        Notes:
+            - The whitelist and blacklist patterns use Unix shell-style wildcards.
+            - If both whitelist and blacklist are provided, a file must match the whitelist and not match the blacklist to be included.
+        """
+        from ..code.loaders.codeparser import parse_code_files_for_db
+        if self.active_branch != branch:
+            self.set_active_branch(branch)
+        _files = self.list_files_in_bot_branch()
+        def is_whitelisted(file_path: str) -> bool:
+            if whitelist:
+                return any(fnmatch.fnmatch(file_path, pattern) for pattern in whitelist)
+            return True
+
+        def is_blacklisted(file_path: str) -> bool:
+            if blacklist:
+                return any(fnmatch.fnmatch(file_path, pattern) for pattern in blacklist)
+            return False
+
+        def file_content_generator():
+            for file in _files:
+                if is_whitelisted(file) and not is_blacklisted(file):
+                    yield self.read_file(file)
+        
+        return parse_code_files_for_db(file_content_generator())
 
     def get_available_tools(self):
         return [
@@ -985,6 +1040,13 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                 "mode": "update_issue",
                 "description": UPDATE_ISSUE_PROMPT,
                 "args_schema": UpdateIssue,
+            },
+            {
+                "ref": self.loader,
+                "name": "loader",
+                "mode": "loader",
+                "description": self.loader.__doc__,
+                "args_schema": LoaderSchema,
             }
         ]
 
