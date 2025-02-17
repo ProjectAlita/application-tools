@@ -6,7 +6,7 @@ on:
       increment_version:
         description: 'Increment version by 0.0.1'
         required: true
-        default: 'false'
+        default: true
         type: boolean
 
 jobs:
@@ -35,11 +35,11 @@ jobs:
         python-version: '3.x'  # Specify your Python version
 
     - name: Install dependencies
-      if: ${{ inputs.increment_version == 'true' }}
+      if: ${{ inputs.increment_version }}
       run: pip install toml
 
     - name: Set up script
-      if: ${{ inputs.increment_version == 'true' }}
+      if: ${{ inputs.increment_version }}
       run: |
          cat > increment_version.py << 'EOF'
          import toml
@@ -67,11 +67,11 @@ jobs:
          EOF
 
     - name: Increment version
-      if: ${{ inputs.increment_version == 'true' }}
+      if: ${{ inputs.increment_version }}
       run: python increment_version.py
 
     - name: Commit changes
-      if: ${{ inputs.increment_version == 'true' }}
+      if: ${{ inputs.increment_version }}
       run: |
         git config --local user.name "github-actions[bot]"
         git config --local user.email "github-actions[bot]@users.noreply.github.com"
@@ -79,7 +79,7 @@ jobs:
         git commit -m "Increment version"
 
     - name: Push changes
-      if: ${{ inputs.increment_version == 'true' }}
+      if: ${{ inputs.increment_version }}
       uses: ad-m/github-push-action@v0.8.0
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
