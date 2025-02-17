@@ -18,13 +18,14 @@ jobs:
       url: https://pypi.org/p/alita-tools
     permissions:
       id-token: write  # IMPORTANT: this permission is mandatory for trusted publishing
+      contents: write           # 'write' access to repository contents
+      pull-requests: write      # 'write' access to pull requests
+      
     steps:
-
     - uses: actions/checkout@v4
     - uses: actions/setup-python@v5
       with:
         python-version: '3.13'
-
 
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -86,7 +87,9 @@ jobs:
         branch: ${{ github.ref }}
         
     - name: Build package
-      run: python -m build
+      run: |
+        pip install build
+        python -m build
 
     - name: Publish package distributions to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
