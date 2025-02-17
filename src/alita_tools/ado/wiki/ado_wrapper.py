@@ -35,7 +35,7 @@ ModifyPageInput = create_model(
     wiki_identified=(str, Field(description="Wiki ID or wiki name")),
     page_name=(str, Field(description="Wiki page name")),
     page_content=(str, Field(description="Wiki page content")),
-    version_identifier=(str, Field(description="Version string identifier (name of tag/branch, SHA1 of commit)", default="master")),
+    version_identifier=(str, Field(description="Version string identifier (name of tag/branch, SHA1 of commit)")),
     version_type=(Optional[str], Field(description="Version type (branch, tag, or commit). Determines how Id is interpreted", default="branch"))
 )
 
@@ -112,7 +112,7 @@ class AzureDevOpsApiWrapper(BaseModel):
             logger.error(f"Unable to delete wiki page: {str(e)}")
             return ToolException(f"Unable to delete wiki page: {str(e)}")
 
-    def modify_wiki_page(self, wiki_identified: str, page_name: str, page_content: str, version_identifier: str, version_type: str):
+    def modify_wiki_page(self, wiki_identified: str, page_name: str, page_content: str, version_identifier: str, version_type: str = "branch"):
         """Create or Update ADO wiki page content."""
         try:
             all_wikis = [wiki.name for wiki in self._client.get_all_wikis(project=self.project)]

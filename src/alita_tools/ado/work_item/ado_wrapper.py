@@ -34,7 +34,7 @@ ADOWorkItemsSearch = create_model(
 ADOCreateWorkItem = create_model(
     "AzureDevOpsCreateWorkItemModel",
     work_item_json=(str, Field(description=create_wi_field)),
-    wi_type=(str, Field(description="Work item type, e.g. 'Task', 'Issue' or  'EPIC'", default="Task"))
+    wi_type=(Optional[str], Field(description="Work item type, e.g. 'Task', 'Issue' or  'EPIC'", default="Task"))
 )
 
 ADOUpdateWorkItem = create_model(

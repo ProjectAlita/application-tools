@@ -55,7 +55,7 @@ class CSVToolApiWrapper(BaseModel):
                 "args_schema": create_model(
                     "ExecuteModel",
                     method_name=(str, Field(description="Method to be called on the pandas dataframe object generated from the file")),
-                    method_args=(dict, Field(description="Pandas dataframe arguments to be passed to the method", default={})),
+                    method_args=(Optional[dict], Field(description="Pandas dataframe arguments to be passed to the method", default={})),
                     column=(Optional[str], Field(description="Column to be used for the operation", default=None))
                 ),
             }

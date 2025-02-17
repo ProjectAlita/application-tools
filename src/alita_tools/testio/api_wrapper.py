@@ -68,8 +68,8 @@ class TestIOApiWrapper(BaseModel):
                 "description": self.list_bugs_for_test_with_filter.__doc__,
                 "args_schema": create_model(
                     "ListBugsForTestWithFilterModel",
-                    filter_product_ids=(Optional[str], Field(description="Comma-separated list of product IDs to filter by")),
-                    filter_test_cycle_ids=(Optional[str], Field(description="Comma-separated list of test cycle IDs to filter by"))
+                    filter_product_ids=(Optional[str], Field(description="Comma-separated list of product IDs to filter by", default=None)),
+                    filter_test_cycle_ids=(Optional[str], Field(description="Comma-separated list of test cycle IDs to filter by", default=None))
                 ),
                 "ref": self.list_bugs_for_test_with_filter,
             }

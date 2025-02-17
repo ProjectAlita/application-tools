@@ -79,8 +79,8 @@ AddCommentInput = create_model(
 ModifyLabels = create_model(
     "AddCommentInputModel",
     issue_key=(str, Field(description="The issue key of the Jira issue to which the comment is to be added, e.g. 'TEST-123'.")),
-    add_labels=(list[str], Field(description="List of labels required to be added", default=None)),
-    remove_labels=(list[str], Field(description="List of labels required to be removed", default=None))
+    add_labels=(Optional[list[str]], Field(description="List of labels required to be added", default=None)),
+    remove_labels=(Optional[list[str]], Field(description="List of labels required to be removed", default=None))
 )
 
 SetIssueStatus = create_model(

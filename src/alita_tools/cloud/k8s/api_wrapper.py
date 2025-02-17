@@ -57,7 +57,7 @@ class KubernetesApiWrapper(BaseModel):
         except Exception:
             return "Tool output parsing error"
 
-    def kubernetes_integration_healthcheck(self, url: str, token: str = None) -> Tuple[bool, str]:
+    def kubernetes_integration_healthcheck(self) -> Tuple[bool, str]:
         """
         Tests the integration with a Kubernetes cluster by performing a GET request to a predefined URL.
 
@@ -94,8 +94,8 @@ class KubernetesApiWrapper(BaseModel):
                     "ExecuteToolModel",
                     method=(str, Field(description="The HTTP method to use for the request (GET, POST, PUT, DELETE, etc.).")),
                     suburl=(str, Field(description="The relative URI for Kubernetes API. URI must start with a forward slash , example '/api/v1/...'. Do not include query parameters in the URL, they must be provided separately in 'body'.")),
-                    body=(Optional[Union[str, Dict[str, Any]]], Field(description="Optional JSON object to be sent in request body. No comments allowed.")),
-                    headers=(Optional[Union[str, Dict[str, Any]]], Field(description="Optional JSON object of headers to be sent in request. No comments allowed."))
+                    body=(Optional[Union[str, Dict[str, Any]]], Field(description="Optional JSON object to be sent in request body. No comments allowed.", default=None)),
+                    headers=(Optional[Union[str, Dict[str, Any]]], Field(description="Optional JSON object of headers to be sent in request. No comments allowed.", default=None))
                 ),
                 "ref": self.execute_kubernetes,
             },
@@ -103,9 +103,7 @@ class KubernetesApiWrapper(BaseModel):
                 "name": "kubernetes_integration_healthcheck",
                 "description": self.kubernetes_integration_healthcheck.__doc__,
                 "args_schema": create_model(
-                    "KubernetesIntegrationHealthcheckModel",
-                    url=(str, Field(description="The URL of the Kubernetes cluster to test integration with.")),
-                    token=(Optional[str], Field(description="The authentication token used for accessing the Kubernetes cluster. If not provided, no token will be used."))
+                    "KubernetesIntegrationHealthcheckModel"
                 ),
                 "ref": self.kubernetes_integration_healthcheck,
             }

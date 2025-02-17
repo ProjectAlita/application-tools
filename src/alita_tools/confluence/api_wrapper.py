@@ -22,58 +22,58 @@ logger = logging.getLogger(__name__)
 
 createPage = create_model(
     "createPage",
-    space=(str, Field(description="Confluence space that is used for page's creation", default=None)),
+    space=(Optional[str], Field(description="Confluence space that is used for page's creation", default=None)),
     title=(str, Field(description="Title of the page")),
     body=(str, Field(description="Body of the page")),
-    status=(str, Field(description="Page publishing option: 'current' for publish page, 'draft' to create draft.", default='current')),
-    parent_id=(str, Field(description="Page parent id (optional)", default=None)),
-    representation=(str, Field(description="Content representation format: storage for html, wiki for markdown", default='storage')),
-    label=(str, Field(description="Page label (optional)", default=None)),
+    status=(Optional[str], Field(description="Page publishing option: 'current' for publish page, 'draft' to create draft.", default='current')),
+    parent_id=(Optional[str], Field(description="Page parent id (optional)", default=None)),
+    representation=(Optional[str], Field(description="Content representation format: storage for html, wiki for markdown", default='storage')),
+    label=(Optional[str], Field(description="Page label (optional)", default=None)),
 )
 
 createPages = create_model(
     "createPages",
-    space=(str, Field(description="Confluence space that is used for pages creation", default=None)),
+    space=(Optional[str], Field(description="Confluence space that is used for pages creation", default=None)),
     pages_info=(str, Field(description="""JSON string containing information about page name and its content per syntax: [{"page1_name": "page1_content"}, {"page2_name": "page2_content"}]""")),
-    parent_id=(str, Field(description="Page parent id (optional)", default=None)),
-    status=(str, Field(description="Page publishing option: 'current' for publish page, 'draft' to create draft.", default='current')),
+    parent_id=(Optional[str], Field(description="Page parent id (optional)", default=None)),
+    status=(Optional[str], Field(description="Page publishing option: 'current' for publish page, 'draft' to create draft.", default='current')),
 )
 
 deletePage = create_model(
     "deletePage",
-    page_id=(str, Field(description="Page id", default=None)),
-    page_title=(str, Field(description="Page title", default=None)),
+    page_id=(Optional[str], Field(description="Page id", default=None)),
+    page_title=(Optional[str], Field(description="Page title", default=None)),
 )
 
 updatePageById = create_model(
     "updatePageById",
     page_id=(str, Field(description="Page id")),
-    representation=(str, Field(description="Content representation format: storage for html, wiki for markdown", default='storage')),
-    new_title=(str, Field(description="New page title", default=None)),
-    new_body=(str, Field(description="New page content", default=None)),
-    new_labels=(list, Field(description="Page labels", default=None)),
+    representation=(Optional[str], Field(description="Content representation format: storage for html, wiki for markdown", default='storage')),
+    new_title=(Optional[str], Field(description="New page title", default=None)),
+    new_body=(Optional[str], Field(description="New page content", default=None)),
+    new_labels=(Optional[list], Field(description="Page labels", default=None)),
 )
 
 updatePageByTitle = create_model(
     "updatePageByTitle",
     page_title=(str, Field(description="Page title")),
-    representation=(str, Field(description="Content representation format: storage for html, wiki for markdown", default='storage')),
-    new_title=(str, Field(description="New page title", default=None)),
-    new_body=(str, Field(description="New page content", default=None)),
-    new_labels=(list, Field(description="Page labels", default=None)),
+    representation=(Optional[str], Field(description="Content representation format: storage for html, wiki for markdown", default='storage')),
+    new_title=(Optional[str], Field(description="New page title", default=None)),
+    new_body=(Optional[str], Field(description="New page content", default=None)),
+    new_labels=(Optional[list], Field(description="Page labels", default=None)),
 )
 
 updatePages = create_model(
     "updatePages",
-    page_ids=(list, Field(description="List of ids of pages to be updated", default=None)),
-    new_contents=(list, Field(description="List of new contents for each page. If content the same for all the pages then it should be a list with a single entry", default=None)),
-    new_labels=(list, Field(description="Page labels", default=None)),
+    page_ids=(Optional[list], Field(description="List of ids of pages to be updated", default=None)),
+    new_contents=(Optional[list], Field(description="List of new contents for each page. If content the same for all the pages then it should be a list with a single entry", default=None)),
+    new_labels=(Optional[list], Field(description="Page labels", default=None)),
 )
 
 updateLabels = create_model(
     "updateLabels",
-    page_ids=(list, Field(description="List of ids of pages to be updated", default=None)),
-    new_labels=(list, Field(description="Page labels", default=None)),
+    page_ids=(Optional[list], Field(description="List of ids of pages to be updated", default=None)),
+    new_labels=(Optional[list], Field(description="Page labels", default=None)),
 )
 
 getPageTree = create_model(
@@ -94,7 +94,7 @@ getPagesWithLabel = create_model(
 searchPages = create_model(
     "searchPages",
     query=(str, Field(description="Query text to search pages")),
-    skip_images=(bool, Field(description="Whether we need to skip existing images or not"))
+    skip_images=(Optional[bool], Field(description="Whether we need to skip existing images or not", default=False))
 )
 
 siteSearch = create_model(
@@ -105,7 +105,7 @@ siteSearch = create_model(
 pageId = create_model(
     "pageId",
     page_id=(str, Field(description="Id of page to be read")),
-    skip_images=(bool, Field(description="Whether we need to skip existing images or not")),
+    skip_images=(Optional[bool], Field(description="Whether we need to skip existing images or not", default=False)),
 )
 
 сonfluenceInput = create_model(

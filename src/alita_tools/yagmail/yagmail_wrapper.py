@@ -19,7 +19,7 @@ SendEmail = create_model(
     receiver=(str, Field(description="Email of the person you are going to send the letter to.")),
     message=(str, Field(description="Email message you going to send.")),
     subject=(str, Field(description="Email subject.")),
-    cc=(List[str], Field(description="Persons who you are going to share a copy of email to."))
+    cc=(Optional[List[str]], Field(description="Persons who you are going to share a copy of email to."))
 )
 
 class YagmailWrapper(BaseModel):

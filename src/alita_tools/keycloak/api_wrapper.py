@@ -65,7 +65,7 @@ class KeycloakApiWrapper(BaseModel):
                     "ExecuteModel",
                     method=(str, Field(description="The HTTP method to use for the request (GET, POST, PUT, DELETE, etc.).")),
                     relative_url=(str, Field(description="The relative URL of the Keycloak Admin API to call, e.g. '/users'.")),
-                    params=(Optional[str], Field(description="Optional string dictionary of parameters to be sent in the query string or request body."))
+                    params=(Optional[str], Field(description="Optional string dictionary of parameters to be sent in the query string or request body.", default=""))
                 ),
             }
         ]

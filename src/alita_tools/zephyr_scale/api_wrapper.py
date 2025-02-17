@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 ZephyrGetTestCases = create_model(
     "ZephyrGetTestCases",
     project_key=(str, Field(description="Jira project key filter")),
-    folder_id=(str, Field(description="Folder ID filter", default=None))
+    folder_id=(Optional[str], Field(description="Folder ID filter", default=None))
 )
 
 ZephyrGetTestCase = create_model(

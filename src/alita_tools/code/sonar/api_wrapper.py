@@ -27,7 +27,7 @@ class SonarApiWrapper(BaseModel):
         cls._client.auth = (sonar_token, '')
         return values
 
-    def get_sonar_data(self, relative_url: str, params: str) -> str:
+    def get_sonar_data(self, relative_url: str, params: str = None) -> str:
         """
         SonarQube Tool for interacting with the SonarQube REST API.
         Required parameter: The relative URI for SONAR REST API.
@@ -44,7 +44,7 @@ class SonarApiWrapper(BaseModel):
         return response.json()
 
     @staticmethod
-    def parse_payload_params(params: Optional[str]) -> Dict[str, Any]:
+    def parse_payload_params(params: Optional[str] = None) -> Dict[str, Any]:
         if params:
             try:
                 return json.loads(params)
@@ -61,7 +61,7 @@ class SonarApiWrapper(BaseModel):
                 "args_schema": create_model(
                     "SonarToolInput",
                     relative_url=(str, Field(description="The relative URI for SONAR REST API.")),
-                    params=(Optional[str], Field(description="Optional JSON of parameters to be sent in request body or query params."))
+                    params=(Optional[str], Field(default=None, description="Optional JSON of parameters to be sent in request body or query params."))
                 ),
                 "ref": self.get_sonar_data,
             }

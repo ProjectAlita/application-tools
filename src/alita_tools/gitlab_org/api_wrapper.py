@@ -16,12 +16,12 @@ branch_description: str = "The name of the branch required to perform correspond
 GitLabCreateBranch = create_model(
     "GitLabCreateBranchModel",
     branch_name=(str, Field(description="Name of the branch to create")),
-    repository=(str, Field(description="Name of the repository", default=None))
+    repository=(Optional[str], Field(description="Name of the repository", default=None))
 )
 
 GitLabListBranches = create_model(
     "GitLabListBranchesModel",
-    repository=(str, Field(description="Name of the repository", default=None))
+    repository=(Optional[str], Field(description="Name of the repository", default=None))
 )
 
 GitlabSetActiveBranch = create_model(
@@ -30,13 +30,13 @@ GitlabSetActiveBranch = create_model(
 
 GitLabGetIssues = create_model(
     "GitLabGetIssuesModel",
-    repository=(str, Field(description="Name of the repository", default=None))
+    repository=(Optional[str], Field(description="Name of the repository", default=None))
 )
 
 GitLabGetIssue = create_model(
     "GitLabGetIssueModel",
     issue_number=(int, Field(description="Number of the issue to fetch")),
-    repository=(str, Field(description="Name of the repository", default=None))
+    repository=(Optional[str], Field(description="Name of the repository", default=None))
 )
 
 GitLabCreatePullRequest = create_model(
@@ -44,13 +44,13 @@ GitLabCreatePullRequest = create_model(
     pr_title=(str, Field(description="Title of the pull request")),
     pr_body=(str, Field(description="Body of the pull request")),
     branch=(str, Field(description=branch_description)),
-    repository=(str, Field(description="Name of the repository", default=None))
+    repository=(Optional[str], Field(description="Name of the repository", default=None))
 )
 
 GitLabCommentOnIssue = create_model(
     "GitLabCommentOnIssueModel",
     comment_query=(str, Field(description="Issue number followed by two newlines and the comment")),
-    repository=(str, Field(description="Name of the repository", default=None))
+    repository=(Optional[str], Field(description="Name of the repository", default=None))
 )
 
 GitLabCreateFile = create_model(
@@ -58,21 +58,21 @@ GitLabCreateFile = create_model(
     file_path=(str, Field(description="Path of the file to create")),
     file_contents=(str, Field(description="Contents of the file to create")),
     branch=(str, Field(description=branch_description)),
-    repository=(str, Field(description="Name of the repository", default=None))
+    repository=(Optional[str], Field(description="Name of the repository", default=None))
 )
 
 GitLabReadFile = create_model(
     "GitLabReadFileModel",
     file_path=(str, Field(description="Path of the file to read")),
     branch=(str, Field(description=branch_description)),
-    repository=(str, Field(description="Name of the repository", default=None))
+    repository=(Optional[str], Field(description="Name of the repository", default=None))
 )
 
 GitLabUpdateFile = create_model(
     "GitLabUpdateFile",
     file_path=(str, Field(description="Path of the file to update")),
     update_query=(str, Field(description="File path followed by the old and new contents")),
-    repository=(str, Field(description="Name of the repository", default=None)),
+    repository=(Optional[str], Field(description="Name of the repository", default=None)),
     branch=(str, Field(description=branch_description))
 )
 
@@ -80,20 +80,20 @@ GitLabDeleteFile = create_model(
     "GitLabDeleteFileModel",
     file_path=(str, Field(description="Path of the file to delete")),
     branch=(str, Field(description=branch_description)),
-    repository=(str, Field(description="Name of the repository", default=None))
+    repository=(Optional[str], Field(description="Name of the repository", default=None))
 )
 
 GitLabGetPRChanges = create_model(
     "GitLabGetPRChanges",
     pr_number=(str, Field(description="Pull request number")),
-    repository=(str, Field(description="Name of the repository", default=None))
+    repository=(Optional[str], Field(description="Name of the repository", default=None))
 )
 
 ListFilesModel = create_model(
     "ListFilesModel",
     path=(str, Field(description="Repository path/package to extract files from.")),
-    branch=(str, Field(description="Repository branch. If None then active branch will be selected.", default=None)),
-    repository=(str, Field(description="Name of the repository", default=None))
+    branch=(Optional[str], Field(description="Repository branch. If None then active branch will be selected.", default=None)),
+    repository=(Optional[str], Field(description="Name of the repository", default=None))
 )
 
 GitLabCreatePullRequestChangeCommentInput = create_model(
@@ -102,7 +102,7 @@ GitLabCreatePullRequestChangeCommentInput = create_model(
     file_path=(str, Field(description="File path where the comment should be added")),
     line_number=(int, Field(description="Line number where the comment should be added")),
     comment=(str, Field(description="Comment text to be added")),
-    repository=(str, Field(description="Name of the repository", default=None))
+    repository=(Optional[str], Field(description="Name of the repository", default=None))
 )
 
 AppendFileInput = create_model(
@@ -110,7 +110,7 @@ AppendFileInput = create_model(
     file_path=(str, Field(description="File path where new code should be added")),
     content=(str, Field(description="Code to be appended to existing file")),
     branch=(str, Field(description=branch_description)),
-    repository=(str, Field(description="Name of the repository", default=None))
+    repository=(Optional[str], Field(description="Name of the repository", default=None))
 )
 
 _misconfigured_alert = "Misconfigured repositories"

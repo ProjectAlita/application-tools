@@ -26,7 +26,7 @@ class AWSToolConfig(BaseModel):
         )
         return values
 
-    def execute_aws(self, query: Union[str, Dict[str, Any]] = None):
+    def execute_aws(self, query: Union[str, Dict[str, Any]]):
         """Execute AWS service method based on the provided query"""
         loaded = self.json_query_load(query)
         if 'service' in loaded:
