@@ -1,11 +1,15 @@
 import os
 import re
-from json import dumps
+from json import dumps, loads
 import fnmatch
 from typing import Dict, Any, Optional, List
 import tiktoken
 from pydantic import model_validator, create_model, BaseModel, Field
 from langchain.utils import get_from_dict_or_env
+
+from logging import getLogger
+
+logger = getLogger(__name__)
 
 from langchain_community.tools.github.prompt import (
     COMMENT_ON_ISSUE_PROMPT,
@@ -387,7 +391,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
 
         return values
 
-    def _get_files(self, directory_path: str, ref: str) -> List[str]:
+    def _get_files(self, directory_path: str, ref: str) -> List[str]:  
         from github import GithubException
 
         files: List[str] = []
@@ -404,7 +408,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                 contents.extend(self.github_repo_instance.get_contents(file_content.path))
             else:
                 files.append(file_content)
-        return str(files)
+        return [file.path for file in files]
 
     def get_files_from_directory(self, directory_path: str) -> str:
         """
@@ -417,7 +421,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             str: List of file paths, or an error message.
         """
 
-        return self._get_files(directory_path, self.active_branch)
+        return dumps(self._get_files(directory_path, self.active_branch))
 
     def get_issue(self, issue_number: str) -> str:
         """
@@ -435,7 +439,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         Returns:
             str: A plaintext report containing the paths and names of the files.
         """
-        return self._get_files("", self.github_base_branch)
+        return dumps(self._get_files("", self.github_base_branch))
 
     def list_files_in_bot_branch(self) -> str:
         """
@@ -444,7 +448,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         Returns:
             str: A plaintext report containing the paths and names of the files.
         """
-        return self._get_files("", self.active_branch)
+        return dumps(self._get_files("", self.active_branch))
 
     def get_pull_request(self, pr_number: str) -> str:
         """
@@ -859,6 +863,23 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         except Exception as e:
             return f"An error occurred while updating the issue: {str(e)}"
     
+    def _read_file(self, file_path: str, branch: str) -> str:
+        """
+        Read a file from specified branch
+        Parameters:
+            file_path(str): the file path
+            branch(str): the branch to read the file from
+        Returns:
+            str: The file decoded as a string, or an error message if not found
+        """
+        try:
+            file = self.github_repo_instance.get_contents(file_path, ref=branch)
+            return file.decoded_content.decode("utf-8")
+        except Exception as e:
+            from traceback import format_exc
+            logger.info(format_exc())
+            return f"File not found `{file_path}` on branch `{branch}`. Error: {str(e)}"
+
     
     def loader(self,
                branch: Optional[str] = None,
@@ -886,9 +907,8 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             - If both whitelist and blacklist are provided, a file must match the whitelist and not match the blacklist to be included.
         """
         from ..code.loaders.codeparser import parse_code_files_for_db
-        if self.active_branch != branch:
-            self.set_active_branch(branch)
-        _files = self.list_files_in_bot_branch()
+        _files = self._get_files("", branch or self.active_branch)
+        logger.info(f"Files in branch: {self.active_branch}")
         def is_whitelisted(file_path: str) -> bool:
             if whitelist:
                 return any(fnmatch.fnmatch(file_path, pattern) for pattern in whitelist)
@@ -898,11 +918,11 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             if blacklist:
                 return any(fnmatch.fnmatch(file_path, pattern) for pattern in blacklist)
             return False
-
+        
         def file_content_generator():
             for file in _files:
                 if is_whitelisted(file) and not is_blacklisted(file):
-                    yield self.read_file(file)
+                    yield {"file_name": file, "file_content": self._read_file(file, branch=branch or self.active_branch)}
         
         return parse_code_files_for_db(file_content_generator())
 
