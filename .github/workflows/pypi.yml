@@ -1,7 +1,13 @@
 name: Publish to PyPI 📦
 
-on: 
+on:
   workflow_dispatch:
+    inputs:
+      increment_version:
+        description: 'Increment version by 0.0.1'
+        required: true
+        default: 'false'
+        type: boolean
 
 jobs:
   pypi-publish:
@@ -17,9 +23,70 @@ jobs:
     - uses: actions/checkout@v4
     - uses: actions/setup-python@v5
       with:
-        python-version: '3.13' 
-    - run: python -m build
+        python-version: '3.13'
 
+
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'  # Specify your Python version
+
+    - name: Install dependencies
+      if: ${{ inputs.increment_version == 'true' }}
+      run: pip install toml
+
+    - name: Set up script
+      if: ${{ inputs.increment_version == 'true' }}
+      run: |
+         cat > increment_version.py << 'EOF'
+         import toml
+ 
+         def increment_version(version):
+             major, minor, patch = map(int, version.split('.'))
+             patch += 1
+             return f"{major}.{minor}.{patch}"
+ 
+         def main():
+             with open('pyproject.toml', 'r') as fd:
+                 data = toml.load(fd)
+ 
+             current_version = data['project']['version']
+             new_version = increment_version(current_version)
+             data['project']['version'] = new_version
+ 
+             with open('pyproject.toml', 'w') as fd:
+                 toml.dump(data, fd)
+ 
+             print(f"Version incremented from {current_version} to {new_version}")
+ 
+         if __name__ == "__main__":
+             main()
+         EOF
+
+    - name: Increment version
+      if: ${{ inputs.increment_version == 'true' }}
+      run: python increment_version.py
+
+    - name: Commit changes
+      if: ${{ inputs.increment_version == 'true' }}
+      run: |
+        git config --local user.name "github-actions[bot]"
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git add pyproject.toml
+        git commit -m "Increment version"
+
+    - name: Push changes
+      if: ${{ inputs.increment_version == 'true' }}
+      uses: ad-m/github-push-action@v0.8.0
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        branch: ${{ github.ref }}
+        
+    - name: Build package
+      run: python -m build
 
     - name: Publish package distributions to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
