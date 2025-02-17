@@ -1,4 +1,3 @@
-import difflib
 import logging
 import re
 from enum import Enum
@@ -20,6 +19,8 @@ from azure.devops.v7_0.git.models import (
 from langchain_core.tools import ToolException
 from msrest.authentication import BasicAuthentication
 from pydantic import BaseModel, Field, PrivateAttr, create_model, model_validator
+
+from ..utils import extract_old_new_pairs, generate_diff
 
 logger = logging.getLogger(__name__)
 
@@ -237,31 +238,6 @@ class ReposApiWrapper(BaseModel):
             if item.git_object_type == "blob":
                 files.append(item.path)
         return str(files)
-
-    def extract_old_new_pairs(self, file_query: str):
-        """
-        Extracts old and new content pairs from a file query.
-        Parameters:
-            file_query (str): The file query containing old and new content.
-        Returns:
-            list of tuples: A list where each tuple contains (old_content, new_content).
-        """
-        old_pattern = re.compile(r"OLD <<<<\s*(.*?)\s*>>>> OLD", re.DOTALL)
-        new_pattern = re.compile(r"NEW <<<<\s*(.*?)\s*>>>> NEW", re.DOTALL)
-
-        old_contents = old_pattern.findall(file_query)
-        new_contents = new_pattern.findall(file_query)
-
-        return list(zip(old_contents, new_contents))
-
-    def generate_diff(self, base_text, target_text, file_path):
-        base_lines = base_text.splitlines(keepends=True)
-        target_lines = target_text.splitlines(keepends=True)
-        diff = difflib.unified_diff(
-            base_lines, target_lines, fromfile=f"a/{file_path}", tofile=f"b/{file_path}"
-        )
-
-        return "".join(diff)
 
     def set_active_branch(self, branch_name: str) -> str:
         """
@@ -514,7 +490,7 @@ class ReposApiWrapper(BaseModel):
             if change_type == "edit":
                 base_content = self.get_file_content(target_commit_id, path)
                 target_content = self.get_file_content(source_commit_id, path)
-                diff = self.generate_diff(base_content, target_content, path)
+                diff = generate_diff(base_content, target_content, path)
             else:
                 diff = f"Change Type: {change_type}"
 
@@ -740,7 +716,7 @@ class ReposApiWrapper(BaseModel):
             file_content = self.read_file(file_path)
 
             updated_file_content = file_content
-            for old, new in self.extract_old_new_pairs(update_query):
+            for old, new in extract_old_new_pairs(update_query):
                 if not old.strip():
                     continue
                 updated_file_content = updated_file_content.replace(old, new)

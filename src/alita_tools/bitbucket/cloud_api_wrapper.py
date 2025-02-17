@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 from atlassian.bitbucket import Bitbucket, Cloud
 from langchain_core.tools import ToolException
 from requests import Response
+from ..ado.utils import extract_old_new_pairs
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.DEBUG)
@@ -82,13 +83,28 @@ class BitbucketServerApi(BitbucketApiAbstract):
             filename=file_path
         )
 
-    def update_file(self, file_path: str, file_contents: str, branch: str) -> str:
+    def update_file(self, file_path: str, update_query: str, branch: str) -> str:
+        file_content = self.get_file(file_path = file_path, branch=branch)
+        updated_file_content = file_content
+        for old, new in extract_old_new_pairs(update_query):
+            if not old.strip():
+                continue
+            updated_file_content = updated_file_content.replace(old, new)
+
+        if file_content == updated_file_content:
+            return (
+                "File content was not updated because old content was not found or empty. "
+                "It may be helpful to use the read_file action to get "
+                "the current file contents."
+            )
+
+
         source_commit_generator = self.api_client.get_commits(project_key=self.project, repository_slug=self.repository, hash_newest=branch, limit=1)
         source_commit = next(source_commit_generator)
         return self.api_client.update_file(
             project_key=self.project,
             repository_slug=self.repository,
-            content=file_contents,
+            content=updated_file_content,
             message=f"Update {file_path}",
             branch=branch,
             filename=file_path,
@@ -142,5 +158,19 @@ class BitbucketCloudApi(BitbucketApiAbstract):
         }
         return self.repository.post(path='src', data=form_data, files={}, headers={'Content-Type': 'application/x-www-form-urlencoded'})
 
-    def update_file(self, file_path: str, file_contents: str, branch: str) -> str:
-        return self.create_file(file_path, file_contents, branch)
+    def update_file(self, file_path: str, update_query: str, branch: str) -> str:
+
+        file_content = self.get_file(file_path=file_path, branch=branch)
+        updated_file_content = file_content
+        for old, new in extract_old_new_pairs(file_query=update_query):
+            if not old.strip():
+                continue
+            updated_file_content = updated_file_content.replace(old, new)
+
+        if file_content == updated_file_content:
+            return (
+                "File content was not updated because old content was not found or empty. "
+                "It may be helpful to use the read_file action to get "
+                "the current file contents."
+            )
+        return self.create_file(file_path, updated_file_content, branch)

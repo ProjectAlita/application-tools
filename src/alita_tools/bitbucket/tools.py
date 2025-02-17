@@ -77,24 +77,35 @@ class CreateFileTool(BaseTool):
 class UpdateFileTool(BaseTool):
     api_wrapper: BitbucketAPIWrapper = Field(default_factory=BitbucketAPIWrapper)
     name: str = "update_file"
-    description: str = """This tool is a wrapper for the Bitbucket API, useful when you need to update a file in a Bitbucket repository.
-    """
+    description: str = """
+        Updates a file with new content.
+        Parameters:
+            file_path (str): Path to the file to be updated 
+            branch (str): The name of the branch where update the file.
+            update_query(str): Contains file contents.
+                The old file contents is wrapped in OLD <<<< and >>>> OLD
+                The new file contents is wrapped in NEW <<<< and >>>> NEW
+                For example:
+                /test/hello.txt
+                OLD <<<<
+                Hello Earth!
+                >>>> OLD
+                NEW <<<<
+                Hello Mars!
+                >>>> NEW
+                """
     args_schema: Type[BaseModel] = create_model(
-        "CreateFileInput",
+        "UpdateFileTool",
         file_path=(str, Field(
-            description="File path of file to be created. e.g. `src/agents/developer/tools/git/bitbucket.py`. **IMPORTANT**: the path must not start with a slash")),
-        file_contents=(str, Field(description="""
-            Full file content to be inserted instead of initial one. It must be without any escapes, just raw content to CREATE in GIT.
-            Generate full file content for this field without any additional texts, escapes, just raw code content. 
-            You MUST NOT ignore, skip or comment any details, PROVIDE FULL CONTENT including all content based on all best practices.
-            """)),
+            description="File path of file to be updated. e.g. `src/agents/developer/tools/git/bitbucket.py`. **IMPORTANT**: the path must not start with a slash")),
+        update_query=(str, Field(description="File path followed by the old and new contents")),
         branch=(str, Field(
-            description="branch - name of the branch file should be read from. e.g. `feature-1`. **IMPORTANT**: if branch not specified, try to determine from the chat history or clarify with user."))
+            description="branch - the name of the branch where file that has to be updated is located. e.g. `feature-1`. **IMPORTANT**: if branch not specified, try to determine from the chat history or clarify with user."))
     )
 
-    def _run(self, file_path: str, file_contents: str, branch: str):
-        logger.info(f"Update file in the repository {file_path} with content: {file_contents}")
-        return self.api_wrapper.update_file(file_path, file_contents, branch)
+    def _run(self, file_path: str, update_query: str, branch: str):
+        logger.info(f"Update file in the repository {file_path} with content: {update_query} and branch {branch}")
+        return self.api_wrapper.update_file(file_path, update_query, branch)
 
 
 class SetActiveBranchTool(BaseTool):
