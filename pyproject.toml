@@ -1,27 +1,26 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = [ "setuptools>=61.0",]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "alita_tools"
-version = "0.3.7"
-authors = [
-  { name="Artem Rozumenko", email="support@projectalita.ai" },
-  { name="Artem Dubrovskii", email="artem_dubrovskii@epam.com"}
-]
+version = "0.3.8"
 description = "Default set of tools and toolkits available within ELITEA Agents."
 readme = "README.md"
 requires-python = ">=3.10"
-classifiers = [
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: Apache Software License",
-    "Operating System :: OS Independent",
-]
-dynamic = ["dependencies"]
+classifiers = [ "Programming Language :: Python :: 3", "License :: OSI Approved :: Apache Software License", "Operating System :: OS Independent",]
+dynamic = [ "dependencies",]
+[[project.authors]]
+name = "Artem Rozumenko"
+email = "support@projectalita.ai"
 
-[tool.setuptools.dynamic]
-dependencies = {file = ["requirements.txt"]}
+[[project.authors]]
+name = "Artem Dubrovskii"
+email = "artem_dubrovskii@epam.com"
 
 [project.urls]
 Homepage = "https://projectalita.ai"
 Issues = "https://github.com/ProjectAlita/application-tools/issues"
+
+[tool.setuptools.dynamic.dependencies]
+file = [ "requirements.txt",]
