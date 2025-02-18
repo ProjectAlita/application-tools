@@ -39,14 +39,15 @@ def parse_code_files_for_db(file_content_generator: Generator[str, None, None]) 
         if programming_language == Language.UNKNOWN:
             documents = TokenTextSplitter(encoding_name="gpt2", chunk_size=256, chunk_overlap=30).split_text(file_content)
             for document in documents:
-                yield Document(
+                document = Document(
                     page_content=document,
                     metadata={
                         "filename": file_name,
-                        "method_name": None,
+                        "method_name": 'text',
                         "language": programming_language.value,
                     },
                 )
+                yield document
         else:
             try:
                 langchain_language = get_langchain_language(programming_language)
