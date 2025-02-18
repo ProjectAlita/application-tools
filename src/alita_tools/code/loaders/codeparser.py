@@ -5,7 +5,7 @@ from langchain.schema import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter, TokenTextSplitter
 
 from .constants import (Language, get_langchain_language, get_file_extension, 
-                        get_programming_language, image_extensions)
+                        get_programming_language, image_extensions, default_skip)
 from .treesitter.treesitter import Treesitter, TreesitterMethodNode
 
 from logging import getLogger
@@ -30,13 +30,13 @@ def parse_code_files_for_db(file_content_generator: Generator[str, None, None]) 
 
         file_extension = get_file_extension(file_name)
         programming_language = get_programming_language(file_extension)
-        if len(file_content.strip()) == 0:
-            logger.debug(f"Skipping empty file: {file_name}")
+        if len(file_content.strip()) == 0 or file_name in default_skip:
+            logger.debug(f"Skipping file: {file_name}")
+            continue
+        if file_extension in image_extensions:
+            logger.debug(f"Skipping image file: {file_name} as it is image")
             continue
         if programming_language == Language.UNKNOWN:
-            if file_extension in image_extensions:
-                logger.debug(f"Skipping image file: {file_name} as it is image")
-                continue
             documents = TokenTextSplitter(encoding_name="gpt2", chunk_size=256, chunk_overlap=30).split_text(file_content)
             for document in documents:
                 yield Document(
@@ -47,40 +47,41 @@ def parse_code_files_for_db(file_content_generator: Generator[str, None, None]) 
                         "language": programming_language.value,
                     },
                 )
-        try:
-            langchain_language = get_langchain_language(programming_language)
+        else:
+            try:
+                langchain_language = get_langchain_language(programming_language)
 
-            if langchain_language:
-                code_splitter = RecursiveCharacterTextSplitter.from_language(
-                    language=langchain_language,
-                    chunk_size=1024,
-                    chunk_overlap=128,
-                )
-            treesitter_parser = Treesitter.create_treesitter(programming_language)
-            treesitterNodes: list[TreesitterMethodNode] = treesitter_parser.parse(
-                file_bytes
-            )
-            for node in treesitterNodes:
-                method_source_code = node.method_source_code
-
-                if node.doc_comment and programming_language != Language.PYTHON:
-                    method_source_code = node.doc_comment + "\n" + method_source_code
-
-                splitted_documents = [method_source_code]
-                if code_splitter:
-                    splitted_documents = code_splitter.split_text(method_source_code)
-
-                for splitted_document in splitted_documents:
-                    document = Document(
-                        page_content=splitted_document,
-                        metadata={
-                            "filename": file_name,
-                            "method_name": node.name,
-                            "language": programming_language.value,
-                        },
+                if langchain_language:
+                    code_splitter = RecursiveCharacterTextSplitter.from_language(
+                        language=langchain_language,
+                        chunk_size=1024,
+                        chunk_overlap=128,
                     )
-                    yield document
-        except Exception as e:
-            from traceback import format_exc
-            logger.error(f"Error: {format_exc()}")
-            raise e
+                treesitter_parser = Treesitter.create_treesitter(programming_language)
+                treesitterNodes: list[TreesitterMethodNode] = treesitter_parser.parse(
+                    file_bytes
+                )
+                for node in treesitterNodes:
+                    method_source_code = node.method_source_code
+
+                    if node.doc_comment and programming_language != Language.PYTHON:
+                        method_source_code = node.doc_comment + "\n" + method_source_code
+
+                    splitted_documents = [method_source_code]
+                    if code_splitter:
+                        splitted_documents = code_splitter.split_text(method_source_code)
+
+                    for splitted_document in splitted_documents:
+                        document = Document(
+                            page_content=splitted_document,
+                            metadata={
+                                "filename": file_name,
+                                "method_name": node.name,
+                                "language": programming_language.value,
+                            },
+                        )
+                        yield document
+            except Exception as e:
+                from traceback import format_exc
+                logger.error(f"Error: {format_exc()}")
+                raise e
