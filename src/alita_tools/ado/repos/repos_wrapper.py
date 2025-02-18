@@ -64,7 +64,7 @@ class ArgsSchema(Enum):
     ListFilesModel = create_model(
         "ListFilesModel",
         directory_path=(
-            str,
+            Optional[str],
             Field(
                 default="",
                 description=(
@@ -74,9 +74,9 @@ class ArgsSchema(Enum):
             ),
         ),
         branch_name=(
-            str,
+            Optional[str],
             Field(
-                default="",
+                default=None,
                 description=(
                     "Repository branch. If None then active branch will be selected."
                 ),
@@ -105,8 +105,8 @@ class ArgsSchema(Enum):
     CreateFile = create_model(
         "CreateFile",
         branch_name=(
-            str,
-            Field(description="The name of the branch, e.g. `my_branch`."),
+            Optional[str],
+            Field(description="The name of the branch, e.g. `my_branch`.", default=None),
         ),
         file_path=(str, Field(description="Path of a file to be created.")),
         file_contents=(

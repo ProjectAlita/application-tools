@@ -1,6 +1,6 @@
 import logging
 import traceback
-from typing import Type
+from typing import Type, Optional
 
 from .api_wrapper import GitLabAPIWrapper
 from langchain_core.tools import BaseTool, ToolException
@@ -229,8 +229,8 @@ class AppendFileToolModel(BaseModel):
     content: str = Field(description="Content to be added to the file.")
 
 class ListFilesModel(BaseModel):
-    path: str = Field(description="Repository path/package to extract files from.")
-    branch: str = Field(description="Repository branch.", default=None)
+    path: Optional[str] = Field(description="Repository path/package to extract files from.", default=None)
+    branch: Optional[str] = Field(description="Repository branch.", default=None)
 
 class ListFilesTool(BaseTool):
     api_wrapper: GitLabAPIWrapper = Field(default_factory=GitLabAPIWrapper)

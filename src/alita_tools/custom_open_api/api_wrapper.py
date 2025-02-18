@@ -57,9 +57,9 @@ class OpenApiWrapper(BaseModel):
                     "InvokeRestApiBySpecModel",
                     method=(str, Field(description="The HTTP method to use")),
                     url=(str, Field(description="The URL to send the request to")),
-                    headers=(Optional[str], Field(description="The headers to include in the request in JSON format")),
-                    fields=(Optional[str], Field(description="The query parameters to include in the request in JSON format")),
-                    body=(Optional[str], Field(description="The body of the request"))
+                    headers=(Optional[str], Field(description="The headers to include in the request in JSON format", default="")),
+                    fields=(Optional[str], Field(description="The query parameters to include in the request in JSON format", default="")),
+                    body=(Optional[str], Field(description="The body of the request", default=""))
                 ),
                 "ref": self.invoke_rest_api_by_spec,
             },
@@ -68,7 +68,6 @@ class OpenApiWrapper(BaseModel):
                 "description": self.get_open_api_spec.__doc__,
                 "args_schema": create_model(
                     "GetOpenApiSpecModel",
-                    query=(Optional[str], Field(description="User initial request should be passed as a string"))
                 ),
                 "ref": self.get_open_api_spec,
             }

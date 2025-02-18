@@ -13,11 +13,11 @@ class AzureSearchInput(BaseModel):
     selected_fields: Optional[List[str]] = Field(None, description="The fields to retrieve from the document.")
 
 class AzureDocumentInput(BaseModel):
-    document_id: str = Field(..., description="The ID of the document to retrieve.")
+    document_id: str = Field(description="The ID of the document to retrieve.")
     selected_fields: Optional[List[str]] = Field(None, description="The fields to retrieve from the document.")
 
 class TextSearchInput(BaseModel):
-    search_text: str = Field(..., description="The text to search for in the Azure Search index.")
+    search_text: str = Field(description="The text to search for in the Azure Search index.")
     limit: Optional[int] = Field(-1, description="The number of results to return (if no limit needed use -1).")
     order_by: Optional[List[str]] = Field(None, description="Ordering expression for the search results (if no order needed use empty list).")
     selected_fields: Optional[List[str]] = Field(None, description="The fields to retrieve from the document (if no fields needed use empty list).")

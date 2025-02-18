@@ -66,7 +66,7 @@ class GCPApiWrapper(BaseModel):
                     method=(str, Field(description="The HTTP method to use for the request (GET, POST, PUT, DELETE, etc.).")),
                     scopes=(List[str], Field(description="List of OAuth 2.0 Scopes for Google APIs.")),
                     url=(str, Field(description="Absolute URI for Google Cloud REST API.")),
-                    optional_args=(Optional[Dict[str, Any]], Field(description="Optional JSON object to be sent in request with possible keys: 'data', 'json', 'params', 'headers'."))
+                    optional_args=(Optional[Dict[str, Any]], Field(description="Optional JSON object to be sent in request with possible keys: 'data', 'json', 'params', 'headers'.", default=None))
                 ),
             }
         ]

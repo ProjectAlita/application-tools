@@ -134,7 +134,6 @@ GetPR = create_model(
 DirectoryPath = create_model(
     "DirectoryPath",
     directory_path=(str, Field(
-        default="",
         description=(
             "The path of the directory, e.g. `some_dir/inner_dir`."
             " Only input a string, do not include the parameter name."
@@ -183,7 +182,7 @@ CreatePR = create_model(
 
 CommentOnIssue = create_model(
     "CommentOnIssue",
-    comment_query=(str, Field(default=..., description="Follow the required formatting."))
+    comment_query=(str, Field(description="Follow the required formatting."))
 )
 
 DeleteFile = create_model(
@@ -212,15 +211,17 @@ SearchIssues = create_model(
         ),
     ),
     repo_name=(
-        str,
+        Optional[str],
         Field(
-            description="Name of the repository to search issues in. If None, use the initialized repository."
+            description="Name of the repository to search issues in. If None, use the initialized repository.",
+            default=None
         ),
     ),
     max_count=(
-        str,
+        Optional[str],
         Field(
-            description="Default is 30. This determines max size of returned list with issues"
+            description="Default is 30. This determines max size of returned list with issues",
+            default=30
         ),
     ),
 )
@@ -231,7 +232,8 @@ CreateIssue = create_model(
     body=(
         Optional[str],
         Field(
-            description="The body or description of the issue providing details and context."
+            description="The body or description of the issue providing details and context.",
+            default=None
         ),
     ),
     labels=(
@@ -250,7 +252,8 @@ CreateIssue = create_model(
     ),
     repo_name=(
         Optional[str],
-        Field(description="The name of the repository where the issue exists."),
+        Field(description="The name of the repository where the issue exists.",
+              default=None),
     ),
 )
 
@@ -259,7 +262,8 @@ UpdateIssue = create_model(
     issue_id=(int, Field(description="The ID of the issue to be updated.")),
     repo_name=(
         Optional[str],
-        Field(description="The name of the repository where the issue exists."),
+        Field(description="The name of the repository where the issue exists.",
+              default=None),
     ),
     title=(
         Optional[str],

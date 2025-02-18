@@ -73,7 +73,7 @@ class AzureApiWrapper(BaseModel):
                     "ExecuteModel",
                     method=(str, Field(description="The HTTP method to use for the request (GET, POST, PUT, DELETE, etc.). Required parameter.")),
                     url=(str, Field(description="Required parameter: always has FQDN part and protocol for Azure Resource Management REST API.")),
-                    optional_args=(Optional[Union[str, Dict[str, Any]]], Field(description="Optional, valid json ONLY! No comments allowed. JSON object to be sent in request with possible keys: 'data', 'headers', 'files'.")),
+                    optional_args=(Optional[Union[str, Dict[str, Any]]], Field(description="Optional, valid json ONLY! No comments allowed. JSON object to be sent in request with possible keys: 'data', 'headers', 'files'.", default=None)),
                 ),
                 "ref": self.execute,
             },
