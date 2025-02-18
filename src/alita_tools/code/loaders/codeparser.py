@@ -2,7 +2,7 @@ import os
 
 from typing import Generator
 from langchain.schema import Document
-from langchain.text_splitter import RecursiveCharacterTextSplitter, TextSplitter
+from langchain.text_splitter import RecursiveCharacterTextSplitter, TokenTextSplitter
 
 from .constants import (Language, get_langchain_language, get_file_extension, 
                         get_programming_language, image_extensions)
@@ -24,17 +24,20 @@ def parse_code_files_for_db(file_content_generator: Generator[str, None, None]) 
     """
     code_splitter = None
     for data in file_content_generator:
-        file_name = data.get("file_name")
-        file_content = data.get("file_content")
+        file_name: str = data.get("file_name")
+        file_content: str = data.get("file_content")
         file_bytes = file_content.encode()
 
         file_extension = get_file_extension(file_name)
         programming_language = get_programming_language(file_extension)
+        if len(file_content.strip()) == 0:
+            logger.debug(f"Skipping empty file: {file_name}")
+            continue
         if programming_language == Language.UNKNOWN:
             if file_extension in image_extensions:
                 logger.debug(f"Skipping image file: {file_name} as it is image")
                 continue
-            documents = TextSplitter(chunk_size=1024, chunk_overlap=128).split_text(file_content)
+            documents = TokenTextSplitter(encoding_name="gpt2", chunk_size=256, chunk_overlap=30).split_text(file_content)
             for document in documents:
                 yield Document(
                     page_content=document,
