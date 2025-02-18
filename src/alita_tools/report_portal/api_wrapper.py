@@ -47,10 +47,8 @@ GetDashboardData = create_model(
     dashboard_id=(str, Field(description="Dashboard ID of the dashboard to get data for.")),
 )
 
-static_field = "http:url.1"
 
 class ReportPortalApiWrapper(BaseModel):
-
     endpoint: str
     api_key: str
     project: str
@@ -137,8 +135,6 @@ class ReportPortalApiWrapper(BaseModel):
         """
         Use user information to personalize dashboards and reports. It can also analyze user activity to optimize
         test assignment and load balancing among QA team members based on their expertise and past performance.
-
-        META: {static_field}
         """
         return self._client.get_user_information(username)
 
