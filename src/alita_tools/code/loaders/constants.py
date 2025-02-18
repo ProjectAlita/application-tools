@@ -21,7 +21,6 @@ class Language(Enum):
     LUA = "lua"
     HASKELL = "haskell"
     RUBY = "ruby"
-    MARKDOWN = "markdown"
     UNKNOWN = "unknown"
 
 
@@ -53,13 +52,12 @@ def get_programming_language(file_extension: str) -> Language:
         ".c": Language.C,
         ".cs": Language.C_SHARP,
         ".hs": Language.HASKELL,
-        ".rb": Language.RUBY,
-        ".md": Language.MARKDOWN,
+        ".rb": Language.RUBY
     }
     return language_mapping.get(file_extension, Language.UNKNOWN)
 
 image_extensions = [".png", ".jpg", ".jpeg", ".gif", ".svg", ".bmp", ".webp", ".ico", ".tiff", ".tif", ".heic", ".heif", ".avif", ".pdf", '.lock']
-default_skip = [".gitignore", ".gitattributes", ".gitmodules", ".gitkeep", ".DS_Store", ".editorconfig", ".npmignore", 
+default_skip = [".gitignore", ".gitattributes", ".gitmodules", ".gitkeep", ".DS_Store", ".editorconfig", ".npmignore", 'LICENSE',
                 ".yarnignore", ".dockerignore", ".prettierignore", ".eslintignore", ".stylelintignore", 
                 ".gitlab-ci.yml", ".travis.yml", ".circleci", ".github", ".vscode", ".idea", 
                 ".git", ".hg", ".svn", ".bzr", ".npmrc", ".yarnrc", ".yarnrc.yml", ".yarnrc.yaml"]
@@ -101,7 +99,5 @@ def get_langchain_language(language: Language):
         return text_splitter.Language.HASKELL
     elif language == Language.RUBY:
         return text_splitter.Language.RUBY
-    elif language == Language.MARKDOWN:
-        return text_splitter.Language.MARKDOWN
     else:
         return None
