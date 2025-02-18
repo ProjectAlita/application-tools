@@ -25,6 +25,7 @@ class Language(Enum):
     UNKNOWN = "unknown"
 
 
+
 def get_programming_language(file_extension: str) -> Language:
     """
     Returns the programming language based on the provided file extension.
@@ -57,6 +58,7 @@ def get_programming_language(file_extension: str) -> Language:
     }
     return language_mapping.get(file_extension, Language.UNKNOWN)
 
+image_extensions = [".png", ".jpg", ".jpeg", ".gif", ".svg", ".bmp", ".webp", ".ico", ".tiff", ".tif", ".heic", ".heif", ".avif", ".pdf"]
 
 def get_file_extension(file_name: str) -> str:
     """

@@ -2,10 +2,10 @@ import os
 
 from typing import Generator
 from langchain.schema import Document
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.text_splitter import RecursiveCharacterTextSplitter, TextSplitter
 
 from .constants import (Language, get_langchain_language, get_file_extension, 
-                        get_programming_language)
+                        get_programming_language, image_extensions)
 from .treesitter.treesitter import Treesitter, TreesitterMethodNode
 
 from logging import getLogger
@@ -31,8 +31,19 @@ def parse_code_files_for_db(file_content_generator: Generator[str, None, None]) 
         file_extension = get_file_extension(file_name)
         programming_language = get_programming_language(file_extension)
         if programming_language == Language.UNKNOWN:
-            logger.info(f"Skipping file: {file_name} as programming language is {programming_language} and extension is {file_extension}")
-            continue
+            if file_extension in image_extensions:
+                logger.debug(f"Skipping image file: {file_name} as it is image")
+                continue
+            documents = TextSplitter(chunk_size=1024, chunk_overlap=128).split_text(file_content)
+            for document in documents:
+                yield Document(
+                    page_content=document,
+                    metadata={
+                        "filename": file_name,
+                        "method_name": None,
+                        "language": programming_language.value,
+                    },
+                )
         try:
             langchain_language = get_langchain_language(programming_language)
 
