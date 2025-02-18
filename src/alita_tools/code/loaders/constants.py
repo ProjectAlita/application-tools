@@ -2,6 +2,9 @@ import os
 from enum import Enum
 import langchain.text_splitter as text_splitter
 
+# We need to port more language from here
+# https://github.com/grantjenks/py-tree-sitter-languages?tab=readme-ov-file
+
 class Language(Enum):
     PYTHON = "python"
     JAVASCRIPT = "javascript"
@@ -18,6 +21,7 @@ class Language(Enum):
     LUA = "lua"
     HASKELL = "haskell"
     RUBY = "ruby"
+    MARKDOWN = "markdown"
     UNKNOWN = "unknown"
 
 
@@ -49,6 +53,7 @@ def get_programming_language(file_extension: str) -> Language:
         ".cs": Language.C_SHARP,
         ".hs": Language.HASKELL,
         ".rb": Language.RUBY,
+        ".md": Language.MARKDOWN,
     }
     return language_mapping.get(file_extension, Language.UNKNOWN)
 
@@ -90,5 +95,7 @@ def get_langchain_language(language: Language):
         return text_splitter.Language.HASKELL
     elif language == Language.RUBY:
         return text_splitter.Language.RUBY
+    elif language == Language.MARKDOWN:
+        return text_splitter.Language.MARKDOWN
     else:
         return None
