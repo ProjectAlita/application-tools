@@ -8,6 +8,7 @@ from langchain_core.tools import ToolException
 from pydantic import BaseModel, model_validator
 from .bitbucket_constants import create_pr_data
 from .cloud_api_wrapper import BitbucketCloudApi, BitbucketServerApi
+from pydantic.fields import PrivateAttr
 
 logger = logging.getLogger(__name__)
 
@@ -19,8 +20,8 @@ if TYPE_CHECKING:
 class BitbucketAPIWrapper(BaseModel):
     """Wrapper for Bitbucket API."""
 
-    bitbucket: Any  #: :meta private:
-    active_branch: Any  #: :meta private:
+    _bitbucket: Any = PrivateAttr()
+    _active_branch: Any = PrivateAttr() 
     url: str = ''
     project: str = ''
     """The key of the project this repo belongs to"""
@@ -50,7 +51,7 @@ class BitbucketAPIWrapper(BaseModel):
                 "atlassian-python-api is not installed. "
                 "Please install it with `pip install atlassian-python-api`"
             )
-        bitbucket = BitbucketCloudApi(
+        cls._bitbucket = BitbucketCloudApi(
             url=values['url'],
             username=values['username'],
             password=values['password'],
@@ -63,31 +64,30 @@ class BitbucketAPIWrapper(BaseModel):
             project=values['project'],
             repository=values['repository']
         )
-        values['bitbucket'] = bitbucket
-        values['active_branch'] = values.get('branch')
+        cls._active_branch = values.get('branch')
         return values
 
     def set_active_branch(self, branch: str) -> None:
         """Set the active branch for the bot."""
-        self.active_branch = branch
+        self._active_branch = branch
         return f"Active branch set to `{branch}`"
 
     def list_branches_in_repo(self) -> List[str]:
         """List all branches in the repository."""
-        return self.bitbucket.list_branches()
+        return self._bitbucket.list_branches()
 
     def create_branch(self, branch_name: str) -> None:
         """Create a new branch in the repository."""
         try:
-            self.bitbucket.create_branch(branch_name, self.active_branch)
+            self._bitbucket.create_branch(branch_name, self._active_branch)
         except Exception as e:
             if "not permitted to access this resource" in str(e):
                 return f"Please, verify you token/password: {str}"
             if "already exists" in str(e):
-                self.active_branch = branch_name
+                self._active_branch = branch_name
                 return f"Branch {branch_name} already exists. set it as active"
             return f"Unable to create branch due to error:\n{e}"
-        self.active_branch = branch_name
+        self._active_branch = branch_name
         return f"Branch {branch_name} created successfully and set as active"
 
     def create_pull_request(self, pr_json_data: str) -> str:
@@ -99,7 +99,7 @@ class BitbucketAPIWrapper(BaseModel):
             str: A success or failure message
         """
         try:
-            pr = self.bitbucket.create_pull_request(pr_json_data)
+            pr = self._bitbucket.create_pull_request(pr_json_data)
             return f"Successfully created PR\n{str(pr)}"
         except Exception as e:
             if "Bad request" in str(e):
@@ -118,7 +118,7 @@ class BitbucketAPIWrapper(BaseModel):
             str: A success or failure message
         """
         try:
-            self.bitbucket.create_file(file_path=file_path, file_contents=file_contents, branch=branch)
+            self._bitbucket.create_file(file_path=file_path, file_contents=file_contents, branch=branch)
             return f"File has been created: {file_path}."
         except Exception as e:
             return ToolException(f"File was not created due to error: {str(e)}")
@@ -143,7 +143,7 @@ class BitbucketAPIWrapper(BaseModel):
             str: A success or failure message
         """
         try:
-            self.bitbucket.update_file(file_path=file_path, update_query=update_query, branch=branch)
+            self._bitbucket.update_file(file_path=file_path, update_query=update_query, branch=branch)
             return f"File has been updated: {file_path}."
         except Exception as e:
             return ToolException(f"File was not updated due to error: {str(e)}")
@@ -158,6 +158,6 @@ class BitbucketAPIWrapper(BaseModel):
             str: The file decoded as a string
         """
         try:
-            return self.bitbucket.get_file(file_path=file_path, branch=branch)
+            return self._bitbucket.get_file(file_path=file_path, branch=branch)
         except Exception as e:
             raise ToolException(f"Can't extract file content (`{file_path}`) due to error:\n{str(e)}")

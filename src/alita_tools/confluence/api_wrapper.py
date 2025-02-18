@@ -11,6 +11,7 @@ from langchain_core.documents import Document
 from langchain_core.tools import ToolException
 from markdownify import markdownify
 from pydantic import create_model, BaseModel, Field, model_validator
+from pydantic.fields import PrivateAttr
 from tenacity import (
     before_sleep_log,
     retry,
@@ -126,7 +127,7 @@ def parse_payload_params(params: Optional[str]) -> Dict[str, Any]:
     return {}
 
 class ConfluenceAPIWrapper(BaseModel):
-    client: Any #: :meta private:
+    _client: Any = PrivateAttr()
     base_url: str
     api_key: Optional[str] = None,
     username: Optional[str] = None
@@ -163,9 +164,9 @@ class ConfluenceAPIWrapper(BaseModel):
         token = values.get('token')
         cloud = values.get('cloud')
         if token:
-            values['client'] = Confluence(url=url, token=token, cloud=cloud)
+            cls._client = Confluence(url=url, token=token, cloud=cloud)
         else:
-            values['client'] = Confluence(url=url,username=username, password=api_key, cloud=cloud)
+            cls._client = Confluence(url=url,username=username, password=api_key, cloud=cloud)
         return values
 
     def __unquote_confluence_space(self) -> str | None:
@@ -192,13 +193,13 @@ class ConfluenceAPIWrapper(BaseModel):
         """ Creates a page in the Confluence space. Represents content in html (storage) or wiki (wiki) formats
             Page could be either published status='current' or make a draft with status='draft'
         """
-        if self.client.get_page_by_title(space=self.space, title=title) is not None:
+        if self._client.get_page_by_title(space=self.space, title=title) is not None:
             return f"Page with title {title} already exists, please use other title."
 
         # normal user flow: put pages in the Space Home, not in the root of the Space
         user_space = space if space else self.space
         logger.info(f"Page will be created within the space {user_space}")
-        parent_id_filled = parent_id if parent_id else self.client.get_space(user_space)['homepage']['id']
+        parent_id_filled = parent_id if parent_id else self._client.get_space(user_space)['homepage']['id']
 
         created_page = self.temp_create_page(space=user_space, title=title, body=body, status=status, parent_id=parent_id_filled, representation=representation)
 
@@ -213,7 +214,7 @@ class ConfluenceAPIWrapper(BaseModel):
         logger.info(f"Page created: {page_details['link']}")
 
         if label:
-            self.client.set_page_label(page_id=created_page['id'], label=label)
+            self._client.set_page_label(page_id=created_page['id'], label=label)
             logger.info(f"Label '{label}' added to the page '{title}'.")
             page_details['label'] = label
 
@@ -225,7 +226,7 @@ class ConfluenceAPIWrapper(BaseModel):
         user_space = space if space else self.space
         logger.info(f"Pages will be created within the space {user_space}")
         # duplicate action to avoid extra api calls in downstream function
-        parent_id_filled = parent_id if parent_id else self.client.get_space(user_space)['homepage']['id']
+        parent_id_filled = parent_id if parent_id else self._client.get_space(user_space)['homepage']['id']
         for page_item in json.loads(pages_info):
             for title, body in page_item.items():
                 created_page = self.create_page(title=title, body=body, status=status, parent_id=parent_id_filled, space=user_space)
@@ -241,7 +242,7 @@ class ConfluenceAPIWrapper(BaseModel):
             "title": title,
             "status": status,
             "space": {"key": space},
-            "body": self.client._create_body(body, representation),
+            "body": self._client._create_body(body, representation),
             "metadata": {"properties": {}},
         }
         if parent_id:
@@ -255,15 +256,15 @@ class ConfluenceAPIWrapper(BaseModel):
             data["metadata"]["properties"]["content-appearance-draft"] = {"value": "fixed-width"}
             data["metadata"]["properties"]["content-appearance-published"] = {"value": "fixed-width"}
 
-        return self.client.post(url, data=data)
+        return self._client.post(url, data=data)
 
     def delete_page(self, page_id: str = None, page_title: str = None):
         """ Deletes a page by its defined page_id or page_title """
         if not page_id and not page_title:
             raise ValueError("Either page_id or page_title is required to delete the page")
-        resolved_page_id = page_id if page_id else (self.client.get_page_by_title(space=self.space, title=page_title) or {}).get('id')
+        resolved_page_id = page_id if page_id else (self._client.get_page_by_title(space=self.space, title=page_title) or {}).get('id')
         if resolved_page_id:
-            self.client.remove_page(resolved_page_id)
+            self._client.remove_page(resolved_page_id)
             message = f"Page with ID '{resolved_page_id}' has been successfully deleted."
         else:
             message = f"Page instance could not be resolved with id '{page_id}' and/or title '{page_title}'"
@@ -271,11 +272,11 @@ class ConfluenceAPIWrapper(BaseModel):
 
     def update_page_by_id(self, page_id: str, representation: str = 'storage', new_title: str = None, new_body: str = None, new_labels: list = None):
         """ Updates an existing Confluence page (using id or title) by replacing its content, title, labels """
-        current_page = self.client.get_page_by_id(page_id, expand='version,body.view')
+        current_page = self._client.get_page_by_id(page_id, expand='version,body.view')
         if not current_page:
             return f"Page with ID {page_id} not found."
 
-        if new_title and current_page['title'] != new_title and self.client.get_page_by_title(space=self.space, title=new_title):
+        if new_title and current_page['title'] != new_title and self._client.get_page_by_title(space=self.space, title=new_title):
             return f"Page with title {new_title} already exists."
 
         current_version = current_page['version']['number']
@@ -283,7 +284,7 @@ class ConfluenceAPIWrapper(BaseModel):
         body_to_use = new_body if new_body else current_page['body']['view']['value']
         representation_to_use = representation if representation else current_page['body']['view']['representation']
 
-        updated_page = self.client.update_page(page_id=page_id, title=title_to_use, body=body_to_use, representation=representation_to_use)
+        updated_page = self._client.update_page(page_id=page_id, title=title_to_use, body=body_to_use, representation=representation_to_use)
         webui_link = updated_page['_links']['base'] + updated_page['_links']['webui']
         logger.info(f"Page updated: {webui_link}")
 
@@ -302,11 +303,11 @@ class ConfluenceAPIWrapper(BaseModel):
         }
 
         if new_labels is not None:
-            current_labels = self.client.get_page_labels(page_id)
+            current_labels = self._client.get_page_labels(page_id)
             for label in current_labels['results']:
-                self.client.remove_page_label(page_id, label['name'])
+                self._client.remove_page_label(page_id, label['name'])
             for label in new_labels:
-                self.client.set_page_label(page_id, label)
+                self._client.set_page_label(page_id, label)
             logger.info(f"Labels updated for the page '{title_to_use}'.")
             update_details['labels'] = new_labels
 
@@ -314,7 +315,7 @@ class ConfluenceAPIWrapper(BaseModel):
 
     def update_page_by_title(self, page_title: str, representation: str = 'storage', new_title: str = None, new_body: str = None, new_labels: list = None):
         """ Updates an existing Confluence page (using id or title) by replacing its content, title, labels """
-        current_page = self.client.get_page_by_title(space=self.space, title=page_title)
+        current_page = self._client.get_page_by_title(space=self.space, title=page_title)
         if not current_page:
             return f"Page with title {page_title} not found."
 
@@ -359,7 +360,7 @@ class ConfluenceAPIWrapper(BaseModel):
         start = 0
 
         while True:
-            children = self.client.get_page_child_by_type(page_id, type='page', start=start, limit=limit)
+            children = self._client.get_page_child_by_type(page_id, type='page', start=start, limit=limit)
             if not children:
                 break
             for child in children:
@@ -372,7 +373,7 @@ class ConfluenceAPIWrapper(BaseModel):
 
     def page_exists(self, title: str):
         """ Checks if a page exists in the Confluence space."""
-        status = self.client.page_exists(space=self.space, title=title)
+        status = self._client.page_exists(space=self.space, title=title)
         return status
 
     def get_pages_with_label(self, label: str):
@@ -389,7 +390,7 @@ class ConfluenceAPIWrapper(BaseModel):
         start = 0
         pages_info = []
         for _ in range((self.max_pages + self.limit - 1) // self.limit):
-            pages = self.client.get_all_pages_by_label(label, start=start, limit=self.limit) #, expand="body.view.value"
+            pages = self._client.get_all_pages_by_label(label, start=start, limit=self.limit) #, expand="body.view.value"
             if not pages:
                 break
 
@@ -404,7 +405,7 @@ class ConfluenceAPIWrapper(BaseModel):
 
     def is_public_page(self, page: dict) -> bool:
         """Check if a page is publicly accessible."""
-        restrictions = self.client.get_all_restrictions_for_content(page["id"])
+        restrictions = self._client.get_all_restrictions_for_content(page["id"])
 
         return (
                 page["status"] == "current"
@@ -426,7 +427,7 @@ class ConfluenceAPIWrapper(BaseModel):
                     max=self.max_retry_seconds,  # type: ignore[arg-type]
                 ),
                 before_sleep=before_sleep_log(logger, logging.WARNING),
-            )(self.client.get_page_by_id)
+            )(self._client.get_page_by_id)
             page = get_page(
                 page_id=page_id, expand=f"{self.content_format.value},version"
             )
@@ -451,7 +452,7 @@ class ConfluenceAPIWrapper(BaseModel):
         start = 0
         pages_info = []
         for _ in range((self.max_pages + self.limit - 1) // self.limit):
-            pages = self.client.cql(cql, start=start, limit=self.limit).get("results", [])
+            pages = self._client.cql(cql, start=start, limit=self.limit).get("results", [])
             if not pages:
                 break
             page_ids = [page['content']['id'] for page in pages]
@@ -489,7 +490,7 @@ class ConfluenceAPIWrapper(BaseModel):
             cql = f'(type=page) and (siteSearch~"{query}")'
         else:
             cql = f'(type=page and space={self.__sanitize_confluence_space()}) and (siteSearch~"{query}")'
-        pages = self.client.cql(cql, start=0, limit=10).get("results", [])
+        pages = self._client.cql(cql, start=0, limit=10).get("results", [])
         if not pages:
             return f"Unable to find anything using query {query}"
         # extract id, title, url and preview text
@@ -541,7 +542,7 @@ class ConfluenceAPIWrapper(BaseModel):
                 ) + "".join(attachment_texts)
 
         if self.include_comments:
-            comments = self.client.get_page_comments(
+            comments = self._client.get_page_comments(
                 page["id"], expand="body.view.value", depth="all"
             )["results"]
             comment_texts = [
@@ -580,7 +581,7 @@ class ConfluenceAPIWrapper(BaseModel):
 
         # depending on setup you may also need to set the correct path for
         # poppler and tesseract
-        attachments = self.client.get_attachments_from_content(page_id)["results"]
+        attachments = self._client.get_attachments_from_content(page_id)["results"]
         texts = []
         for attachment in attachments:
             media_type = attachment["metadata"]["mediaType"]
@@ -620,7 +621,7 @@ class ConfluenceAPIWrapper(BaseModel):
         """Generic Confluence Tool for Official Atlassian Confluence REST API to call, searching, creating, updating pages, etc."""
         payload_params = parse_payload_params(params)
         if method == "GET":
-            response = self.client.request(
+            response = self._client.request(
                 method=method,
                 path=relative_url,
                 params=payload_params,
@@ -628,7 +629,7 @@ class ConfluenceAPIWrapper(BaseModel):
             )
             response_text = self.process_search_response(relative_url, response)
         else:
-            response = self.client.request(
+            response = self._client.request(
                 method=method,
                 path=relative_url,
                 data=payload_params,

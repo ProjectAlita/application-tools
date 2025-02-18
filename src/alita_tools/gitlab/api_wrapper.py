@@ -5,6 +5,7 @@ import json
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from pydantic import BaseModel, model_validator
+from pydantic.fields import PrivateAttr
 
 if TYPE_CHECKING:
     from gitlab.v4.objects import Issue
@@ -13,9 +14,9 @@ if TYPE_CHECKING:
 class GitLabAPIWrapper(BaseModel):
     """Wrapper for GitLab API."""
 
-    git: Any  #: :meta private:
-    repo_instance: Any  #: :meta private:
-    active_branch: Any  #: :meta private:
+    _git: Any = PrivateAttr()
+    _repo_instance: Any = PrivateAttr()
+    _active_branch: Any = PrivateAttr()
     url: str = ''
     repository: str = ''
     """The name of the GitLab repository, in the form {username}/{repo-name}."""
@@ -47,27 +48,27 @@ class GitLabAPIWrapper(BaseModel):
         )
 
         g.auth()
-        values["repo_instance"] = g.projects.get(values.get('repository'))
-        values['git'] = g
-        values['active_branch'] = values.get('branch')
+        cls._repo_instance = g.projects.get(values.get('repository'))
+        cls._git = g
+        cls._active_branch = values.get('branch')
         return values
 
 
     def set_active_branch(self, branch: str) -> None:
         """Set the active branch for the bot."""
-        self.active_branch = branch
+        self._active_branch = branch
         return f"Active branch set to {branch}"
 
 
     def list_branches_in_repo(self) -> List[str]:
         """List all branches in the repository."""
-        branches = self.repo_instance.branches.list()
+        branches = self._repo_instance.branches.list()
         return json.dumps([branch.name for branch in branches])
 
     def list_files(self, path: str = None, branch: str = None) -> List[str]:
         """List files by defined path."""
 
-        files = self.repo_instance.repository_tree(path=path, ref=branch if branch else self.active_branch,
+        files = self._repo_instance.repository_tree(path=path, ref=branch if branch else self._active_branch,
                                                    recursive=True)
         paths = [file['path'] for file in files if file['type'] == 'blob']
         return f"Files: {paths}"
@@ -75,18 +76,18 @@ class GitLabAPIWrapper(BaseModel):
     def create_branch(self, branch_name: str) -> None:
         """Create a new branch in the repository."""
         try:
-            self.repo_instance.branches.create(
+            self._repo_instance.branches.create(
                 {
                     'branch': branch_name,
-                    'ref': self.active_branch,
+                    'ref': self._active_branch,
                 }
             )
         except Exception as e:
             if "Branch already exists" in str(e):
-                self.active_branch = branch_name
+                self._active_branch = branch_name
                 return f"Branch {branch_name} already exists. set it as active"
             return f"Unable to create branch due to error:\n{e}"
-        self.active_branch = branch_name
+        self._active_branch = branch_name
         return f"Branch {branch_name} created successfully and set as active"
 
     def parse_issues(self, issues: List[Issue]) -> List[dict]:
@@ -112,7 +113,7 @@ class GitLabAPIWrapper(BaseModel):
             str: A plaintext report containing the number of issues
             and each issue's title and number.
         """
-        issues = self.repo_instance.issues.list(state="opened")
+        issues = self._repo_instance.issues.list(state="opened")
         if len(issues) > 0:
             parsed_issues = self.parse_issues(issues)
             parsed_issues_str = (
@@ -131,7 +132,7 @@ class GitLabAPIWrapper(BaseModel):
             dict: A dictionary containing the issue's title,
             body, and comments as a string
         """
-        issue = self.repo_instance.issues.get(issue_number)
+        issue = self._repo_instance.issues.get(issue_number)
         page = 0
         comments: List[dict] = []
         while len(comments) <= 10:
@@ -162,14 +163,14 @@ class GitLabAPIWrapper(BaseModel):
         Returns:
             str: A success or failure message
         """
-        if self.branch == self.active_branch:
+        if self.branch == self._active_branch:
             return f"""Cannot make a pull request because 
             commits are already in the {self.branch} branch"""
         else:
             try:
-                pr = self.repo_instance.mergerequests.create(
+                pr = self._repo_instance.mergerequests.create(
                     {
-                        "source_branch": self.active_branch,
+                        "source_branch": self._active_branch,
                         "target_branch": self.branch,
                         "title": pr_title,
                         "description": pr_body,
@@ -194,7 +195,7 @@ class GitLabAPIWrapper(BaseModel):
         issue_number = int(comment_query.split("\n\n")[0])
         comment = comment_query[len(str(issue_number)) + 2 :]
         try:
-            issue = self.repo_instance.issues.get(issue_number)
+            issue = self._repo_instance.issues.get(issue_number)
             issue.notes.create({"body": comment})
             return "Commented on issue " + str(issue_number)
         except Exception as e:
@@ -213,17 +214,17 @@ class GitLabAPIWrapper(BaseModel):
             str: A success or failure message
         """
         try:
-            self.repo_instance.files.get(file_path, self.active_branch)
+            self._repo_instance.files.get(file_path, self._active_branch)
             return f"File already exists at {file_path}. Use update_file instead"
         except Exception:
             data = {
-                "branch": self.active_branch,
+                "branch": self._active_branch,
                 "commit_message": "Create " + file_path,
                 "file_path": file_path,
                 "content": file_contents,
             }
 
-            self.repo_instance.files.create(data)
+            self._repo_instance.files.create(data)
 
             return "Created file " + file_path
 
@@ -235,7 +236,7 @@ class GitLabAPIWrapper(BaseModel):
         Returns:
             str: The file decoded as a string
         """
-        file = self.repo_instance.files.get(file_path, self.active_branch)
+        file = self._repo_instance.files.get(file_path, self._active_branch)
         return file.decode().decode("utf-8")
 
     def update_file(self, file_query: str) -> str:
@@ -256,7 +257,7 @@ class GitLabAPIWrapper(BaseModel):
         Returns:
             A success or failure message
         """
-        if self.active_branch == self.branch:
+        if self._active_branch == self.branch:
             return (
                 "You're attempting to commit to the directly"
                 f"to the {self.branch} branch, which is protected. "
@@ -280,7 +281,7 @@ class GitLabAPIWrapper(BaseModel):
                 )
 
             commit = {
-                "branch": self.active_branch,
+                "branch": self._active_branch,
                 "commit_message": "Create " + file_path,
                 "actions": [
                     {
@@ -291,7 +292,7 @@ class GitLabAPIWrapper(BaseModel):
                 ],
             }
 
-            self.repo_instance.commits.create(commit)
+            self._repo_instance.commits.create(commit)
             return "Updated file " + file_path
         except Exception as e:
             return "Unable to update file due to error:\n" + str(e)
@@ -307,7 +308,7 @@ class GitLabAPIWrapper(BaseModel):
         Returns:
             A success or failure message
         """
-        if self.active_branch == self.branch:
+        if self._active_branch == self.branch:
             return (
                 "You're attempting to commit to the directly"
                 f"to the {self.branch} branch, which is protected. "
@@ -319,7 +320,7 @@ class GitLabAPIWrapper(BaseModel):
             file_content = self.read_file(file_path)
             updated_file_content = f"{file_content}\n{content}"
             commit = {
-                "branch": self.active_branch,
+                "branch": self._active_branch,
                 "commit_message": "Append " + file_path,
                 "actions": [
                     {
@@ -330,7 +331,7 @@ class GitLabAPIWrapper(BaseModel):
                 ],
             }
 
-            self.repo_instance.commits.create(commit)
+            self._repo_instance.commits.create(commit)
             return "Updated file " + file_path
         except Exception as e:
             return "Unable to update file due to error:\n" + str(e)
@@ -345,8 +346,8 @@ class GitLabAPIWrapper(BaseModel):
             str: Success or failure message
         """
         try:
-            self.repo_instance.files.delete(
-                file_path, self.active_branch, "Delete " + file_path
+            self._repo_instance.files.delete(
+                file_path, self._active_branch, "Delete " + file_path
             )
             return "Deleted file " + file_path
         except Exception as e:

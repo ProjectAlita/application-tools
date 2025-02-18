@@ -32,8 +32,8 @@ class HybridSearchInput(BaseModel):
     limit: Optional[int] = Field(None, description="The number of results to return.")
 
 class AzureSearchApiWrapper(BaseModel):
-    _client: Any #: :meta private:
-    _AzureOpenAIClient: Any #: :meta private:
+    _client: Any = PrivateAttr()
+    _AzureOpenAIClient: Any = PrivateAttr()
     api_key: str
     endpoint: str
     index_name: str
