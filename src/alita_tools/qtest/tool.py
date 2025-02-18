@@ -1,13 +1,12 @@
 from typing import Optional, Type
 
-from langchain_core.callbacks import CallbackManagerForToolRun
 from pydantic import BaseModel, field_validator, Field
-from langchain_core.tools import BaseTool
-from traceback import format_exc
+
 from .api_wrapper import QtestApiWrapper
+from ..base.tool import BaseAction
 
 
-class QtestAction(BaseTool):
+class QtestAction(BaseAction):
     """Tool for interacting with the Qtest API."""
 
     api_wrapper: QtestApiWrapper = Field(default_factory=QtestApiWrapper)
@@ -20,15 +19,3 @@ class QtestAction(BaseTool):
     @classmethod
     def remove_spaces(cls, v):
         return v.replace(' ', '')
-
-    def _run(
-            self,
-            *args,
-            run_manager: Optional[CallbackManagerForToolRun] = None,
-            **kwargs,
-    ) -> str:
-        """Use the Qtest API to run an operation."""
-        try:
-            return self.api_wrapper.run(self.mode, *args, **kwargs)
-        except Exception as e:
-            return f"Error: {format_exc()}"

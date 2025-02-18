@@ -1,12 +1,61 @@
+import json
 import logging
 from typing import Any
 
 import swagger_client
-from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator, create_model
 from langchain_core.tools import ToolException
+from pydantic import BaseModel, Field, PrivateAttr, model_validator, create_model
 from sklearn.feature_extraction.text import strip_tags
 from swagger_client import TestCaseApi, SearchApi, PropertyResource
 from swagger_client.rest import ApiException
+
+QTEST_ID = "QTest Id"
+
+TEST_CASES_IN_JSON_FORMAT = f"""
+Provide test case in json format strictly following CRITERIA:
+
+If there is no provided test case, try to extract data to fill json from history, otherwise generate some relevant data.
+If generated data was used, put appropriate note to the test case description field.
+
+### CRITERIA
+1. The structure should be as in EXAMPLE.
+2. Case and spaces for field names should be exactly the same as in NOTES.
+3. Extra fields are allowed.
+4. "{QTEST_ID}" is required to update, change or replace values in test case.
+5. Do not provide "Id" and "{QTEST_ID}" to create test case.
+6  "Steps" is a list of test step objects with fields "Test Step Number", "Test Step Description", "Test Step Expected Result".
+
+### NOTES
+Id: Unique identifier (e.g., TC-123).
+QTest id: Unique identifier (e.g., 4626964).
+Name: Brief title.
+Description: Short purpose.
+Type: 'Manual' or 'Automation - UTAF'. Leave blank if unknown.
+Status: Default 'New'.
+Priority: Leave blank.
+Test Type: Default 'Functional'.
+Precondition: List prerequisites in one cell, formatted as: <Step1> <Step2> Leave blank if none..
+
+### EXAMPLE
+{{
+    "Id": "TC-12780",
+    "{QTEST_ID}": "4626964",
+    "Name": "Brief title.",
+    "Description": "Short purpose.",
+    "Type": "Manual",
+    "Status": "New",
+    "Priority": "",
+    "Test Type": "Functional",
+    "Precondition": "Env is available. Browser is open.",
+    "Steps": [
+        {{ "Test Step Number": 1, "Test Step Description": "Navigate to url", "Test Step Expected Result": "Page content is loaded"}},
+        {{ "Test Step Number": 2, "Test Step Description": "Click 'Login'", "Test Step Expected Result": "Form is expanded"}},
+    ]
+}}
+
+### OUTPUT
+Json object
+"""
 
 logger = logging.getLogger(__name__)
 
@@ -17,14 +66,14 @@ QtestDataQuerySearch = create_model(
 QtestCreateTestCase = create_model(
     "QtestCreateTestCase",
     test_case_content=(str, Field(
-        description="Strictly follow the provided instructions."))
+        description=TEST_CASES_IN_JSON_FORMAT))
 )
 
 UpdateTestCase = create_model(
     "UpdateTestCase",
     test_id=(str, Field(description="Test ID e.g. TC-1234")),
     test_case_content=(str, Field(
-        description="test_case_content should be provided as a markdown table with only plain text both in header and in cells (without any emphasis like bold, italic, strikethrough and so on)."))
+        description=TEST_CASES_IN_JSON_FORMAT))
 )
 
 FindTestCaseById = create_model(
@@ -36,31 +85,6 @@ DeleteTestCase = create_model(
     "DeleteTestCase",
     qtest_id=(int, Field(description="Qtest id e.g. 3253490123")),
 )
-
-TEST_CASES_CONVERSION_PROMPT = """
-### Instructions:
-1. If the provided test cases meet the "Output Format" guidelines, leave them unchanged.
-2. Revise test cases using the "Output Format" guidelines.
-
-### Output Format:
-Create a table with these columns. For multi-step cases, fill Id, Name, Description, Type, Status, Priority, Test Type, and Precondition only for the first step:
-- **Id**: Unique identifier (e.g., TC-12780).
-- **QTest id**: Unique identifier (e.g., 4626964).
-- **Name**: Brief title.
-- **Description**: Short purpose.
-- **Type**: 'Manual' or 'Automation - UTAF'. Leave blank if unknown.
-- **Status**: Default 'New'.
-- **Priority**: Leave blank.
-- **Test Type**: Default 'Functional'.
-- **Precondition**: List prerequisites in one cell, formatted as:
-  <Step1>
-  <Step2>
-  Leave blank if none.
-- **Test Step Number**: Start from 1 for each test case.
-- **Test Step Description**: Clear, actionable test steps.
-- **Test Step Expected Result**: Expected outcome for each test step.
-"""
-
 
 class QtestApiWrapper(BaseModel):
     base_url: str
@@ -96,64 +120,13 @@ class QtestApiWrapper(BaseModel):
         # Instantiate the TestCaseApi instance according to the qtest api documentation and swagger client
         return swagger_client.TestCaseApi(self._client)
 
-    def __convert_markdown_test_steps_data_to_dict(self, test_cases: str) -> list[dict]:
-        # Correct markdown table. It should have pipe at the end.
-        # This issue can appear on big table when LLM just "forget" to send the final pipe symbol.
-        if not test_cases.endswith("|"):
-            test_cases = test_cases + "|"
-        # Split the table into lines
-        lines = test_cases.strip().split('\n')
-
-        # Extract the headers
-        headers = [header.strip() for header in lines[0].split('|')[1:-1]]
-
-        # Initialize a list to hold the test case data
-        test_cases_data = []
-        current_test_case = None
-
-        # Process each line except the first two header lines
-        for line in lines[2:]:
-            # Split the line into cells and trim whitespace
-            cells = [cell.strip() for cell in line.split('|')[1:-1]]
-
-            # Create a dictionary for the test case step
-            test_step = dict(zip(headers, cells))
-
-            # Check if a new test case starts
-            if test_step['Id']:
-                if current_test_case:
-                    test_cases_data.append(current_test_case)
-                current_test_case = {
-                    'Id': test_step['Id'],
-                    'Name': test_step['Name'],
-                    'Description': test_step['Description'],
-                    'Type': test_step['Type'],
-                    'Status': test_step['Status'],
-                    'Priority': test_step['Priority'],
-                    'Test Type': test_step['Test Type'],
-                    'Precondition': test_step['Precondition'],
-                    'Steps': []
-                }
-
-            # Add the step to the current test case
-            if current_test_case:
-                current_test_case['Steps'].append({
-                    'Test Step Number': test_step['Test Step Number'],
-                    'Test Step Description': test_step['Test Step Description'],
-                    'Test Step Expected Result': test_step['Test Step Expected Result']
-                })
-
-        # Add the last test case
-        if current_test_case:
-            test_cases_data.append(current_test_case)
-        return test_cases_data
-
     def __build_body_for_create_test_case(self, test_cases_data: list[dict]) -> list:
         initial_project_properties = self.__get_properties_form_project()
         props = []
         for prop in initial_project_properties:
             props.append(PropertyResource(field_id=prop['field_id'], field_name=prop['field_name'],
-                                          field_value_name=prop.get('field_value_name', None), field_value=prop['field_value']))
+                                          field_value_name=prop.get('field_value_name', None),
+                                          field_value=prop['field_value']))
         bodies = []
         for test_case in test_cases_data:
             body = swagger_client.TestCaseWithCustomFieldResource(properties=props)
@@ -188,17 +161,12 @@ class QtestApiWrapper(BaseModel):
                 'Description': html.unescape(strip_tags(item['description'])),
                 'Precondition': html.unescape(strip_tags(item['precondition'])),
                 'Name': item['name'],
-                'Qtest Id': item['id'],
-                'Test Step Description': '\n'.join(map(str,
-                                                       [html.unescape(
-                                                           strip_tags(str(item['order']) + '. ' + item['description']))
-                                                           for item in item['test_steps']
-                                                           for key in item if key == 'description'])),
-                'Test Expected Result': '\n'.join(map(str,
-                                                      [html.unescape(
-                                                          strip_tags(str(item['order']) + '. ' + item['expected']))
-                                                          for item in item['test_steps']
-                                                          for key in item if key == 'expected'])),
+                QTEST_ID: item['id'],
+                'Steps': list(map(lambda step: {
+                    'Test Step Number': step[0] + 1,
+                    'Test Step Description': step[1]['description'],
+                    'Test Step Expected Result': step[1]['expected']
+                }, enumerate(item['test_steps']))),
                 'Status': ''.join([properties['field_value_name'] for properties in item['properties']
                                    if properties['field_name'] == 'Status']),
                 'Automation': ''.join([properties['field_value_name'] for properties in item['properties']
@@ -238,12 +206,6 @@ class QtestApiWrapper(BaseModel):
                     Exception: \n%s""" % e)
         return parsed_data
 
-    def __find_qtest_id_by_test_id(self, test_id: str) -> int:
-        """ Search for a qtest id using the test id. Test id should be in format TC-123. """
-        dql = f"Id = '{test_id}'"
-        parsed_data = self.__perform_search_by_dql(dql)
-        return parsed_data[0]['Qtest Id']
-
     def __get_properties_form_project(self) -> list[dict]:
         test_api_instance = self.__instantiate_test_api_instance()
         expand_props = 'true'
@@ -260,9 +222,10 @@ class QtestApiWrapper(BaseModel):
             len(parsed_data)) + f" Qtest test cases:\n" + str(parsed_data[:self.no_of_tests_shown_in_dql_search])
 
     def create_test_cases(self, test_case_content: str) -> str:
-        """ Create the tes case base on the incoming content. The input should be in Markdown format. """
+        """ Create the tes case base on the incoming content. The input should be in json format. """
         test_cases_api_instance: TestCaseApi = self.__instantiate_test_api_instance()
-        test_cases = self.__convert_markdown_test_steps_data_to_dict(test_case_content)
+        input_obj = json.loads(test_case_content)
+        test_cases = input_obj if isinstance(input_obj, list) else [input_obj]
         bodies = self.__build_body_for_create_test_case(test_cases)
         if len(bodies) == 1:
             return \
@@ -276,17 +239,24 @@ class QtestApiWrapper(BaseModel):
             return f'Successfully created {len(bodies)} test case(s) in project with id - {self.project_id}. The ids of created test cases are - {test_case_ids}.'
 
     def update_test_case(self, test_id: str, test_case_content: str) -> str:
-        """ Update the test case base on the incoming content. The input should be in Markdown format. Also test id should be passed in following format TC-786. """
-        qtest_id = self.__find_qtest_id_by_test_id(test_id)
+        """ Update the test case base on the incoming content. The input should be in json format. Also test id should be passed in following format TC-786. """
+        input_obj = json.loads(test_case_content)
+        test_case = input_obj[0] if isinstance(input_obj, list) else input_obj
+
+        qtest_id = test_case.get(QTEST_ID)
+        if qtest_id is None or qtest_id == '':
+            actual_test_case = self.__perform_search_by_dql(f"Id = '{test_id}'")[0]
+            test_case = actual_test_case | test_case
+            qtest_id = test_case[QTEST_ID]
+
         test_cases_api_instance: TestCaseApi = self.__instantiate_test_api_instance()
-        tests = self.__convert_markdown_test_steps_data_to_dict(test_case_content)
-        bodies = self.__build_body_for_create_test_case(tests)
+        bodies = self.__build_body_for_create_test_case([test_case])
         try:
             response = test_cases_api_instance.update_test_case(self.project_id, qtest_id, bodies[0])
             return f"""Successfully updated test case in project with id - {self.project_id}.
             Updated test case id - {response.pid}.
             Test id of updated test case - {test_id}.
-            Updated with content:\n{test_case_content}"""
+            Updated with content:\n{test_case}"""
         except ApiException as e:
             logger.error("Exception when calling TestCaseApi->update_test_case: %s\n" % e)
             raise ToolException(
@@ -320,21 +290,21 @@ class QtestApiWrapper(BaseModel):
             {
                 "name": "create_test_cases",
                 "mode": "create_test_cases",
-                "description": TEST_CASES_CONVERSION_PROMPT,
+                "description": "Create a test case in qTest.",
                 "args_schema": QtestCreateTestCase,
                 "ref": self.create_test_cases,
             },
             {
                 "name": "update_test_case",
                 "mode": "update_test_case",
-                "description": TEST_CASES_CONVERSION_PROMPT,
+                "description": "Update, change or replace data in the test case.",
                 "args_schema": UpdateTestCase,
                 "ref": self.update_test_case,
             },
             {
                 "name": "find_test_case_by_id",
                 "mode": "find_test_case_by_id",
-                "description": "Find the test case by its id. Id should be in format TC-123",
+                "description": f"Find the test case and its fields (e.g., '{QTEST_ID}') by test case id. Id should be in format TC-123",
                 "args_schema": FindTestCaseById,
                 "ref": self.find_test_case_by_id,
             },
