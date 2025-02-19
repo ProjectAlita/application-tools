@@ -230,6 +230,7 @@ class AppendFileToolModel(BaseModel):
 
 class ListFilesModel(BaseModel):
     path: Optional[str] = Field(description="Repository path/package to extract files from.", default=None)
+    recursive: Optional[bool] = Field(description="Return files list recursively. Default: True", default=True)
     branch: Optional[str] = Field(description="Repository branch.", default=None)
 
 class ListFilesTool(BaseTool):
@@ -239,13 +240,33 @@ class ListFilesTool(BaseTool):
     args_schema: Type[BaseModel] = ListFilesModel
     handle_tool_error: bool = True
 
-    def _run(self, path: str = None, branch: str = None):
+    def _run(self, path: str = None, recursive: bool = True, branch: str = None):
         try:
-            return self.api_wrapper.list_files(path, branch)
+            return self.api_wrapper.list_files(path, recursive, branch)
         except Exception as e:
             stacktrace = traceback.format_exc()
             logger.error(f"Unable to update file: {stacktrace}")
             raise ToolException(f"Unable to update file: {stacktrace}")
+
+class ListFoldersModel(BaseModel):
+    path: Optional[str] = Field(description="Repository path/package to extract folders from.", default=None)
+    recursive: Optional[bool] = Field(description="Return folders list recursively. Default: True", default=True)
+    branch: Optional[str] = Field(description="Repository branch.", default=None)
+
+class ListFoldersTool(BaseTool):
+    api_wrapper: GitLabAPIWrapper = Field(default_factory=GitLabAPIWrapper)
+    name: str = "list_folders"
+    description: str = "Lists folders per defined path and branch"
+    args_schema: Type[BaseModel] = ListFoldersModel
+    handle_tool_error: bool = True
+
+    def _run(self, path: str = None, recursive: bool = True, branch: str = None):
+        try:
+            return self.api_wrapper.list_folders(path, recursive, branch)
+        except Exception as e:
+            stacktrace = traceback.format_exc()
+            logger.error(f"Unable to extract folders: {stacktrace}")
+            raise ToolException(f"Unable to extract folders: {stacktrace}")
 
 class UpdateFileTool(BaseTool):
     api_wrapper: GitLabAPIWrapper = Field(default_factory=GitLabAPIWrapper)
@@ -306,6 +327,7 @@ __all__ = [
     {"name": "update_file", "tool": UpdateFileTool},
     {"name": "append_file", "tool": AppendFileTool},
     {"name": "list_files", "tool": ListFilesTool},
+    {"name": "list_folders", "tool": ListFoldersTool},
     {"name": "set_active_branch", "tool": SetActiveBranchTool},
     {"name": "list_branches_in_repo", "tool": ListBranchesTool},
     {"name": "get_pr_changes", "tool": GetPullRequesChanges},

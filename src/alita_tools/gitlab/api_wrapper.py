@@ -65,13 +65,23 @@ class GitLabAPIWrapper(BaseModel):
         branches = self._repo_instance.branches.list()
         return json.dumps([branch.name for branch in branches])
 
-    def list_files(self, path: str = None, branch: str = None) -> List[str]:
+    def list_files(self, path: str = None, recursive: bool = True, branch: str = None) -> List[str]:
         """List files by defined path."""
 
-        files = self._repo_instance.repository_tree(path=path, ref=branch if branch else self._active_branch,
-                                                   recursive=True)
+        files = self._get_all_files(path, recursive, branch)
         paths = [file['path'] for file in files if file['type'] == 'blob']
         return f"Files: {paths}"
+
+    def list_folders(self, path: str = None, recursive: bool = True, branch: str = None) -> List[str]:
+        """List folders by defined path."""
+
+        files = self._get_all_files(path, recursive, branch)
+        paths = [file['path'] for file in files if file['type'] == 'tree']
+        return f"Folders: {paths}"
+
+    def _get_all_files(self, path: str = None, recursive: bool = True, branch: str = None):
+        return self._repo_instance.repository_tree(path=path, ref=branch if branch else self._active_branch,
+                                                    recursive=recursive, all=True)
 
     def create_branch(self, branch_name: str) -> None:
         """Create a new branch in the repository."""
