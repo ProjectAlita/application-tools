@@ -96,6 +96,14 @@ ListFilesModel = create_model(
     repository=(Optional[str], Field(description="Name of the repository", default=None))
 )
 
+ListFilesModel = create_model(
+    "ListFoldersModel",
+    path=(str, Field(description="Repository path/package to extract folders from.")),
+    recursive=(Optional[bool], Field(description="Return folders list recursively. Default: True", default=True)),
+    branch=(Optional[str], Field(description="Repository branch. If None then active branch will be selected.", default=None)),
+    repository=(Optional[str], Field(description="Name of the repository", default=None))
+)
+
 GitLabCreatePullRequestChangeCommentInput = create_model(
     "CreatePullRequestChangeCommentInput",
     pr_number=(str, Field(description="Pull request number")),
@@ -460,13 +468,23 @@ class GitLabWorkspaceAPIWrapper(BaseModel):
         except Exception as e:
             return ToolException(f"An error occurred: {e}")
 
-    def list_files(self, path: str, repository: str = None, branch: str = None) -> List[str]:
+    def list_files(self, path: str = None, recursive: bool = True, branch: str = None, repository: str = None) -> List[str]:
         """List files by defined path."""
 
-        files = self._get_repo(repository).repository_tree(path=path, ref=branch if branch else self._active_branch,
-                                                           recursive=True)
+        files = self._get_all_files(path=path, recursive=recursive, branch=branch, repository=repository)
         paths = [file['path'] for file in files if file['type'] == 'blob']
         return f"Files: {paths}"
+
+    def list_folders(self, path: str = None, recursive: bool = True, branch: str = None, repository: str = None) -> List[str]:
+        """List folders by defined path."""
+
+        files = self._get_all_files(path=path, recursive=recursive, branch=branch, repository=repository)
+        paths = [file['path'] for file in files if file['type'] == 'tree']
+        return f"Folders: {paths}"
+
+    def _get_all_files(self, path: str = None, recursive: bool = True, branch: str = None, repository: str = None):
+        return self._get_repo(repository).repository_tree(path=path, ref=branch if branch else self._active_branch,
+                                                    recursive=recursive, all=True)
 
     def get_available_tools(self):
         """Return a list of available tools."""
@@ -554,6 +572,12 @@ class GitLabWorkspaceAPIWrapper(BaseModel):
                 "description": self.list_files.__doc__,
                 "args_schema": ListFilesModel,
                 "ref": self.list_files,
+            },
+            {
+                "name": "list_folders",
+                "description": self.list_folders.__doc__,
+                "args_schema": ListFilesModel,
+                "ref": self.list_folders,
             },
             {
                 "name": "append_file",
