@@ -17,6 +17,7 @@ from .xray import get_tools as get_xray_cloud, XrayToolkit
 from .sharepoint import get_tools as get_sharepoint, SharepointToolkit
 from .qtest import get_tools as get_qtest, QtestToolkit
 from .zephyr_scale import get_tools as get_zephyr_scale, ZephyrScaleToolkit
+from .zephyr_enterprise import get_tools as get_zephyr_enterprise, ZephyrEnterpriseToolkit
 from .ado import get_tools as get_ado
 from .ado.repos import AzureDevOpsReposToolkit
 from .ado.test_plan import AzureDevOpsPlansToolkit
@@ -79,6 +80,8 @@ def get_tools(tools_list, *args, **kwargs):
             tools.extend(get_qtest(tool))
         elif tool['type'] == 'zephyr_scale':
             tools.extend(get_zephyr_scale(tool))
+        elif tool['type'] == 'zephyr_enterprise':
+            tools.extend(get_zephyr_enterprise(tool))
         elif tool['type'] == 'rally':
             tools.extend(get_rally(tool))
         elif tool['type'] == 'sql':
@@ -123,6 +126,7 @@ def get_toolkits():
         AlitaBitbucketToolkit.toolkit_config_schema(),
         AlitaGitlabSpaceToolkit.toolkit_config_schema(),
         ZephyrScaleToolkit.toolkit_config_schema(),
+        ZephyrEnterpriseToolkit.toolkit_config_schema(),
         ZephyrToolkit.toolkit_config_schema(),
         AlitaYagmailToolkit.toolkit_config_schema(),
         SharepointToolkit.toolkit_config_schema(),
