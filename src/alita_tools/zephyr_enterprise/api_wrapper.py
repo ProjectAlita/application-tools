@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Any
 
 from langchain_core.tools import ToolException
 from pydantic import create_model, model_validator, BaseModel, PrivateAttr, Field
@@ -39,7 +39,7 @@ class ZephyrApiWrapper(BaseModel):
 
         """Retrieve Zephyr entities by zql."""
         try:
-            return self._client.search_by_zql(create_testcase_json)
+            return self._client.create_testcase(create_testcase_json)
         except Exception as e:
             return ToolException(f"Unable to retrieve Zephyr entities: {e}")
 
@@ -82,3 +82,10 @@ class ZephyrApiWrapper(BaseModel):
                 "ref": self.create_testcase,
             }
         ]
+
+    def run(self, mode: str, *args: Any, **kwargs: Any):
+        for tool in self.get_available_tools():
+            if tool["name"] == mode:
+                return tool["ref"](*args, **kwargs)
+        else:
+            raise ValueError(f"Unknown mode: {mode}")
