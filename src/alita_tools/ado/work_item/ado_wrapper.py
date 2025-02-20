@@ -3,13 +3,11 @@ import logging
 from typing import Optional, Any, Dict
 
 from azure.devops.connection import Connection
-from azure.devops.released.work_item_tracking import TeamContext
-from azure.devops.released.work_item_tracking import Wiql
-from azure.devops.released.work_item_tracking import WorkItemTrackingClient
-from pydantic import model_validator, BaseModel
+from azure.devops.v7_1.work_item_tracking import TeamContext, Wiql, WorkItemTrackingClient
 from langchain_core.tools import ToolException
 from msrest.authentication import BasicAuthentication
 from pydantic import create_model, PrivateAttr
+from pydantic import model_validator, BaseModel
 from pydantic.fields import Field
 
 logger = logging.getLogger(__name__)
@@ -63,6 +61,15 @@ ADOGetLinkType = create_model(
     "ADOGetLinkType",
 )
 
+ADOGetComments = create_model(
+    "ADOGetComments",
+    work_item_id=(int, Field(description="The work item id")),
+    limit_total=(Optional[int], Field(description="Max number of total comments to return", default=None)),
+    include_deleted=(Optional[bool], Field(description="Specify if the deleted comments should be retrieved", default=False)),
+    expand=(Optional[str], Field(description="The expand parameters for comments. Possible options are { all, none, reactions, renderedText, renderedTextOnly }.", default="none")),
+    order=(Optional[str], Field(description="Order in which the comments should be returned. Possible options are { asc, desc }", default=None))
+)
+
 
 class AzureDevOpsApiWrapper(BaseModel):
     organization_url: str
@@ -85,7 +92,7 @@ class AzureDevOpsApiWrapper(BaseModel):
             connection = Connection(base_url=values['organization_url'], creds=credentials)
 
             # Retrieve the work item tracking client and assign it to the private _client attribute
-            cls._client = connection.clients.get_work_item_tracking_client()
+            cls._client = connection.clients_v7_1.get_work_item_tracking_client()
 
         except Exception as e:
             return ImportError(f"Failed to connect to Azure DevOps: {e}")
@@ -278,6 +285,33 @@ class AzureDevOpsApiWrapper(BaseModel):
             return ToolException(f"Error getting work item: {e}")
 
 
+    def get_comments(self, work_item_id: int, limit_total: Optional[int] = None, include_deleted: Optional[bool] = None, expand: Optional[str] = None, order: Optional[str] = None):
+        """Get comments for work item by ID."""
+        try:
+            # Validate that the Azure DevOps client is initialized
+            if not self._client:
+                raise ToolException("Azure DevOps client not initialized.")
+
+            # Resolve limits to extract in single portion and for whole set of comment
+            limit_portion = self.limit
+            limit_all = limit_total if limit_total else self.limit
+
+            # Fetch the work item comments
+            comments_portion = self._client.get_comments(project=self.project, work_item_id=work_item_id, top=limit_portion, include_deleted=include_deleted, expand=expand, order=order)
+            comments_all = []
+
+            while True:
+                comments_all += [comment.as_dict() for comment in comments_portion.comments]
+
+                if not comments_portion.continuation_token or len(comments_all) >= limit_all:
+                    return comments_all[:limit_all]
+                else:
+                    comments_portion = self._client.get_comments(continuation_token=comments_portion.continuation_token, project=self.project, work_item_id=int(work_item_id), top=3, include_deleted=include_deleted, expand=expand, order=order)
+        except Exception as e:
+            logger.error(f"Error getting work item comments: {e}")
+            return ToolException(f"Error getting work item comments: {e}")
+
+
     def get_available_tools(self):
         """Return a list of available tools."""
         return [
@@ -316,6 +350,12 @@ class AzureDevOpsApiWrapper(BaseModel):
                 "description": self.get_relation_types.__doc__,
                 "args_schema": ADOGetLinkType,
                 "ref": self.get_relation_types,
+            },
+            {
+                "name": "get_comments",
+                "description": self.get_comments.__doc__,
+                "args_schema": ADOGetComments,
+                "ref": self.get_comments,
             }
         ]
 
