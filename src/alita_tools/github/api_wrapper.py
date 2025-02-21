@@ -10,6 +10,8 @@ from langchain.utils import get_from_dict_or_env
 
 from logging import getLogger
 
+from .graphql_github import GraphQLClient
+
 logger = getLogger(__name__)
 
 from langchain_community.tools.github.prompt import (
@@ -310,6 +312,7 @@ LoaderSchema = create_model(
 class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
     _github: Any = PrivateAttr()
     _github_repo_instance: Any = PrivateAttr()
+    _github_graphql_instance: Any = PrivateAttr()
     github_repository: Optional[str] = None
     active_branch: Optional[str] = None
     github_base_branch: Optional[str] = None
@@ -318,6 +321,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
     github_password: Optional[str] = None
     github_app_id: Optional[str] = None
     github_app_private_key: Optional[str] = None
+    
 
     @model_validator(mode='before')
     @classmethod
@@ -389,6 +393,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             g = Github(base_url=github_base_url, auth=auth)
 
         cls._github = g
+        cls._github_graphql_instance = g._Github__requester
         cls._github_repo_instance = g.get_repo(github_repository)
         values["github_repository"] = github_repository
         values["active_branch"] = active_branch
@@ -930,6 +935,74 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                     yield {"file_name": file, "file_content": self._read_file(file, branch=branch or self.active_branch)}
         
         return parse_code_files_for_db(file_content_generator())
+    
+
+    def create_issue_on_project(
+        self,
+        project_title: str,
+        desired_title: str,
+        desired_body: str,
+        desired_fields: Dict[str, str],
+    ):
+        _graphql_client = GraphQLClient(self._github_graphql_instance)
+
+        full_name = self.github_repo_instance.full_name
+        split_name = full_name.split("/")
+        owner_name = split_name[0]
+        repo_name = split_name[1]
+
+        try:
+            result = _graphql_client.get_project(
+                owner=owner_name, repo_name=repo_name, project_title=project_title
+            )
+            project = result.get("project")
+            project_id = result.get("projectId")
+            repository_id = result.get("repositoryId")
+        except Exception as e:
+            return f"Project has not been found. Error: {str(e)}. {str(result)}"
+
+        try:
+            fields_to_update, missing_fields = _graphql_client.get_project_fields(
+                project, desired_fields
+            )
+        except Exception as e:
+            return f"Project fields are not returned. Error: {str(e)}"
+
+        try:
+            draft_issue_item_id = _graphql_client.create_draft_issue(
+                project_id=project_id,
+                title=desired_title,
+                body=desired_body,
+            )
+        except Exception as e:
+            return f"Draft Issue Not Created. Error: {str(e)}. {str(draft_issue_item_id)}"
+
+        try:
+            issue_number = _graphql_client.convert_draft_issue(
+                repository_id=repository_id,
+                draft_issue_id=draft_issue_item_id,
+            )
+        except Exception as e:
+            return f"Convert Issue Not Created. Error: {str(e)}. {str(issue_number)}"
+
+        try:
+            updated_fields = _graphql_client.update_issue(
+                project_id=project_id,
+                desired_issue_item_id=draft_issue_item_id,
+                fields=fields_to_update,
+            )
+        except Exception as e:
+            return f"Issue fields are not updated. Error: {str(e)}. {str(updated_fields)}"
+
+        base_message = f"The issue with number '{issue_number}' has been created."
+
+        if missing_fields:
+            fields_message = f"Response on update fields: {str(updated_fields)},\nexcept for the fields: {str(missing_fields)}."
+        else:
+            fields_message = f"Response on update fields: {str(updated_fields)}."
+
+        return f"{base_message}\n{fields_message}"
+
 
     def get_available_tools(self):
         return [
@@ -1072,6 +1145,13 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                 "mode": "loader",
                 "description": self.loader.__doc__,
                 "args_schema": LoaderSchema,
+            },
+            {
+                "ref": self.create_issue_on_project,
+                "name": "create_issue_on_project",
+                "mode": "create_issue_on_project",
+                "description": self.create_issue_on_project.__doc__,
+                "args_schema": None,
             }
         ]
 
