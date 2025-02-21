@@ -30,21 +30,36 @@ def get_tools(tool):
 
 def create_api_tool(name: str, op: Operation):
     fields = {}
+    headers = {}
+    headers_descriptions = []
+
     for parameter in op.spec.parameters:
+        if "header" in parameter.param_in:
+            headers[parameter.name] = parameter.param_schema.default
+            headers_descriptions.append(f"Header: {parameter.name}. Description: {parameter.description}.")
+            continue
         fields[parameter.name] = (str, Field(default=parameter.param_schema.default,
                                              description=parameter.description))
+
+    # add headers
+    if headers:
+        fields['headers'] = (Optional[dict], Field(default = headers, description="The dict that represents headers for request:\n" + '\n'.join(headers_descriptions)))
+
+    if op.spec.requestBody:
+        fields['json'] = (Optional[str], Field(default = None, description="JSON body for request"))
+
     op.server = Server.from_openapi_server(op.server)  # patch this
     op.server.get_url = partial(Server.get_url, op.server)
     op.server.set_url = partial(Server.set_url, op.server)
     return ApiTool(
         name=name,
         description=op.spec.description if op.spec.description else op.spec.summary,
-        args_schema=create_model("request_params",
-                                 **fields,
-                                 regexp = (Optional[str], Field(description="Regular expression used to remove from final output if any", default=None))),
+        args_schema=create_model(
+            'request_params',
+            regexp = (Optional[str], Field(description="Regular expression used to remove from final output if any", default=None)),
+            **fields),
         callable=op
     )
-
 
 class ApiTool(BaseTool):
     name: str
@@ -59,6 +74,10 @@ class ApiTool(BaseTool):
             arg_value = headers.get(arg)
             if arg_value:
                 kwargs.update({arg : arg_value})
+
+        if kwargs.get("json"):
+            # add json to payload
+            kwargs.update({"json": json.loads(kwargs.get("json"))})
         output = self.callable(**kwargs).content
         try:
             if regexp is not None:

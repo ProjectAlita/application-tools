@@ -4,7 +4,7 @@ from typing import Any, Optional
 
 import chardet
 import pandas as pd
-from pydantic import BaseModel, create_model, Field, model_validator, PrivateAttr
+from pydantic import BaseModel, create_model, Field
 
 
 class CSVToolApiWrapper(BaseModel):
@@ -41,10 +41,7 @@ class CSVToolApiWrapper(BaseModel):
         else:
             result = getattr(df, method_name)
 
-        if len(method_args):
-            result = result(**method_args)
-
-        return str(result)
+        return str(result(**method_args))
 
     def get_available_tools(self):
         return [
@@ -60,3 +57,10 @@ class CSVToolApiWrapper(BaseModel):
                 ),
             }
         ]
+
+    def run(self, mode: str, *args: Any, **kwargs: Any):
+        for tool in self.get_available_tools():
+            if tool["name"] == mode:
+                return tool["ref"](*args, **kwargs)
+        else:
+            raise ValueError(f"Unknown mode: {mode}")
