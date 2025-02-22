@@ -946,7 +946,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
     ):
         _graphql_client = GraphQLClient(self._github_graphql_instance)
 
-        full_name = self.github_repo_instance.full_name
+        full_name = self._github_repo_instance.full_name
         split_name = full_name.split("/")
         owner_name = split_name[0]
         repo_name = split_name[1]
@@ -956,6 +956,8 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                 owner=owner_name, repo_name=repo_name, project_title=project_title
             )
             project = result.get("project")
+            labels = result.get("labels")
+            assignableUsers = result.get("assignableUsers")
             project_id = result.get("projectId")
             repository_id = result.get("repositoryId")
         except Exception as e:
@@ -963,7 +965,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
 
         try:
             fields_to_update, missing_fields = _graphql_client.get_project_fields(
-                project, desired_fields
+                project, desired_fields, labels, assignableUsers
             )
         except Exception as e:
             return f"Project fields are not returned. Error: {str(e)}"
@@ -978,7 +980,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             return f"Draft Issue Not Created. Error: {str(e)}. {str(draft_issue_item_id)}"
 
         try:
-            issue_number = _graphql_client.convert_draft_issue(
+            issue_number, item_id, issue_item_id = _graphql_client.convert_draft_issue(
                 repository_id=repository_id,
                 draft_issue_id=draft_issue_item_id,
             )
@@ -988,8 +990,9 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         try:
             updated_fields = _graphql_client.update_issue(
                 project_id=project_id,
-                desired_issue_item_id=draft_issue_item_id,
-                fields=fields_to_update,
+                desired_item_id=item_id,
+                desired_issue_item_id=issue_item_id,
+                fields=fields_to_update
             )
         except Exception as e:
             return f"Issue fields are not updated. Error: {str(e)}. {str(updated_fields)}"

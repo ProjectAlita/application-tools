@@ -11,30 +11,32 @@ class GraphQLTemplates(Enum):
     query {
     repository(owner: "$owner", name: "$repo_name") {
         id
+        labels (first: 100) { nodes { id name } }
+        assignableUsers (first: 100) { nodes { id name } }
         projectsV2(first: 10) {
-        nodes
-        {
-            id
-            title
-            fields(first: 30) { 
-            nodes {
-                ... on ProjectV2SingleSelectField { 
+            nodes
+            {
                 id
-                dataType
-                name
-                options {
+                title
+                fields(first: 30) { 
+                nodes {
+                    ... on ProjectV2SingleSelectField { 
                     id
+                    dataType
                     name
+                    options {
+                        id
+                        name
+                    }
+                    }
+                    ... on ProjectV2FieldCommon { 
+                    id
+                    dataType
+                    name
+                    }
                 }
-                }
-                ... on ProjectV2FieldCommon { 
-                id
-                dataType
-                name
-                }
+                } 
             }
-            } 
-        }
         }
         issues(first: 10, orderBy: {
                             field: CREATED_AT, 
@@ -68,18 +70,20 @@ class GraphQLTemplates(Enum):
 
     MUTATION_CONVERT_DRAFT_INTO_ISSUE = Template("""
     mutation ($draftItemId: ID!, $repositoryId: ID!) {
-    convertProjectV2DraftIssueItemToIssue(input: {
-        itemId: $draftItemId,
-        repositoryId: $repositoryId
-    }) {
-        item {
-        content {
-            ... on Issue {
-            number
+        convertProjectV2DraftIssueItemToIssue(input: {
+            itemId: $draftItemId,
+            repositoryId: $repositoryId
+        }) {
+            item {
+                id
+                content {
+                    ... on Issue {
+                        id
+                        number
+                    }
+                }
             }
         }
-        }
-    }
     }
     """)
 
@@ -104,6 +108,31 @@ class GraphQLTemplates(Enum):
                         }
                     }
                 }
+            }
+        }
+    }
+    """)
+
+    MUTATION_SET_ISSUE_LABELS = Template("""
+    mutation ($labelableId: ID!, $labelIds: [ID!]!) {
+        addLabelsToLabelable(input: {
+                                        labelableId: $labelableId,
+                                        labelIds: $labelIds
+                                    }) {
+            labelable {
+                ... on Issue {
+                    labels (first: 100) { nodes { id name } }
+                }
+            }
+        }
+    }
+    """)
+
+    MUTATION_SET_ISSUE_ASSIGNEES = Template("""
+    mutation AddAssigneesToAssignable($assignableId: ID!, $assigneeIds: [ID!]!) {
+        addAssigneesToAssignable(input: { assignableId: $assignableId, assigneeIds: $assigneeIds }) {
+            assignable { 
+                assignees (first: 10) { nodes { name } }     
             }
         }
     }
@@ -158,21 +187,31 @@ class GraphQLClient:
             return "No repository data found."
         
         projects = repository.get('projectsV2', {}).get('nodes', [])
+        labels = repository.get('labels', {}).get('nodes', [])
+        assignable_users = repository.get('assignableUsers', {}).get('nodes', [])
         project = next((prj for prj in projects if prj['title'] == project_title), None)
         
         if not project:
             return f"Project '{project_title}' not found."
 
-        return {"project": project, "projectId": project['id'], "repositoryId": repository['id']}
+        return { 
+            "project": project,
+            "projectId": project['id'],
+            "repositoryId": repository['id'],
+            "labels": labels,
+            "assignableUsers": assignable_users
+        }
 
 
-    def get_project_fields(self, project: str, desired_fields: Dict[str, str] = None):
+    def get_project_fields(self, project: str, desired_fields: Dict[str, str] = None, available_labels = None, available_assignees = None):
         fields_to_update = []
         missing_fields = []
 
         available_fields = {
             field.get("name"): field for field in project["fields"]["nodes"] if field
         }
+        label_map = {label['name']: label['id'] for label in available_labels}
+        assignee_map = {assignee['name']: assignee['id'] for assignee in available_assignees}
 
         for field_name, option_name in desired_fields.items():
             if field_name in available_fields:
@@ -214,15 +253,32 @@ class GraphQLClient:
                             "field_value": desired_date,
                         }
                     )
-                elif (field_type == "LABELS" or field_type == "ASSIGNEES"):
-                    fields_to_update.append(
-                        {
+                elif (field_type == "LABELS"):
+                    mapped_ids = [label_map[name] for name in option_name if name in label_map]
+                    if not mapped_ids:
+                        missing_fields.append({
+                            "field": field_name,
+                            "reason": "No valid label entries found for the provided value."
+                        })
+                    else:
+                        fields_to_update.append({
                             "field_title": field_name,
                             "field_type": field_type,
-                            "field_id": field_id,
-                            "field_value": option_name,
-                        }
-                    )
+                            "field_value": mapped_ids
+                        })
+                elif field_type == "ASSIGNEES":
+                    mapped_ids = [assignee_map[name] for name in option_name if name in assignee_map]
+                    if not mapped_ids:
+                        missing_fields.append({
+                            "field": field_name,
+                            "reason": "No valid assignees found for the provided value."
+                        })
+                    else:
+                        fields_to_update.append({
+                            "field_title": field_name,
+                            "field_type": field_type,
+                            "field_value": mapped_ids
+                        })
             else:
                 missing_fields.append({"field": field_name, "reason": "Field is not found"})
 
@@ -271,6 +327,7 @@ class GraphQLClient:
                 return "Failed to convert draft issue: No convertProjectV2DraftIssueItemToIssue returned."
 
             item = draft_issue_data.get('item')
+            item_id = item.get('id')
             if not item:
                 return "Failed to convert draft issue: No issue item found."
             
@@ -279,16 +336,17 @@ class GraphQLClient:
                 return "Failed to convert draft issue: No item content found."
 
             issue_number = item_content.get('number')
+            issue_item_id = item_content.get('id')
             if not issue_number:
                 return "Failed to convert draft issue: No issue number found."
         except Exception as e:
             return f"Convert Draft Issue mutation failed. Error: {str(e)}"
 
-        return issue_number
+        return issue_number, item_id, issue_item_id
 
 
     def update_issue(
-        self, project_id: str, desired_issue_item_id: str, fields: Dict[str, str]
+        self, project_id: str, desired_item_id: str, desired_issue_item_id: str, fields: Dict[str, str]
     ):
         updated_fields = []
         failed_fields = []
@@ -299,17 +357,23 @@ class GraphQLClient:
                 value_content = f'date: "{field.get("field_value")}"'
             elif field_type == "SINGLE_SELECT":
                 value_content = f'singleSelectOptionId: "{field.get("option_id")}"'
-            elif (field_type == "LABELS" or field_type == "ASSIGNEES"):
-                value_content = f'text: "{field.get("field_value")}"'
 
-            query = GraphQLTemplates.MUTATION_UPDATE_ISSUE_FIELDS.value.safe_substitute(
-                project_id=project_id,
-                issue_item_id=desired_issue_item_id,
-                field_id=field.get("field_id"),
-                value_content=value_content,
-            )
+            if (field_type == "DATE" or field_type == "SINGLE_SELECT"):
+                query = GraphQLTemplates.MUTATION_UPDATE_ISSUE_FIELDS.value.safe_substitute(
+                    project_id=project_id,
+                    issue_item_id=desired_item_id,
+                    field_id=field.get("field_id"),
+                    value_content=value_content,
+                )
+                query_variables = None
+            elif field_type == "LABELS":
+                query = GraphQLTemplates.MUTATION_SET_ISSUE_LABELS.value.template
+                query_variables = {"labelableId": desired_issue_item_id, "labelIds": field.get("field_value")}
+            elif field_type == "ASSIGNEES":
+                query = GraphQLTemplates.MUTATION_SET_ISSUE_ASSIGNEES.value.template
+                query_variables = {"assignableId": desired_issue_item_id, "assigneeIds": field.get("field_value")}
             try:
-                result = self._run_graphql_query(query)
+                result = self._run_graphql_query(query,variables=query_variables)
 
                 if result['error']:
                     failed_fields.append(field.get("field_title"))
