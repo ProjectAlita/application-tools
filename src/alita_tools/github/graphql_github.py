@@ -203,7 +203,7 @@ class GraphQLClient:
         }
 
 
-    def get_project_fields(self, project: str, desired_fields: Dict[str, str] = None, available_labels = None, available_assignees = None):
+    def get_project_fields(self, project: str, desired_fields: Dict[str, str] = None, available_labels=None, available_assignees=None):
         fields_to_update = []
         missing_fields = []
 
@@ -213,74 +213,65 @@ class GraphQLClient:
         label_map = {label['name']: label['id'] for label in available_labels}
         assignee_map = {assignee['name']: assignee['id'] for assignee in available_assignees}
 
+        def handle_single_select(field, option_name):
+            options = field.get("options", [])
+            matched_option = next(
+                (option for option in options if option["name"] == option_name),
+                None,
+            )
+
+            if matched_option:
+                fields_to_update.append({
+                    "field_title": field['name'],
+                    "field_type": field['dataType'],
+                    "field_id": field['id'],
+                    "option_id": matched_option["id"],
+                })
+            else:
+                available_options = [option["name"] for option in options]
+                missing_fields.append({
+                    "field": field['name'],
+                    "reason": f"Option '{option_name}' is not found. Available options: {str(available_options)}"
+                })
+
+        def handle_date(field, option_name):
+            desired_date = self._convert_to_standard_utc(option_name)
+            fields_to_update.append({
+                "field_title": field['name'],
+                "field_type": field['dataType'],
+                "field_id": field['id'],
+                "field_value": desired_date,
+            })
+
+        def handle_labels_or_assignees(field, option_names, type_map, field_type):
+            mapped_ids = [type_map[name] for name in option_names if name in type_map]
+            if not mapped_ids:
+                missing_fields.append({
+                    "field": field['name'],
+                    "reason": f"No valid {field_type.lower()} entries found for the provided values."
+                })
+            else:
+                fields_to_update.append({
+                    "field_title": field['name'],
+                    "field_type": field['dataType'],
+                    "field_value": mapped_ids
+                })
+
         for field_name, option_name in desired_fields.items():
             if field_name in available_fields:
                 field = available_fields[field_name]
-                field_id = field.get("id")
                 field_type = field.get("dataType")
-                if field_type == "SINGLE_SELECT":
-                    options = field.get("options", [])
-                    matched_option = next(
-                        (option for option in options if option["name"] == option_name),
-                        None,
-                    )
 
-                    if matched_option:
-                        fields_to_update.append(
-                            {
-                                "field_title": field_name,
-                                "field_type": field_type,
-                                "field_id": field_id,
-                                "option_id": matched_option["id"],
-                            }
-                        )
-                    else:
-                        available_options = [option["name"] for option in options]
-                        missing_fields.append(
-                            {
-                                "field": field_name,
-                                "reason": f"Option '{option_name}' is not found. "
-                                + f"Available options: {str(available_options)}",
-                            }
-                        )
+                if field_type == "SINGLE_SELECT":
+                    handle_single_select(field, option_name)
                 elif field_type == "DATE":
-                    desired_date = self._convert_to_standard_utc(option_name)
-                    fields_to_update.append(
-                        {
-                            "field_title": field_name,
-                            "field_type": field_type,
-                            "field_id": field_id,
-                            "field_value": desired_date,
-                        }
-                    )
-                elif (field_type == "LABELS"):
-                    mapped_ids = [label_map[name] for name in option_name if name in label_map]
-                    if not mapped_ids:
-                        missing_fields.append({
-                            "field": field_name,
-                            "reason": "No valid label entries found for the provided value."
-                        })
-                    else:
-                        fields_to_update.append({
-                            "field_title": field_name,
-                            "field_type": field_type,
-                            "field_value": mapped_ids
-                        })
+                    handle_date(field, option_name)
+                elif field_type == "LABELS":
+                    handle_labels_or_assignees(field, option_name, label_map, field_type)
                 elif field_type == "ASSIGNEES":
-                    mapped_ids = [assignee_map[name] for name in option_name if name in assignee_map]
-                    if not mapped_ids:
-                        missing_fields.append({
-                            "field": field_name,
-                            "reason": "No valid assignees found for the provided value."
-                        })
-                    else:
-                        fields_to_update.append({
-                            "field_title": field_name,
-                            "field_type": field_type,
-                            "field_value": mapped_ids
-                        })
+                    handle_labels_or_assignees(field, option_name, assignee_map, field_type)
             else:
-                missing_fields.append({"field": field_name, "reason": "Field is not found"})
+                missing_fields.append({"field": field_name, "reason": "Field not found"})
 
         return fields_to_update, missing_fields
 
