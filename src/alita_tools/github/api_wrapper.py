@@ -120,6 +120,10 @@ closed
 """
 
 CREATE_ISSUE_ON_PROJECT_PROMPT = """
+**VERY IMPORTANT**: This method CANNOT be used with Personal token.
+It can work only with OAuth App token: https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps
+"X-Accepted-OAuth-Scopes" should include "project:admin"
+
 This tool allows you to create a new issue within a specified project in a GitHub repository. **VERY IMPORTANT**: Your input to this tool MUST strictly follow these rules:
 
 - First, you must specify the title of the project.
@@ -147,6 +151,10 @@ The navigation bar disappears on mobile view. Need a fix to ensure responsive co
 """
 
 UPDATE_ISSUE_ON_PROJECT_PROMPT = """
+**VERY IMPORTANT**: This method CANNOT be used with Personal token.
+It can work only with OAuth App token: https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps
+"X-Accepted-OAuth-Scopes" should include "project:admin"
+
 This tool allows you to update an existing issue within a specified project in a GitHub repository. **VERY IMPORTANT**: Your input to this tool MUST strictly follow these rules:
 
 - First, provide the unique number of the issue you wish to update.
@@ -1068,6 +1076,9 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         desired_fields: Optional[Dict[str, str]] = None,
     ) -> str:
         """
+        VERY IMPORTANT: This method CANNOT be used with Personal token but with OAuth token having project scope only
+        "X-Accepted-OAuth-Scopes" should include "project:admin"
+
         Creates an issue within a specified project using a series of GraphQL operations.
 
         The function initializes by identifying the repository, then extracts or creates the project and sets up
@@ -1157,6 +1168,9 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         desired_fields: Optional[Dict[str, str]],
     ) -> str:
         """
+        VERY IMPORTANT: This method CANNOT be used with Personal token but with OAuth token having project scope only
+        "X-Accepted-OAuth-Scopes" should include "project:admin"
+        
         Updates an existing issue specified by issue number within a project, title, body, and other fields.
 
         Args:
