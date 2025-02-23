@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from enum import Enum
 from string import Template
-from typing import Any, Dict
+from typing import Any, Optional, Dict
 
 from dateutil import parser
 
@@ -9,48 +9,49 @@ from dateutil import parser
 class GraphQLTemplates(Enum):
     QUERY_GET_PROJECT_INFO_TEMPLATE = Template("""
     query {
-    repository(owner: "$owner", name: "$repo_name") {
-        id
-        labels (first: 100) { nodes { id name } }
-        assignableUsers (first: 100) { nodes { id name } }
-        projectsV2(first: 10) {
-            nodes
-            {
-                id
-                title
-                fields(first: 30) { 
-                nodes {
-                    ... on ProjectV2SingleSelectField { 
+        repository(owner: "$owner", name: "$repo_name") {
+            id
+            labels (first: 100) { nodes { id name } }
+            assignableUsers (first: 100) { nodes { id name } }
+            projectsV2(first: 10) {
+                nodes
+                {
                     id
-                    dataType
-                    name
-                    options {
-                        id
-                        name
+                    title
+                    fields(first: 30) { 
+                        nodes {
+                            ... on ProjectV2SingleSelectField { 
+                                id
+                                dataType
+                                name
+                                options {
+                                    id
+                                    name
+                                }
+                            }
+                            ... on ProjectV2FieldCommon { 
+                                id
+                                dataType
+                                name
+                            }
+                        }
                     }
-                    }
-                    ... on ProjectV2FieldCommon { 
-                    id
-                    dataType
-                    name
+                    items(first: 100) {
+                        nodes {
+                            id
+                            content {
+                                ... on Issue {
+                                    id
+                                    number
+                                    labels (first: 20) { nodes { id name } }
+                                    assignees (first: 20) { nodes { id name } }
+                                }
+                            }
+                        }
                     }
                 }
-                } 
             }
         }
-        issues(first: 10, orderBy: {
-                            field: CREATED_AT, 
-                            direction: DESC
-                            }) {
-        edges {
-            node {
-            id
-            number
-            title
-            }
-        }
-        }
-    }
     }
     """)
 
@@ -62,7 +63,7 @@ class GraphQLTemplates(Enum):
         body: $body
     }) {
         projectItem {
-        id
+            id
         }
     }
     }
@@ -82,6 +83,19 @@ class GraphQLTemplates(Enum):
                         number
                     }
                 }
+            }
+        }
+    }
+    """)
+
+    MUTATION_UPDATE_ISSUE = Template("""
+    mutation UpdateIssue($issueId: ID!, $title: String!, $body: String!) {
+        updateIssue(input: {id: $issueId, title: $title, body: $body}) {
+            issue {
+                id
+                number
+                title
+                body
             }
         }
     }
@@ -115,10 +129,7 @@ class GraphQLTemplates(Enum):
 
     MUTATION_SET_ISSUE_LABELS = Template("""
     mutation ($labelableId: ID!, $labelIds: [ID!]!) {
-        addLabelsToLabelable(input: {
-                                        labelableId: $labelableId,
-                                        labelIds: $labelIds
-                                    }) {
+        addLabelsToLabelable(input: { labelableId: $labelableId, labelIds: $labelIds }) {
             labelable {
                 ... on Issue {
                     labels (first: 100) { nodes { id name } }
@@ -138,20 +149,73 @@ class GraphQLTemplates(Enum):
     }
     """)
 
+    MUTATION_REMOVE_ISSUE_LABELS = Template("""
+    mutation ($labelableId: ID!, $labelIds: [ID!]!) {
+        removeLabelsFromLabelable(input: { labelableId: $labelableId, labelIds: $labelIds }) {
+            labelable {
+                ... on Issue {
+                    labels (first: 100) { nodes { id name } }
+                }
+            }
+        }
+    }
+    """)
+
+    MUTATION_REMOVE_ISSUE_ASSIGNEES = Template("""
+    mutation ($assignableId: ID!, $assigneeIds: [ID!]!) {
+        removeAssigneesFromAssignable(input: { assignableId: $assignableId, assigneeIds: $assigneeIds }) {
+            assignable {
+                ... on Issue {
+                    assignees (first: 100) { nodes { id name } }
+                }
+            }
+        }
+    }
+    """)
+
 
 class GraphQLClient:
     def __init__(self, requester: Any):
         self.requester = requester
         pass
 
-    def _run_graphql_query(self, query: str, variables: Dict[str, str] = None):
+    def _run_graphql_query(self, query: str, variables: Optional[Dict[str, str]] = None):
         """
-        Execute a GraphQL query using PyGithub's internal Requester, optionally including variables.
+        Executes a GraphQL query against the GitHub API with optional variables.
+
+        This method constructs a GraphQL query payload and sends it to the GitHub GraphQL API endpoint using
+        the internal requester of the PyGithub library. It handles both GraphQL queries and mutations. If the query
+        includes variables, they should be specified in the 'variables' parameter as a dictionary.
+
         Args:
-            query: A string containing the GraphQL mutation or query
-            variables: A Python dictionary representing the variables in the query (default is None)
+            query (str): A string containing the GraphQL mutation or query.
+            variables (Optional[Dict[str, str]]): A dictionary of variables to be used in the GraphQL query. Default is None.
+
         Returns:
-            A Python dictionary with the query results
+            Dict[str, Any]: A dictionary containing the keys 'error' and either 'details' or 'data'. If 'error' is True,
+                            'details' will contain the error message; if 'error' is False, 'data' will contain the query results.
+        
+        Examples:
+            result = self._run_graphql_query(
+                query='''
+                    query ($number_of_repos: Int!) {
+                        viewer {
+                            repositories(last: $number_of_repos) {
+                                nodes {
+                                    name
+                                }
+                            }
+                        }
+                    }
+                ''',
+                variables={'number_of_repos': 5}
+            )
+
+            print(result)
+
+        Important:
+            This method should be used carefully as it directly manipulates and sends queries to the GitHub API. 
+            Improper or malformed queries might lead to unexpected behaviors or high API usage costs.
         """
         payload = {"query": query}
         if variables:
@@ -244,18 +308,25 @@ class GraphQLClient:
             })
 
         def handle_labels_or_assignees(field, option_names, type_map, field_type):
-            mapped_ids = [type_map[name] for name in option_names if name in type_map]
-            if not mapped_ids:
-                missing_fields.append({
-                    "field": field['name'],
-                    "reason": f"No valid {field_type.lower()} entries found for the provided values."
-                })
-            else:
+            if option_names == []:
                 fields_to_update.append({
                     "field_title": field['name'],
                     "field_type": field['dataType'],
-                    "field_value": mapped_ids
+                    "field_value": []
                 })
+            else:
+                mapped_ids = [type_map[name] for name in option_names if name in type_map]
+                if not mapped_ids:
+                    missing_fields.append({
+                        "field": field['name'],
+                        "reason": f"No valid {field_type.lower()} entries found for the provided values."
+                    })
+                else:
+                    fields_to_update.append({
+                        "field_title": field['name'],
+                        "field_type": field['dataType'],
+                        "field_value": mapped_ids
+                    })
 
         for field_name, option_name in desired_fields.items():
             if field_name in available_fields:
@@ -336,8 +407,25 @@ class GraphQLClient:
         return issue_number, item_id, issue_item_id
 
 
-    def update_issue(
-        self, project_id: str, desired_item_id: str, desired_issue_item_id: str, fields: Dict[str, str]
+    def update_issue(self, issue_id: str, desired_title: str, desired_body: str):
+        query = GraphQLTemplates.MUTATION_UPDATE_ISSUE.value.template
+        query_variables = { "issueId": issue_id, "title": desired_title, "body": desired_body }
+
+        try:
+            result = self._run_graphql_query(query, variables=query_variables)
+
+            if result['error']:
+                return f"Error occurred: {result['details']}"
+        except Exception as e:
+            return f"Update Title and Body Issue mutation failed. Error: {str(e)}"
+        
+        return result
+
+    def update_issue_fields(
+        self, project_id: str, 
+        desired_item_id: str, desired_issue_item_id: str, 
+        fields: Dict[str, str], 
+        item_label_ids: Optional[Any], item_assignee_ids: Optional[Any]
     ):
         updated_fields = []
         failed_fields = []
@@ -358,11 +446,22 @@ class GraphQLClient:
                 )
                 query_variables = None
             elif field_type == "LABELS":
-                query = GraphQLTemplates.MUTATION_SET_ISSUE_LABELS.value.template
-                query_variables = {"labelableId": desired_issue_item_id, "labelIds": field.get("field_value")}
+                label_ids = field.get("field_value")
+                if label_ids == []:
+                    query = GraphQLTemplates.MUTATION_REMOVE_ISSUE_LABELS.value.template
+                    query_variables = { "labelableId": desired_issue_item_id, "labelIds":  item_label_ids}
+                elif not label_ids:
+                    query = GraphQLTemplates.MUTATION_SET_ISSUE_LABELS.value.template
+                    query_variables = { "labelableId": desired_issue_item_id, "labelIds": label_ids}
             elif field_type == "ASSIGNEES":
-                query = GraphQLTemplates.MUTATION_SET_ISSUE_ASSIGNEES.value.template
-                query_variables = {"assignableId": desired_issue_item_id, "assigneeIds": field.get("field_value")}
+                assignee_ids = field.get("field_value")
+                
+                if assignee_ids == []:
+                    query = GraphQLTemplates.MUTATION_REMOVE_ISSUE_ASSIGNEES.value.template
+                    query_variables = {"assignableId": desired_issue_item_id, "assigneeIds": item_assignee_ids}
+                elif not assignee_ids:
+                    query = GraphQLTemplates.MUTATION_SET_ISSUE_ASSIGNEES.value.template
+                    query_variables = {"assignableId": desired_issue_item_id, "assigneeIds": assignee_ids}
             try:
                 result = self._run_graphql_query(query,variables=query_variables)
 

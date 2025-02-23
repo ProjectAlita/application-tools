@@ -988,7 +988,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             return f"Convert Issue Not Created. Error: {str(e)}. {str(issue_number)}"
 
         try:
-            updated_fields = _graphql_client.update_issue(
+            updated_fields = _graphql_client.update_issue_fields(
                 project_id=project_id,
                 desired_item_id=item_id,
                 desired_issue_item_id=issue_item_id,
@@ -1000,7 +1000,83 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         base_message = f"The issue with number '{issue_number}' has been created."
 
         if missing_fields:
-            fields_message = f"Response on update fields: {str(updated_fields)},\nexcept for the fields: {str(missing_fields)}."
+            fields_message = f"Response on update fields: {str(updated_fields)},\nExcept for the fields: {str(missing_fields)}."
+        else:
+            fields_message = f"Response on update fields: {str(updated_fields)}."
+
+        return f"{base_message}\n{fields_message}"
+    
+    def update_issue_on_project(
+        self,
+        issue_number: str,
+        project_title: str,
+        desired_title: str,
+        desired_body: str,
+        desired_fields: Dict[str, str],
+    ):
+        _graphql_client = GraphQLClient(self._github_graphql_instance)
+
+        full_name = self._github_repo_instance.full_name
+        split_name = full_name.split("/")
+        owner_name = split_name[0]
+        repo_name = split_name[1]
+
+        try:
+            result = _graphql_client.get_project(
+                owner=owner_name, repo_name=repo_name, project_title=project_title
+            )
+            project = result.get("project")
+            labels = result.get("labels")
+            assignableUsers = result.get("assignableUsers")
+            project_id = result.get("projectId")
+        except Exception as e:
+            return f"Project has not been found. Error: {str(e)}. {str(result)}"
+
+        try:
+            fields_to_update, missing_fields = _graphql_client.get_project_fields(
+                project, desired_fields, labels, assignableUsers
+            )
+        except Exception as e:
+            return f"Project fields are not returned. Error: {str(e)}"
+        
+        items = project['items']['nodes']
+
+        for item in items:
+            content = item.get('content')
+            if content and str(content['number']) == issue_number:
+                item_labels = content.get('labels', []).get('nodes', [])
+                item_assignees = content.get('assignees', []).get('nodes', [])
+                item_id = item['id']
+                issue_item_id = content['id']
+
+        try:
+            updated_issue = _graphql_client.update_issue(
+                issue_id=issue_item_id,
+                desired_title=desired_title,
+                desired_body=desired_body
+            )
+        except Exception as e:
+            return f"Issue title and body have not updated. Error: {str(e)}. {str(updated_issue)}"
+
+        try:
+            item_label_ids = [obj["id"] for obj in item_labels]
+            item_assignee_ids = [obj["id"] for obj in item_assignees]
+            
+            updated_fields = _graphql_client.update_issue_fields(
+                project_id=project_id,
+                desired_item_id=item_id,
+                desired_issue_item_id=issue_item_id,
+                fields=fields_to_update,
+                item_label_ids=item_label_ids,
+                item_assignee_ids=item_assignee_ids
+            )
+        except Exception as e:
+            return f"Issue fields are not updated. Error: {str(e)}. {str(updated_fields)}"
+
+        base_message = f"The issue with number '{issue_number}' has been updated."
+
+        if missing_fields:
+            fields_message = f"Response on update fields: {str(updated_fields)},\nExcept for the fields: {str(missing_fields)}."
         else:
             fields_message = f"Response on update fields: {str(updated_fields)}."
 
@@ -1154,6 +1230,13 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                 "name": "create_issue_on_project",
                 "mode": "create_issue_on_project",
                 "description": self.create_issue_on_project.__doc__,
+                "args_schema": None,
+            },
+            {
+                "ref": self.update_issue_on_project,
+                "name": "update_issue_on_project",
+                "mode": "update_issue_on_project",
+                "description": self.update_issue_on_project.__doc__,
                 "args_schema": None,
             }
         ]
