@@ -942,7 +942,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         project_title: str,
         desired_title: str,
         desired_body: str,
-        desired_fields: Dict[str, str],
+        desired_fields: Optional[Dict[str, str]] = None,
     ):
         _graphql_client = GraphQLClient(self._github_graphql_instance)
 
@@ -964,9 +964,10 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             return f"Project has not been found. Error: {str(e)}. {str(result)}"
 
         try:
-            fields_to_update, missing_fields = _graphql_client.get_project_fields(
-                project, desired_fields, labels, assignableUsers
-            )
+            if not desired_fields:
+                fields_to_update, missing_fields = _graphql_client.get_project_fields(
+                    project, desired_fields, labels, assignableUsers
+                )
         except Exception as e:
             return f"Project fields are not returned. Error: {str(e)}"
 
@@ -988,12 +989,13 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             return f"Convert Issue Not Created. Error: {str(e)}. {str(issue_number)}"
 
         try:
-            updated_fields = _graphql_client.update_issue_fields(
-                project_id=project_id,
-                desired_item_id=item_id,
-                desired_issue_item_id=issue_item_id,
-                fields=fields_to_update
-            )
+            if not desired_fields:
+                updated_fields = _graphql_client.update_issue_fields(
+                    project_id=project_id,
+                    desired_item_id=item_id,
+                    desired_issue_item_id=issue_item_id,
+                    fields=fields_to_update
+                )
         except Exception as e:
             return f"Issue fields are not updated. Error: {str(e)}. {str(updated_fields)}"
 
@@ -1012,7 +1014,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         project_title: str,
         desired_title: str,
         desired_body: str,
-        desired_fields: Dict[str, str],
+        desired_fields: Optional[Dict[str, str]],
     ):
         _graphql_client = GraphQLClient(self._github_graphql_instance)
 
