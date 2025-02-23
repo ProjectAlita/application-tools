@@ -21,6 +21,8 @@ class GraphQLTemplates(Enum):
         MUTATION_UPDATE_ISSUE (Template): Template for a mutation to update the title and body of a specific issue.
         
         MUTATION_UPDATE_ISSUE_FIELDS (Template): Template for a mutation to update the field values of a project item.
+
+        MUTATION_CLEAR_ISSUE_FIELDS (Template): Template for a mutation to clear the field values of a project item.
         
         MUTATION_SET_ISSUE_LABELS (Template): Template for a mutation to set labels to an issue.
         
@@ -137,11 +139,52 @@ class GraphQLTemplates(Enum):
         }) {
             projectV2Item {
                 id
-                fieldValues(first: 10) {
+                fieldValues(first: 30) {
                     nodes {
                         ... on ProjectV2ItemFieldSingleSelectValue {
                             id
                             name
+                        }
+                        ... on ProjectV2ItemFieldDateValue {
+                            id
+                            date
+                        }
+                        ... on ProjectV2ItemFieldLabelValue {
+                            labels (first: 20) {
+                                nodes { id name }
+                            }
+                        }                    
+                    }
+                }
+            }
+        }
+    }
+    """)
+
+    MUTATION_CLEAR_ISSUE_FIELDS = Template("""
+    mutation {
+        clearProjectV2ItemFieldValue(input: 
+        {
+            projectId: "$project_id"
+            itemId: "$issue_item_id",
+            fieldId: "$field_id"
+        }) {
+            projectV2Item {
+                id
+                fieldValues(first: 30) {
+                    nodes {
+                        ... on ProjectV2ItemFieldSingleSelectValue {
+                            id
+                            name
+                        }
+                        ... on ProjectV2ItemFieldDateValue {
+                            id
+                            date
+                        }
+                        ... on ProjectV2ItemFieldLabelValue {
+                            labels (first: 20) {
+                                nodes { id name }
+                            }
                         }
                     }
                 }
@@ -348,20 +391,28 @@ class GraphQLClient:
 
         def handle_single_select(field, option_name):
             options = field.get("options", [])
-            matched_option = next((option for option in options if option['name'] == option_name), None)
-            if matched_option:
+            if option_name == "":
                 fields_to_update.append({
                     "field_title": field['name'],
                     "field_type": field['dataType'],
                     "field_id": field['id'],
-                    "option_id": matched_option['id'],
+                    "option_id": "",
                 })
             else:
-                available_options = [option['name'] for option in options]
-                missing_fields.append({
-                    "field": field['name'],
-                    "reason": f"Option '{option_name}' not found. Available options: {available_options}"
-                })
+                matched_option = next((option for option in options if option['name'] == option_name), None)
+                if matched_option:
+                    fields_to_update.append({
+                        "field_title": field['name'],
+                        "field_type": field['dataType'],
+                        "field_id": field['id'],
+                        "option_id": matched_option['id'],
+                    })
+                else:
+                    available_options = [option['name'] for option in options]
+                    missing_fields.append({
+                        "field": field['name'],
+                        "reason": f"Option '{option_name}' not found. Available options: {available_options}"
+                    })
 
         def handle_date(field, option_name):
             try:
@@ -561,21 +612,48 @@ class GraphQLClient:
         updated_fields = []
         failed_fields = []
         for field in fields:
+            query_variables = None
             field_type = field.get("field_type")
             
             if field_type == "DATE":
-                value_content = f'date: "{field.get("field_value")}"'
+                field_value = field.get("field_value")
+
+                if field_value == "":
+                    query = GraphQLTemplates.MUTATION_CLEAR_ISSUE_FIELDS.value.safe_substitute(
+                        project_id=project_id,
+                        issue_item_id=desired_item_id,
+                        field_id=field.get("field_id")
+                    )
+                else:
+                    value_content = f'date: "{field.get("field_value")}"'
+                    query = GraphQLTemplates.MUTATION_UPDATE_ISSUE_FIELDS.value.safe_substitute(
+                        project_id=project_id,
+                        issue_item_id=desired_item_id,
+                        field_id=field.get("field_id"),
+                        value_content=value_content,
+                    )
             elif field_type == "SINGLE_SELECT":
-                value_content = f'singleSelectOptionId: "{field.get("option_id")}"'
+                option_id = field.get("option_id")
+                if option_id == "":
+                    query = GraphQLTemplates.MUTATION_CLEAR_ISSUE_FIELDS.value.safe_substitute(
+                        project_id=project_id,
+                        issue_item_id=desired_item_id,
+                        field_id=field.get("field_id")
+                    )
+                else:
+                    value_content = f'singleSelectOptionId: "{option_id}"'
+                    query = GraphQLTemplates.MUTATION_UPDATE_ISSUE_FIELDS.value.safe_substitute(
+                        project_id=project_id,
+                        issue_item_id=desired_item_id,
+                        field_id=field.get("field_id"),
+                        value_content=value_content,
+                    )
+
 
             if (field_type == "DATE" or field_type == "SINGLE_SELECT"):
-                query = GraphQLTemplates.MUTATION_UPDATE_ISSUE_FIELDS.value.safe_substitute(
-                    project_id=project_id,
-                    issue_item_id=desired_item_id,
-                    field_id=field.get("field_id"),
-                    value_content=value_content,
-                )
-                query_variables = None
+                field.get("field_value")
+                
+                
             elif field_type == "LABELS":
                 label_ids = field.get("field_value")
                 query = (
@@ -601,7 +679,7 @@ class GraphQLClient:
                     else {"assignableId": desired_issue_item_id, "assigneeIds": assignee_ids}
                 )
             try:
-                result = self._run_graphql_query(query,variables=query_variables)
+                result = self._run_graphql_query(query, query_variables)
 
                 if result['error']:
                     failed_fields.append(field.get("field_title"))
@@ -629,11 +707,15 @@ class GraphQLClient:
             date_input (str): The date string to be parsed and converted.
 
         Returns:
-            str: An ISO 8601 formatted string representing the date in UTC timezone.
+            str: An ISO 8601 formatted string representing the date in UTC timezone, or an empty string if input was empty.
 
         Example:
             date_iso = MyClass._convert_to_standard_utc("2021-05-25T12:00:00")
+            empty_output = MyClass._convert_to_standard_utc("")
         """
+        if date_input == "":
+            return ""
+
         try:
             date_parsed = parser.parse(date_input)
         except ValueError:
