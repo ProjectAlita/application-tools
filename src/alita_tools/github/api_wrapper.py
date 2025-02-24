@@ -120,64 +120,57 @@ closed
 """
 
 CREATE_ISSUE_ON_PROJECT_PROMPT = """
-**VERY IMPORTANT**: This method CANNOT be used with Personal token.
-It can work only with OAuth App token: https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps
-"X-Accepted-OAuth-Scopes" should include "project:admin"
+**IMPORTANT**: Only OAuth App tokens are permitted (no Personal tokens). Ensure the "project:admin" scope is included as per GitHub documentation.
 
-This tool allows you to create a new issue within a specified project in a GitHub repository. **VERY IMPORTANT**: Your input to this tool MUST strictly follow these rules:
+This tool allows for creating GitHub issues within specified projects. Adhere to these steps:
 
-- First, you must specify the title of the project.
-- Next, specify the title of the issue.
-- Optionally you can specify:
-  - a detailed description or body of the issue.
-  - additional fields based on project's requirements. For additional fields, write each field as a JSON key-value pair. 
+1. Specify both project and issue titles.
+2. Optionally, include a detailed issue description and any additional required fields in JSON format.
 
-Ensure you follow the JSON structure and utilize proper field names as expected within the project context.
+Ensure JSON fields are correctly named as expected by the project.
 
-For example, if you would like to create an issue within the "WebApp Redesign" project, titled "Fix Navigation Bar" with a body explaining the issue, and having additional configurations such as environment setting to "Staging" and prioritized as "Medium", you would pass in the following string:
+**Example**:
+For an issue titled "Fix Navigation Bar" in the "WebApp Redesign" project, addressing mobile view responsiveness, set as medium priority, in staging, and assigned to "dev_lead":
 
 Project: WebApp Redesign
 Issue Title: Fix Navigation Bar
-
-The navigation bar disappears on mobile view. Need a fix to ensure responsive compatibility across devices.
-
+Description: The navigation bar disappears on mobile view. Needs responsive fix.
+JSON:
 {
   "Environment": "Staging",
-  "SR Type": "Issue/Bug Report",
-  "SR Priority": "Medium",
+  "Priority": "Medium",
   "Labels": ["bug", "UI"],
   "Assignees": ["dev_lead"]
 }
 """
 
 UPDATE_ISSUE_ON_PROJECT_PROMPT = """
-**VERY IMPORTANT**: This method CANNOT be used with Personal token.
-It can work only with OAuth App token: https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps
-"X-Accepted-OAuth-Scopes" should include "project:admin"
+**IMPORTANT**: Only OAuth App tokens are valid. Ensure "project:admin" is authorized.
 
-This tool allows you to update an existing issue within a specified project in a GitHub repository. **VERY IMPORTANT**: Your input to this tool MUST strictly follow these rules:
+This tool updates GitHub issues. Follow these steps:
 
-- First, provide the unique number of the issue you wish to update.
-- Specify the title of the project containing the issue.
-- You can update the title of the issue if necessary.
-- Optionally, you can also update the description or body of the issue.
-- Additional fields in the issue can be adjusted or cleared based on the project's specifications. To do so, write each field as a JSON key-value pair. If you intend to clear any previously set fields, supply an empty string as the value for those fields.
+- Provide the issue number and project title.
+- Optionally, adjust the issue's title, description, and other fields.
+- Use JSON key-value pairs to update or clear fields, setting empty strings to clear.
 
-Ensure you follow the JSON structure and use the correct field names as expected within the project context.
+Ensure field names align with project requirements.
 
-For example, if you need to update an issue identified by number 42 within the "WebApp Redesign" project, changing its title to "Update Navigation Bar", revising the body to address new details, and modifying configurations such as setting the environment to "Production" while updating priority and clearing an unwanted label, you would structure your input as follows:
+**Example**:
+Update issue 42 in "WebApp Redesign," change its title, modify the description, and update settings:
 
 Issue Number: 42
 Project: WebApp Redesign
-Desired New Title: Update Navigation Bar
+New Title: Update Navigation Bar
 
-The navigation bar should now include dropdown menus based on user role. Ensure compatibility across all devices.
+Description:
+Implement dropdown menus based on user roles for full device compatibility.
 
+JSON:
 {
   "Environment": "Production",
-  "SR Type": "Enhancement",
-  "SR Priority": "High",
-  "Labels": ["UI"],  // Assuming a previous 'bug' label needs to be removed before
+  "Type": "Enhancement",
+  "Priority": "High",
+  "Labels": ["UI"],
   "Assignees": ["ui_team"]
 }
 """

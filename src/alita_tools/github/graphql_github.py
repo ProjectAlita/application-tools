@@ -247,20 +247,17 @@ class GraphQLClient:
 
     def _run_graphql_query(self, query: str, variables: Optional[Dict[str, str]] = None):
         """
-        Executes a GraphQL query against the GitHub API with optional variables.
+        Sends a GraphQL query or mutation to the GitHub API.
 
-        This method constructs a GraphQL query payload and sends it to the GitHub GraphQL API endpoint using
-        the internal requester of the PyGithub library. It handles both GraphQL queries and mutations. If the query
-        includes variables, they should be specified in the 'variables' parameter as a dictionary.
+        This method builds and submits a GraphQL payload to GitHub using PyGithub's requester for both query and mutation types. Variables for the payload are optional.
 
         Args:
-            query (str): A string containing the GraphQL mutation or query.
-            variables (Optional[Dict[str, str]]): A dictionary of variables to be used in the GraphQL query. Default is None.
+            query (str): GraphQL mutation or query string.
+            variables (Optional[Dict[str, str]]): Variables for the GraphQL query, defaults to None.
 
         Returns:
-            Dict[str, Any]: A dictionary containing the keys 'error' and either 'details' or 'data'. If 'error' is True,
-                            'details' will contain the error message; if 'error' is False, 'data' will contain the query results.
-        
+            Dict[str, Any]: Contains 'error' status and 'details' or 'data' from the response.
+
         Examples:
             result = self._run_graphql_query(
                 query='''
@@ -279,9 +276,8 @@ class GraphQLClient:
 
             print(result)
 
-        Important:
-            This method should be used carefully as it directly manipulates and sends queries to the GitHub API. 
-            Improper or malformed queries might lead to unexpected behaviors or high API usage costs.
+        Note:
+            Handle this method with caution to prevent API misuse or high costs.
         """
         payload = {"query": query}
         if variables:
@@ -305,20 +301,18 @@ class GraphQLClient:
 
     def get_project(self, owner: str, repo_name: str, project_title: str) -> Union[Dict[str, Any], str]:
         """
-        Fetches project details from a specific GitHub repository using GraphQL.
+        Retrieves project details from a GitHub repository using GraphQL.
 
-        This method retrieves information including the project details, labels, and assignable users from a GitHub repository
-        by executing a GraphQL query. The query is constructed using a pre-defined template and customized with the given
-        repository owner and name parameters.
+        This method formulates a GraphQL query to fetch project details, labels, and assignable users based on the owner and repository name provided.
 
         Args:
-            owner (str): The owner of the repository.
-            repo_name (str): The repository name.
-            project_title (str): The title of the project to find within the repository.
+            owner (str): Repository owner.
+            repo_name (str): Repository name.
+            project_title (str): Project title to search within the repository.
 
         Returns:
-            Union[Dict[str, Any], str]: If the project is found, returns a dictionary containing keys "project", "projectId",
-            "repositoryId", "labels", and "assignableUsers". If an error occurs or the project is not found, returns an error message.
+            Union[Dict[str, Any], str]: Returns project details or an error message.
+
         """
         query_template = GraphQLTemplates.QUERY_GET_PROJECT_INFO_TEMPLATE.value
         query = query_template.safe_substitute(owner=owner, repo_name=repo_name)
@@ -352,34 +346,26 @@ class GraphQLClient:
                        available_labels: Optional[List[Dict[str, Any]]] = None, 
                        available_assignees: Optional[List[Dict[str, Any]]] = None) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
         """
-        Processes project fields to update based on the provided desired field values.
+            Updates project fields based on provided desired field values.
 
-        This method maps the desired fields provided by the user to the actual fields available in the project.
-        It supports handling of single-select options, date fields, labels, and assignees. It checks for each field
-        stated in the desired fields if they exist in the project and updates them accordingly. If any field or 
-        option within a field does not exist, it is recorded in the missing fields list.
+            This method maps and updates fields like single-select options, date fields, labels, and assignees by checking the availability in the project. It records any unavailable fields or options.
 
-        Args:
-            project (Dict[str, Any]): The dictionary containing project data with fields.
-            desired_fields (Optional[Dict[str, List[str]]]): A dictionary where keys represent field names and 
-                values are a list of option names to be updated. Default is None.
-            available_labels (Optional[List[Dict[str, Any]]]): List of dictionaries containing label data available in the project.  
-                Each label is a dictionary with at least 'name' and 'id'. Default is None.
-            available_assignees (Optional[List[Dict[str, Any]]]): List of dictionaries containing assignee data available in the project. 
-                Each assignee is a dictionary with at least 'name' and 'id'. Default is None.
+            Args:
+                project (Dict[str, Any]): Dictionary containing project data.
+                desired_fields (Optional[Dict[str, List[str]]]): Keys are field names and values are options for update. Default is None.
+                available_labels (Optional[List[Dict[str, Any]]]): List containing available label data. Default is None.
+                available_assignees (Optional[List[Dict[str, Any]]]): List containing available assignee data. Default is None.
 
-        Returns:
-            Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]: A tuple containing two lists:
-                - First list contains dictionaries of fields that can be updated.
-                - Second list contains dictionaries of missing fields with reasons.
+            Returns:
+                Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]: Tuple with lists of updatable fields and missing fields.
 
-        Example:
-            fields_to_update, missing_fields = self.get_project_fields(
-                project=my_project,
-                desired_fields={"Due Date": ['2022-10-30'], "Assignee": ['username1', 'username2']},
-                available_labels=[{"name": "bug", "id": "label123"}],
-                available_assignees=[{"name": "dev1", "id": "user123"}]
-            )
+            Example:
+                fields_to_update, missing_fields = self.get_project_fields(
+                    project=my_project,
+                    desired_fields={"Due Date": ['2022-10-30'], "Assignee": ['username1']},
+                    available_labels=[{"name": "bug", "id": "label123"}],
+                    available_assignees=[{"name": "dev1", "id": "user123"}]
+                )
         """
         fields_to_update = []
         missing_fields = []
@@ -473,19 +459,17 @@ class GraphQLClient:
 
     def create_draft_issue(self, project_id: str, title: str, body: str) -> Union[str, Dict[str, str]]:
         """
-        Creates a draft issue in a specific GitHub project using the GraphQL API.
+        Creates a draft issue in a GitHub project via GraphQL API.
 
-        This method sends a mutation request to GitHub's GraphQL API to create a draft issue. 
-        It includes the project ID, title, and body of the issue as arguments and expects the draft issue ID on success.
+        This method sends a mutation request with project ID, title, and body, and returns the draft issue ID upon success.
 
         Args:
-            project_id (str): The unique identifier for the project within GitHub.
-            title (str): The title for the draft issue.
-            body (str): The body or detailed description of the draft issue.
+            project_id (str): Identifier for the GitHub project.
+            title (str): Title of the draft issue.
+            body (str): Description of the draft issue.
 
         Returns:
-            Union[str, Dict[str, str]]: If successful, returns the created draft issue ID. 
-            If an error occurs during the process, returns a descriptive error message.
+            Union[str, Dict[str, str]]: Returns the draft issue ID or an error message.
 
         Example:
             draft_issue_id = self.create_draft_issue(
@@ -519,20 +503,17 @@ class GraphQLClient:
 
     def convert_draft_issue(self, repository_id: str, draft_issue_id: str) -> Union[Tuple[int, str, str], str]:
         """
-        Converts a draft issue to a standard GitHub issue using the GraphQL API.
+        Converts a draft issue to a standard issue via GitHub's GraphQL API.
 
-        This method sends a mutation request to GitHub's GraphQL API to convert a previously created draft issue
-        to a standard issue. It includes the repository ID and the draft issue ID as arguments.
+        This method sends a mutation request with repository and draft issue IDs to convert a draft issue to a standard issue.
 
         Args:
-            repository_id (str): The unique identifier for the repository where the draft issue exists.
-            draft_issue_id (str): The unique identifier for the draft issue to be converted.
+            repository_id (str): Repository identifier.
+            draft_issue_id (str): Draft issue identifier to be converted.
 
         Returns:
-            Union[Tuple[int, str, str], str]: If successful, returns a tuple containing the issue number, 
-            the issue item ID, and the content ID of the converted issue. If an error occurs during the process,
-            returns a descriptive error message.
-        
+            Union[Tuple[int, str, str], str]: Returns issue details on success or an error message if failed.
+
         Example:
             issue_number, item_id, issue_item_id = self.convert_draft_issue(
                 repository_id="repo123",
@@ -569,20 +550,17 @@ class GraphQLClient:
 
     def update_issue(self, issue_id: str, desired_title: str, desired_body: str) -> Union[Dict[str, Any], str]:
         """
-        Updates the title and body of an existing GitHub issue using the GraphQL API.
+        Updates the title and body of an existing GitHub issue via GraphQL API.
 
-        This function sends a mutation query to the GitHub GraphQL API to update the title and body
-        of a specific issue identified by its `issue_id`. Proper error handling and meaningful response 
-        messages are provided to assist with troubleshooting and validation.
+        This function submits a mutation query to update the title and body of an issue based on its `issue_id`.
 
         Args:
-            issue_id (str): The unique identifier for the issue to be updated.
-            desired_title (str): The new title to be set for the issue.
-            desired_body (str): The new body content to be set for the issue.
+            issue_id (str): Identifier for the issue to be updated.
+            desired_title (str): New title for the issue.
+            desired_body (str): New body content for the issue.
 
         Returns:
-            Union[Dict[str, Any], str]: If successful, returns the JSON response from the API containing the update details. 
-                                        If any error occurs, returns a descriptive error message as a string.
+            Union[Dict[str, Any], str]: Returns the update response or an error message if failed.
 
         Example:
             result = self.update_issue(
@@ -609,6 +587,33 @@ class GraphQLClient:
         fields: Dict[str, str], 
         item_label_ids: Optional[Any] = [], item_assignee_ids: Optional[Any] = []
     ):
+        """
+        Updates fields of an issue in a GitHub project using GraphQL.
+
+        Args:
+            project_id (str): The GitHub project's unique identifier.
+            desired_item_id (str): The item's identifier within the project.
+            desired_issue_item_id (str): The identifier of the issue item to be updated.
+            fields (Dict[str, str]): Fields to update, keyed by field type with corresponding new values.
+            item_label_ids (Optional[Any]): IDs of labels to set, default is empty list.
+            item_assignee_ids (Optional[Any]): IDs of assignees to set, default is empty list.
+
+        Returns:
+            List[str]: Titles of fields successfully updated.
+
+        Raises:
+            Exception: Records failed field updates due to GraphQL operation issues.
+
+        Example:
+            updated_fields = self.update_issue_fields(
+                project_id="proj123",
+                desired_item_id="item456",
+                desired_issue_item_id="issue789",
+                fields={"Date": {"field_type": "DATE", "field_value": "2022-10-01", "field_id": "field123"}},
+                item_label_ids=["label321"],
+                item_assignee_ids=["assignee321"]
+            )
+        """
         updated_fields = []
         failed_fields = []
         for field in fields:
@@ -697,17 +702,15 @@ class GraphQLClient:
     @staticmethod
     def _convert_to_standard_utc(date_input: str) -> str:
         """
-        Converts a date string into an ISO 8601 formatted string with UTC timezone.
+        Converts a date string to an ISO 8601 formatted string in UTC.
 
-        This method attempts to parse a date string into a datetime object, then formats it into
-        ISO 8601 format. If the input string cannot be successfully parsed, the method defaults to the 
-        current datetime.
+        Parses the input into a datetime, formatting it as ISO 8601. If parsing fails, uses the current datetime.
 
         Args:
-            date_input (str): The date string to be parsed and converted.
+            date_input (str): Date string to convert.
 
         Returns:
-            str: An ISO 8601 formatted string representing the date in UTC timezone, or an empty string if input was empty.
+            str: ISO 8601 formatted date or an empty string if input is empty.
 
         Example:
             date_iso = MyClass._convert_to_standard_utc("2021-05-25T12:00:00")
