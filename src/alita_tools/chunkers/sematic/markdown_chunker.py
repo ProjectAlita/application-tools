@@ -12,6 +12,7 @@ def markdown_chunker(file_content_generator: Generator[Document, None, None], co
     headers_to_split_on = config.get("headers_to_split_on", [])
     max_tokens = config.get("max_tokens", 512)
     tokens_overlapping = config.get("token_owerlap", 10)
+    headers_to_split_on = [tuple(header) for header in headers_to_split_on]
     for doc in file_content_generator:
         doc_metadata = doc.metadata
         doc_content = doc.page_content
@@ -31,7 +32,7 @@ def markdown_chunker(file_content_generator: Generator[Document, None, None], co
                     chunk_id += 1
                     headers_meta = list(chunk.metadata.values())
                     docmeta = copy(doc_metadata)
-                    docmeta.update({"headers": headers_meta})
+                    docmeta.update({"headers": "; ".join(headers_meta)})
                     docmeta['chunk_id'] = chunk_id
                     yield Document(
                         page_content=subchunk,
@@ -41,7 +42,7 @@ def markdown_chunker(file_content_generator: Generator[Document, None, None], co
                 chunk_id += 1
                 headers_meta = list(chunk.metadata.values())
                 docmeta = copy(doc_metadata)
-                docmeta.update({"headers": headers_meta})
+                docmeta.update({"headers": "; ".join(headers_meta)})
                 docmeta['chunk_id'] = chunk_id
                 yield Document(
                     page_content=chunk.page_content,
