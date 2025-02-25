@@ -23,7 +23,7 @@ def _encode_documents(embeddings: 'BaseModel', docs: List[str]) -> np.ndarray:
     """
     max_docs_per_batch = 2000
     _embeddings = []
-
+    logger.info(f"Encoding {len(docs)} documents.")
     for i in range(0, len(docs), max_docs_per_batch):
         batch_docs = docs[i : i + max_docs_per_batch]
         try:
@@ -32,8 +32,8 @@ def _encode_documents(embeddings: 'BaseModel', docs: List[str]) -> np.ndarray:
         except Exception as e:
             logger.error(f"Error encoding documents {batch_docs}: {e}")
             raise
-
-    return np.array(embeddings)
+    logger.info(f"Encoded {len(_embeddings)} embeddings.")
+    return np.array(_embeddings)
 
 def _calculate_similarity_scores(encoded_docs: np.ndarray, window_size: int) -> List[float]:
         raw_similarities = []
@@ -264,52 +264,60 @@ def statistical_chunker(file_content_generator: Generator[Document, None, None],
     split_tokens_tolerance: int = config.get("split_tokens_tolerance", 10)
     threshold_adjustment: float = config.get("threshold_adjustment", 0.01)
     score_threshold: float = config.get("score_threshold", 0.5)
-    
+    docs_no = 0
     for doc in file_content_generator:
-        doc_metadata = doc.metadata
-        doc_content = doc.page_content
-        last_chunk: Optional[Chunk] = None
-        splits = TokenTextSplitter(encoding_name='cl100k_base', 
-                                   chunk_size=max_tokens_doc, chunk_overlap=0
-                                   ).split_text(doc_content)
-        chunk_index = 0
-        for i in tqdm(range(0, len(splits), batch_size)):
-            batch_splits = splits[i : i + batch_size]
-            if last_chunk is not None:
-                batch_splits = last_chunk.splits + batch_splits
-            
-            encoded_splits = _encode_documents(embedding, batch_splits)
-            
-            similarities = _calculate_similarity_scores(encoded_splits, window_size)
+        docs_no+=1
+        logger.info(f"Processing document {docs_no}.")
+        try:
+            doc_metadata = doc.metadata
+            doc_content = doc.page_content
+            last_chunk: Optional[Chunk] = None
+            splits = TokenTextSplitter(encoding_name='cl100k_base', 
+                                    chunk_size=max_tokens_doc, chunk_overlap=0
+                                    ).split_text(doc_content)
+            logger.info(f"Splitting {len(splits)} documents.")
+            chunk_index = 0
+            for i in tqdm(range(0, len(splits), batch_size)):
+                batch_splits = splits[i : i + batch_size]
+                if last_chunk is not None:
+                    batch_splits = last_chunk.splits + batch_splits
+                
+                encoded_splits = _encode_documents(embedding, batch_splits)
+                
+                similarities = _calculate_similarity_scores(encoded_splits, window_size)
 
-            if dynamic_threshold:
-                calculated_threshold = _find_optimal_threshold(
-                    batch_splits, similarities, min_split_tokens, 
-                    max_split_tokens, split_tokens_tolerance, 
-                    threshold_adjustment
+                if dynamic_threshold:
+                    calculated_threshold = _find_optimal_threshold(
+                        batch_splits, similarities, min_split_tokens, 
+                        max_split_tokens, split_tokens_tolerance, 
+                        threshold_adjustment
+                    )
+                else:
+                    calculated_threshold = score_threshold
+                
+                split_indices = _find_split_indices(
+                    similarities=similarities, 
+                    calculated_threshold=calculated_threshold
                 )
-            else:
-                calculated_threshold = score_threshold
-            
-            split_indices = _find_split_indices(
-                similarities=similarities, 
-                calculated_threshold=calculated_threshold
-            )
 
-            doc_chunks = _split_documents(
-                docs=batch_splits,
-                split_indices=split_indices,
-                similarities=similarities,
-            )
-            for chunk in doc_chunks:
-                chunk_index += 1
-                metadata = doc_metadata.copy()
-                metadata['chunk_index'] = chunk_index
-                metadata['chunk_token_count'] = chunk.token_count
-                last_chunk = chunk
-                logger.info(f"Chunk {chunk_index} created with {chunk.token_count} tokens.")
-                logger.info(chunk.content)
-                yield Document(
-                    page_content=chunk.content,
-                    metadata=metadata
+                doc_chunks = _split_documents(
+                    docs=batch_splits,
+                    split_indices=split_indices,
+                    similarities=similarities,
                 )
+                for chunk in doc_chunks:
+                    chunk_index += 1
+                    metadata = doc_metadata.copy()
+                    metadata['chunk_index'] = chunk_index
+                    metadata['chunk_token_count'] = chunk.token_count
+                    last_chunk = chunk
+                    logger.info(f"Chunk {chunk_index} created with {chunk.token_count} tokens.")
+                    logger.info(f"Chunk metadata: {metadata}")
+                    yield Document(
+                        page_content=chunk.content,
+                        metadata=metadata
+                    )
+        except Exception as e:
+            from traceback import format_exc
+            logger.error(f"Error: {format_exc()}")
+            raise e

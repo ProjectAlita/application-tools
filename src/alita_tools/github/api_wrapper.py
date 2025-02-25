@@ -911,7 +911,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             - The whitelist and blacklist patterns use Unix shell-style wildcards.
             - If both whitelist and blacklist are provided, a file must match the whitelist and not match the blacklist to be included.
         """
-        from ..code.loaders.codeparser import parse_code_files_for_db
+        from ..chunkers.code.codeparser import parse_code_files_for_db
         _files = self._get_files("", branch or self.active_branch)
         logger.info(f"Files in branch: {self.active_branch}")
         def is_whitelisted(file_path: str) -> bool:
