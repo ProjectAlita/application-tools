@@ -1,4 +1,4 @@
-from .constants import get_programming_language, get_file_extension
+from ...chunkers.code.constants import get_programming_language, get_file_extension
 
 def search_format(items):
     results = []

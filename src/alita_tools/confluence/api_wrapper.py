@@ -2,10 +2,10 @@ import json
 import logging
 import re
 import traceback
-from json import JSONDecodeError
-from typing import List, Optional, Any, Dict
-
 import requests
+from json import JSONDecodeError
+from typing import List, Optional, Any, Dict, Callable, Generator
+
 from langchain_community.document_loaders.confluence import ContentFormat
 from langchain_core.documents import Document
 from langchain_core.tools import ToolException
@@ -116,6 +116,25 @@ pageId = create_model(
      params=(Optional[str], Field(default="", description="Optional JSON of parameters to be sent in request body or query params. MUST be string with valid JSON. For search/read operations, you MUST always get minimum fields and set max results, until users ask explicitly for more fields. For search/read operations you must generate CQL query string and pass it as params."))
  )
 
+loaderParams = create_model(
+    "LoaderParams",
+    content_format=(str, Field(description="The format of the content to be retrieved.")),
+    page_ids=(Optional[List[str]], Field(description="List of page IDs to retrieve.", default=None)),
+    label=(Optional[str], Field(description="Label to filter pages.", default=None)),
+    cql=(Optional[str], Field(description="CQL query to filter pages.", default=None)),
+    include_restricted_content=(Optional[bool], Field(description="Include restricted content.", default=False)),
+    include_archived_content=(Optional[bool], Field(description="Include archived content.", default=False)),
+    include_attachments=(Optional[bool], Field(description="Include attachments.", default=False)),
+    include_comments=(Optional[bool], Field(description="Include comments.", default=False)),
+    include_labels=(Optional[bool], Field(description="Include labels.", default=False)),
+    limit=(Optional[int], Field(description="Limit the number of results.", default=10)),
+    max_pages=(Optional[int], Field(description="Maximum number of pages to retrieve.", default=1000)),
+    ocr_languages=(Optional[str], Field(description="OCR languages for processing attachments.", default=None)),
+    keep_markdown_format=(Optional[bool], Field(description="Keep the markdown format.", default=True)),
+    keep_newlines=(Optional[bool], Field(description="Keep newlines in the content.", default=True)),
+    bins_with_llm=(Optional[bool], Field(description="Use LLM for processing binary files.", default=False)),
+)
+
 
 def parse_payload_params(params: Optional[str]) -> Dict[str, Any]:
     if params:
@@ -146,6 +165,7 @@ class ConfluenceAPIWrapper(BaseModel):
     keep_markdown_format: Optional[bool] = True
     ocr_languages: Optional[str] = None
     keep_newlines: Optional[bool] = True
+    alita: Any = None
 
     @model_validator(mode='before')
     @classmethod
@@ -646,6 +666,140 @@ class ConfluenceAPIWrapper(BaseModel):
             body = markdownify(response.text, heading_style="ATX")
             return body
         return response.text
+    
+    
+    def paginate_request(self, retrieval_method: Callable, **kwargs: Any) -> List:
+        """Paginate the various methods to retrieve groups of pages.
+
+        Unfortunately, due to page size, sometimes the Confluence API
+        doesn't match the limit value. If `limit` is >100 confluence
+        seems to cap the response to 100. Also, due to the Atlassian Python
+        package, we don't get the "next" values from the "_links" key because
+        they only return the value from the result key. So here, the pagination
+        starts from 0 and goes until the max_pages, getting the `limit` number
+        of pages with each request. We have to manually check if there
+        are more docs based on the length of the returned list of pages, rather than
+        just checking for the presence of a `next` key in the response like this page
+        would have you do:
+        https://developer.atlassian.com/server/confluence/pagination-in-the-rest-api/
+
+        :param retrieval_method: Function used to retrieve docs
+        :type retrieval_method: callable
+        :return: List of documents
+        :rtype: List
+        """
+
+        max_pages = kwargs.pop("max_pages")
+        docs: List[dict] = []
+        next_url: str = ""
+        while len(docs) < max_pages:
+            get_pages = retry(
+                reraise=True,
+                stop=stop_after_attempt(
+                    self.number_of_retries  # type: ignore[arg-type]
+                ),
+                wait=wait_exponential(
+                    multiplier=1,
+                    min=self.min_retry_seconds,  # type: ignore[arg-type]
+                    max=self.max_retry_seconds,  # type: ignore[arg-type]
+                ),
+                before_sleep=before_sleep_log(logger, logging.WARNING),
+            )(retrieval_method)
+            if self.cql:  # cursor pagination for CQL
+                batch, next_url = get_pages(**kwargs, next_url=next_url)
+                if not next_url:
+                    docs.extend(batch)
+                    break
+            else:
+                batch = get_pages(**kwargs, start=len(docs))
+                if not batch:
+                    break
+            docs.extend(batch)
+        return docs[:max_pages]
+    
+    def loader(self,
+            content_format: str,
+            page_ids: Optional[List[str]] = None,
+            label: Optional[str] = None,
+            cql: Optional[str] = None,
+            include_restricted_content: Optional[bool] = False,
+            include_archived_content: Optional[bool] = False,
+            include_attachments: Optional[bool] = False,
+            include_comments: Optional[bool] = False,
+            include_labels: Optional[bool] = False,
+            limit: Optional[int] = 10,
+            max_pages: Optional[int] = 10,
+            ocr_languages: Optional[str] = None,
+            keep_markdown_format: Optional[bool] = True,
+            keep_newlines: Optional[bool] = True,
+            bins_with_llm: bool = False,
+            **kwargs) -> Generator[str, None, None]:
+        """
+        Loads content from Confluence based on the provided parameters.
+
+        Parameters:
+            content_format (str): The format of the content to be retrieved.
+            page_ids (Optional[List[str]]): List of page IDs to retrieve.
+            label (Optional[str]): Label to filter pages.
+            cql (Optional[str]): CQL query to filter pages.
+            include_restricted_content (Optional[bool]): Include restricted content.
+            include_archived_content (Optional[bool]): Include archived content.
+            include_attachments (Optional[bool]): Include attachments.
+            include_comments (Optional[bool]): Include comments.
+            include_labels (Optional[bool]): Include labels.
+            limit (Optional[int]): Limit the number of results.
+            max_pages (Optional[int]): Maximum number of pages to retrieve.
+            ocr_languages (Optional[str]): OCR languages for processing attachments.
+            keep_markdown_format (Optional[bool]): Keep the markdown format.
+            keep_newlines (Optional[bool]): Keep newlines in the content.
+            bins_with_llm (bool): Use LLM for processing binary files.
+            kwargs: Additional runtime arguments (deprecated).
+
+        Returns:
+            Generator: A generator that yields the content of pages that match the specified criteria.
+        """
+        from .loader import AlitaConfluenceLoader
+        
+        content_formant = content_format.lower() if content_format else 'view'
+        mapping = {
+            'view': ContentFormat.VIEW,
+            'storage': ContentFormat.STORAGE,
+            'export_view': ContentFormat.EXPORT_VIEW,
+            'editor': ContentFormat.EDITOR,
+            'anonymous': ContentFormat.ANONYMOUS_EXPORT_VIEW
+        }
+        content_format = mapping.get(content_formant, ContentFormat.VIEW)
+        
+        confluence_loader_params = {
+            'url': self.base_url,
+            'space_key': self.space,
+            'page_ids': page_ids,
+            'label': label,
+            'cql': cql,
+            'include_restricted_content': include_restricted_content,
+            'include_archived_content': include_archived_content,
+            'include_attachments': include_attachments,
+            'include_comments': include_comments,
+            'include_labels': include_labels,
+            'content_format': content_format,
+            'limit': limit,
+            'max_pages': max_pages,
+            'ocr_languages': ocr_languages,
+            'keep_markdown_format': keep_markdown_format,
+            'keep_newlines': keep_newlines,
+            'min_retry_seconds': self.min_retry_seconds,
+            'max_retry_seconds': self.max_retry_seconds,
+            'number_of_retries': self.number_of_retries
+            
+        }
+        
+        loader = AlitaConfluenceLoader(self._client, self.alita, bins_with_llm, **confluence_loader_params)
+        
+        for document in loader._lazy_load(kwargs={}):
+            yield document
+
+
+        
 
     def get_available_tools(self):
         return [
@@ -744,6 +898,12 @@ class ConfluenceAPIWrapper(BaseModel):
                 "description": self.execute_generic_confluence.__doc__,
                 "args_schema": сonfluenceInput,
                 "ref": self.execute_generic_confluence,
+            },
+            {
+                "name": "loader",
+                "ref": self.loader,
+                "description": self.loader.__doc__,
+                "args_schema": loaderParams,
             }
         ]
 
