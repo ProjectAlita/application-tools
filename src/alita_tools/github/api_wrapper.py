@@ -10,6 +10,8 @@ from langchain.utils import get_from_dict_or_env
 
 from logging import getLogger
 
+from .graphql_github import GraphQLClient
+
 logger = getLogger(__name__)
 
 from langchain_community.tools.github.prompt import (
@@ -115,6 +117,58 @@ labels: bug, ui
 assignees: user1, user2
 
 closed
+"""
+
+CREATE_ISSUE_ON_PROJECT_PROMPT = """
+This tool allows for creating GitHub issues within specified projects. Adhere to these steps:
+
+1. Specify both project and issue titles.
+2. Optionally, include a detailed issue description and any additional required fields in JSON format.
+
+Ensure JSON fields are correctly named as expected by the project.
+
+**Example**:
+For an issue titled "Fix Navigation Bar" in the "WebApp Redesign" project, addressing mobile view responsiveness, set as medium priority, in staging, and assigned to "dev_lead":
+
+Project: WebApp Redesign
+Issue Title: Fix Navigation Bar
+Description: The navigation bar disappears on mobile view. Needs responsive fix.
+JSON:
+{
+  "Environment": "Staging",
+  "Priority": "Medium",
+  "Labels": ["bug", "UI"],
+  "Assignees": ["dev_lead"]
+}
+"""
+
+UPDATE_ISSUE_ON_PROJECT_PROMPT = """
+This tool updates GitHub issues for the specified project. Follow these steps:
+
+- Provide the issue number and project title.
+- Optionally, adjust the issue's title, description, and other fields.
+- Use JSON key-value pairs to update or clear fields, setting empty strings to clear.
+
+Ensure field names align with project requirements.
+
+**Example**:
+Update issue 42 in "WebApp Redesign," change its title, modify the description, and update settings:
+
+Issue Number: 42
+Project: WebApp Redesign
+New Title: Update Navigation Bar
+
+Description:
+Implement dropdown menus based on user roles for full device compatibility.
+
+JSON:
+{
+  "Environment": "Production",
+  "Type": "Enhancement",
+  "Priority": "High",
+  "Labels": ["UI"],
+  "Assignees": ["ui_team"]
+}
 """
 
 SearchCode = create_model(
@@ -300,6 +354,74 @@ UpdateIssue = create_model(
     ),
 )
 
+CreateIssueOnProject = create_model(
+    "CreateIssueOnProject",
+    project_title=(
+        str,
+        Field(
+            description="The title of the project within which the issue will be created."
+        ),
+    ),
+    title=(
+        str,
+        Field(description="The title of the issue to be created within the project."),
+    ),
+    body=(
+        str,
+        Field(
+            description="The body or description of the issue, providing details and context."
+        ),
+    ),
+    fields=(
+        Optional[Dict[str, str]],
+        Field(
+            default=None,
+            description="A dictionary of additional fields to set on the issue. Each key should correspond to a field name, and each value to the desired field value. Declare but leave empty if you want to clear field.",
+            example={
+                "Environment": "Staging",
+                "SR Type": "Issue/Bug Report",
+                "SR Priority": "Medium",
+                "Labels": ["bug", "documentation"],
+                "Assignees": ["assignee_name"],
+            },
+        ),
+    ),
+)
+
+UpdateIssueOnProject = create_model(
+    "UpdateIssueOnProject",
+    issue_number=(
+        str,
+        Field(description="The unique number of the issue to update within the project.")
+    ),
+    project_title=(
+        str,
+        Field(description="The title of the project from which to fetch the issue.")
+    ),
+    title=(
+        str,
+        Field(description="New title to set for the issue.")
+    ),
+    body=(
+        str,
+        Field(description="New body content to set for the issue.")
+    ),
+    fields=(
+        Optional[Dict[str, str]],
+        Field(
+            default=None,
+            description="A dictionary of additional field values by field names to update. Provide empty strings to clear specific fields.",
+            example={
+                "Environment": "Development",
+                "SR Type": "Enhancement",
+                "SR Priority": "Low",
+                "Labels": ["enhancement", "low-priority"],
+                "Assignees": ["developer_name"]
+            }
+        )
+    )
+)
+
 LoaderSchema = create_model(
     "LoaderSchema",
     branch=(Optional[str], Field(description="The branch to set as active before listing files. If None, the current active branch is used.")),
@@ -310,6 +432,8 @@ LoaderSchema = create_model(
 class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
     _github: Any = PrivateAttr()
     _github_repo_instance: Any = PrivateAttr()
+    _github_graphql_instance: Any = PrivateAttr()
+    _graphql_client: Optional[GraphQLClient] = PrivateAttr(None)
     github_repository: Optional[str] = None
     active_branch: Optional[str] = None
     github_base_branch: Optional[str] = None
@@ -318,6 +442,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
     github_password: Optional[str] = None
     github_app_id: Optional[str] = None
     github_app_private_key: Optional[str] = None
+    
 
     @model_validator(mode='before')
     @classmethod
@@ -389,12 +514,30 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             g = Github(base_url=github_base_url, auth=auth)
 
         cls._github = g
+        cls._github_graphql_instance = g._Github__requester
         cls._github_repo_instance = g.get_repo(github_repository)
         values["github_repository"] = github_repository
         values["active_branch"] = active_branch
         values["github_base_branch"] = github_base_branch
 
         return values
+    
+    def _get_graphql_client(self) -> GraphQLClient:
+        """
+        Returns an existing GraphQLClient instance or creates a new one.
+        Handles authentication issues or other client creation errors.
+        """
+        try:
+            if not self._graphql_client:
+                self._graphql_client = GraphQLClient(self._github_graphql_instance)
+            return self._graphql_client
+        except Exception as e:
+            logger.error(f"An error occurred while initializing the GraphQL client. Error: {str(e)}")
+            return (
+                "Authentication failed. Please ensure you are using valid credentials. "
+                "Refer to the documentation here:\nhttps://docs.github.com/en/graphql/guides/forming-calls-with-graphql#authenticating-with-graphql\n"
+                f"Error: {str(e)}"
+            )
 
     def _get_files(self, directory_path: str, ref: str) -> List[str]:  
         from github import GithubException
@@ -930,6 +1073,186 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                     yield {"file_name": file, "file_content": self._read_file(file, branch=branch or self.active_branch)}
         
         return parse_code_files_for_db(file_content_generator())
+    
+
+    def create_issue_on_project(
+        self,
+        project_title: str,
+        title: str,
+        body: str,
+        fields: Optional[Dict[str, str]] = None,
+    ) -> str:
+        """
+        Creates an issue within a specified project using a series of GraphQL operations.
+
+        The function initializes by identifying the repository, then extracts or creates the project and sets up
+        the issue draft and configuration using provided parameters. It eventually finalizes the issue by converting
+        from the draft and optionally updating with detailed fields.
+
+        Args:
+            project_title (str): The title of the project to which the issue will be added.
+            title (str): Title for the newly created issue.
+            body (str): Body text for the newly created issue.
+            fields (Optional[Dict[str, str]]): Additional key value pairs for issue field configurations.
+
+        Returns:
+            str: A message indicating the outcome of the operation, with details of the newly created issue
+            and any fields that were updated or failed to update.
+
+        Raises:
+            Exception: If any step in the process encounters an error, it will return a formatted error message.
+        """
+        _graphql_client = self._get_graphql_client()
+        full_name = self._github_repo_instance.full_name
+        owner_name, repo_name = full_name.split("/")
+
+        try:
+            result = _graphql_client.get_project(owner=owner_name, repo_name=repo_name, project_title=project_title)
+            project = result.get("project")
+            labels = result.get("labels")
+            assignableUsers = result.get("assignableUsers")
+            project_id = result.get("projectId")
+            repository_id = result.get("repositoryId")
+        except Exception as e:
+            return f"Project has not been found. Error: {str(e)}. {str(result)}"
+
+        try:
+            missing_fields = []
+            updated_fields = []
+            if fields:
+                fields_to_update, missing_fields = _graphql_client.get_project_fields(
+                    project, fields, labels, assignableUsers
+                )
+        except Exception as e:
+            return f"Project fields are not returned. Error: {str(e)}"
+
+        try:
+            draft_issue_item_id = _graphql_client.create_draft_issue(
+                project_id=project_id,
+                title=title,
+                body=body,
+            )
+        except Exception as e:
+            return f"Draft Issue Not Created. Error: {str(e)}. {str(draft_issue_item_id)}"
+
+        try:
+            issue_number, item_id, issue_item_id = _graphql_client.convert_draft_issue(
+                repository_id=repository_id,
+                draft_issue_id=draft_issue_item_id,
+            )
+        except Exception as e:
+            return f"Convert Issue Failed. Error: {str(e)}. {str(issue_number)}"
+
+        try:
+            if fields:
+                updated_fields = _graphql_client.update_issue_fields(
+                    project_id=project_id,
+                    item_id=item_id,
+                    issue_item_id=issue_item_id,
+                    fields=fields_to_update
+                )
+        except Exception as e:
+            return f"Issue fields are not updated. Error: {str(e)}. {str(updated_fields)}"
+
+        base_message = f"The issue with number '{issue_number}' has been created."
+        fields_message = ""
+        if missing_fields:
+            fields_message = f"Response on update fields: {str(updated_fields)},\nExcept for the fields: {str(missing_fields)}."
+        elif updated_fields:
+            fields_message = f"Response on update fields: {str(updated_fields)}."
+
+        return f"{base_message}\n{fields_message}"
+    
+    def update_issue_on_project(
+        self,
+        issue_number: str,
+        project_title: str,
+        title: str,
+        body: str,
+        fields: Optional[Dict[str, str]],
+    ) -> str:
+        """
+        Updates an existing issue specified by issue number within a project, title, body, and other fields.
+
+        Args:
+            issue_number (str): The unique number of the issue to update.
+            project_title (str): The title of the project from which to fetch the issue.
+            title (str): New title to set for the issue.
+            body (str): New body content to set for the issue.
+            fields (Optional[Dict[str, str]]): A dictionary of additional field values by field names to update. Provide empty string to clear field
+
+        Returns:
+            str: Summary of the update operation and any changes applied or errors encountered.
+
+        Raises:
+            Exception: Describes any errors encountered during operation execution.
+        """
+        _graphql_client = self._get_graphql_client()
+        owner_name, repo_name = self._github_repo_instance.full_name.split("/")
+
+        try:
+            result = _graphql_client.get_project(owner=owner_name, repo_name=repo_name, project_title=project_title)
+            project = result.get("project")
+            labels = result.get("labels")
+            assignableUsers = result.get("assignableUsers")
+            project_id = result.get("projectId")
+        except Exception as e:
+            return f"Project has not been found. Error: {str(e)}. {str(result)}"
+
+        try:
+            fields_to_update, missing_fields = _graphql_client.get_project_fields(
+                project, fields, labels, assignableUsers
+            )
+        except Exception as e:
+            return f"Project fields are not returned. Error: {str(e)}"
+
+        issue_item_id = None
+        items = project['items']['nodes']
+        for item in items:
+            content = item.get('content')
+            if content and str(content['number']) == issue_number:
+                item_labels = content.get('labels', {}).get('nodes', [])
+                item_assignees = content.get('assignees', {}).get('nodes', [])
+                item_id = item['id']
+                issue_item_id = content['id']
+                break
+
+        if not issue_item_id:
+            return f"Issue number {issue_number} not found in project."
+
+        try:
+            updated_issue = _graphql_client.update_issue(
+                issue_id=issue_item_id,
+                title=title,
+                body=body
+            )
+        except Exception as e:
+            return f"Issue title and body have not updated. Error: {str(e)}. {str(updated_issue)}"
+
+        try:
+            item_label_ids = [label["id"] for label in item_labels]
+            item_assignee_ids = [assignee["id"] for assignee in item_assignees]
+
+            updated_fields = _graphql_client.update_issue_fields(
+                project_id=project_id,
+                item_id=item_id,
+                issue_item_id=issue_item_id,
+                fields=fields_to_update,
+                item_label_ids=item_label_ids,
+                item_assignee_ids=item_assignee_ids
+            )
+        except Exception as e:
+            return f"Issue fields are not updated. Error: {str(e)}. {str(updated_fields)}"
+
+        base_message = f"The issue with number '{issue_number}' has been updated."
+        fields_message = ""
+        if missing_fields:
+            fields_message = f"Response on update fields: {str(updated_fields)},\nExcept for the fields: {str(missing_fields)}."
+        elif updated_fields:
+            fields_message = f"Response on update fields: {str(updated_fields)}."
+
+        return f"{base_message}\n{fields_message}"
+
 
     def get_available_tools(self):
         return [
@@ -1072,6 +1395,20 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                 "mode": "loader",
                 "description": self.loader.__doc__,
                 "args_schema": LoaderSchema,
+            },
+            {
+                "ref": self.create_issue_on_project,
+                "name": "create_issue_on_project",
+                "mode": "create_issue_on_project",
+                "description": CREATE_ISSUE_ON_PROJECT_PROMPT,
+                "args_schema": CreateIssueOnProject,
+            },
+            {
+                "ref": self.update_issue_on_project,
+                "name": "update_issue_on_project",
+                "mode": "update_issue_on_project",
+                "description": UPDATE_ISSUE_ON_PROJECT_PROMPT,
+                "args_schema": UpdateIssueOnProject,
             }
         ]
 
