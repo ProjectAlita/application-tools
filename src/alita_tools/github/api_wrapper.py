@@ -120,8 +120,6 @@ closed
 """
 
 CREATE_ISSUE_ON_PROJECT_PROMPT = """
-**IMPORTANT**: Only OAuth App tokens are permitted (no Personal tokens). Ensure the "project:admin" scope is included as per GitHub documentation.
-
 This tool allows for creating GitHub issues within specified projects. Adhere to these steps:
 
 1. Specify both project and issue titles.
@@ -145,9 +143,7 @@ JSON:
 """
 
 UPDATE_ISSUE_ON_PROJECT_PROMPT = """
-**IMPORTANT**: Only OAuth App tokens are valid. Ensure "project:admin" is authorized.
-
-This tool updates GitHub issues. Follow these steps:
+This tool updates GitHub issues for the specified project. Follow these steps:
 
 - Provide the issue number and project title.
 - Optionally, adjust the issue's title, description, and other fields.
