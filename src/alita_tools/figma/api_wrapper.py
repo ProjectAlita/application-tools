@@ -53,11 +53,11 @@ class ArgsSchema(Enum):
         ),
         geometry=(
             Optional[str],
-            Field(description="Set to 'paths' to export vector data"),
+            Field(description="Sets to 'paths' to export vector data"),
         ),
         version=(
             Optional[str],
-            Field(description="Set to 'paths' to export vector data"),
+            Field(description="Sets version of file"),
         ),
         limit=(
             Optional[str],
