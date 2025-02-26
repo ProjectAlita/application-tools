@@ -38,6 +38,7 @@ from .keycloak import KeycloakToolkit
 from .localgit import AlitaLocalGitToolkit
 from .pandas import PandasToolkit
 from .azure_ai.search import AzureSearchToolkit, get_tools as get_azure_search
+from .figma import FigmaToolkit
 
 logger = logging.getLogger(__name__)
 
@@ -141,4 +142,5 @@ def get_toolkits():
         AlitaLocalGitToolkit.toolkit_config_schema(),
         PandasToolkit.toolkit_config_schema(),
         AzureSearchToolkit.toolkit_config_schema(),
+        FigmaToolkit.toolkit_config_schema(),
     ]

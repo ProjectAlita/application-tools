@@ -47,3 +47,4 @@ pandas==2.2.3
 langchain-openai~=0.3.4
 tree_sitter==0.20.2
 tree-sitter-languages==1.10.2
+FigmaPy==2018.1.0
