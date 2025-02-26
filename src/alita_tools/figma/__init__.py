@@ -4,7 +4,7 @@ from langchain_core.tools import BaseTool, BaseToolkit
 from pydantic import BaseModel, ConfigDict, Field, create_model
 
 from ..base.tool import BaseAction
-from .api_wrapper import FigmaApiWrapper, GLOBAL_REGEXP
+from .api_wrapper import FigmaApiWrapper, GLOBAL_LIMIT
 
 name = "figma"
 
@@ -12,7 +12,13 @@ name = "figma"
 def get_tools(tool):
     return (
         FigmaToolkit()
-        .get_toolkit(selected_tools=tool["settings"].get("selected_tools", []))
+        .get_toolkit(
+            selected_tools=tool["settings"].get("selected_tools", []),
+            token=tool["settings"].get("token", None),
+            oauth2=tool["settings"].get("oauth2", False),
+            global_limit=tool["settings"].get("global_limit", GLOBAL_LIMIT),
+            global_regexp=tool["settings"].get("global_regexp", None),
+        )
         .get_tools()
     )
 
@@ -30,8 +36,8 @@ class FigmaToolkit(BaseToolkit):
             name,
             token=(str, Field(description="Token", json_schema_extra={"secret": True})),
             oauth2=(bool, Field(description="OAuth2", default=False)),
-            global_limit=(Optional[int], Field(description="Global limit", default=10000)),
-            global_regexp=(Optional[str], Field(description="Global regex pattern", default=GLOBAL_REGEXP)),
+            global_limit=(Optional[int], Field(description="Global limit", default=GLOBAL_LIMIT)),
+            global_regexp=(Optional[str], Field(description="Global regex pattern", default=None)),
             selected_tools=(
                 List[Literal[tuple(selected_tools)]],
                 Field(default=[], json_schema_extra={"args_schemas": selected_tools}),

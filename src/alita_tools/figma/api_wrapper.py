@@ -9,7 +9,7 @@ from FigmaPy import FigmaPy
 from langchain_core.tools import ToolException
 from pydantic import BaseModel, Field, PrivateAttr, create_model, model_validator
 
-GLOBAL_REGEXP = r'("id"|"componentId"|"blendMode"|"scrollBehavior"|"thumbnailUrl"|"r"|"g"|"b"|"a"|"x"|"y"|"width"|"height"|"strokeWeight"|"strokeAlign"|"strokeJoin"|"strokeCap"|"stroke"|"vertical"|"horizontal"|"clipsContent"|"layoutAlign"|"layoutGrow"|"layoutSizingHorizontal"|"layoutSizingVertical"|"fill"|"text"|"effect"|"startingAngle"|"endingAngle"|"innerRadius"|"cornerRadius"|"cornerSmoothing"|"layoutMode"|"counterAxisSizingMode"|"itemSpacing"|"primaryAxisSizingMode"|"counterAxisAlignItems"|"primaryAxisAlignItems"|"paddingLeft"|"paddingRight"|"paddingTop"|"paddingBottom"|"layoutWrap"|"key"|"description"|"styleType"|"remote"|"componentSetId"|"fontFamily"|"fontPostScriptName"|"fontWeight"|"textCase"|"textAutoResize"|"fontSize"|"textAlignHorizontal"|"textAlignVertical"|"letterSpacing"|"lineHeightPx"|"lineHeightPercent"|"lineHeightUnit"|"strokes"|"fills")\s*:\s*("[^"]*"|[^\s,}\[]+)\s*(?=,|\}|\n)'
+GLOBAL_LIMIT = 10000
 
 class ArgsSchema(Enum):
     NoInput = create_model("NoInput")
@@ -30,7 +30,7 @@ class ArgsSchema(Enum):
         ),
         limit=(
             Optional[str],
-            Field(description="Sets limit to lenght of output", default=10000),
+            Field(description="Sets limit to lenght of output", default=GLOBAL_LIMIT),
         ),
         regexp=(
             Optional[str],
@@ -61,7 +61,7 @@ class ArgsSchema(Enum):
         ),
         limit=(
             Optional[str],
-            Field(description="Sets limit to lenght of output", default=10000),
+            Field(description="Sets limit to lenght of output", default=GLOBAL_LIMIT),
         ),
         regexp=(
             Optional[str],
@@ -84,7 +84,7 @@ class ArgsSchema(Enum):
         ),
         limit=(
             Optional[str],
-            Field(description="Sets limit to lenght of output", default=10000),
+            Field(description="Sets limit to lenght of output", default=GLOBAL_LIMIT),
         ),
         regexp=(
             Optional[str],
@@ -117,7 +117,7 @@ class ArgsSchema(Enum):
         ),
         limit=(
             Optional[str],
-            Field(description="Sets limit to lenght of output", default=10000),
+            Field(description="Sets limit to lenght of output", default=GLOBAL_LIMIT),
         ),
         regexp=(
             Optional[str],
@@ -162,7 +162,7 @@ class ArgsSchema(Enum):
         ),
         limit=(
             Optional[str],
-            Field(description="Sets limit to lenght of output", default=10000),
+            Field(description="Sets limit to lenght of output", default=GLOBAL_LIMIT),
         ),
         regexp=(
             Optional[str],
@@ -185,7 +185,7 @@ class ArgsSchema(Enum):
         ),
         limit=(
             Optional[str],
-            Field(description="Sets limit to lenght of output", default=10000),
+            Field(description="Sets limit to lenght of output", default=GLOBAL_LIMIT),
         ),
         regexp=(
             Optional[str],
@@ -208,7 +208,7 @@ class ArgsSchema(Enum):
         ),
         limit=(
             Optional[str],
-            Field(description="Sets limit to lenght of output", default=10000),
+            Field(description="Sets limit to lenght of output", default=GLOBAL_LIMIT),
         ),
         regexp=(
             Optional[str],
@@ -225,8 +225,8 @@ class ArgsSchema(Enum):
 class FigmaApiWrapper(BaseModel):
     token: str = Field(default=None)
     oauth2: bool = Field(default=False)
-    global_limit: Optional[int] = Field(default=10000)
-    global_regexp: Optional[str] = Field(default=GLOBAL_REGEXP)
+    global_limit: Optional[int] = Field(default=GLOBAL_LIMIT)
+    global_regexp: Optional[str] = Field(default=None)
     _client: Optional[FigmaPy] = PrivateAttr()
 
     @model_validator(mode="after")
@@ -236,13 +236,17 @@ class FigmaApiWrapper(BaseModel):
         oauth2 = values.oauth2
         global_regexp = values.global_regexp
 
-        try:
-            re.compile(global_regexp)
-            cls.global_regexp = global_regexp
-        except re.error as e:
-            msg = f"Failed to compile regex pattern: {str(e)}"
-            logging.error(msg)
-            return ToolException(msg)
+        if global_regexp is None:
+            logging.warning("No regex pattern provided. Skipping regex compilation.")
+            cls.global_regexp = None
+        else:
+            try:
+                re.compile(global_regexp)
+                cls.global_regexp = global_regexp
+            except re.error as e:
+                msg = f"Failed to compile regex pattern: {str(e)}"
+                logging.error(msg)
+                return ToolException(msg)
 
         try:
             if token:

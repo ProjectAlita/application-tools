@@ -38,7 +38,7 @@ from .keycloak import KeycloakToolkit
 from .localgit import AlitaLocalGitToolkit
 from .pandas import PandasToolkit
 from .azure_ai.search import AzureSearchToolkit, get_tools as get_azure_search
-from .figma import FigmaToolkit
+from .figma import get_tools as get_figma, FigmaToolkit
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +95,8 @@ def get_tools(tools_list, alita: 'AlitaClient', llm: 'LLMLikeObject', *args, **k
             tools.extend(get_google_places(tool))
         elif tool['type'] == 'azure_search':
             tools.extend(get_azure_search(tool))
+        elif tool['type'] == 'figma':
+            tools.extend(get_figma(tool))
         else:
             if tool.get("settings", {}).get("module"):
                 try:
