@@ -223,8 +223,8 @@ class ArgsSchema(Enum):
 
 
 class FigmaApiWrapper(BaseModel):
-    token: str = Field(default=None)
-    oauth2: bool = Field(default=False)
+    token: Optional[str] = Field(default=None)
+    oauth2: Optional[str] = Field(default=None)
     global_limit: Optional[int] = Field(default=GLOBAL_LIMIT)
     global_regexp: Optional[str] = Field(default=None)
     _client: Optional[FigmaPy] = PrivateAttr()
@@ -250,8 +250,11 @@ class FigmaApiWrapper(BaseModel):
 
         try:
             if token:
-                cls._client = FigmaPy(token=token, oauth2=oauth2)
-                logging.info("Authenticated with token")
+                cls._client = FigmaPy(token=token, oauth2=False)
+                logging.info("Authenticated with Figma token")
+            elif oauth2:
+                cls._client = FigmaPy(token=oauth2, oauth2=True)
+                logging.info("Authenticated with OAuth2 token")
             else:
                 return ToolException("You have to define Figma token.")
             logging.info("Successfully authenticated to Figma.")
