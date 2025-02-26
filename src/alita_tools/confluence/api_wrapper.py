@@ -166,6 +166,7 @@ class ConfluenceAPIWrapper(BaseModel):
     ocr_languages: Optional[str] = None
     keep_newlines: Optional[bool] = True
     alita: Any = None
+    llm: Any = None
 
     @model_validator(mode='before')
     @classmethod
@@ -793,7 +794,7 @@ class ConfluenceAPIWrapper(BaseModel):
             
         }
         
-        loader = AlitaConfluenceLoader(self._client, self.alita, bins_with_llm, **confluence_loader_params)
+        loader = AlitaConfluenceLoader(self._client, self.llm, bins_with_llm, **confluence_loader_params)
         
         for document in loader._lazy_load(kwargs={}):
             yield document

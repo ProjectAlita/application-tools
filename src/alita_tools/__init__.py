@@ -41,10 +41,11 @@ from .azure_ai.search import AzureSearchToolkit, get_tools as get_azure_search
 
 logger = logging.getLogger(__name__)
 
-def get_tools(tools_list, alita, *args, **kwargs):
+def get_tools(tools_list, alita: 'AlitaClient', llm: 'LLMLikeObject', *args, **kwargs):
     tools = []
     for tool in tools_list:
         tool['settings']['alita'] = alita
+        tool['settings']['llm'] = llm
         if tool['type'] == 'openapi':
             tools.extend(get_openapi(tool))
         elif tool['type'] == 'github':

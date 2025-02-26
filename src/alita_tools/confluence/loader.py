@@ -17,7 +17,7 @@ Image.MAX_IMAGE_PIXELS = 300_000_000
 
 class AlitaConfluenceLoader(ConfluenceLoader):
 
-    def __init__(self, confluence_client, alita, bins_with_llm=False, **kwargs):
+    def __init__(self, confluence_client, llm, bins_with_llm=False, **kwargs):
         self.bins_with_llm = bins_with_llm
         self.prompt = kwargs.get('prompt', """
 ## Image Type: Diagrams (e.g., Sequence Diagram, Context Diagram, Component Diagram)
@@ -38,7 +38,7 @@ class AlitaConfluenceLoader(ConfluenceLoader):
 - Maintain a structured and logical flow in the output to enhance understanding and usability.
 - Avoid presenting the entire prompt for user.
     """)
-        self.llm = alita
+        self.llm = llm
         for key in ['bins_with_llm', 'prompt', 'llm']:
             try:
                 del kwargs[key]
