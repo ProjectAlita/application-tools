@@ -47,4 +47,7 @@ pandas==2.2.3
 langchain-openai~=0.3.4
 tree_sitter==0.20.2
 tree-sitter-languages==1.10.2
+pdf2image==1.16.3
+reportlab==4.2.5
+svglib==1.5.1
 FigmaPy==2018.1.0

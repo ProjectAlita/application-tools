@@ -14,11 +14,15 @@ PaginatedResults = create_model(
     "PaginatedResultsModel",
     page_number=PageNumberField,
 )
-ExportSpecifiedLaunch = create_model(
-    "ExportSpecifiedLaunchModel",
+GetExtendedLaunchData = create_model(
+    "GetExtendedLaunchData",
+    launch_id=(str, Field(description="Launch ID of the launch to export."))
+)
+GetExtendedLaunchDataAsRaw = create_model(
+    "GetExtendedLaunchDataAsRaw",
     launch_id=(str, Field(description="Launch ID of the launch to export.")),
     format=(Optional[str], Field(default="html",
-                                 description="format of the exported data. may be one of 'pdf' or 'html'")),
+                                 description="format of the exported data. may be one of 'pdf' or 'html'"))
 )
 GetLaunchDetails = create_model(
     "GetLaunchDetailsModel",
@@ -63,13 +67,24 @@ class ReportPortalApiWrapper(BaseModel):
         cls._client = RPClient(endpoint=endpoint, api_key=api_key, project=project)
         return values
 
-    def export_specified_launch(self, launch_id: str, format: str = 'html') -> str | None:
+    def get_extended_launch_data_as_raw(self, launch_id: str, format: str = 'html') -> str | None:
+        """
+        Get Launch details as a raw
+        """
+        response = self._client.export_specified_launch(launch_id, format)
+        if not response.headers['Content-Disposition']:
+            logger.warning(f"Exported data for launch {launch_id} is empty.")
+            return None
+        return response.content
+
+    def get_extended_launch_data(self, launch_id: str) -> str | None:
         """
         Use the exported data from a specific launch to generate a comprehensive test report for management.
         The AI can analyze the results, highlight key metrics, and provide insights into test coverage,
         defect density, and test execution trends.
         Returns content of the report.
         """
+        format: str = 'html'
         response = self._client.export_specified_launch(launch_id, format)
 
         if not response.headers['Content-Disposition']:
@@ -149,10 +164,16 @@ class ReportPortalApiWrapper(BaseModel):
     def get_available_tools(self):
         return [
             {
-                "name": "export_specified_launch",
-                "description": self.export_specified_launch.__doc__,
-                "args_schema": ExportSpecifiedLaunch,
-                "ref": self.export_specified_launch,
+                "name": "get_extended_launch_data_as_raw",
+                "description": self.get_extended_launch_data_as_raw.__doc__,
+                "args_schema": GetExtendedLaunchDataAsRaw,
+                "ref": self.get_extended_launch_data_as_raw,
+            },
+            {
+                "name": "get_extended_launch_data",
+                "description": self.get_extended_launch_data.__doc__,
+                "args_schema": GetExtendedLaunchData,
+                "ref": self.get_extended_launch_data,
             },
             {
                 "name": "get_launch_details",

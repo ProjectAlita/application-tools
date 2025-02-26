@@ -20,7 +20,8 @@ def get_tools(tool):
             token=tool['settings'].get('token', None),
             limit=tool['settings'].get('limit', 5),
             additional_fields=tool['settings'].get('additional_fields', []),
-            verify_ssl=tool['settings'].get('verify_ssl', True)).get_tools()
+            verify_ssl=tool['settings'].get('verify_ssl', True),
+            alita=tool['settings'].get('alita')).get_tools()
 
 
 class ConfluenceToolkit(BaseToolkit):

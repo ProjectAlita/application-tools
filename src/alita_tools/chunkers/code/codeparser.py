@@ -12,7 +12,7 @@ from logging import getLogger
 
 logger = getLogger(__name__)
 
-def parse_code_files_for_db(file_content_generator: Generator[str, None, None]) -> Generator[Document, None, None]:
+def parse_code_files_for_db(file_content_generator: Generator[str, None, None], *args, **kwargs) -> Generator[Document, None, None]:
     """
     Parses code files from a generator and returns a generator of Document objects for database storage.
 
