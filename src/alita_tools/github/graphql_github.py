@@ -342,7 +342,7 @@ class GraphQLClient:
         }
 
 
-    def get_project_fields(self, project: Dict[str, Any], desired_fields: Optional[Dict[str, List[str]]] = None, 
+    def get_project_fields(self, project: Dict[str, Any], fields: Optional[Dict[str, List[str]]] = None, 
                        available_labels: Optional[List[Dict[str, Any]]] = None, 
                        available_assignees: Optional[List[Dict[str, Any]]] = None) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
         """
@@ -352,7 +352,7 @@ class GraphQLClient:
 
             Args:
                 project (Dict[str, Any]): Dictionary containing project data.
-                desired_fields (Optional[Dict[str, List[str]]]): Keys are field names and values are options for update. Default is None.
+                fields (Optional[Dict[str, List[str]]]): Keys are field names and values are options for update. Default is None.
                 available_labels (Optional[List[Dict[str, Any]]]): List containing available label data. Default is None.
                 available_assignees (Optional[List[Dict[str, Any]]]): List containing available assignee data. Default is None.
 
@@ -362,7 +362,7 @@ class GraphQLClient:
             Example:
                 fields_to_update, missing_fields = self.get_project_fields(
                     project=my_project,
-                    desired_fields={"Due Date": ['2022-10-30'], "Assignee": ['username1']},
+                    fields={"Due Date": ['2022-10-30'], "Assignee": ['username1']},
                     available_labels=[{"name": "bug", "id": "label123"}],
                     available_assignees=[{"name": "dev1", "id": "user123"}]
                 )
@@ -402,12 +402,12 @@ class GraphQLClient:
 
         def handle_date(field, option_name):
             try:
-                desired_date = self._convert_to_standard_utc(option_name)
+                date = self._convert_to_standard_utc(option_name)
                 fields_to_update.append({
                     "field_title": field['name'],
                     "field_type": field['dataType'],
                     "field_id": field['id'],
-                    "field_value": desired_date,
+                    "field_value": date,
                 })
             except Exception as e:
                 missing_fields.append({
@@ -436,7 +436,7 @@ class GraphQLClient:
                         "field_value": [type_map[name] for name in valid_values]
                     })
 
-        for field_name, option_names in (desired_fields or {}).items():
+        for field_name, option_names in (fields or {}).items():
             field = available_fields.get(field_name)
             if field:
                 field_type = field.get("dataType")
@@ -548,7 +548,7 @@ class GraphQLClient:
         return issue_number, item.get('id'), issue_item_id
 
 
-    def update_issue(self, issue_id: str, desired_title: str, desired_body: str) -> Union[Dict[str, Any], str]:
+    def update_issue(self, issue_id: str, title: str, body: str) -> Union[Dict[str, Any], str]:
         """
         Updates the title and body of an existing GitHub issue via GraphQL API.
 
@@ -556,8 +556,8 @@ class GraphQLClient:
 
         Args:
             issue_id (str): Identifier for the issue to be updated.
-            desired_title (str): New title for the issue.
-            desired_body (str): New body content for the issue.
+            title (str): New title for the issue.
+            body (str): New body content for the issue.
 
         Returns:
             Union[Dict[str, Any], str]: Returns the update response or an error message if failed.
@@ -565,12 +565,12 @@ class GraphQLClient:
         Example:
             result = self.update_issue(
                 issue_id="issue123",
-                desired_title="Updated Title Example",
-                desired_body="Updated issue description here."
+                title="Updated Title Example",
+                body="Updated issue description here."
             )
         """
         query = GraphQLTemplates.MUTATION_UPDATE_ISSUE.value.template
-        query_variables = {"issueId": issue_id, "title": desired_title, "body": desired_body}
+        query_variables = {"issueId": issue_id, "title": title, "body": body}
 
         try:
             result = self._run_graphql_query(query, variables=query_variables)
@@ -583,7 +583,7 @@ class GraphQLClient:
 
     def update_issue_fields(
         self, project_id: str, 
-        desired_item_id: str, desired_issue_item_id: str, 
+        item_id: str, issue_item_id: str, 
         fields: Dict[str, str], 
         item_label_ids: Optional[Any] = [], item_assignee_ids: Optional[Any] = []
     ):
@@ -592,8 +592,8 @@ class GraphQLClient:
 
         Args:
             project_id (str): The GitHub project's unique identifier.
-            desired_item_id (str): The item's identifier within the project.
-            desired_issue_item_id (str): The identifier of the issue item to be updated.
+            item_id (str): The item's identifier within the project.
+            issue_item_id (str): The identifier of the issue item to be updated.
             fields (Dict[str, str]): Fields to update, keyed by field type with corresponding new values.
             item_label_ids (Optional[Any]): IDs of labels to set, default is empty list.
             item_assignee_ids (Optional[Any]): IDs of assignees to set, default is empty list.
@@ -607,8 +607,8 @@ class GraphQLClient:
         Example:
             updated_fields = self.update_issue_fields(
                 project_id="proj123",
-                desired_item_id="item456",
-                desired_issue_item_id="issue789",
+                item_id="item456",
+                issue_item_id="issue789",
                 fields={"Date": {"field_type": "DATE", "field_value": "2022-10-01", "field_id": "field123"}},
                 item_label_ids=["label321"],
                 item_assignee_ids=["assignee321"]
@@ -626,14 +626,14 @@ class GraphQLClient:
                 if field_value == "":
                     query = GraphQLTemplates.MUTATION_CLEAR_ISSUE_FIELDS.value.safe_substitute(
                         project_id=project_id,
-                        issue_item_id=desired_item_id,
+                        issue_item_id=item_id,
                         field_id=field.get("field_id")
                     )
                 else:
                     value_content = f'date: "{field.get("field_value")}"'
                     query = GraphQLTemplates.MUTATION_UPDATE_ISSUE_FIELDS.value.safe_substitute(
                         project_id=project_id,
-                        issue_item_id=desired_item_id,
+                        issue_item_id=item_id,
                         field_id=field.get("field_id"),
                         value_content=value_content,
                     )
@@ -642,14 +642,14 @@ class GraphQLClient:
                 if option_id == "":
                     query = GraphQLTemplates.MUTATION_CLEAR_ISSUE_FIELDS.value.safe_substitute(
                         project_id=project_id,
-                        issue_item_id=desired_item_id,
+                        issue_item_id=item_id,
                         field_id=field.get("field_id")
                     )
                 else:
                     value_content = f'singleSelectOptionId: "{option_id}"'
                     query = GraphQLTemplates.MUTATION_UPDATE_ISSUE_FIELDS.value.safe_substitute(
                         project_id=project_id,
-                        issue_item_id=desired_item_id,
+                        issue_item_id=item_id,
                         field_id=field.get("field_id"),
                         value_content=value_content,
                     )
@@ -667,9 +667,9 @@ class GraphQLClient:
                     else GraphQLTemplates.MUTATION_SET_ISSUE_LABELS.value.template
                 )
                 query_variables = (
-                    {"labelableId": desired_issue_item_id, "labelIds": item_label_ids}
+                    {"labelableId": issue_item_id, "labelIds": item_label_ids}
                     if label_ids == []
-                    else {"labelableId": desired_issue_item_id, "labelIds": label_ids}
+                    else {"labelableId": issue_item_id, "labelIds": label_ids}
                 )
             elif field_type == "ASSIGNEES":
                 assignee_ids = field.get("field_value")
@@ -679,9 +679,9 @@ class GraphQLClient:
                     else GraphQLTemplates.MUTATION_SET_ISSUE_ASSIGNEES.value.template
                 )
                 query_variables = (
-                    {"assignableId": desired_issue_item_id, "assigneeIds": item_assignee_ids}
+                    {"assignableId": issue_item_id, "assigneeIds": item_assignee_ids}
                     if assignee_ids == []
-                    else {"assignableId": desired_issue_item_id, "assigneeIds": assignee_ids}
+                    else {"assignableId": issue_item_id, "assigneeIds": assignee_ids}
                 )
             try:
                 result = self._run_graphql_query(query, query_variables)

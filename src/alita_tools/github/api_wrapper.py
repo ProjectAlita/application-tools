@@ -366,17 +366,17 @@ CreateIssueOnProject = create_model(
             description="The title of the project within which the issue will be created."
         ),
     ),
-    desired_title=(
+    title=(
         str,
         Field(description="The title of the issue to be created within the project."),
     ),
-    desired_body=(
+    body=(
         str,
         Field(
             description="The body or description of the issue, providing details and context."
         ),
     ),
-    desired_fields=(
+    fields=(
         Optional[Dict[str, str]],
         Field(
             default=None,
@@ -402,15 +402,15 @@ UpdateIssueOnProject = create_model(
         str,
         Field(description="The title of the project from which to fetch the issue.")
     ),
-    desired_title=(
+    title=(
         str,
         Field(description="New title to set for the issue.")
     ),
-    desired_body=(
+    body=(
         str,
         Field(description="New body content to set for the issue.")
     ),
-    desired_fields=(
+    fields=(
         Optional[Dict[str, str]],
         Field(
             default=None,
@@ -437,6 +437,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
     _github: Any = PrivateAttr()
     _github_repo_instance: Any = PrivateAttr()
     _github_graphql_instance: Any = PrivateAttr()
+    _graphql_client: Optional[GraphQLClient] = PrivateAttr(None)
     github_repository: Optional[str] = None
     active_branch: Optional[str] = None
     github_base_branch: Optional[str] = None
@@ -524,6 +525,23 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         values["github_base_branch"] = github_base_branch
 
         return values
+    
+    def _get_graphql_client(self) -> GraphQLClient:
+        """
+        Returns an existing GraphQLClient instance or creates a new one.
+        Handles authentication issues or other client creation errors.
+        """
+        try:
+            if not self._graphql_client:
+                self._graphql_client = GraphQLClient(self._github_graphql_instance)
+            return self._graphql_client
+        except Exception as e:
+            logger.error(f"An error occurred while initializing the GraphQL client. Error: {str(e)}")
+            return (
+                "Authentication failed. Please ensure you are using valid credentials. "
+                "Refer to the documentation here:\nhttps://docs.github.com/en/graphql/guides/forming-calls-with-graphql#authenticating-with-graphql\n"
+                f"Error: {str(e)}"
+            )
 
     def _get_files(self, directory_path: str, ref: str) -> List[str]:  
         from github import GithubException
@@ -1064,14 +1082,11 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
     def create_issue_on_project(
         self,
         project_title: str,
-        desired_title: str,
-        desired_body: str,
-        desired_fields: Optional[Dict[str, str]] = None,
+        title: str,
+        body: str,
+        fields: Optional[Dict[str, str]] = None,
     ) -> str:
         """
-        VERY IMPORTANT: This method CANNOT be used with Personal token but with OAuth token having project scope only
-        "X-Accepted-OAuth-Scopes" should include "project:admin"
-
         Creates an issue within a specified project using a series of GraphQL operations.
 
         The function initializes by identifying the repository, then extracts or creates the project and sets up
@@ -1080,9 +1095,9 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
 
         Args:
             project_title (str): The title of the project to which the issue will be added.
-            desired_title (str): Title for the newly created issue.
-            desired_body (str): Body text for the newly created issue.
-            desired_fields (Optional[Dict[str, str]]): Additional key value pairs for issue field configurations.
+            title (str): Title for the newly created issue.
+            body (str): Body text for the newly created issue.
+            fields (Optional[Dict[str, str]]): Additional key value pairs for issue field configurations.
 
         Returns:
             str: A message indicating the outcome of the operation, with details of the newly created issue
@@ -1091,7 +1106,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         Raises:
             Exception: If any step in the process encounters an error, it will return a formatted error message.
         """
-        _graphql_client = GraphQLClient(self._github_graphql_instance)
+        _graphql_client = self._get_graphql_client()
         full_name = self._github_repo_instance.full_name
         owner_name, repo_name = full_name.split("/")
 
@@ -1108,9 +1123,9 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         try:
             missing_fields = []
             updated_fields = []
-            if desired_fields:
+            if fields:
                 fields_to_update, missing_fields = _graphql_client.get_project_fields(
-                    project, desired_fields, labels, assignableUsers
+                    project, fields, labels, assignableUsers
                 )
         except Exception as e:
             return f"Project fields are not returned. Error: {str(e)}"
@@ -1118,8 +1133,8 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         try:
             draft_issue_item_id = _graphql_client.create_draft_issue(
                 project_id=project_id,
-                title=desired_title,
-                body=desired_body,
+                title=title,
+                body=body,
             )
         except Exception as e:
             return f"Draft Issue Not Created. Error: {str(e)}. {str(draft_issue_item_id)}"
@@ -1130,14 +1145,14 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                 draft_issue_id=draft_issue_item_id,
             )
         except Exception as e:
-            return f"Convert Issue Not Created. Error: {str(e)}. {str(issue_number)}"
+            return f"Convert Issue Failed. Error: {str(e)}. {str(issue_number)}"
 
         try:
-            if desired_fields:
+            if fields:
                 updated_fields = _graphql_client.update_issue_fields(
                     project_id=project_id,
-                    desired_item_id=item_id,
-                    desired_issue_item_id=issue_item_id,
+                    item_id=item_id,
+                    issue_item_id=issue_item_id,
                     fields=fields_to_update
                 )
         except Exception as e:
@@ -1156,22 +1171,19 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         self,
         issue_number: str,
         project_title: str,
-        desired_title: str,
-        desired_body: str,
-        desired_fields: Optional[Dict[str, str]],
+        title: str,
+        body: str,
+        fields: Optional[Dict[str, str]],
     ) -> str:
         """
-        VERY IMPORTANT: This method CANNOT be used with Personal token but with OAuth token having project scope only
-        "X-Accepted-OAuth-Scopes" should include "project:admin"
-        
         Updates an existing issue specified by issue number within a project, title, body, and other fields.
 
         Args:
             issue_number (str): The unique number of the issue to update.
             project_title (str): The title of the project from which to fetch the issue.
-            desired_title (str): New title to set for the issue.
-            desired_body (str): New body content to set for the issue.
-            desired_fields (Optional[Dict[str, str]]): A dictionary of additional field values by field names to update. Provide empty string to clear field
+            title (str): New title to set for the issue.
+            body (str): New body content to set for the issue.
+            fields (Optional[Dict[str, str]]): A dictionary of additional field values by field names to update. Provide empty string to clear field
 
         Returns:
             str: Summary of the update operation and any changes applied or errors encountered.
@@ -1179,7 +1191,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         Raises:
             Exception: Describes any errors encountered during operation execution.
         """
-        _graphql_client = GraphQLClient(self._github_graphql_instance)
+        _graphql_client = self._get_graphql_client()
         owner_name, repo_name = self._github_repo_instance.full_name.split("/")
 
         try:
@@ -1193,7 +1205,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
 
         try:
             fields_to_update, missing_fields = _graphql_client.get_project_fields(
-                project, desired_fields, labels, assignableUsers
+                project, fields, labels, assignableUsers
             )
         except Exception as e:
             return f"Project fields are not returned. Error: {str(e)}"
@@ -1215,8 +1227,8 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         try:
             updated_issue = _graphql_client.update_issue(
                 issue_id=issue_item_id,
-                desired_title=desired_title,
-                desired_body=desired_body
+                title=title,
+                body=body
             )
         except Exception as e:
             return f"Issue title and body have not updated. Error: {str(e)}. {str(updated_issue)}"
@@ -1227,8 +1239,8 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
 
             updated_fields = _graphql_client.update_issue_fields(
                 project_id=project_id,
-                desired_item_id=item_id,
-                desired_issue_item_id=issue_item_id,
+                item_id=item_id,
+                issue_item_id=issue_item_id,
                 fields=fields_to_update,
                 item_label_ids=item_label_ids,
                 item_assignee_ids=item_assignee_ids

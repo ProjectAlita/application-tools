@@ -26,8 +26,12 @@ gh auth token
 
 #### Create issue on project
 
-> src/alita_tools/github/api_wrapper.py::create_issue_on_project
+> VERY IMPORTANT: This method CANNOT be used with Personal token but with OAuth token having project scope only
+> "X-Accepted-OAuth-Scopes" should include "project:admin"
 
+
+src/alita_tools/github/api_wrapper.py::create_issue_on_project
+\
 ```python
 from src.alita_tools.github import AlitaGitHubAPIWrapper
 from pydantic import ValidationError
@@ -59,8 +63,12 @@ print(f"\n> Result: {data}\n")
 ```
 
 #### Update issue on project
-> src/alita_tools/github/api_wrapper.py::update_issue_on_project
+> VERY IMPORTANT: This method CANNOT be used with Personal token but with OAuth token having project scope only
+> "X-Accepted-OAuth-Scopes" should include "project:admin"
 
+
+src/alita_tools/github/api_wrapper.py::update_issue_on_project
+\
 ```python
 from src.alita_tools.github import AlitaGitHubAPIWrapper
 from pydantic import ValidationError
