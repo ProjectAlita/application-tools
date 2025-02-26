@@ -5,7 +5,6 @@ from pydantic import create_model, BaseModel, ConfigDict, Field
 
 from .api_wrapper import AlitaGitHubAPIWrapper
 from .tool import GitHubAction
-import re
 
 from ..utils import TOOLKIT_SPLITTER
 
@@ -64,13 +63,12 @@ class AlitaGitHubToolkit(BaseToolkit):
             if selected_tools:
                 if tool["name"] not in selected_tools:
                     continue
-            repo = re.sub(r'[^a-zA-Z0-9_-]', '', github_api_wrapper.github_repository.split("/")[1])
             tools.append(GitHubAction(
                 api_wrapper=github_api_wrapper,
                 name=toolkit_name + TOOLKIT_SPLITTER + tool["name"],
                 mode=tool["mode"],
                 # set unique description for declared tools to differentiate the same methods for different toolkits
-                description=f"Repository: {repo}\n"+tool["description"],
+                description=f"Repository: {github_api_wrapper.github_repository}\n"+tool["description"],
                 args_schema=tool["args_schema"]
             ))
         return cls(tools=tools)
