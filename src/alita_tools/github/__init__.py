@@ -19,7 +19,7 @@ def _get_toolkit(tool) -> BaseToolkit:
         github_access_token=tool['settings'].get('access_token', ''),
         github_username=tool['settings'].get('username', ''),
         github_password=tool['settings'].get('password', ''),
-        toolkit_id=tool.get('toolkit_id', '')
+        toolkit_name=tool.get('name', '')
     )
 
 def get_toolkit():
@@ -53,7 +53,7 @@ class AlitaGitHubToolkit(BaseToolkit):
         )
 
     @classmethod
-    def get_toolkit(cls, selected_tools: list[str] | None = None, toolkit_id: str = None, **kwargs):
+    def get_toolkit(cls, selected_tools: list[str] | None = None, toolkit_name: str = None, **kwargs):
         if selected_tools is None:
             selected_tools = []
         github_api_wrapper = AlitaGitHubAPIWrapper(**kwargs)
@@ -65,7 +65,7 @@ class AlitaGitHubToolkit(BaseToolkit):
                     continue
             tools.append(GitHubAction(
                 api_wrapper=github_api_wrapper,
-                name=toolkit_id + TOOLKIT_SPLITTER + tool["name"],
+                name=toolkit_name + TOOLKIT_SPLITTER + tool["name"],
                 mode=tool["mode"],
                 # set unique description for declared tools to differentiate the same methods for different toolkits
                 description=f"Repository: {github_api_wrapper.github_repository}\n"+tool["description"],
