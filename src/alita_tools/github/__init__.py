@@ -5,7 +5,8 @@ from pydantic import create_model, BaseModel, ConfigDict, Field
 
 from .api_wrapper import AlitaGitHubAPIWrapper
 from .tool import GitHubAction
-import re
+
+from ..utils import TOOLKIT_SPLITTER
 
 name = "github"
 
@@ -17,7 +18,8 @@ def _get_toolkit(tool) -> BaseToolkit:
         github_base_branch=tool['settings']['base_branch'],
         github_access_token=tool['settings'].get('access_token', ''),
         github_username=tool['settings'].get('username', ''),
-        github_password=tool['settings'].get('password', '')
+        github_password=tool['settings'].get('password', ''),
+        toolkit_id=tool.get('toolkit_id', '')
     )
 
 def get_toolkit():
@@ -51,22 +53,22 @@ class AlitaGitHubToolkit(BaseToolkit):
         )
 
     @classmethod
-    def get_toolkit(cls, selected_tools: list[str] | None = None, **kwargs):
+    def get_toolkit(cls, selected_tools: list[str] | None = None, toolkit_id: str = None, **kwargs):
         if selected_tools is None:
             selected_tools = []
         github_api_wrapper = AlitaGitHubAPIWrapper(**kwargs)
         available_tools: List[Dict] = github_api_wrapper.get_available_tools()
         tools = []
-        repo = re.sub(r'[^a-zA-Z0-9_-]', '', github_api_wrapper.github_repository.split("/")[1])
         for tool in available_tools:
             if selected_tools:
                 if tool["name"] not in selected_tools:
                     continue
             tools.append(GitHubAction(
                 api_wrapper=github_api_wrapper,
-                name=repo + "_" + tool["name"],
+                name=toolkit_id + TOOLKIT_SPLITTER + tool["name"],
                 mode=tool["mode"],
-                description=tool["description"],
+                # set unique description for declared tools to differentiate the same methods for different toolkits
+                description=f"Repository: {github_api_wrapper.github_repository}\n"+tool["description"],
                 args_schema=tool["args_schema"]
             ))
         return cls(tools=tools)
