@@ -247,7 +247,7 @@ def _split_documents(docs: List[str], split_indices: List[int], similarities: Li
 
 def statistical_chunker(file_content_generator: Generator[Document, None, None], config: dict, *args, **kwargs) -> Generator[str, None, None]:
     logger.info(config)
-    embedding = kwargs.get('embedding')
+    embedding = config.get('embedding')
     if embedding is None:
         raise ImportError("Could not import the required module 'alita_sdk.langchain.interfaces.llm_processor'.")
     max_tokens_doc: int = config.get("max_doc_size", 300)
