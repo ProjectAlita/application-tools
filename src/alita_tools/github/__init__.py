@@ -17,7 +17,9 @@ def _get_toolkit(tool) -> BaseToolkit:
         github_base_branch=tool['settings']['base_branch'],
         github_access_token=tool['settings'].get('access_token', ''),
         github_username=tool['settings'].get('username', ''),
-        github_password=tool['settings'].get('password', '')
+        github_password=tool['settings'].get('password', ''),
+        github_app_id=tool['settings'].get('app_id', None),
+        github_app_private_key=tool['settings'].get('app_private_key', None)
     )
 
 def get_toolkit():
