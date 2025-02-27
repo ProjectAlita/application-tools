@@ -30,7 +30,7 @@ class AWSToolkit(BaseToolkit):
             access_key_id=(Optional[str], Field(default=None, title="Access Key ID", description="AWS access key ID")),
             secret_access_key=(Optional[str], Field(default=None, title="Secret Access Key", description="AWS secret access key", json_schema_extra={'secret': True})),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
-            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Cloud AWS", "icon_url": None}})
+            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Cloud AWS", "icon_url": None, "hidden": True}})
         )
 
     @classmethod
