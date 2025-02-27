@@ -28,7 +28,7 @@ class CSVToolApiWrapper(BaseModel):
         dialect = sniffer.sniff(data[0:self._length_to_sniff])
         return dialect.delimiter
 
-    def execute(self, method_name: str, method_args: dict = {}, column: Optional[str] = None, csv_content: Any = None):
+    def execute(self, method_name: str, method_args: dict = {}, column: Optional[str] = None, csv_content: Optional[Any] = None):
         """ Tool for working with data from CSV files. """
         bytes_data = self.bytes_content(csv_content if csv_content else self.csv_content)
         encoding = chardet.detect(bytes_data)['encoding']
