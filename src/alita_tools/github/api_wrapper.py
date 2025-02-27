@@ -2,7 +2,7 @@ import os
 import re
 from json import dumps, loads
 import fnmatch
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Union
 import tiktoken
 from pydantic import model_validator, create_model, BaseModel, Field
 from pydantic.fields import PrivateAttr
@@ -355,6 +355,13 @@ UpdateIssue = create_model(
 
 CreateIssueOnProject = create_model(
     "CreateIssueOnProject",
+    board_repo=(
+        str,
+        Field(
+            description="The organization and repository for the board (project).",
+            examples=["OrganizationName/repository-name"]
+        ),
+    ),
     project_title=(
         str,
         Field(
@@ -372,7 +379,8 @@ CreateIssueOnProject = create_model(
         ),
     ),
     fields=(
-        Optional[Dict[str, str]],
+        Optional[Dict[str, Union[str, List[str]]]
+],
         Field(
             default=None,
             description="A dictionary of additional fields to set on the issue. Each key should correspond to a field name, and each value to the desired field value. Declare but leave empty if you want to clear field.",
@@ -389,6 +397,13 @@ CreateIssueOnProject = create_model(
 
 UpdateIssueOnProject = create_model(
     "UpdateIssueOnProject",
+    board_repo=(
+        str,
+        Field(
+            description="The organization and repository for the board (project).",
+            examples=["OrganizationName/repository-name"]
+        ),
+    ),
     issue_number=(
         str,
         Field(description="The unique number of the issue to update within the project.")
@@ -406,7 +421,7 @@ UpdateIssueOnProject = create_model(
         Field(description="New body content to set for the issue.")
     ),
     fields=(
-        Optional[Dict[str, str]],
+        Optional[Dict[str, Union[str, List[str]]]],
         Field(
             default=None,
             description="A dictionary of additional field values by field names to update. Provide empty strings to clear specific fields.",
@@ -1081,11 +1096,12 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         return parse_code_files_for_db(file_content_generator())
 
     def create_issue_on_project(
-            self,
-            project_title: str,
-            title: str,
-            body: str,
-            fields: Optional[Dict[str, str]] = None,
+        self,
+        board_repo: str,
+        project_title: str,
+        title: str,
+        body: str,
+        fields: Optional[Dict[str, str]] = None,
     ) -> str:
         """
         Creates an issue within a specified project using a series of GraphQL operations.
@@ -1095,6 +1111,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         from the draft and optionally updating with detailed fields.
 
         Args:
+            board_repo (str): The organization and repository for the board (project). Example: 'org-name/repo-name'
             project_title (str): The title of the project to which the issue will be added.
             title (str): Title for the newly created issue.
             body (str): Body text for the newly created issue.
@@ -1108,8 +1125,10 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             Exception: If any step in the process encounters an error, it will return a formatted error message.
         """
         _graphql_client = self._get_graphql_client()
-        full_name = self._github_repo_instance.full_name
-        owner_name, repo_name = full_name.split("/")
+        try:
+            owner_name, repo_name = board_repo.split("/")
+        except Exception as e:
+            return f"Board repo format is invalid. It should be like 'org-name/repo-name'. Error: {str(e)}"
 
         try:
             result = _graphql_client.get_project(owner=owner_name, repo_name=repo_name, project_title=project_title)
@@ -1169,17 +1188,19 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         return f"{base_message}\n{fields_message}"
 
     def update_issue_on_project(
-            self,
-            issue_number: str,
-            project_title: str,
-            title: str,
-            body: str,
-            fields: Optional[Dict[str, str]],
+        self,
+        board_repo: str,
+        issue_number: str,
+        project_title: str,
+        title: str,
+        body: str,
+        fields: Optional[Dict[str, str]],
     ) -> str:
         """
         Updates an existing issue specified by issue number within a project, title, body, and other fields.
 
         Args:
+            board_repo (str): The organization and repository for the board (project). Example: 'org-name/repo-name'
             issue_number (str): The unique number of the issue to update.
             project_title (str): The title of the project from which to fetch the issue.
             title (str): New title to set for the issue.
@@ -1193,7 +1214,11 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             Exception: Describes any errors encountered during operation execution.
         """
         _graphql_client = self._get_graphql_client()
-        owner_name, repo_name = self._github_repo_instance.full_name.split("/")
+        
+        try:
+            owner_name, repo_name = board_repo.split("/")
+        except Exception as e:
+            return f"Board repo format is invalid. It should be like 'org-name/repo-name'. Error: {str(e)}"
 
         try:
             result = _graphql_client.get_project(owner=owner_name, repo_name=repo_name, project_title=project_title)

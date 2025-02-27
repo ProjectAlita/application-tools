@@ -329,7 +329,7 @@ class GraphQLClient:
         labels = repository.get('labels', {}).get('nodes', [])
         assignable_users = repository.get('assignableUsers', {}).get('nodes', [])
         
-        project = next((prj for prj in projects if prj.get('title') == project_title), None)
+        project = next((prj for prj in projects if prj.get('title').lower() == project_title.lower()), None)
         if not project:
             return f"Project '{project_title}' not found."
         
@@ -385,7 +385,7 @@ class GraphQLClient:
                     "option_id": "",
                 })
             else:
-                matched_option = next((option for option in options if option['name'] == option_name), None)
+                matched_option = next((option for option in options if option['name'].lower() == option_name.lower()), None)
                 if matched_option:
                     fields_to_update.append({
                         "field_title": field['name'],
@@ -620,7 +620,7 @@ class GraphQLClient:
             query_variables = None
             field_type = field.get("field_type")
             
-            if field_type == "DATE":
+            if field_type.upper() == "DATE":
                 field_value = field.get("field_value")
 
                 if field_value == "":
@@ -637,7 +637,7 @@ class GraphQLClient:
                         field_id=field.get("field_id"),
                         value_content=value_content,
                     )
-            elif field_type == "SINGLE_SELECT":
+            elif field_type.upper() == "SINGLE_SELECT":
                 option_id = field.get("option_id")
                 if option_id == "":
                     query = GraphQLTemplates.MUTATION_CLEAR_ISSUE_FIELDS.value.safe_substitute(
@@ -655,11 +655,11 @@ class GraphQLClient:
                     )
 
 
-            if (field_type == "DATE" or field_type == "SINGLE_SELECT"):
+            if (field_type.upper() == "DATE" or field_type.upper() == "SINGLE_SELECT"):
                 field.get("field_value")
                 
                 
-            elif field_type == "LABELS":
+            elif field_type.upper() == "LABELS":
                 label_ids = field.get("field_value")
                 query = (
                     GraphQLTemplates.MUTATION_REMOVE_ISSUE_LABELS.value.template
@@ -671,7 +671,7 @@ class GraphQLClient:
                     if label_ids == []
                     else {"labelableId": issue_item_id, "labelIds": label_ids}
                 )
-            elif field_type == "ASSIGNEES":
+            elif field_type.upper() == "ASSIGNEES":
                 assignee_ids = field.get("field_value")
                 query = (
                     GraphQLTemplates.MUTATION_REMOVE_ISSUE_ASSIGNEES.value.template

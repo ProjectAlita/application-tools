@@ -47,6 +47,7 @@ try:
 except ValidationError as err:
     print(err.json(indent=4))
 
+board_repo = "<org_name>/<repo_name>" # board repo
 project_title = "<project_title>" # board title
 issue_title = "Test Issue Title"
 issue_description = "Test Description"
@@ -58,7 +59,7 @@ desired_fields = {
     "Assignees": ["<assignee_name>"]
 }
 
-data = api.create_issue_on_project(project_title, issue_title, issue_description, desired_fields)
+data = api.create_issue_on_project(board_repo, project_title, issue_title, issue_description, desired_fields)
 print(f"\n> Result: {data}\n")
 ```
 
@@ -84,6 +85,7 @@ try:
 except ValidationError as err:
     print(err.json(indent=4))
 
+board_repo = "<org_name>/<repo_name>" # board repo
 project_title = "<project_title>" # board title
 issue_number = "2"
 issue_title = "New Test Issue Title"
@@ -96,6 +98,6 @@ desired_fields = {
     "Assignees": [] # all assignees will be removed
 }
 
-data = api.update_issue_on_project(issue_number, project_title, issue_title, issue_description, desired_fields)
+data = api.update_issue_on_project(board_repo, issue_number, project_title, issue_title, issue_description, desired_fields)
 print(f"\n> Result: {data}\n")
 ```
