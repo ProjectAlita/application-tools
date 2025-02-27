@@ -11,16 +11,16 @@ class CSVToolApiWrapper(BaseModel):
     csv_content: Any
     _length_to_sniff: int = 1024
 
-    def bytes_content(self) -> bytes:
+    def bytes_content(self, content: Any) -> bytes:
         """
         Returns the content of the file as bytes
         """
-        if self.csv_content is None:
+        if content is None:
             raise ValueError("CSV content is not set")
-        if isinstance(self.csv_content, bytes):
-            return self.csv_content
+        if isinstance(content, bytes):
+            return content
 
-        return self.csv_content.encode('utf-8')
+        return content.encode('utf-8')
 
     def _get_csv_delimiter(self, data: str) -> str:
         """ Get the delimiter of the CSV file. """
@@ -28,9 +28,9 @@ class CSVToolApiWrapper(BaseModel):
         dialect = sniffer.sniff(data[0:self._length_to_sniff])
         return dialect.delimiter
 
-    def execute(self, method_name: str, method_args: dict = {}, column: Optional[str] = None):
+    def execute(self, method_name: str, method_args: dict = {}, column: Optional[str] = None, csv_content: Any = None):
         """ Tool for working with data from CSV files. """
-        bytes_data = self.bytes_content()
+        bytes_data = self.bytes_content(csv_content if csv_content else self.csv_content)
         encoding = chardet.detect(bytes_data)['encoding']
         data = bytes_data.decode(encoding)
         df = pd.read_csv(StringIO(data), sep=self._get_csv_delimiter(data), on_bad_lines='skip')
@@ -53,7 +53,8 @@ class CSVToolApiWrapper(BaseModel):
                     "ExecuteModel",
                     method_name=(str, Field(description="Method to be called on the pandas dataframe object generated from the file")),
                     method_args=(Optional[dict], Field(description="Pandas dataframe arguments to be passed to the method", default={})),
-                    column=(Optional[str], Field(description="Column to be used for the operation", default=None))
+                    column=(Optional[str], Field(description="Column to be used for the operation", default=None)),
+                    csv_content=(Optional[Any], Field(default=None, description="CSV content to be processed"))
                 ),
             }
         ]
