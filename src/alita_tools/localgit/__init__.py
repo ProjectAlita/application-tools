@@ -30,7 +30,7 @@ class AlitaLocalGitToolkit(BaseToolkit):
             repo_url=(Optional[str], Field(default=None, title="Repository URL", description="Local GIT Repository URL")),
             commit_sha=(Optional[str], Field(default=None, title="Commit SHA", description="Local GIT Commit SHA")),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
-            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Local GIT", "icon_url": None}})
+            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Local GIT", "icon_url": None, "hidden": True}})
         )
 
     @classmethod
