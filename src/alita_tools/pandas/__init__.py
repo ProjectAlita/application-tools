@@ -1,7 +1,5 @@
 from typing import Any, List, Literal
 
-from alita_sdk.clients import AlitaClient
-from alita_sdk.tools.artifact import ArtifactWrapper
 from langchain_core.tools import BaseToolkit, BaseTool
 from pydantic import BaseModel, ConfigDict, create_model, Field
 
@@ -14,19 +12,18 @@ def get_tools(tool):
     return PandasToolkit().get_toolkit(
         selected_tools=tool['settings'].get('selected_tools', []),
         csv_content=read_content(
-            artifact_bucket_name=tool['settings'].get('bucket_name', None),
+            artifact_bucket_name=tool['settings'].get('artifact_bucket_name', None),
             file_name=tool['settings'].get('file_name', None),
             client=tool['settings']['alita'])
     ).get_tools()
 
 def read_content(client: 'AlitaClient', artifact_bucket_name: str = None, file_name: str = None):
     if artifact_bucket_name and file_name:
-        artifacts_wrapper = ArtifactWrapper(client=client, bucket=artifact_bucket_name)
-        return artifacts_wrapper.read_file(file_name)
+        return client.artifact(artifact_bucket_name).get(bucket_name=artifact_bucket_name, artifact_name=file_name)
     return None
 
 class PandasToolkit(BaseToolkit):
-    tools: list[BaseTool] = []
+    tools: List[BaseTool] = []
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
@@ -57,5 +54,5 @@ class PandasToolkit(BaseToolkit):
             ))
         return cls(tools=tools)
 
-    def get_tools(self) -> list[BaseTool]:
+    def get_tools(self):
         return self.tools
