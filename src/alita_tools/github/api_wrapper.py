@@ -64,10 +64,9 @@ new contents
 >>>> NEW"""
 
 CREATE_ISSUE_PROMPT = """
-This tool allows you to create a new issue in a GitHub repository. **VERY IMPORTANT**: Your input to this tool MUST strictly follow these rules:
-
+This tool allows you to create a new issue in a GitHub repository.
+**VERY IMPORTANT**: Your input to this tool MUST strictly follow these rules:
 - First, you must specify the title of the issue.
-
 Optionally you can specify:
 - a detailed description or body of the issue
 - labels for the issue, each separated by a comma. For labels, write `labels:` followed by a comma-separated list of labels.
@@ -88,7 +87,7 @@ assignees: user123
 """
 
 UPDATE_ISSUE_PROMPT = """
-This tool allows you to update an existing issue in a GitHub repository. **VERY IMPORTANT**: Your input to this tool MUST strictly follow 
+This tool allows you to update an existing issue in a GitHub repository. **VERY IMPORTANT**: Your input MUST strictly follow 
 these rules:
 - You must specify the repository name where the issue exists.
 - You must specify the issue ID that you wish to update.
@@ -439,10 +438,14 @@ UpdateIssueOnProject = create_model(
 
 LoaderSchema = create_model(
     "LoaderSchema",
-    branch=(Optional[str], Field(description="The branch to set as active before listing files. If None, the current active branch is used.")),
-    whitelist=(Optional[List[str]], Field(description="A list of file extensions or paths to include. If None, all files are included.")),
-    blacklist=(Optional[List[str]], Field(description="A list of file extensions or paths to exclude. If None, no files are excluded."))
+    branch=(Optional[str], Field(
+        description="The branch to set as active before listing files. If None, the current active branch is used.")),
+    whitelist=(Optional[List[str]],
+               Field(description="A list of file extensions or paths to include. If None, all files are included.")),
+    blacklist=(Optional[List[str]],
+               Field(description="A list of file extensions or paths to exclude. If None, no files are excluded."))
 )
+
 
 class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
     _github: Any = PrivateAttr()
@@ -457,7 +460,6 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
     github_password: Optional[str] = None
     github_app_id: Optional[str] = None
     github_app_private_key: Optional[str] = None
-    
 
     @model_validator(mode='before')
     @classmethod
@@ -531,12 +533,14 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         cls._github = g
         cls._github_graphql_instance = g._Github__requester
         cls._github_repo_instance = g.get_repo(github_repository)
+        values["github"] = g
+        values["github_repo_instance"] = g.get_repo(github_repository)
         values["github_repository"] = github_repository
         values["active_branch"] = active_branch
         values["github_base_branch"] = github_base_branch
 
         return values
-    
+
     def _get_graphql_client(self) -> GraphQLClient:
         """
         Returns an existing GraphQLClient instance or creates a new one.
@@ -554,7 +558,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                 f"Error: {str(e)}"
             )
 
-    def _get_files(self, directory_path: str, ref: str) -> List[str]:  
+    def _get_files(self, directory_path: str, ref: str) -> List[str]:
         from github import GithubException
 
         files: List[str] = []
@@ -914,7 +918,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         try:
             if not self.validate_search_query(search_query):
                 return "Invalid search query. Please ensure it matches expected GitHub search syntax."
-        
+
             target_repo = self._github_repo_instance.full_name if repo_name is None else repo_name
 
             query = f"repo:{target_repo} {search_query}"
@@ -924,7 +928,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                 return "No issues or PRs found matching your query."
 
             matching_issues = []
-            
+
             count = min(max_count, search_result.totalCount)
             for issue in search_result[:count]:
                 issue_details = {
@@ -940,8 +944,9 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             return dumps(matching_issues)
         except Exception as e:
             return "An error occurred while searching issues:\n" + str(e)
-        
-    def create_issue(self, title: str, body: Optional[str] = None, repo_name: Optional[str] = None, labels: Optional[List[str]] = None, assignees: Optional[List[str]] = None) -> str:
+
+    def create_issue(self, title: str, body: Optional[str] = None, repo_name: Optional[str] = None,
+                     labels: Optional[List[str]] = None, assignees: Optional[List[str]] = None) -> str:
         """
         Creates a new issue in the GitHub repository.
 
@@ -959,7 +964,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
 
             if not repo:
                 return "GitHub repository instance is not found or not initialized."
-            
+
             issue = repo.create_issue(
                 title=title,
                 body=body,
@@ -970,11 +975,11 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             return f"Issue created successfully! ID:{issue.number}, URL: {issue.html_url}"
         except Exception as e:
             return f"An error occurred while creating the issue: {str(e)}"
-        
-    def update_issue(self, issue_id: int, title: Optional[str] = None, 
-                 body: Optional[str] = None, labels: Optional[List[str]] = None, 
-                 assignees: Optional[List[str]] = None, state: Optional[str] = None,
-                 repo_name: Optional[str] = None) -> str:
+
+    def update_issue(self, issue_id: int, title: Optional[str] = None,
+                     body: Optional[str] = None, labels: Optional[List[str]] = None,
+                     assignees: Optional[List[str]] = None, state: Optional[str] = None,
+                     repo_name: Optional[str] = None) -> str:
         """
         Updates an existing issue in a specified GitHub repository.
 
@@ -991,14 +996,14 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             str: A confirmation message including the updated issue details, or an error message.
         """
         if not issue_id:
-                return "Issue ID is required."
+            return "Issue ID is required."
         try:
             repo = self._github.get_repo(repo_name) if repo_name else self._github_repo_instance
             issue = repo.get_issue(number=issue_id)
 
             if not issue:
                 return f"Issue with #{issue_id} has not been found."
-            
+
             if labels is None or labels == []:
                 current_labels = [label.name for label in issue.get_labels()]
                 for label in current_labels:
@@ -1025,7 +1030,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             return f"Issue updated successfully! Updated details: ID: {issue.number}, URL: {issue.html_url}"
         except Exception as e:
             return f"An error occurred while updating the issue: {str(e)}"
-    
+
     def _read_file(self, file_path: str, branch: str) -> str:
         """
         Read a file from specified branch
@@ -1043,10 +1048,9 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             logger.info(format_exc())
             return f"File not found `{file_path}` on branch `{branch}`. Error: {str(e)}"
 
-    
     def loader(self,
                branch: Optional[str] = None,
-               whitelist: Optional[List[str]] = None, 
+               whitelist: Optional[List[str]] = None,
                blacklist: Optional[List[str]] = None) -> str:
         """
         Generates file content from the specified branch while honoring whitelist and blacklist patterns.
@@ -1072,6 +1076,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         from ..chunkers.code.codeparser import parse_code_files_for_db
         _files = self._get_files("", branch or self.active_branch)
         logger.info(f"Files in branch: {self.active_branch}")
+
         def is_whitelisted(file_path: str) -> bool:
             if whitelist:
                 return any(fnmatch.fnmatch(file_path, pattern) for pattern in whitelist)
@@ -1081,14 +1086,14 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             if blacklist:
                 return any(fnmatch.fnmatch(file_path, pattern) for pattern in blacklist)
             return False
-        
+
         def file_content_generator():
             for file in _files:
                 if is_whitelisted(file) and not is_blacklisted(file):
-                    yield {"file_name": file, "file_content": self._read_file(file, branch=branch or self.active_branch)}
-        
+                    yield {"file_name": file,
+                           "file_content": self._read_file(file, branch=branch or self.active_branch)}
+
         return parse_code_files_for_db(file_content_generator())
-    
 
     def create_issue_on_project(
         self,
@@ -1181,7 +1186,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             fields_message = f"Response on update fields: {str(updated_fields)}."
 
         return f"{base_message}\n{fields_message}"
-    
+
     def update_issue_on_project(
         self,
         board_repo: str,
@@ -1277,7 +1282,6 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             fields_message = f"Response on update fields: {str(updated_fields)}."
 
         return f"{base_message}\n{fields_message}"
-
 
     def get_available_tools(self):
         return [

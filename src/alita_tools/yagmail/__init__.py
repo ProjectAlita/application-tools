@@ -30,7 +30,7 @@ class AlitaYagmailToolkit(BaseToolkit):
             username=(str, Field(description="Username")),
             password=(str, Field(description="Password", json_schema_extra={'secret': True})),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
-            __config__={'json_schema_extra': {'metadata': {"label": "Yet Another Gmail", "icon_url": None}}}
+            __config__={'json_schema_extra': {'metadata': {"label": "Yet Another Gmail", "icon_url": None, "hidden": True}}}
         )
 
     @classmethod
