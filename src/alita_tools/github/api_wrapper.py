@@ -516,7 +516,12 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         elif github_username and github_password:
             auth = Auth.Login(github_username, github_password)
         elif github_app_id and private_key:
-            auth = Auth.AppAuth(github_app_id, private_key)
+            header = "-----BEGIN RSA PRIVATE KEY-----"
+            footer = "-----END RSA PRIVATE KEY-----"
+
+            key_body = private_key[len(header):-len(footer)].strip()
+            body = key_body.replace(" ", "\n")
+            auth = Auth.AppAuth(github_app_id, f"{header}\n{body}\n{footer}")
         else:
             auth = None
 

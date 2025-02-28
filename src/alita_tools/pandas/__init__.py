@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, create_model, Field
 from .api_wrapper import CSVToolApiWrapper
 from ..base.tool import BaseAction
 
-name = "pandas_toolkit"
+name = "pandas"
 
 def get_tools(tool):
     return PandasToolkit().get_toolkit(

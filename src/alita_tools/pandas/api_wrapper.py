@@ -29,7 +29,11 @@ class CSVToolApiWrapper(BaseModel):
         return dialect.delimiter
 
     def execute(self, method_name: str, method_args: dict = {}, column: Optional[str] = None, csv_content: Optional[Any] = None):
-        """ Tool for working with data from CSV files. """
+        """
+        Tool for working with data from CSV files.
+        IMPORTANT:
+        Don't request csv_content from user if he hasn't provided it - it is expected to extract data from artifact
+        """
         bytes_data = self.bytes_content(csv_content if csv_content else self.csv_content)
         encoding = chardet.detect(bytes_data)['encoding']
         data = bytes_data.decode(encoding)
@@ -54,7 +58,8 @@ class CSVToolApiWrapper(BaseModel):
                     method_name=(str, Field(description="Method to be called on the pandas dataframe object generated from the file")),
                     method_args=(Optional[dict], Field(description="Pandas dataframe arguments to be passed to the method", default={})),
                     column=(Optional[str], Field(description="Column to be used for the operation", default=None)),
-                    csv_content=(Optional[Any], Field(default=None, description="CSV content to be processed"))
+                    csv_content=(Optional[Any], Field(default=None, description="CSV content to be processed. "
+                                                                                "Can be None when user defined artifact's path in configuration"))
                 ),
             }
         ]
