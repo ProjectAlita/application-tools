@@ -36,7 +36,7 @@ from .custom_open_api import OpenApiToolkit as CustomOpenApiToolkit
 from .elastic import ElasticToolkit
 from .keycloak import KeycloakToolkit
 from .localgit import AlitaLocalGitToolkit
-from .pandas import PandasToolkit
+from .pandas import get_tools as get_pandas, PandasToolkit
 from .azure_ai.search import AzureSearchToolkit, get_tools as get_azure_search
 
 logger = logging.getLogger(__name__)
@@ -94,6 +94,8 @@ def get_tools(tools_list, alita: 'AlitaClient', llm: 'LLMLikeObject', *args, **k
             tools.extend(get_google_places(tool))
         elif tool['type'] == 'azure_search':
             tools.extend(get_azure_search(tool))
+        elif tool['type'] == 'pandas':
+            tools.extend(get_pandas(tool))
         else:
             if tool.get("settings", {}).get("module"):
                 try:
