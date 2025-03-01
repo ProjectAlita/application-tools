@@ -103,8 +103,7 @@ class AgenticChunker:
         return result
 
     def add_propositions(self, propositions):
-        self.create_chunkes(propositions)
-        for chunk in self.chunks:
+        for chunk in self.create_chunkes(propositions):
             refined = self.chunk_refinement(chunk)
             yield {
                 "title": refined.chunk_title,
