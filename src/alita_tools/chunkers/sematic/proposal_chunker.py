@@ -134,6 +134,7 @@ def proposal_chunker(file_content_generator: Generator[Document, None, None], co
                 docmeta = doc_metadata.copy()
                 docmeta.update({"chunk_title": chunk['title']})
                 docmeta.update({"chunk_summary": chunk['summary']})
+                docmeta.update({"original": split})
                 page_content = "\n".join(chunk['propositions'])
                 yield Document(
                     metadata=docmeta,
