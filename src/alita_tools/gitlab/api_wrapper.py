@@ -162,7 +162,7 @@ class GitLabAPIWrapper(BaseModel):
             "comments": str(comments),
         }
 
-    def create_pull_request(self, pr_title: str, pr_body: str) -> str:
+    def create_pull_request(self, pr_title: str, pr_body: str, branch: str) -> str:
         """
         Makes a pull request from the bot's branch to the base branch
         Parameters:
@@ -173,14 +173,14 @@ class GitLabAPIWrapper(BaseModel):
         Returns:
             str: A success or failure message
         """
-        if self.branch == self._active_branch:
+        if self.branch == branch:
             return f"""Cannot make a pull request because 
             commits are already in the {self.branch} branch"""
         else:
             try:
                 pr = self._repo_instance.mergerequests.create(
                     {
-                        "source_branch": self._active_branch,
+                        "source_branch": branch,
                         "target_branch": self.branch,
                         "title": pr_title,
                         "description": pr_body,
@@ -212,7 +212,7 @@ class GitLabAPIWrapper(BaseModel):
             return "Unable to make comment due to error:\n" + str(e)
 
 
-    def create_file(self, file_path: str, file_contents: str) -> str:
+    def create_file(self, file_path: str, file_contents: str, branch: str) -> str:
         """
         Creates a new file on the gitlab repo
         Parameters:
@@ -224,11 +224,11 @@ class GitLabAPIWrapper(BaseModel):
             str: A success or failure message
         """
         try:
-            self._repo_instance.files.get(file_path, self._active_branch)
+            self._repo_instance.files.get(file_path, branch)
             return f"File already exists at {file_path}. Use update_file instead"
         except Exception:
             data = {
-                "branch": self._active_branch,
+                "branch": branch,
                 "commit_message": "Create " + file_path,
                 "file_path": file_path,
                 "content": file_contents,
@@ -238,7 +238,7 @@ class GitLabAPIWrapper(BaseModel):
 
             return "Created file " + file_path
 
-    def read_file(self, file_path: str) -> str:
+    def read_file(self, file_path: str, branch: str) -> str:
         """
         Reads a file from the gitlab repo
         Parameters:
@@ -246,10 +246,10 @@ class GitLabAPIWrapper(BaseModel):
         Returns:
             str: The file decoded as a string
         """
-        file = self._repo_instance.files.get(file_path, self._active_branch)
+        file = self._repo_instance.files.get(file_path, branch)
         return file.decode().decode("utf-8")
 
-    def update_file(self, file_query: str) -> str:
+    def update_file(self, file_query: str, branch: str) -> str:
         """
         Updates a file with new content.
         Parameters:
@@ -267,7 +267,7 @@ class GitLabAPIWrapper(BaseModel):
         Returns:
             A success or failure message
         """
-        if self._active_branch == self.branch:
+        if branch == self.branch:
             return (
                 "You're attempting to commit to the directly"
                 f"to the {self.branch} branch, which is protected. "
@@ -276,7 +276,7 @@ class GitLabAPIWrapper(BaseModel):
         try:
             file_path: str = file_query.split("\n")[0]
 
-            file_content = self.read_file(file_path)
+            file_content = self.read_file(file_path, branch)
             updated_file_content = file_content
             for old, new in self.extract_old_new_pairs(file_query):
                 if not old.strip():
@@ -291,7 +291,7 @@ class GitLabAPIWrapper(BaseModel):
                 )
 
             commit = {
-                "branch": self._active_branch,
+                "branch": branch,
                 "commit_message": "Create " + file_path,
                 "actions": [
                     {
@@ -307,7 +307,7 @@ class GitLabAPIWrapper(BaseModel):
         except Exception as e:
             return "Unable to update file due to error:\n" + str(e)
 
-    def append_file(self, file_path: str, content: str) -> str:
+    def append_file(self, file_path: str, content: str, branch: str) -> str:
         """
         Appends new content to the end of file.
         Parameters:
@@ -318,7 +318,7 @@ class GitLabAPIWrapper(BaseModel):
         Returns:
             A success or failure message
         """
-        if self._active_branch == self.branch:
+        if branch == self.branch:
             return (
                 "You're attempting to commit to the directly"
                 f"to the {self.branch} branch, which is protected. "
@@ -327,10 +327,10 @@ class GitLabAPIWrapper(BaseModel):
         try:
             if not content:
                 return "Content to be added is empty. Append file won't be completed"
-            file_content = self.read_file(file_path)
+            file_content = self.read_file(file_path, branch)
             updated_file_content = f"{file_content}\n{content}"
             commit = {
-                "branch": self._active_branch,
+                "branch": branch,
                 "commit_message": "Append " + file_path,
                 "actions": [
                     {
@@ -347,7 +347,7 @@ class GitLabAPIWrapper(BaseModel):
             return "Unable to update file due to error:\n" + str(e)
 
 
-    def delete_file(self, file_path: str) -> str:
+    def delete_file(self, file_path: str, branch: str) -> str:
         """
         Deletes a file from the repo
         Parameters:
@@ -357,7 +357,7 @@ class GitLabAPIWrapper(BaseModel):
         """
         try:
             self._repo_instance.files.delete(
-                file_path, self._active_branch, "Delete " + file_path
+                file_path, branch, "Delete " + file_path
             )
             return "Deleted file " + file_path
         except Exception as e:

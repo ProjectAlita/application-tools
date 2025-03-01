@@ -39,6 +39,8 @@ existing contents
 new contents
 >>>> NEW"""
 
+branch_description: str = "The name of the branch required to perform corresponding action. e.g. `feature-1`. **IMPORTANT**: if branch not specified, try to determine from the chat history or clarify with user."
+
 branchInput = create_model(
     "BranchInput",
     branch_name=(str, Field(description="The name of the branch, e.g. `my_branch`.")))
@@ -68,13 +70,14 @@ class CreatePRTool(BaseTool):
     args_schema: Type[BaseModel] = create_model(
         "CreatePRInput",
         pr_title=(str, Field(description="Title of pull request. Maybe generated from made changes in the branch.")),
-        pr_body=(str, Field(description="Body or description of the pull request of made changes.")))
+        pr_body=(str, Field(description="Body or description of the pull request of made changes.")),
+        branch=(str, Field(description=branch_description)))
 
-    def _run(self, pr_title: str, pr_body: str):
+    def _run(self, pr_title: str, pr_body: str, branch: str):
         try:
             base_branch = self.api_wrapper.branch
             logger.info(f"Creating pull request with title: {pr_title}, body: {pr_body}, base_branch: {base_branch}")
-            return self.api_wrapper.create_pull_request(pr_title, pr_body)
+            return self.api_wrapper.create_pull_request(pr_title, pr_body, branch)
         except Exception as e:
             stacktrace = traceback.format_exc()
             logger.error(f"Unable to create PR: {stacktrace}")
@@ -88,12 +91,12 @@ class DeleteFileTool(BaseTool):
     Simply pass in the full file path of the file you would like to delete. **IMPORTANT**: the path must not start with a slash"""
     args_schema: Type[BaseModel] = create_model(
         "DeleteFileInput",
-        file_path=(str, Field(description="File path of file to be deleted. e.g. `src/agents/developer/tools/git/github_tools.py`. **IMPORTANT**: the path must not start with a slash")
-                   ))
+        file_path=(str, Field(description="File path of file to be deleted. e.g. `src/agents/developer/tools/git/github_tools.py`. **IMPORTANT**: the path must not start with a slash")),
+        branch=(str, Field(description=branch_description)))
 
-    def _run(self, file_path: str):
+    def _run(self, file_path: str, branch: str):
         try:
-            return self.api_wrapper.delete_file(file_path)
+            return self.api_wrapper.delete_file(file_path, branch)
         except Exception as e:
             stacktrace = traceback.format_exc()
             logger.error(f"Unable to delete file: {stacktrace}")
@@ -111,11 +114,12 @@ class CreateFileTool(BaseTool):
     Full file content to be created. It must be without any escapes, just raw content to CREATE in GIT.
     Generate full file content for this field without any additional texts, escapes, just raw code content. 
     You MUST NOT ignore, skip or comment any details, PROVIDE FULL CONTENT including all content based on all best practices.
-    """)))
+    """)),
+        branch=(str, Field(description=branch_description)))
 
-    def _run(self, file_path: str, file_contents: str):
+    def _run(self, file_path: str, file_contents: str, branch: str):
         logger.info(f"Create file in the repository {file_path} with content: {file_contents}")
-        return self.api_wrapper.create_file(file_path, file_contents)
+        return self.api_wrapper.create_file(file_path, file_contents, branch)
 
 
 class SetActiveBranchTool(BaseTool):
@@ -223,10 +227,12 @@ class CreatePullRequestChangeComment(BaseTool):
 
 class UpdateFileToolModel(BaseModel):
     file_query: str = Field(description="Strictly follow the provided rules.")
+    branch: str = Field(description=branch_description)
 
 class AppendFileToolModel(BaseModel):
     file_path: str = Field(description="Path to the file new content will be appended to.")
     content: str = Field(description="Content to be added to the file.")
+    branch: str = Field(description=branch_description)
 
 class ListFilesModel(BaseModel):
     path: Optional[str] = Field(description="Repository path/package to extract files from.", default=None)
@@ -275,9 +281,9 @@ class UpdateFileTool(BaseTool):
     args_schema: Type[BaseModel] = UpdateFileToolModel
     handle_tool_error: bool = True
 
-    def _run(self, file_query: str):
+    def _run(self, file_query: str, branch: str):
         try:
-            return self.api_wrapper.update_file(file_query)
+            return self.api_wrapper.update_file(file_query, branch)
         except Exception as e:
             stacktrace = traceback.format_exc()
             logger.error(f"Unable to update file: {stacktrace}")
@@ -290,9 +296,9 @@ class AppendFileTool(BaseTool):
                         Useful in case file content is greater than model's output tokens"""
     args_schema: Type[BaseModel] = AppendFileToolModel
 
-    def _run(self, file_path: str, content: str):
+    def _run(self, file_path: str, content: str, branch: str):
         try:
-            return self.api_wrapper.append_file(file_path, content)
+            return self.api_wrapper.append_file(file_path, content, branch)
         except Exception:
             stacktrace = traceback.format_exc()
             logger.error(f"Unable to append to the file: {stacktrace}")
@@ -306,13 +312,13 @@ class ReadFileTool(BaseTool):
     file path of the file you would like to read. **IMPORTANT**: the path must not start with a slash"""
     args_schema: Type[BaseModel] = create_model(
         "ReadFileInput",
-        file_path=(str, Field(description="File path of file to be read. e.g. `src/agents/developer/tools/git/github_tools.py`. **IMPORTANT**: the path must not start with a slash")
-                   )
+        file_path=(str, Field(description="File path of file to be read. e.g. `src/agents/developer/tools/git/github_tools.py`. **IMPORTANT**: the path must not start with a slash")),
+        branch=(str, Field(description=branch_description))
     )
 
-    def _run(self, file_path: str):
+    def _run(self, file_path: str, branch: str):
         try:
-            return self.api_wrapper.read_file(file_path)
+            return self.api_wrapper.read_file(file_path, branch)
         except Exception as e:
             stacktrace = traceback.format_exc()
             logger.error(f"Unable to read file: {stacktrace}")

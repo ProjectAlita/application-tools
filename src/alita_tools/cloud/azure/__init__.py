@@ -32,7 +32,7 @@ class AzureToolkit(BaseToolkit):
             client_id=(str, Field(default="", title="Client ID", description="Azure client ID")),
             client_secret=(str, Field(default="", title="Client secret", description="Azure client secret", json_schema_extra={'secret': True})),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
-            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Cloud Azure", "icon_url": None}})
+            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Cloud Azure", "icon_url": None, "hidden": True}})
         )
 
     @classmethod

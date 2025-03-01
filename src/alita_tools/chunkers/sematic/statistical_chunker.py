@@ -12,7 +12,7 @@ from ..utils import tiktoken_length
 from .base import Chunk
 
 
-def _encode_documents(embeddings: 'BaseModel', docs: List[str]) -> np.ndarray:
+def _encode_documents(embeddings: 'BaseModel', docs: List[str]) -> np.ndarray: # type: ignore
     """
     Encodes a list of documents into embeddings. If the number of documents
     exceeds 2000, the documents are split into batches to avoid overloading
@@ -247,14 +247,9 @@ def _split_documents(docs: List[str], split_indices: List[int], similarities: Li
 
 def statistical_chunker(file_content_generator: Generator[Document, None, None], config: dict, *args, **kwargs) -> Generator[str, None, None]:
     logger.info(config)
-    try:
-        from alita_sdk.langchain.interfaces.llm_processor import get_embeddings
-        embedding = get_embeddings(config.get('embedding_model'), 
-                                   config.get('embedding_model_params'))
-    except ImportError:
-        embedding = kwargs.get('embedding')
-        if embedding is None:
-            raise ImportError("Could not import the required module 'alita_sdk.langchain.interfaces.llm_processor'.")
+    embedding = config.get('embedding')
+    if embedding is None:
+        raise ImportError("Could not import the required module 'alita_sdk.langchain.interfaces.llm_processor'.")
     max_tokens_doc: int = config.get("max_doc_size", 300)
     batch_size: int = config.get("batch_size", 64)
     window_size: int = config.get("window_size", 5)
