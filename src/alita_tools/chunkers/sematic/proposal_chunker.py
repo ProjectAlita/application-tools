@@ -1,4 +1,4 @@
-import uuid
+from json import dumps
 from typing import Generator
 from logging import getLogger
 from langchain.schema import Document
@@ -57,68 +57,53 @@ Britain and America."]
 """
 
 CHUNK_SUMMARY_PROMPT = """
-You are the steward of a group of chunks, where each chunk represents a set of sentences discussing a similar topic. 
-Your task is to generate a structured JSON output containing both a brief chunk title and a one-sentence summary that inform viewers about the chunk content.
+You are the steward of a group of chunks, where each chunk represents a set of sentences discussing a similar topic.
+Your task is to generate a structured List of JSON output containing both a brief chunk title and a set of one-sentence summary that inform viewers about the chunk content, it also have a list of propositions from user message associated with chunk
 
 Guidelines:
-- Chunk Title: A short, generalized phrase that broadly describes the topic.
+- chunk_title: A short, generalized phrase that broadly describes the topic.
 - Example: If the chunk is about apples, generalize it to “Food.”
 - If the chunk is about a specific month, generalize it to “Dates & Times.”
-- Chunk Summary: A concise, one-sentence explanation that clarifies the chunk content and may include guidance on what additional information should be added.
-- Example: If given “Greg likes to eat pizza,” the summary should be “This chunk contains information about the types of food Greg likes to eat.”
+- chunk_summary: A concise, one-sentence explanation that clarifies the chunk content and may include guidance on what additional information should be added.
+- Example: If given “Greg likes to eat pizza,” the summary should be “This chunk contains information about the types of food Greg likes to eat.
+- propositions: A list of propositions from user message associated with chunk
 """
 
 CHUNK_REFINEMENT_PROMPT = """
 You are the steward of a group of chunks, where each chunk represents a set of sentences discussing a similar topic. 
-Your task is to generate a structured JSON output containing both an updated chunk title and an updated chunk summary when a new proposition is added to the chunk.
+Your task is to generate a structured JSON output containing both an updated chunk title and an updated chunk summary to better represent propositions in chunk
 
 Guidelines:
-- Chunk Title: A short, generalized phrase that broadly describes the topic.
+- chunk_title: Updated chunk title that represents information provided in chunk in one concise manned.
 - Example: If the chunk is about apples, generalize it to “Food.”
 - If the chunk is about a specific month, generalize it to “Dates & Times.”
-- Chunk Summary: A concise, one-sentence explanation that clarifies the chunk content and may include guidance on what additional information should be added.
-- Example: If given “Greg likes to eat pizza,” the summary should be “This chunk contains information about the types of food Greg likes to eat.”
-- You will be provided with:
+- Chunk Summary: An explanation that clarifies the chunk content with summary of the information available in propositions.
+
+You will be provided with:
 - A group of propositions currently in the chunk
-- The chunk existing summary
-- The chunk existing title (if available)
+- Existing chunk existing summary
+- Existing chunk existing title
 """
 
-CHUNK_ALLOCATION_PROMPT = """
-Determine whether or not the "Proposition" should belong to any of the existing chunks.
-
-A proposition should belong to a chunk of their meaning, direction, or intention are similar.
-The goal is to group similar propositions and chunks.
-
-If you think a proposition should be joined with a chunk, return the chunk id.
-If you do not think an item should be joined with an existing chunk, just return "No chunks" as Chunk ID.
-
-Example:
-Input:
-    - Proposition: "Greg really likes hamburgers"
-    - Current Chunks:
-        - Chunk ID: 2n4l3d
-        - Chunk Name: Places in San Francisco
-        - Chunk Summary: Overview of the things to do with San Francisco Places
-
-        - Chunk ID: 93833k
-        - Chunk Name: Food Greg likes
-        - Chunk Summary: Lists of the food and dishes that Greg likes
-Output: 93833k
-"""
 
 class Sentences(BaseModel):
     """Extracting propositions from a document"""
     sentences: List[str]
     
-class ChunkID(BaseModel):
-    """Extracting the chunk id"""
-    chunk_id: Optional[str]
+class ChunkRefinement(BaseModel):
+    """Extracting the chunk details"""
+    chunk_title: str
+    chunk_summary: str
+
+class ChunkDetails(BaseModel):
+    """Extracting the chunk details"""
+    chunk_title: str
+    chunk_summary: str
+    propositions: List[str]
 
 class ChunkAnalysis(BaseModel):
     """ Extracting the chunk summary abd title from proposition"""
-    chunk_summary: str
-    chunk_title: str
+    chunks: List[ChunkDetails]
 
 class AgenticChunker:
     def __init__(self, llm=None):
@@ -127,48 +112,9 @@ class AgenticChunker:
         self.generate_new_metadata_ind = True
         self.llm = llm
         self.chunk_summary_llm = llm.with_structured_output(schema=ChunkAnalysis)
-        self.chunk_id_llm = llm.with_structured_output(schema=ChunkID)
+        self.chunk_refinement_llm = llm.with_structured_output(schema=ChunkRefinement)
 
-    def add_propositions(self, propositions):
-        for proposition in propositions:
-            self.add_proposition(proposition)
-
-    
-    def add_proposition(self, proposition):
-        # If it's your first chunk, just make a new chunk and don't check for others
-        if len(self.chunks) == 0:
-            self._create_new_chunk(proposition)
-            return
-        
-        chunk_id = self._find_relevant_chunk(proposition)
-
-        # If a chunk was found then add the proposition to it
-        if chunk_id:
-            logger.debug(f"Chunk Found ({self.chunks[chunk_id]['chunk_id']}), adding to: {self.chunks[chunk_id]['title']}")
-            self.add_proposition_to_chunk(chunk_id, proposition)
-        else:
-            self._create_new_chunk(proposition)
-        
-
-    def add_proposition_to_chunk(self, chunk_id, proposition):
-        # Add then
-        self.chunks[chunk_id]['propositions'].append(proposition)
-
-        prompt_template = ChatPromptTemplate.from_messages(
-            ("system", CHUNK_REFINEMENT_PROMPT),
-            ("user", "Chunk's propositions:\n{proposition}\n\nCurrent chunk summary:\n{current_summary}")
-        )
-        prompt = prompt_template.invoke({"proposition": "\n".join(self.chunks[chunk_id]['propositions']), "current_summary": self.chunks[chunk_id]['summary']})
-        result = self.chunk_summary_llm.invoke(prompt)
-        
-        # Then grab a new summary
-        if self.generate_new_metadata_ind:
-            self.chunks[chunk_id]['summary'] = result.chunk_summary
-            self.chunks[chunk_id]['title'] = result.chunk_title
-
-
-    def _create_new_chunk(self, proposition):
-        new_chunk_id = str(uuid.uuid4())
+    def create_chunkes(self, proposition):
         chunk_analysis_prompt = ChatPromptTemplate.from_messages(
             [
                 ("system", CHUNK_SUMMARY_PROMPT),
@@ -176,42 +122,29 @@ class AgenticChunker:
             ]
         )
         prompt = chunk_analysis_prompt.invoke({"proposition": proposition})
-        chunk_analysis = self.chunk_summary_llm.invoke(prompt)
-
-        self.chunks[new_chunk_id] = {
-            'chunk_id' : new_chunk_id,
-            'propositions': [proposition],
-            'title' : chunk_analysis.chunk_title,
-            'summary': chunk_analysis.chunk_summary,
-            'chunk_index' : len(self.chunks)
-        }
-        logger.debug(f"New Chunk Created ({new_chunk_id}): {chunk_analysis.chunk_title}")
-    
-    def get_chunk_outline(self):
-        """
-        Get a string which represents the chunks you currently have.
-        This will be empty when you first start off
-        """
-        chunk_outline = ""
-
-        for _, chunk in self.chunks.items():
-            single_chunk_string = f"""Chunk ({chunk['chunk_id']}): {chunk['title']}\nSummary: {chunk['summary']}\n\n"""
-            chunk_outline += single_chunk_string
-        
-        return chunk_outline
-
-    def _find_relevant_chunk(self, proposition):
-        current_chunk_outline = self.get_chunk_outline()
-
-        prompt_template = ChatPromptTemplate.from_messages(
+        return self.chunk_summary_llm.invoke(prompt)
+            
+    def chunk_refinement(self, chunk):
+        chunk_refinement_prompt = ChatPromptTemplate.from_messages(
             [
-                ( "system", CHUNK_ALLOCATION_PROMPT),
-                ("user", "Current Chunks:\n--Start of current chunks--\n{current_chunk_outline}\n--End of current chunks--\n\nDetermine if the following statement should belong to one of the chunks outlined:\n{proposition}"),
+                ("system", CHUNK_REFINEMENT_PROMPT),
+                ("user", "Chunk: {chunk}"),
             ]
         )
-        prompt = prompt_template.invoke({"current_chunk_outline": current_chunk_outline, "proposition": proposition})
-        result = self.chunk_id_llm.invoke(prompt)
-        return None if 'No chunks' in result.chunk_id else result.chunk_id
+        prompt = chunk_refinement_prompt.invoke({"chunk": dumps(chunk)})
+        result = self.chunk_refinement_llm.invoke(prompt)
+        return result
+
+    def add_propositions(self, propositions):
+        self.create_chunkes(propositions)
+        for chunk in self.chunks:
+            refined = self.chunk_refinement(chunk)
+            yield {
+                "title": refined.chunk_title,
+                "summary": refined.chunk_summary,
+                "propositions": chunk.propositions
+            }
+            
 
 
 def proposal_chunker(file_content_generator: Generator[Document, None, None], config: dict, *args, **kwargs):
@@ -237,17 +170,15 @@ def proposal_chunker(file_content_generator: Generator[Document, None, None], co
             result = structured_llm.invoke(prompt)
             propositions.extend(result.sentences)
         chunker = AgenticChunker(llm=llm)
-        chunker.add_propositions(propositions)
-        for chunk in chunker.chunks.values():
+        for chunk in chunker.add_propositions(propositions):
             chunk_id += 1
             docmeta = doc_metadata.copy()
-            docmeta.update({"chunk_id": chunk_id})
             docmeta.update({"chunk_title": chunk['title']})
             docmeta.update({"chunk_summary": chunk['summary']})
             page_content = "\n".join(chunk['propositions'])
             yield Document(
+                metadata=docmeta,
                 page_content=f"{chunk['title']}\n\n{chunk['summary']}\n\n{page_content}",
-                metadata=docmeta
             )
         
         
