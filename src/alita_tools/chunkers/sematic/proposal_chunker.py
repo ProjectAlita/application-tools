@@ -89,7 +89,11 @@ class AgenticChunker:
             ]
         )
         prompt = chunk_analysis_prompt.invoke({"split": split})
-        return self.chunk_summary_llm.invoke(prompt)
+        try:
+            return self.chunk_summary_llm.invoke(prompt)
+        except Exception as e:
+            logger.error(f"Error in chunking: {e}")
+            return []
             
     def chunk_refinement(self, chunk):
         chunk_refinement_prompt = ChatPromptTemplate.from_messages(
