@@ -102,7 +102,9 @@ class AgenticChunker:
                 ("user", "Chunk: {chunk}"),
             ]
         )
-        prompt = chunk_refinement_prompt.invoke({"chunk": dumps(chunk)})
+        prompt = chunk_refinement_prompt.invoke({
+            "chunk": f"chunk_title: {chunk.chunk_title}\n chunk_summary: {chunk.chunk_summary}\n propositions: {dumps(chunk.propositions)}"
+            })
         result = self.chunk_refinement_llm.invoke(prompt)
         return result
 
