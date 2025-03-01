@@ -90,7 +90,7 @@ class AgenticChunker:
         )
         prompt = chunk_analysis_prompt.invoke({"split": split})
         try:
-            return self.chunk_summary_llm.invoke(prompt)
+            return self.chunk_summary_llm.invoke(prompt).chunks
         except Exception as e:
             logger.error(f"Error in chunking: {e}")
             return []
@@ -105,8 +105,7 @@ class AgenticChunker:
         prompt = chunk_refinement_prompt.invoke({
             "chunk": f"chunk_title: {chunk.chunk_title}\n chunk_summary: {chunk.chunk_summary}\n propositions: {dumps(chunk.propositions)}"
             })
-        result = self.chunk_refinement_llm.invoke(prompt)
-        return result
+        return self.chunk_refinement_llm.invoke(prompt)
 
     def add_propositions(self, propositions):
         for chunk in self.create_chunkes(propositions):
