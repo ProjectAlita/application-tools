@@ -435,18 +435,3 @@ class QtestApiWrapper(BaseModel):
         else:
             raise ValueError(f"Unknown mode: {mode}")
 
-
-if __name__ == '__main__':
-    qtest = QtestApiWrapper(
-        base_url='https://ctcprod.qtestnet.com',
-        project_id=124186,
-        qtest_api_token='f3ea6279-eb6d-44a7-9b1a-e95edb863256'
-    )
-
-    # res = qtest._get_requirement_id('CKOUT-360')
-    # r = qtest.link_tests_to_requirement('CKOUT-360', '["TC-701"]')
-    # r = qtest._create_requirement_if_not_exists("PLAN-1590", 'Created via API')
-    # res = qtest.find_test_case_by_id('TC-601')
-    # print(res)
-    r = qtest.find_test_case_by_id('TC-701')
-    print(r)
