@@ -8,6 +8,7 @@ from tqdm.auto import tqdm
 
 logger = getLogger(__name__)
 
+from .base import Chunk
 from ..utils import tiktoken_length
 
 
