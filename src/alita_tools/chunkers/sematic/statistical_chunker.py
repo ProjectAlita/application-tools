@@ -9,7 +9,6 @@ from tqdm.auto import tqdm
 logger = getLogger(__name__)
 
 from ..utils import tiktoken_length
-from .base import Chunk
 
 
 def _encode_documents(embeddings: 'BaseModel', docs: List[str]) -> np.ndarray: # type: ignore
