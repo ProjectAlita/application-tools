@@ -15,7 +15,8 @@ logger = getLogger(__name__)
 
 CHUNK_SUMMARY_PROMPT = """
 You are the steward of a group of chunks, where each chunk represents a set of sentences discussing a similar topic.
-Your task is to generate a structured List of JSON output containing both a brief chunk title and a set of one-sentence summary that inform viewers about the chunk content, it also have a list of propositions from user message associated with chunk
+Your task is to generate a structured List of JSON output containing both a brief chunk title and a set of one-sentence 
+summary that inform viewers about the chunk content, it also have a list of propositions from user message associated with chunk
 
 Guidelines:
 - chunk_title: A short, generalized phrase that broadly describes the topic.
@@ -34,35 +35,6 @@ and replacing pronouns (e.g., "it", "he", "she", "they", "this", "that") with th
 entities they refer to.
 """
 
-CHUNK_REFINEMENT_PROMPT = """
-You are the steward of a group of chunks, where each chunk represents a set of sentences discussing a similar topic. 
-Your task is to generate a structured JSON output containing both an updated chunk title and an updated chunk summary to better represent propositions in chunk
-
-Guidelines:
-- chunk_title: Updated chunk title that represents information provided in chunk in one concise manned.
-- Example: If the chunk is about apples, generalize it to “Food.”
-- If the chunk is about a specific month, generalize it to “Dates & Times.”
-- Chunk Summary: An explanation that clarifies the chunk content with summary of the information available in propositions.
-
-You will be provided with:
-- A group of propositions currently in the chunk
-- Existing chunk existing summary
-- Existing chunk existing title
-"""
-
-class Sentences(BaseModel):
-    """Extracting propositions from a document"""
-    sentences: List[str]
- 
-class Propositions(BaseModel):
-    """Extracting propositions from a document"""
-    propositions: List[Sentences]
-    
-class ChunkRefinement(BaseModel):
-    """Extracting the chunk details"""
-    chunk_title: str
-    chunk_summary: str
-
 class ChunkDetails(BaseModel):
     """Extracting the chunk details"""
     chunk_title: str
@@ -77,9 +49,7 @@ class AgenticChunker:
     def __init__(self, llm=None):
         # Whether or not to update/refine summaries and titles as you get new information
         self.llm = llm
-        self.propositions_llm = llm.with_structured_output(schema=Propositions)
         self.chunk_summary_llm = llm.with_structured_output(schema=ChunkAnalysis)
-        self.chunk_refinement_llm = llm.with_structured_output(schema=ChunkRefinement)
 
     def create_chunkes(self, split: str):
         chunk_analysis_prompt = ChatPromptTemplate.from_messages(
@@ -94,25 +64,12 @@ class AgenticChunker:
         except Exception as e:
             logger.error(f"Error in chunking: {e}")
             return []
-            
-    def chunk_refinement(self, chunk):
-        chunk_refinement_prompt = ChatPromptTemplate.from_messages(
-            [
-                ("system", CHUNK_REFINEMENT_PROMPT),
-                ("user", "Chunk: {chunk}"),
-            ]
-        )
-        prompt = chunk_refinement_prompt.invoke({
-            "chunk": f"chunk_title: {chunk.chunk_title}\n chunk_summary: {chunk.chunk_summary}\n propositions: {dumps(chunk.propositions)}"
-            })
-        return self.chunk_refinement_llm.invoke(prompt)
 
     def add_propositions(self, propositions):
         for chunk in self.create_chunkes(propositions):
-            refined = self.chunk_refinement(chunk)
             yield {
-                "title": refined.chunk_title,
-                "summary": refined.chunk_summary,
+                "title": chunk.chunk_title,
+                "summary": chunk.chunk_summary,
                 "propositions": chunk.propositions
             }
 
@@ -136,12 +93,26 @@ def proposal_chunker(file_content_generator: Generator[Document, None, None], co
             for chunk in chunker.add_propositions(split):
                 chunk_id += 1
                 docmeta = doc_metadata.copy()
-                docmeta.update({"chunk_title": chunk['title']})
-                docmeta.update({"chunk_summary": chunk['summary']})
-                docmeta.update({"original": split})
-                page_content = "\n".join(chunk['propositions'])
+                docmeta['chunk_type'] = "title"
                 yield Document(
                     metadata=docmeta,
-                    page_content=f"{chunk['title']}\n\n{chunk['summary']}\n\n{page_content}",
+                    page_content=chunk['title'],
+                )
+                docmeta['chunk_type'] = "summary"
+                yield Document(
+                    metadata=docmeta,
+                    page_content=chunk['summary'],
+                )
+                docmeta['chunk_type'] = "propositions"
+                yield Document(
+                    metadata=docmeta,
+                    page_content="\n".join(chunk['propositions']),
+                )
+                docmeta['chunk_type'] = "document"
+                docmeta.update({"chunk_title": chunk['title']})
+                docmeta.update({"chunk_summary": chunk['summary']})
+                yield Document(
+                    metadata=docmeta,
+                    page_content=split,
                 )
     

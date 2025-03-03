@@ -94,7 +94,7 @@ def _find_optimal_threshold(docs: List[str], similarity_scores: List[float],
                 [0] + split_indices, split_indices + [len(token_counts)]
             )
         ]
-
+        
         # Calculate the median token count for the chunks
         median_tokens = np.median(split_token_counts)
         logger.debug(
@@ -305,6 +305,7 @@ def statistical_chunker(file_content_generator: Generator[Document, None, None],
                     metadata = doc_metadata.copy()
                     metadata['chunk_index'] = chunk_index
                     metadata['chunk_token_count'] = chunk.token_count
+                    metadata['chunk_type'] = "document"
                     last_chunk = chunk
                     logger.info(f"Chunk {chunk_index} created with {chunk.token_count} tokens.")
                     logger.info(f"Chunk metadata: {metadata}")
