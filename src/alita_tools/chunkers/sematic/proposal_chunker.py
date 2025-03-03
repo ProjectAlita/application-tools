@@ -93,6 +93,7 @@ def proposal_chunker(file_content_generator: Generator[Document, None, None], co
             for chunk in chunker.add_propositions(split):
                 chunk_id += 1
                 docmeta = doc_metadata.copy()
+                docmeta['chunk_id'] = chunk_id
                 docmeta['chunk_type'] = "title"
                 yield Document(
                     metadata=docmeta,
