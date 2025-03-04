@@ -65,7 +65,7 @@ class ConfluenceToolkit(BaseToolkit):
             tools.append(BaseAction(
                 api_wrapper=confluence_api_wrapper,
                 name=prefix + tool["name"],
-                description=tool["description"],
+                description=f"Confluence space: {confluence_api_wrapper.space}" + tool["description"],
                 args_schema=tool["args_schema"]
             ))
         return cls(tools=tools)

@@ -35,9 +35,9 @@ class AlitaBitbucketToolkit(BaseToolkit):
             selected_tools[t['name']] = default.schema() if default else default
         return create_model(
             name,
-            url=(str, Field(description="Bitbucket URL", json_schema_extra={'toolkit_name': True})),
+            url=(str, Field(description="Bitbucket URL")),
             project=(str, Field(description="Project/Workspace")),
-            repository=(str, Field(description="Repository")),
+            repository=(str, Field(description="Repository", json_schema_extra={'toolkit_name': True})),
             branch=(str, Field(description="Main branch", default="main")),
             username=(str, Field(description="Username")),
             password=(str, Field(description="GitLab private token", json_schema_extra={'secret': True})),
@@ -61,6 +61,7 @@ class AlitaBitbucketToolkit(BaseToolkit):
                 if tool['name'] not in selected_tools:
                     continue
             tool['tool']['name'] = prefix + tool['tool']['name']
+            tool['tool']['description'] = f"Repository: {bitbucket_api_wrapper.repository}" + tool['tool']['description']
             tools.append(tool['tool'](api_wrapper=bitbucket_api_wrapper))
         return cls(tools=tools)
 

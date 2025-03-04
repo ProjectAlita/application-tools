@@ -43,7 +43,7 @@ class AzureDevOpsWikiToolkit(BaseToolkit):
             tools.append(BaseAction(
                 api_wrapper=azure_devops_api_wrapper,
                 name=prefix + tool["name"],
-                description=tool["description"],
+                description=tool["description"] + f"\nADO instance: {azure_devops_api_wrapper.organization_url}/{azure_devops_api_wrapper.project}",
                 args_schema=tool["args_schema"]
             ))
         return cls(tools=tools)

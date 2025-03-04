@@ -1,10 +1,11 @@
-from typing import Any, List, Literal
+from typing import Any, List, Literal, Optional
 
 from langchain_core.tools import BaseToolkit, BaseTool
 from pydantic import BaseModel, ConfigDict, create_model, Field
 
 from .api_wrapper import CSVToolApiWrapper
 from ..base.tool import BaseAction
+from ..utils import clean_string, TOOLKIT_SPLITTER
 
 name = "pandas"
 
@@ -14,7 +15,8 @@ def get_tools(tool):
         csv_content=read_content(
             artifact_bucket_name=tool['settings'].get('artifact_bucket_name', None),
             file_name=tool['settings'].get('file_name', None),
-            client=tool['settings']['alita'])
+            client=tool['settings']['alita']),
+        toolkit_name=tool.get('toolkit_name')
     ).get_tools()
 
 def read_content(client: 'AlitaClient', artifact_bucket_name: str = None, file_name: str = None):
@@ -37,10 +39,11 @@ class PandasToolkit(BaseToolkit):
         )
 
     @classmethod
-    def get_toolkit(cls, selected_tools: list[str] | None = None, **kwargs):
+    def get_toolkit(cls, selected_tools: list[str] | None = None, toolkit_name: Optional[str] = None, **kwargs):
         if selected_tools is None:
             selected_tools = []
         csv_tool_api_wrapper = CSVToolApiWrapper(**kwargs)
+        prefix = clean_string(toolkit_name + TOOLKIT_SPLITTER) if toolkit_name else ''
         available_tools = csv_tool_api_wrapper.get_available_tools()
         tools = []
         for tool in available_tools:
@@ -48,7 +51,7 @@ class PandasToolkit(BaseToolkit):
                 continue
             tools.append(BaseAction(
                 api_wrapper=csv_tool_api_wrapper,
-                name=tool["name"],
+                name=prefix + tool["name"],
                 description=tool["description"],
                 args_schema=tool["args_schema"]
             ))

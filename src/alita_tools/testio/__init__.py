@@ -1,10 +1,11 @@
-from typing import List, Literal
+from typing import List, Literal, Optional
 
 from langchain_core.tools import BaseToolkit, BaseTool
 from pydantic import create_model, BaseModel, ConfigDict, Field
 
 from .api_wrapper import TestIOApiWrapper
 from ..base.tool import BaseAction
+from ..utils import clean_string, TOOLKIT_SPLITTER
 
 name = "testio"
 
@@ -13,7 +14,8 @@ def get_tools(tool):
     return TestIOToolkit().get_toolkit(
         selected_tools=tool['settings'].get('selected_tools', []),
         endpoint=tool['settings']['endpoint'],
-        api_key=tool['settings']['api_key']
+        api_key=tool['settings']['api_key'],
+        toolkit_name=tool['toolkit_name']
     ).get_tools()
 
 
@@ -32,10 +34,11 @@ class TestIOToolkit(BaseToolkit):
         )
 
     @classmethod
-    def get_toolkit(cls, selected_tools: list[str] | None = None, **kwargs):
+    def get_toolkit(cls, selected_tools: list[str] | None = None, toolkit_name: Optional[str] = None, **kwargs):
         if selected_tools is None:
             selected_tools = []
         testio_api_wrapper = TestIOApiWrapper(**kwargs)
+        prefix = clean_string(toolkit_name + TOOLKIT_SPLITTER) if toolkit_name else ''
         available_tools = testio_api_wrapper.get_available_tools()
         tools = []
         for tool in available_tools:
@@ -43,7 +46,7 @@ class TestIOToolkit(BaseToolkit):
                 continue
             tools.append(BaseAction(
                 api_wrapper=testio_api_wrapper,
-                name=tool["name"],
+                name=prefix + tool["name"],
                 description=tool["description"],
                 args_schema=tool["args_schema"]
             ))
