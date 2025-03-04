@@ -22,7 +22,6 @@ class AzureDevOpsWikiToolkit(BaseToolkit):
             project=(str, Field(description="ADO project")),
             token=(str, Field(description="ADO token", json_schema_extra={'secret': True})),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
-            # TODO add icon_url
             __config__={'json_schema_extra': {'metadata': {"label": "ADO wiki", "icon_url": None}}}
         )
 
