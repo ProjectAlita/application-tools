@@ -5,6 +5,7 @@ from pydantic import create_model, BaseModel, Field
 
 from .test_plan_wrapper import TestPlanApiWrapper
 from ...base.tool import BaseAction
+from ...utils import clean_string, TOOLKIT_SPLITTER
 
 
 name = "azure_devops_plans"
@@ -27,7 +28,7 @@ class AzureDevOpsPlansToolkit(BaseToolkit):
         )
 
     @classmethod
-    def get_toolkit(cls, selected_tools: list[str] | None = None, **kwargs):
+    def get_toolkit(cls, selected_tools: list[str] | None = None, toolkit_name: Optional[str] = None, **kwargs):
         from os import environ
         if not environ.get('AZURE_DEVOPS_CACHE_DIR', None):
             environ['AZURE_DEVOPS_CACHE_DIR'] = '/tmp/.azure-devops'
@@ -36,6 +37,7 @@ class AzureDevOpsPlansToolkit(BaseToolkit):
         azure_devops_api_wrapper = TestPlanApiWrapper(**kwargs)
         available_tools = azure_devops_api_wrapper.get_available_tools()
         tools = []
+        prefix = clean_string(toolkit_name + TOOLKIT_SPLITTER) if toolkit_name else ''
         for tool in available_tools:
             if selected_tools:
                 if tool["name"] not in selected_tools:
@@ -43,7 +45,7 @@ class AzureDevOpsPlansToolkit(BaseToolkit):
             print(tool)
             tools.append(BaseAction(
                 api_wrapper=azure_devops_api_wrapper,
-                name=tool["name"],
+                name=prefix + tool["name"],
                 description=tool["description"],
                 args_schema=tool["args_schema"]
             ))

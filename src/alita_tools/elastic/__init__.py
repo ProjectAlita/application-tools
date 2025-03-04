@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict, create_model, Field
 
 from .api_wrapper import ELITEAElasticApiWrapper
 from ..base.tool import BaseAction
+from ..utils import clean_string, TOOLKIT_SPLITTER
 
 name = "elastic"
 
@@ -12,7 +13,8 @@ def get_tools(tool):
     return ElasticToolkit().get_toolkit(
         selected_tools=tool['settings'].get('selected_tools', []),
         url=tool['settings'].get('url', ''),
-        api_key=tool['settings'].get('api_key', None)
+        api_key=tool['settings'].get('api_key', None),
+        toolkit_name=tool.get('toolkit_name')
     ).get_tools()
 
 class ElasticToolkit(BaseToolkit):
@@ -23,7 +25,7 @@ class ElasticToolkit(BaseToolkit):
         selected_tools = {x['name']: x['args_schema'].schema() for x in ELITEAElasticApiWrapper.model_construct().get_available_tools()}
         return create_model(
             name,
-            url=(str, Field(default=None, title="Elasticsearch URL", description="Elasticsearch URL")),
+            url=(str, Field(default=None, title="Elasticsearch URL", description="Elasticsearch URL", json_schema_extra={'toolkit_name': True})),
             api_key=(
                 Optional[str],
                 Field(
@@ -38,18 +40,19 @@ class ElasticToolkit(BaseToolkit):
         )
 
     @classmethod
-    def get_toolkit(cls, selected_tools: list[str] | None = None, **kwargs):
+    def get_toolkit(cls, selected_tools: list[str] | None = None, toolkit_name: Optional[str] = None, **kwargs):
         if selected_tools is None:
             selected_tools = []
         elastic_api_wrapper = ELITEAElasticApiWrapper(**kwargs)
         available_tools = elastic_api_wrapper.get_available_tools()
         tools = []
+        prefix = clean_string(toolkit_name + TOOLKIT_SPLITTER) if toolkit_name else ''
         for tool in available_tools:
             if selected_tools and tool["name"] not in selected_tools:
                 continue
             tools.append(BaseAction(
                 api_wrapper=elastic_api_wrapper,
-                name=tool["name"],
+                name=prefix + tool["name"],
                 description=tool["description"],
                 args_schema=tool["args_schema"]
             ))

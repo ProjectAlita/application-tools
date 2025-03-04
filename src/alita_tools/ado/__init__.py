@@ -18,6 +18,7 @@ def get_tools(tool_type, tool):
         "repository_id": tool['settings'].get('repository_id', None),
         "base_branch": tool['settings'].get('base_branch', None),
         "active_branch": tool['settings'].get('active_branch', None),
+        "toolkit_name": tool.get('toolkit_name', ''),
     }
     if tool_type == 'ado_plans':
         return AzureDevOpsPlansToolkit().get_toolkit(**config_dict).get_tools()
