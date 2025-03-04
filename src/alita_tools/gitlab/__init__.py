@@ -16,7 +16,8 @@ def get_tools(tool):
         url=tool['settings']['url'],
         repository=tool['settings']['repository'],
         branch=tool['settings']['branch'],
-        private_token=tool['settings']['private_token']
+        private_token=tool['settings']['private_token'],
+        toolkit_name = tool.get('name', name)
     ).get_tools()
 
 class AlitaGitlabToolkit(BaseToolkit):
@@ -49,6 +50,7 @@ class AlitaGitlabToolkit(BaseToolkit):
             if selected_tools:
                 if tool['name'] not in selected_tools:
                     continue
+            tool['tool']['description'] = f"Repository: {github_api_wrapper.repository}\n"+tool['tool']["description"],
             tools.append(tool['tool'](api_wrapper=github_api_wrapper))
         return cls(tools=tools)
 

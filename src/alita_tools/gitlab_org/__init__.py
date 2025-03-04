@@ -13,7 +13,8 @@ def get_tools(tool):
         url=tool['settings']['url'],
         repositories=tool['settings'].get('repositories', ''),
         branch=tool['settings']['branch'],
-        private_token=tool['settings']['private_token']
+        private_token=tool['settings']['private_token'],
+        toolkit_name=tool.get('name', name)
     ).get_tools()
 
 class AlitaGitlabSpaceToolkit(BaseToolkit):

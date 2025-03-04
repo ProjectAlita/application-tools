@@ -6,7 +6,7 @@ from pydantic import create_model, BaseModel, ConfigDict, Field
 from .api_wrapper import AlitaGitHubAPIWrapper
 from .tool import GitHubAction
 
-from ..utils import TOOLKIT_SPLITTER
+from ..utils import TOOLKIT_SPLITTER, clean_string
 
 name = "github"
 
@@ -19,7 +19,7 @@ def _get_toolkit(tool) -> BaseToolkit:
         github_access_token=tool['settings'].get('access_token', ''),
         github_username=tool['settings'].get('username', ''),
         github_password=tool['settings'].get('password', ''),
-        toolkit_name=tool.get('name', '')
+        toolkit_name=tool.get('name', tool['settings']['repository'])
     )
 
 def get_toolkit():
@@ -65,7 +65,7 @@ class AlitaGitHubToolkit(BaseToolkit):
                     continue
             tools.append(GitHubAction(
                 api_wrapper=github_api_wrapper,
-                name=toolkit_name + TOOLKIT_SPLITTER + tool["name"],
+                name=clean_string(toolkit_name + TOOLKIT_SPLITTER + tool["name"]),
                 mode=tool["mode"],
                 # set unique description for declared tools to differentiate the same methods for different toolkits
                 description=f"Repository: {github_api_wrapper.github_repository}\n"+tool["description"],
