@@ -32,7 +32,7 @@ class TestrailToolkit(BaseToolkit):
             email=(str, Field(description="User's email")),
             password=(str, Field(description="User's password", json_schema_extra={'secret': True})),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
-            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Testrail", "icon_url": None}})
+            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Testrail", "icon_url": "testrail-icon.svg"}})
         )
 
     @classmethod

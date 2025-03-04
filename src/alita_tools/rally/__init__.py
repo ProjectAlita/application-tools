@@ -36,7 +36,7 @@ class RallyToolkit(BaseToolkit):
             workspace=(Optional[str], Field(default=None, description="Rally workspace")),
             project=(Optional[str], Field(default=None, description="Rally project")),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
-            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Rally", "icon_url": None}})
+            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Rally", "icon_url": "rally.svg"}})
         )
 
     @classmethod

@@ -31,7 +31,7 @@ class SharepointToolkit(BaseToolkit):
             client_id=(str, Field(description="Client ID")),
             client_secret=(str, Field(description="Client Secret", json_schema_extra={'secret': True})),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
-            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Sharepoint", "icon_url": None}})
+            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Sharepoint", "icon_url": "sharepoint.svg"}})
         )
 
     @classmethod

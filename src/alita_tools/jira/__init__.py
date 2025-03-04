@@ -37,7 +37,7 @@ class JiraToolkit(BaseToolkit):
             verify_ssl=(bool, Field(description="Verify SSL", default=True)),
             additional_fields=(Optional[str], Field(description="Additional fields", default="")),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
-            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Jira", "icon_url": None}})
+            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Jira", "icon_url": "jira-icon.svg"}})
         )
 
     @classmethod
