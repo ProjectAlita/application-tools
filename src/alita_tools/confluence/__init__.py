@@ -1,9 +1,10 @@
-from typing import List, Literal
+from typing import List, Literal, Optional
 from langchain_community.agent_toolkits.base import BaseToolkit
 from .api_wrapper import ConfluenceAPIWrapper
 from langchain_core.tools import BaseTool
 from ..base.tool import BaseAction
 from pydantic import create_model, BaseModel, ConfigDict, Field
+from ..utils import clean_string, TOOLKIT_SPLITTER
 
 
 name = "confluence"
@@ -21,7 +22,9 @@ def get_tools(tool):
             limit=tool['settings'].get('limit', 5),
             additional_fields=tool['settings'].get('additional_fields', []),
             verify_ssl=tool['settings'].get('verify_ssl', True),
-            alita=tool['settings'].get('alita')).get_tools()
+            alita=tool['settings'].get('alita'),
+            toolkit_name=tool.get('toolkit_name')
+    ).get_tools()
 
 
 class ConfluenceToolkit(BaseToolkit):
@@ -32,7 +35,7 @@ class ConfluenceToolkit(BaseToolkit):
         selected_tools = {x['name']: x['args_schema'].schema() for x in ConfluenceAPIWrapper.model_construct().get_available_tools()}
         return create_model(
             name,
-            base_url=(str, Field(description="Confluence URL")),
+            base_url=(str, Field(description="Confluence URL", json_schema_extra={'toolkit_name': True})),
             token=(str, Field(description="Token", default=None, json_schema_extra={'secret': True})),
             api_key=(str, Field(description="API key", default=None, json_schema_extra={'secret': True})),
             username=(str, Field(description="Username", default=None)),
@@ -48,10 +51,11 @@ class ConfluenceToolkit(BaseToolkit):
         )
 
     @classmethod
-    def get_toolkit(cls, selected_tools: list[str] | None = None, **kwargs):
+    def get_toolkit(cls, selected_tools: list[str] | None = None, toolkit_name: Optional[str] = None, **kwargs):
         if selected_tools is None:
             selected_tools = []
         confluence_api_wrapper = ConfluenceAPIWrapper(**kwargs)
+        prefix = clean_string(toolkit_name + TOOLKIT_SPLITTER) if toolkit_name else ''
         available_tools = confluence_api_wrapper.get_available_tools()
         tools = []
         for tool in available_tools:
@@ -60,8 +64,8 @@ class ConfluenceToolkit(BaseToolkit):
                     continue
             tools.append(BaseAction(
                 api_wrapper=confluence_api_wrapper,
-                name=tool["name"],
-                description=tool["description"],
+                name=prefix + tool["name"],
+                description=f"Confluence space: {confluence_api_wrapper.space}" + tool["description"],
                 args_schema=tool["args_schema"]
             ))
         return cls(tools=tools)

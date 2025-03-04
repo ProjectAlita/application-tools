@@ -5,7 +5,8 @@ from pydantic import create_model, BaseModel, ConfigDict, Field
 
 from .api_wrapper import AlitaGitHubAPIWrapper
 from .tool import GitHubAction
-import re
+
+from ..utils import clean_string, TOOLKIT_SPLITTER
 
 name = "github"
 
@@ -19,7 +20,8 @@ def _get_toolkit(tool) -> BaseToolkit:
         github_username=tool['settings'].get('username', ''),
         github_password=tool['settings'].get('password', ''),
         github_app_id=tool['settings'].get('app_id', None),
-        github_app_private_key=tool['settings'].get('app_private_key', None)
+        github_app_private_key=tool['settings'].get('app_private_key', None),
+        toolkit_name=tool.get('toolkit_name')
     )
 
 def get_toolkit():
@@ -46,29 +48,30 @@ class AlitaGitHubToolkit(BaseToolkit):
             username=(Optional[str], Field(description="Github Username", default=None)),
             password=(Optional[str], Field(description="Github Password", default=None, json_schema_extra={'secret': True})),
 
-            repository=(str, Field(description="Github repository")),
+            repository=(str, Field(description="Github repository", json_schema_extra={'toolkit_name': True})),
             active_branch=(Optional[str], Field(description="Active branch", default="main")),
             base_branch=(Optional[str], Field(description="Github Base branch", default="main")),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools}))
         )
 
     @classmethod
-    def get_toolkit(cls, selected_tools: list[str] | None = None, **kwargs):
+    def get_toolkit(cls, selected_tools: list[str] | None = None, toolkit_name: Optional[str] = None, **kwargs):
         if selected_tools is None:
             selected_tools = []
         github_api_wrapper = AlitaGitHubAPIWrapper(**kwargs)
         available_tools: List[Dict] = github_api_wrapper.get_available_tools()
         tools = []
-        repo = re.sub(r'[^a-zA-Z0-9_-]', '', github_api_wrapper.github_repository.split("/")[1])
+        prefix = clean_string(toolkit_name + TOOLKIT_SPLITTER) if toolkit_name else ''
         for tool in available_tools:
             if selected_tools:
                 if tool["name"] not in selected_tools:
                     continue
             tools.append(GitHubAction(
                 api_wrapper=github_api_wrapper,
-                name=repo + "_" + tool["name"],
+                name=prefix + tool["name"],
                 mode=tool["mode"],
-                description=tool["description"],
+                # set unique description for declared tools to differentiate the same methods for different toolkits
+                description=f"Repository: {github_api_wrapper.github_repository}\n" + tool["description"],
                 args_schema=tool["args_schema"]
             ))
         return cls(tools=tools)

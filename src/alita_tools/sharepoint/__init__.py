@@ -1,9 +1,10 @@
-from typing import List, Literal
+from typing import List, Literal, Optional
 
 from langchain_core.tools import BaseToolkit, BaseTool
 from pydantic import create_model, BaseModel, ConfigDict, Field
 from .api_wrapper import SharepointApiWrapper
 from ..base.tool import BaseAction
+from ..utils import clean_string, TOOLKIT_SPLITTER
 
 name = "sharepoint"
 
@@ -13,7 +14,8 @@ def get_tools(tool):
         selected_tools=tool['settings'].get('selected_tools', []),
         site_url=tool['settings'].get('site_url', None),
         client_id=tool['settings'].get('client_id', None),
-        client_secret=tool['settings'].get('client_secret', None))
+        client_secret=tool['settings'].get('client_secret', None),
+        toolkit_name=tool.get('toolkit_name'))
             .get_tools())
 
 
@@ -25,7 +27,7 @@ class SharepointToolkit(BaseToolkit):
         selected_tools = {x['name']: x['args_schema'].schema() for x in SharepointApiWrapper.model_construct().get_available_tools()}
         return create_model(
             name,
-            site_url=(str, Field(description="Sharepoint site's URL")),
+            site_url=(str, Field(description="Sharepoint site's URL", json_schema_extra={'toolkit_name': True})),
             client_id=(str, Field(description="Client ID")),
             client_secret=(str, Field(description="Client Secret", json_schema_extra={'secret': True})),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
@@ -33,10 +35,11 @@ class SharepointToolkit(BaseToolkit):
         )
 
     @classmethod
-    def get_toolkit(cls, selected_tools: list[str] | None = None, **kwargs):
+    def get_toolkit(cls, selected_tools: list[str] | None = None, toolkit_name: Optional[str] = None, **kwargs):
         if selected_tools is None:
             selected_tools = []
         sharepoint_api_wrapper = SharepointApiWrapper(**kwargs)
+        prefix = clean_string(toolkit_name + TOOLKIT_SPLITTER) if toolkit_name else ''
         available_tools = sharepoint_api_wrapper.get_available_tools()
         tools = []
         for tool in available_tools:
@@ -45,8 +48,8 @@ class SharepointToolkit(BaseToolkit):
                     continue
             tools.append(BaseAction(
                 api_wrapper=sharepoint_api_wrapper,
-                name=tool["name"],
-                description=tool["description"],
+                name=prefix + tool["name"],
+                description=f"Sharepoint {sharepoint_api_wrapper.site_url}\n{tool["description"]}",
                 args_schema=tool["args_schema"]
             ))
         return cls(tools=tools)

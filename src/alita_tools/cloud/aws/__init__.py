@@ -5,6 +5,7 @@ from langchain_core.tools import BaseToolkit, BaseTool
 
 from .api_wrapper import AWSToolConfig
 from ...base.tool import BaseAction
+from ...utils import clean_string, TOOLKIT_SPLITTER
 
 name = "aws"
 
@@ -14,7 +15,8 @@ def get_tools(tool):
         selected_tools=tool['settings'].get('selected_tools', []),
         region=tool['settings'].get('region', ''),
         access_key_id=tool['settings'].get('access_key_id', None),
-        secret_access_key=tool['settings'].get('secret_access_key', None)
+        secret_access_key=tool['settings'].get('secret_access_key', None),
+        toolkit_name=tool.get('toolkit_name')
     ).get_tools()
 
 
@@ -34,18 +36,19 @@ class AWSToolkit(BaseToolkit):
         )
 
     @classmethod
-    def get_toolkit(cls, selected_tools: list[str] | None = None, **kwargs):
+    def get_toolkit(cls, selected_tools: list[str] | None = None, toolkit_name: Optional[str] = None, **kwargs):
         if selected_tools is None:
             selected_tools = []
         aws_tool_config = AWSToolConfig(**kwargs)
         available_tools = aws_tool_config.get_available_tools()
         tools = []
+        prefix = clean_string(toolkit_name + TOOLKIT_SPLITTER) if toolkit_name else ''
         for tool in available_tools:
             if selected_tools and tool["name"] not in selected_tools:
                 continue
             tools.append(BaseAction(
                 api_wrapper=aws_tool_config,
-                name=tool["name"],
+                name=prefix + tool["name"],
                 description=tool["description"],
                 args_schema=tool["args_schema"]
             ))

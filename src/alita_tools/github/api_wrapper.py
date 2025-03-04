@@ -448,8 +448,8 @@ LoaderSchema = create_model(
 
 
 class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
-    _github: Any = PrivateAttr()
-    _github_repo_instance: Any = PrivateAttr()
+    github_api: Any = None
+    github_repo_instance: Any = None
     _github_graphql_instance: Any = PrivateAttr()
     _graphql_client: Optional[GraphQLClient] = PrivateAttr(None)
     github_repository: Optional[str] = None
@@ -537,7 +537,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
 
         cls._github = g
         cls._github_graphql_instance = g._Github__requester
-        cls._github_repo_instance = g.get_repo(github_repository)
+        cls.github_repo_instance = g.get_repo(github_repository)
         values["github"] = g
         values["github_repo_instance"] = g.get_repo(github_repository)
         values["github_repository"] = github_repository
@@ -568,7 +568,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
 
         files: List[str] = []
         try:
-            contents = self._github_repo_instance.get_contents(
+            contents = self.github_repo_instance.get_contents(
                 directory_path, ref=ref
             )
         except GithubException as e:
@@ -577,7 +577,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         while contents:
             file_content = contents.pop(0)
             if file_content.type == "dir":
-                contents.extend(self._github_repo_instance.get_contents(file_content.path))
+                contents.extend(self.github_repo_instance.get_contents(file_content.path))
             else:
                 files.append(file_content)
         return [file.path for file in files]
@@ -630,7 +630,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             str: A dictionary containing information about the pull request.
         """
         max_tokens = 2000
-        pull = self._github_repo_instance.get_pull(number=int(pr_number))
+        pull = self.github_repo_instance.get_pull(number=int(pr_number))
         total_tokens = 0
 
         def get_tokens(text: str) -> int:
@@ -688,7 +688,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             str: A list of files and pathes to then included in the pull request.
         """
         # Grab PR
-        repo = self._github_repo_instance
+        repo = self.github_repo_instance
         pr = repo.get_pull(int(pr_number))
         files = pr.get_files()
         data = []
@@ -717,12 +717,12 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
 
         i = 0
         new_branch_name = proposed_branch_name
-        base_branch = self._github_repo_instance.get_branch(
+        base_branch = self.github_repo_instance.get_branch(
             self.active_branch if self.active_branch else self.github_base_branch
         )
         for i in range(1000):
             try:
-                self._github_repo_instance.create_git_ref(
+                self.github_repo_instance.create_git_ref(
                     ref=f"refs/heads/{new_branch_name}", sha=base_branch.commit.sha
                 )
                 self.active_branch = new_branch_name
@@ -764,7 +764,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             )
         try:
             try:
-                file = self._github_repo_instance.get_contents(
+                file = self.github_repo_instance.get_contents(
                     file_path, ref=self.active_branch
                 )
                 if file:
@@ -777,7 +777,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                 # expected behavior, file shouldn't exist yet
                 pass
 
-            self._github_repo_instance.create_file(
+            self.github_repo_instance.create_file(
                 path=file_path,
                 message="Create " + file_path,
                 content=file_contents,
@@ -881,12 +881,12 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                     "the current file contents."
                 )
 
-            self._github_repo_instance.update_file(
+            self.github_repo_instance.update_file(
                 path=file_path,
                 message="Update " + str(file_path),
                 content=updated_file_content,
                 branch=self.active_branch,
-                sha=self._github_repo_instance.get_contents(
+                sha=self.github_repo_instance.get_contents(
                     file_path, ref=self.active_branch
                 ).sha,
             )
@@ -924,7 +924,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             if not self.validate_search_query(search_query):
                 return "Invalid search query. Please ensure it matches expected GitHub search syntax."
 
-            target_repo = self._github_repo_instance.full_name if repo_name is None else repo_name
+            target_repo = self.github_repo_instance.full_name if repo_name is None else repo_name
 
             query = f"repo:{target_repo} {search_query}"
             search_result = self._github.search_issues(query)
@@ -965,7 +965,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             str: A success or failure message along with the URL to the newly created issue.
         """
         try:
-            repo = self._github.get_repo(repo_name) if repo_name else self._github_repo_instance
+            repo = self._github.get_repo(repo_name) if repo_name else self.github_repo_instance
 
             if not repo:
                 return "GitHub repository instance is not found or not initialized."
@@ -1003,7 +1003,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         if not issue_id:
             return "Issue ID is required."
         try:
-            repo = self._github.get_repo(repo_name) if repo_name else self._github_repo_instance
+            repo = self._github.get_repo(repo_name) if repo_name else self.github_repo_instance
             issue = repo.get_issue(number=issue_id)
 
             if not issue:
@@ -1046,7 +1046,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             str: The file decoded as a string, or an error message if not found
         """
         try:
-            file = self._github_repo_instance.get_contents(file_path, ref=branch)
+            file = self.github_repo_instance.get_contents(file_path, ref=branch)
             return file.decoded_content.decode("utf-8")
         except Exception as e:
             from traceback import format_exc

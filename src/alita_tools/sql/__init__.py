@@ -1,4 +1,4 @@
-from typing import List, Literal
+from typing import List, Literal, Optional
 
 from langchain_core.tools import BaseToolkit, BaseTool
 from pydantic import create_model, BaseModel, ConfigDict, Field
@@ -6,6 +6,7 @@ from pydantic import create_model, BaseModel, ConfigDict, Field
 from .api_wrapper import SQLApiWrapper
 from ..base.tool import BaseAction
 from .models import SQLDialect
+from ..utils import TOOLKIT_SPLITTER, clean_string
 
 name = "sql"
 
@@ -17,7 +18,8 @@ def get_tools(tool):
         port=tool['settings']['port'],
         username=tool['settings']['username'],
         password=tool['settings']['password'],
-        database_name=tool['settings']['database_name']
+        database_name=tool['settings']['database_name'],
+        toolkit_name=tool.get('toolkit_name')
     ).get_tools()
 
 
@@ -31,7 +33,7 @@ class SQLToolkit(BaseToolkit):
         return create_model(
             name,
             dialect=(Literal[tuple(supported_dialects)], Field(description="Database dialect (mysql or postgres)")),
-            host=(str, Field(description="Database server address")),
+            host=(str, Field(description="Database server address", json_schema_extra= {'toolkit_name': True})),
             port=(str, Field(description="Database server port")),
             username=(str, Field(description="Database username")),
             password=(str, Field(description="Database password", json_schema_extra={'secret': True})),
@@ -41,10 +43,11 @@ class SQLToolkit(BaseToolkit):
         )
 
     @classmethod
-    def get_toolkit(cls, selected_tools: list[str] | None = None, **kwargs):
+    def get_toolkit(cls, selected_tools: list[str] | None = None, toolkit_name: Optional[str] = None, **kwargs):
         if selected_tools is None:
             selected_tools = []
         sql_api_wrapper = SQLApiWrapper(**kwargs)
+        prefix = clean_string(toolkit_name + TOOLKIT_SPLITTER) if toolkit_name else ''
         available_tools = sql_api_wrapper.get_available_tools()
         tools = []
         for tool in available_tools:
@@ -52,8 +55,8 @@ class SQLToolkit(BaseToolkit):
                 continue
             tools.append(BaseAction(
                 api_wrapper=sql_api_wrapper,
-                name=tool["name"],
-                description=tool["description"],
+                name=prefix + tool["name"],
+                description=f"{tool["description"]}\nDatabase: {sql_api_wrapper.database_name}. Host: {sql_api_wrapper.host}",
                 args_schema=tool["args_schema"]
             ))
         return cls(tools=tools)

@@ -7,7 +7,7 @@ from langchain_community.tools.gmail.utils import build_resource_service
 from .gmail_wrapper import GmailWrapper
 from .utils import get_gmail_credentials
 
-
+# disabled
 class AlitaGmailToolkit(BaseToolkit):
     tools: List[BaseTool] = []
 
