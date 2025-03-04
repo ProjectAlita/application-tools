@@ -39,7 +39,7 @@ class SQLToolkit(BaseToolkit):
             password=(str, Field(description="Database password", json_schema_extra={'secret': True})),
             database_name=(str, Field(description="Database name")),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
-            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "SQL", "icon_url": None}})
+            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "SQL", "icon_url": "sql-icon.svg"}})
         )
 
     @classmethod
@@ -56,7 +56,7 @@ class SQLToolkit(BaseToolkit):
             tools.append(BaseAction(
                 api_wrapper=sql_api_wrapper,
                 name=prefix + tool["name"],
-                description=f"{tool["description"]}\nDatabase: {sql_api_wrapper.database_name}. Host: {sql_api_wrapper.host}",
+                description=f"{tool['description']}\nDatabase: {sql_api_wrapper.database_name}. Host: {sql_api_wrapper.host}",
                 args_schema=tool["args_schema"]
             ))
         return cls(tools=tools)

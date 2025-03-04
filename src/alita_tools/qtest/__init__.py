@@ -32,7 +32,7 @@ class QtestToolkit(BaseToolkit):
             project_id=(int, Field(description="QTest project id")),
             qtest_api_token=(str, Field(description="QTest API token", json_schema_extra={'secret': True})),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
-            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "QTest", "icon_url": None}})
+            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "QTest", "icon_url": "qtest.svg"}})
         )
 
     @classmethod
@@ -51,7 +51,7 @@ class QtestToolkit(BaseToolkit):
                 api_wrapper=qtest_api_wrapper,
                 name=prefix + tool["name"],
                 mode=tool["mode"],
-                description=f"{tool["description"]}\nUrl: {qtest_api_wrapper.base_url}. Project id: {qtest_api_wrapper.project_id}",
+                description=f"{tool['description']}\nUrl: {qtest_api_wrapper.base_url}. Project id: {qtest_api_wrapper.project_id}",
                 args_schema=tool["args_schema"]
             ))
         return cls(tools=tools)
