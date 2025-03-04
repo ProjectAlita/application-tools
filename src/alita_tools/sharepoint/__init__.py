@@ -49,7 +49,7 @@ class SharepointToolkit(BaseToolkit):
             tools.append(BaseAction(
                 api_wrapper=sharepoint_api_wrapper,
                 name=prefix + tool["name"],
-                description=f"Sharepoint {sharepoint_api_wrapper.site_url}\n{tool["description"]}",
+                description=f"Sharepoint {sharepoint_api_wrapper.site_url}\n{tool['description']}",
                 args_schema=tool["args_schema"]
             ))
         return cls(tools=tools)

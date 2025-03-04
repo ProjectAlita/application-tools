@@ -56,7 +56,7 @@ class SQLToolkit(BaseToolkit):
             tools.append(BaseAction(
                 api_wrapper=sql_api_wrapper,
                 name=prefix + tool["name"],
-                description=f"{tool["description"]}\nDatabase: {sql_api_wrapper.database_name}. Host: {sql_api_wrapper.host}",
+                description=f"{tool['description']}\nDatabase: {sql_api_wrapper.database_name}. Host: {sql_api_wrapper.host}",
                 args_schema=tool["args_schema"]
             ))
         return cls(tools=tools)

@@ -54,7 +54,7 @@ class RallyToolkit(BaseToolkit):
             tools.append(BaseAction(
                 api_wrapper=rally_api_wrapper,
                 name=prefix + tool["name"],
-                description=f"{tool["description"]}\nWorkspace: {rally_api_wrapper.workspace}. Project: {rally_api_wrapper.project}",
+                description=f"{tool['description']}\nWorkspace: {rally_api_wrapper.workspace}. Project: {rally_api_wrapper.project}",
                 args_schema=tool["args_schema"]
             ))
         return cls(tools=tools)

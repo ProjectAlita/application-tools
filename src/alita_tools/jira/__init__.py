@@ -55,7 +55,7 @@ class JiraToolkit(BaseToolkit):
             tools.append(BaseAction(
                 api_wrapper=jira_api_wrapper,
                 name=prefix + tool["name"],
-                description=f"Tool for Jira: '{jira_api_wrapper.base_url}'\n{tool["description"]}",
+                description=f"Tool for Jira: '{jira_api_wrapper.base_url}'\n{tool['description']}",
                 args_schema=tool["args_schema"]
             ))
         return cls(tools=tools)

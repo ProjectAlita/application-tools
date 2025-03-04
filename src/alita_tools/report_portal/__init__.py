@@ -50,7 +50,7 @@ class ReportPortalToolkit(BaseToolkit):
             tools.append(BaseAction(
                 api_wrapper=report_portal_api_wrapper,
                 name=prefix + tool["name"],
-                description=f"{tool["description"]}\nReport portal configuration: 'url - {report_portal_api_wrapper.endpoint}, project - {report_portal_api_wrapper.project}'",
+                description=f"{tool['description']}\nReport portal configuration: 'url - {report_portal_api_wrapper.endpoint}, project - {report_portal_api_wrapper.project}'",
                 args_schema=tool["args_schema"]
             ))
         return cls(tools=tools)

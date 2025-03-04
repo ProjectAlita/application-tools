@@ -51,7 +51,7 @@ class QtestToolkit(BaseToolkit):
                 api_wrapper=qtest_api_wrapper,
                 name=prefix + tool["name"],
                 mode=tool["mode"],
-                description=f"{tool["description"]}\nUrl: {qtest_api_wrapper.base_url}. Project id: {qtest_api_wrapper.project_id}",
+                description=f"{tool['description']}\nUrl: {qtest_api_wrapper.base_url}. Project id: {qtest_api_wrapper.project_id}",
                 args_schema=tool["args_schema"]
             ))
         return cls(tools=tools)
