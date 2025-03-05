@@ -57,6 +57,8 @@ class GitLabAPIWrapper(BaseModel):
     def set_active_branch(self, branch: str) -> None:
         """Set the active branch for the bot."""
         self._active_branch = branch
+        self._repo_instance.default_branch = branch
+        self._repo_instance.save()
         return f"Active branch set to {branch}"
 
 
@@ -67,19 +69,20 @@ class GitLabAPIWrapper(BaseModel):
 
     def list_files(self, path: str = None, recursive: bool = True, branch: str = None) -> List[str]:
         """List files by defined path."""
-
+        self.set_active_branch(branch)
         files = self._get_all_files(path, recursive, branch)
         paths = [file['path'] for file in files if file['type'] == 'blob']
         return f"Files: {paths}"
 
     def list_folders(self, path: str = None, recursive: bool = True, branch: str = None) -> List[str]:
         """List folders by defined path."""
-
+        self.set_active_branch(branch)
         files = self._get_all_files(path, recursive, branch)
         paths = [file['path'] for file in files if file['type'] == 'tree']
         return f"Folders: {paths}"
 
     def _get_all_files(self, path: str = None, recursive: bool = True, branch: str = None):
+        self.set_active_branch(branch)
         return self._repo_instance.repository_tree(path=path, ref=branch if branch else self._active_branch,
                                                     recursive=recursive, all=True)
 
@@ -224,6 +227,7 @@ class GitLabAPIWrapper(BaseModel):
             str: A success or failure message
         """
         try:
+            self.set_active_branch(branch)
             self._repo_instance.files.get(file_path, branch)
             return f"File already exists at {file_path}. Use update_file instead"
         except Exception:
@@ -233,7 +237,6 @@ class GitLabAPIWrapper(BaseModel):
                 "file_path": file_path,
                 "content": file_contents,
             }
-
             self._repo_instance.files.create(data)
 
             return "Created file " + file_path
@@ -246,6 +249,7 @@ class GitLabAPIWrapper(BaseModel):
         Returns:
             str: The file decoded as a string
         """
+        self.set_active_branch(branch)
         file = self._repo_instance.files.get(file_path, branch)
         return file.decode().decode("utf-8")
 
@@ -275,7 +279,7 @@ class GitLabAPIWrapper(BaseModel):
             )
         try:
             file_path: str = file_query.split("\n")[0]
-
+            self.set_active_branch(branch)
             file_content = self.read_file(file_path, branch)
             updated_file_content = file_content
             for old, new in self.extract_old_new_pairs(file_query):
@@ -327,6 +331,7 @@ class GitLabAPIWrapper(BaseModel):
         try:
             if not content:
                 return "Content to be added is empty. Append file won't be completed"
+            self.set_active_branch(branch)
             file_content = self.read_file(file_path, branch)
             updated_file_content = f"{file_content}\n{content}"
             commit = {
@@ -356,6 +361,7 @@ class GitLabAPIWrapper(BaseModel):
             str: Success or failure message
         """
         try:
+            self.set_active_branch(branch)
             self._repo_instance.files.delete(
                 file_path, branch, "Delete " + file_path
             )
