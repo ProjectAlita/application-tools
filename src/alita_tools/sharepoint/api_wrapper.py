@@ -7,6 +7,7 @@ from office365.sharepoint.client_context import ClientContext
 from pydantic import BaseModel, Field, PrivateAttr, create_model, model_validator
 
 from .utils import read_docx_from_bytes
+from ..BaseToolApiWrapper import BaseToolApiWrapper
 
 NoInput = create_model(
     "NoInput"
@@ -30,7 +31,7 @@ ReadDocument = create_model(
 )
 
 
-class SharepointApiWrapper(BaseModel):
+class SharepointApiWrapper(BaseToolApiWrapper):
     site_url: str
     client_id: str = None
     client_secret: str = None
@@ -160,10 +161,3 @@ class SharepointApiWrapper(BaseModel):
                 "ref": self.read_file
             }
         ]
-
-    def run(self, mode: str, *args: Any, **kwargs: Any):
-        for tool in self.get_available_tools():
-            if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
-        else:
-            raise ValueError(f"Unknown mode: {mode}")

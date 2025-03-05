@@ -4,9 +4,10 @@ from langchain_core.tools import ToolException
 from pydantic import create_model, model_validator, BaseModel, PrivateAttr, Field
 
 from .zephyr_enterprise import ZephyrClient
+from ..BaseToolApiWrapper import BaseToolApiWrapper
 
 
-class ZephyrApiWrapper(BaseModel):
+class ZephyrApiWrapper(BaseToolApiWrapper):
     base_url: str
     token: str
     _client: Optional[ZephyrClient] = PrivateAttr()
@@ -82,10 +83,3 @@ class ZephyrApiWrapper(BaseModel):
                 "ref": self.create_testcase,
             }
         ]
-
-    def run(self, mode: str, *args: Any, **kwargs: Any):
-        for tool in self.get_available_tools():
-            if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
-        else:
-            raise ValueError(f"Unknown mode: {mode}")

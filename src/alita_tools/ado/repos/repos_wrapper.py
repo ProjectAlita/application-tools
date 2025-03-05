@@ -21,6 +21,7 @@ from msrest.authentication import BasicAuthentication
 from pydantic import BaseModel, Field, PrivateAttr, create_model, model_validator
 
 from ..utils import extract_old_new_pairs, generate_diff
+from ...BaseToolApiWrapper import BaseToolApiWrapper
 
 logger = logging.getLogger(__name__)
 
@@ -157,7 +158,7 @@ class ArgsSchema(Enum):
     )
 
 
-class ReposApiWrapper(BaseModel):
+class ReposApiWrapper(BaseToolApiWrapper):
     organization_url: Optional[str]
     project: Optional[str]
     repository_id: Optional[str]
@@ -970,10 +971,3 @@ class ReposApiWrapper(BaseModel):
                 "args_schema": ArgsSchema.CreatePullRequest.value,
             },
         ]
-
-    def run(self, mode: str, *args: Any, **kwargs: Any):
-        """Run the tool based on the selected mode."""
-        for tool in self.get_available_tools():
-            if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
-        raise ValueError(f"Unknown mode: {mode}")

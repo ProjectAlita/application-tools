@@ -11,6 +11,8 @@ from msrest.authentication import BasicAuthentication
 from pydantic import create_model, PrivateAttr, BaseModel, model_validator
 from pydantic.fields import FieldInfo as Field
 
+from ...BaseToolApiWrapper import BaseToolApiWrapper
+
 logger = logging.getLogger(__name__)
 
 # Input models for Test Plan operations
@@ -76,7 +78,7 @@ TestCasesGetModel = create_model(
     suite_id=(int, Field(description="ID of the test suite for which test cases are requested"))
 )
 
-class TestPlanApiWrapper(BaseModel):
+class TestPlanApiWrapper(BaseToolApiWrapper):
     organization_url: str
     token: str
     limit: Optional[int] = 5
@@ -252,10 +254,3 @@ class TestPlanApiWrapper(BaseModel):
                 "ref": self.get_test_cases,
             }
         ]
-
-    def run(self, mode: str, *args: Any, **kwargs: Any):
-        """Run the tool based on the selected mode."""
-        for tool in self.get_available_tools():
-            if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
-        raise ValueError(f"Unknown mode: {mode}")

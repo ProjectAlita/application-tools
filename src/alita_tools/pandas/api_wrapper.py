@@ -6,8 +6,10 @@ import chardet
 import pandas as pd
 from pydantic import BaseModel, create_model, Field
 
+from ..BaseToolApiWrapper import BaseToolApiWrapper
 
-class CSVToolApiWrapper(BaseModel):
+
+class CSVToolApiWrapper(BaseToolApiWrapper):
     csv_content: Any
     _length_to_sniff: int = 1024
 
@@ -63,10 +65,3 @@ class CSVToolApiWrapper(BaseModel):
                 ),
             }
         ]
-
-    def run(self, mode: str, *args: Any, **kwargs: Any):
-        for tool in self.get_available_tools():
-            if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
-        else:
-            raise ValueError(f"Unknown mode: {mode}")

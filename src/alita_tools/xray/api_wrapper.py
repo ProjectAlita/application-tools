@@ -2,11 +2,13 @@ import logging
 from typing import Optional, Any, List
 
 import requests
-from pydantic import model_validator, BaseModel
 from langchain_core.tools import ToolException
 from pydantic import create_model, PrivateAttr
+from pydantic import model_validator
 from pydantic.fields import Field
 from python_graphql_client import GraphqlClient
+
+from src.alita_tools.BaseToolApiWrapper import BaseToolApiWrapper
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +95,7 @@ def _parse_tests(test_results) -> List[Any]:
     return test_results
 
 
-class XrayApiWrapper(BaseModel):
+class XrayApiWrapper(BaseToolApiWrapper):
     _default_base_url: str = 'https://xray.cloud.getxray.app'
     base_url: str = ""
     client_id: str = None,
@@ -200,10 +202,3 @@ class XrayApiWrapper(BaseModel):
                 "ref": self.execute_graphql,
             }
         ]
-
-    def run(self, mode: str, *args: Any, **kwargs: Any):
-        for tool in self.get_available_tools():
-            if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
-        else:
-            raise ValueError(f"Unknown mode: {mode}")
