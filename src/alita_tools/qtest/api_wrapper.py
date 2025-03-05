@@ -9,6 +9,8 @@ from sklearn.feature_extraction.text import strip_tags
 from swagger_client import TestCaseApi, SearchApi, PropertyResource
 from swagger_client.rest import ApiException
 
+from ..BaseToolApiWrapper import BaseToolApiWrapper
+
 QTEST_ID = "QTest Id"
 
 TEST_CASES_IN_JSON_FORMAT = f"""
@@ -96,7 +98,7 @@ DeleteTestCase = create_model(
     qtest_id=(int, Field(description="Qtest id e.g. 3253490123")),
 )
 
-class QtestApiWrapper(BaseModel):
+class QtestApiWrapper(BaseToolApiWrapper):
     base_url: str
     project_id: int
     qtest_api_token: str
@@ -427,11 +429,3 @@ class QtestApiWrapper(BaseModel):
                 "ref": self.link_tests_to_jira_requirement,
             }
         ]
-
-    def run(self, mode: str, *args: Any, **kwargs: Any):
-        for tool in self.get_available_tools():
-            if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
-        else:
-            raise ValueError(f"Unknown mode: {mode}")
-

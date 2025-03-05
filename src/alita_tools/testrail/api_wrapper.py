@@ -9,6 +9,8 @@ from pydantic import create_model
 from pydantic.fields import Field, PrivateAttr
 from testrail_api import StatusCodeError
 
+from ..BaseToolApiWrapper import BaseToolApiWrapper
+
 logger = logging.getLogger(__name__)
 
 getCase = create_model(
@@ -36,7 +38,7 @@ addCase = create_model(
 )
 
 
-class TestrailAPIWrapper(BaseModel):
+class TestrailAPIWrapper(BaseToolApiWrapper):
     url: str
     password: Optional[str] = None,
     email: Optional[str] = None,
@@ -125,10 +127,3 @@ class TestrailAPIWrapper(BaseModel):
                 "args_schema": addCase,
             }
         ]
-
-    def run(self, mode: str, *args: Any, **kwargs: Any):
-        for tool in self.get_available_tools():
-            if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
-        else:
-            raise ValueError(f"Unknown mode: {mode}")

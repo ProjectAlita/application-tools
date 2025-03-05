@@ -4,9 +4,10 @@ from pydantic import BaseModel, model_validator, create_model, Field
 from pydantic.fields import PrivateAttr
 
 from .testio_client import TestIOClient
+from ..BaseToolApiWrapper import BaseToolApiWrapper
 
 
-class TestIOApiWrapper(BaseModel):
+class TestIOApiWrapper(BaseToolApiWrapper):
     endpoint: str
     api_key: str
     _client: Optional[TestIOClient] = PrivateAttr()
@@ -74,10 +75,3 @@ class TestIOApiWrapper(BaseModel):
                 "ref": self.list_bugs_for_test_with_filter,
             }
         ]
-
-    def run(self, mode: str, *args: Any, **kwargs: Any):
-        for tool in self.get_available_tools():
-            if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
-        else:
-            raise ValueError(f"Unknown mode: {mode}")

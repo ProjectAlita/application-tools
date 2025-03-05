@@ -7,6 +7,7 @@ from sqlalchemy import create_engine, text, inspect, Engine
 from sqlalchemy.orm import sessionmaker
 
 from .models import SQLConfig, SQLDialect
+from ..BaseToolApiWrapper import BaseToolApiWrapper
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +20,7 @@ SQLNoInput = create_model(
     "ListTablesAndColumnsModel"
 )
 
-class SQLApiWrapper(BaseModel):
+class SQLApiWrapper(BaseToolApiWrapper):
     dialect: str
     host: str
     port: str
@@ -109,10 +110,3 @@ class SQLApiWrapper(BaseModel):
                 "args_schema": SQLNoInput,
             }
         ]
-
-    def run(self, mode: str, *args: Any, **kwargs: Any):
-        for tool in self.get_available_tools():
-            if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
-        else:
-            raise ValueError(f"Unknown mode: {mode}")

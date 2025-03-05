@@ -19,6 +19,8 @@ from tenacity import (
     wait_exponential,
 )
 
+from ...BaseToolApiWrapper import BaseToolApiWrapper
+
 logger = logging.getLogger(__name__)
 
 createPage = create_model(
@@ -145,7 +147,7 @@ def parse_payload_params(params: Optional[str]) -> Dict[str, Any]:
             return ToolException(f"Confluence tool exception. Passed params are not valid JSON. {stacktrace}")
     return {}
 
-class ConfluenceAPIWrapper(BaseModel):
+class ConfluenceAPIWrapper(BaseToolApiWrapper):
     _client: Any = PrivateAttr()
     base_url: str
     api_key: Optional[str] = None,
@@ -907,10 +909,3 @@ class ConfluenceAPIWrapper(BaseModel):
                 "args_schema": loaderParams,
             }
         ]
-
-    def run(self, mode: str, *args: Any, **kwargs: Any):
-        for tool in self.get_available_tools():
-            if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
-        else:
-            raise ValueError(f"Unknown mode: {mode}")

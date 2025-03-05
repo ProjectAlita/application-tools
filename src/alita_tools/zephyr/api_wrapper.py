@@ -5,6 +5,7 @@ import logging
 from pydantic.fields import PrivateAttr
 
 from .Zephyr import Zephyr
+from ..BaseToolApiWrapper import BaseToolApiWrapper
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ ZephyrAddTestCase = create_model(
     steps_data=(str, Field(description="""JSON list of steps need to be added to Jira ticket in format { "steps":[ { "step":"click something", "data":"expected data", "result":"expected result" }, { "step":"click something2", "data":"expected data2", "result":"expected result" } ] }"""))
 )
 
-class ZephyrV1ApiWrapper(BaseModel):
+class ZephyrV1ApiWrapper(BaseToolApiWrapper):
     base_url: str
     username: str
     password: str
@@ -86,13 +87,6 @@ class ZephyrV1ApiWrapper(BaseModel):
             self.add_new_test_case_step(issue_id=issue_id, project_id=project_id, step=step["step"],
                                         data=step["data"], result=step["result"])
         return f"Done. Test issue was update with steps: {steps}"
-
-    def run(self, mode: str, *args: Any, **kwargs: Any):
-        for tool in self.get_available_tools():
-            if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
-        else:
-            raise ValueError(f"Unknown mode: {mode}")
 
     def get_available_tools(self):
         return [

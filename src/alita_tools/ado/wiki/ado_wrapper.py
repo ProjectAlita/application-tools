@@ -11,6 +11,8 @@ from msrest.authentication import BasicAuthentication
 from pydantic import create_model, PrivateAttr
 from pydantic.fields import Field
 
+from ...BaseToolApiWrapper import BaseToolApiWrapper
+
 logger = logging.getLogger(__name__)
 
 GetWikiInput = create_model(
@@ -40,7 +42,7 @@ ModifyPageInput = create_model(
 )
 
 
-class AzureDevOpsApiWrapper(BaseModel):
+class AzureDevOpsApiWrapper(BaseToolApiWrapper):
     organization_url: str
     project: str
     token: str
@@ -191,10 +193,3 @@ class AzureDevOpsApiWrapper(BaseModel):
                 "ref": self.modify_wiki_page,
             }
         ]
-
-    def run(self, mode: str, *args: Any, **kwargs: Any):
-        """Run the tool based on the selected mode."""
-        for tool in self.get_available_tools():
-            if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
-        raise ValueError(f"Unknown mode: {mode}")

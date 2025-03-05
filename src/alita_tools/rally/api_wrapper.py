@@ -7,6 +7,8 @@ from pydantic import BaseModel, ConfigDict, Field, create_model, model_validator
 from pydantic.fields import PrivateAttr
 from langchain_core.tools import ToolException
 
+from ..BaseToolApiWrapper import BaseToolApiWrapper
+
 logger = logging.getLogger(__name__)
 
 create_entity_field = """JSON of the artifact fields to create in Rally, i.e. for `Defect`
@@ -81,7 +83,7 @@ RallyUpdateArtifact = create_model(
 
 
 # Toolkit API wrapper
-class RallyApiWrapper(BaseModel):
+class RallyApiWrapper(BaseToolApiWrapper):
     server: str
     api_key: Optional[str] = None
     username: Optional[str] = None
@@ -281,10 +283,3 @@ class RallyApiWrapper(BaseModel):
                 "ref": self.update_entity,
             }
         ]
-
-    def run(self, mode: str, *args: Any, **kwargs: Any):
-        """Run the tool based on the selected mode."""
-        for tool in self.get_available_tools():
-            if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
-        raise ValueError(f"Unknown mode: {mode}")

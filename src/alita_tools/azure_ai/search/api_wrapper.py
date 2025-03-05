@@ -5,6 +5,8 @@ from azure.core.credentials import AzureKeyCredential
 from azure.search.documents import SearchClient
 from langchain_openai import AzureOpenAIEmbeddings
 
+from ...BaseToolApiWrapper import BaseToolApiWrapper
+
 logger = logging.getLogger(__name__)
 
 class AzureSearchInput(BaseModel):
@@ -31,7 +33,7 @@ class HybridSearchInput(BaseModel):
     vectors: List[Dict[str, Any]] = Field(..., description="The vectors to search for in the Azure Search index.")
     limit: Optional[int] = Field(None, description="The number of results to return.")
 
-class AzureSearchApiWrapper(BaseModel):
+class AzureSearchApiWrapper(BaseToolApiWrapper):
     _client: Any = PrivateAttr()
     _AzureOpenAIClient: Any = PrivateAttr()
     api_key: str
@@ -162,18 +164,3 @@ class AzureSearchApiWrapper(BaseModel):
                 "args_schema": AzureDocumentInput,
             },
         ]
-
-    def run(self, mode: str, *args: Any, **kwargs: Any):
-        """
-        Run a specific tool based on the mode.
-
-        :param mode: The mode of the tool to run.
-        :param args: The arguments to pass to the tool.
-        :param kwargs: The keyword arguments to pass to the tool.
-        :return: The result of the tool execution.
-        """
-        for tool in self.get_available_tools():
-            if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
-        else:
-            raise ValueError(f"Unknown mode: {mode}")
