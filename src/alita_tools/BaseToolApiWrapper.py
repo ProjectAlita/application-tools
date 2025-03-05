@@ -1,6 +1,6 @@
 from typing import Any
 from pydantic import BaseModel
-from utils import TOOLKIT_SPLITTER
+from .utils import TOOLKIT_SPLITTER
 
 class BaseToolApiWrapper(BaseModel):
 

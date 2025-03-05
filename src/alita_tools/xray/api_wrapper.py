@@ -8,7 +8,7 @@ from pydantic import model_validator
 from pydantic.fields import Field
 from python_graphql_client import GraphqlClient
 
-from src.alita_tools.BaseToolApiWrapper import BaseToolApiWrapper
+from ..BaseToolApiWrapper import BaseToolApiWrapper
 
 logger = logging.getLogger(__name__)
 
