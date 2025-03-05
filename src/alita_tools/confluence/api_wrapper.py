@@ -2,15 +2,15 @@ import json
 import logging
 import re
 import traceback
-import requests
 from json import JSONDecodeError
 from typing import List, Optional, Any, Dict, Callable, Generator
 
+import requests
 from langchain_community.document_loaders.confluence import ContentFormat
 from langchain_core.documents import Document
 from langchain_core.tools import ToolException
 from markdownify import markdownify
-from pydantic import create_model, BaseModel, Field, model_validator
+from pydantic import create_model, Field, model_validator
 from pydantic.fields import PrivateAttr
 from tenacity import (
     before_sleep_log,
@@ -19,7 +19,7 @@ from tenacity import (
     wait_exponential,
 )
 
-from ...BaseToolApiWrapper import BaseToolApiWrapper
+from ..BaseToolApiWrapper import BaseToolApiWrapper
 
 logger = logging.getLogger(__name__)
 
