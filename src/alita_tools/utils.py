@@ -8,6 +8,6 @@ def clean_string(s):
     pattern = '[^a-zA-Z0-9_.-]'
 
     # Replace these characters with an empty string
-    cleaned_string = re.sub(pattern, '', s)
+    cleaned_string = re.sub(pattern, '', s).replace('.', '_')
 
     return cleaned_string

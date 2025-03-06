@@ -51,7 +51,7 @@ class AlitaGitlabSpaceToolkit(BaseToolkit):
                     continue
             tools.append(BaseAction(
                 api_wrapper=gitlab_wrapper,
-                name=prefix + ["name"],
+                name=prefix + tool['name'],
                 description=tool["description"],
                 args_schema=tool["args_schema"]
             ))

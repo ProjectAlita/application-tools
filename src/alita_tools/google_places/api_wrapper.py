@@ -1,14 +1,16 @@
 import logging
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, create_model, Field, field_validator, PrivateAttr
 import googlemaps
+from pydantic import create_model, Field, field_validator, PrivateAttr
+
+from ..BaseToolApiWrapper import BaseToolApiWrapper
 
 logger = logging.getLogger(__name__)
 
 
 # TODO: review langchain-google-community: places_api.py
-class GooglePlacesAPIWrapper(BaseModel):
+class GooglePlacesAPIWrapper(BaseToolApiWrapper):
     api_key: Optional[str] = None
     results_count: Optional[int] = None
     _client: Optional[googlemaps.Client] = PrivateAttr()
@@ -107,10 +109,3 @@ class GooglePlacesAPIWrapper(BaseModel):
                 ),
             }
         ]
-
-    def run(self, mode: str, *args: Any, **kwargs: Any):
-        for tool in self.get_available_tools():
-            if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
-        else:
-            raise ValueError(f"Unknown mode: {mode}")

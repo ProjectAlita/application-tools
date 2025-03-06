@@ -36,8 +36,8 @@ from langchain_community.utilities.github import GitHubAPIWrapper
 
 CREATE_FILE_PROMPT = """Create new file in your github repository."""
 
-UPDATE_FILE_PROMPT = """Updates the contents of a file in a GitHub repository. Your input to this tool MUST strictly follow these rules:
-Specify which file to modify by passing a full file path (the path must not start with a slash); Specify at lest 2 lines of the old contents which you would like to replace wrapped in OLD <<<< and >>>> OLD; Specify the new contents which you would like to replace the old contents with wrapped in NEW <<<< and >>>> NEW; NEW content may contain lines from OLD content in case you want to add content without removing the old content
+UPDATE_FILE_PROMPT = """Updates the contents of a file in repository. Input MUST strictly follow these rules:
+Specify the file to modify by passing a full file path (the path must not start with a slash); Specify at lest 2 lines of the old contents which you would like to replace wrapped in OLD <<<< and >>>> OLD; Specify the new contents which you would like to replace the old contents with wrapped in NEW <<<< and >>>> NEW; NEW content may contain lines from OLD content in case you want to add content without removing the old content
 
 Example 1: Replace "old contents" to "new contents" in the file /test/test.txt from , pass in the following string:
 
@@ -64,8 +64,8 @@ new contents
 >>>> NEW"""
 
 CREATE_ISSUE_PROMPT = """
-This tool allows you to create a new issue in a GitHub repository.
-**VERY IMPORTANT**: Your input to this tool MUST strictly follow these rules:
+Tool allows to create a new issue in a GitHub repository.
+**IMPORTANT**: Input to this tool MUST strictly follow these rules:
 - First, you must specify the title of the issue.
 Optionally you can specify:
 - a detailed description or body of the issue
@@ -87,7 +87,7 @@ assignees: user123
 """
 
 UPDATE_ISSUE_PROMPT = """
-This tool allows you to update an existing issue in a GitHub repository. **VERY IMPORTANT**: Your input MUST strictly follow 
+Tool allows you to update an existing issue in a GitHub repository. **IMPORTANT**: Input MUST follow 
 these rules:
 - You must specify the repository name where the issue exists.
 - You must specify the issue ID that you wish to update.
@@ -119,7 +119,7 @@ closed
 """
 
 CREATE_ISSUE_ON_PROJECT_PROMPT = """
-This tool allows for creating GitHub issues within specified projects. Adhere to these steps:
+Tool allows for creating GitHub issues within specified projects. Adhere to these steps:
 
 1. Specify both project and issue titles.
 2. Optionally, include a detailed issue description and any additional required fields in JSON format.
@@ -142,7 +142,7 @@ JSON:
 """
 
 UPDATE_ISSUE_ON_PROJECT_PROMPT = """
-This tool updates GitHub issues for the specified project. Follow these steps:
+Tool updates GitHub issues for the specified project. Follow these steps:
 
 - Provide the issue number and project title.
 - Optionally, adjust the issue's title, description, and other fields.
