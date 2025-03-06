@@ -14,7 +14,7 @@ def get_tools(tool):
     return QtestToolkit().get_toolkit(
         selected_tools=tool['settings'].get('selected_tools', []),
         base_url=tool['settings'].get('base_url', None),
-        project_id=tool['settings'].get('project_id', None),
+        qtest_project_id=tool['settings'].get('qtest_project_id', None),
         qtest_api_token=tool['settings'].get('qtest_api_token', None),
         toolkit_name=tool.get('toolkit_name')
     ).get_tools()
@@ -29,10 +29,10 @@ class QtestToolkit(BaseToolkit):
         return create_model(
             name,
             base_url=(str, Field(description="QTest base url", json_schema_extra={'toolkit_name': True})),
-            project_id=(int, Field(description="QTest project id")),
+            qtest_project_id=(int, Field(description="QTest project id", alias='project_id')),
             qtest_api_token=(str, Field(description="QTest API token", json_schema_extra={'secret': True})),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
-            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "QTest", "icon_url": "qtest.svg"}})
+            __config__=ConfigDict(populate_by_name=True, json_schema_extra={'metadata': {"label": "QTest", "icon_url": "qtest.svg"}})
         )
 
     @classmethod
@@ -51,7 +51,7 @@ class QtestToolkit(BaseToolkit):
                 api_wrapper=qtest_api_wrapper,
                 name=prefix + tool["name"],
                 mode=tool["mode"],
-                description=f"{tool['description']}\nUrl: {qtest_api_wrapper.base_url}. Project id: {qtest_api_wrapper.project_id}",
+                description=f"{tool['description']}\nUrl: {qtest_api_wrapper.base_url}. Project id: {qtest_api_wrapper.qtest_project_id}",
                 args_schema=tool["args_schema"]
             ))
         return cls(tools=tools)

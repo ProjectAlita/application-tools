@@ -4,7 +4,7 @@ from typing import Any
 
 import swagger_client
 from langchain_core.tools import ToolException
-from pydantic import BaseModel, Field, PrivateAttr, model_validator, create_model
+from pydantic import BaseModel, Field, PrivateAttr, model_validator, create_model, ConfigDict
 from sklearn.feature_extraction.text import strip_tags
 from swagger_client import TestCaseApi, SearchApi, PropertyResource
 from swagger_client.rest import ApiException
@@ -100,12 +100,16 @@ DeleteTestCase = create_model(
 
 class QtestApiWrapper(BaseToolApiWrapper):
     base_url: str
-    project_id: int
+    qtest_project_id: int = Field(alias='project_id')
     qtest_api_token: str
     no_of_items_per_page: int = 100
     page: int = 1
     no_of_tests_shown_in_dql_search: int = 10
     _client: Any = PrivateAttr()
+
+    model_config = ConfigDict(
+        populate_by_name=True
+    )
 
     @model_validator(mode='before')
     @classmethod
@@ -164,11 +168,11 @@ class QtestApiWrapper(BaseToolApiWrapper):
         module_api = swagger_client.ModuleApi(self._client)
         expand = 'descendants'
         try:
-            modules = module_api.get_sub_modules_of(self.project_id, expand=expand)
+            modules = module_api.get_sub_modules_of(self.qtest_project_id, expand=expand)
         except ApiException as e:
             logger.error("Exception when calling ModuleApi->get_sub_modules_of: %s\n" % e)
             raise ValueError(
-                f"""Unable to get all the modules information from following qTest project - {self.project_id}.
+                f"""Unable to get all the modules information from following qTest project - {self.qtest_project_id}.
                                 Exception: \n%s""" % e)
         return modules
 
@@ -198,7 +202,7 @@ class QtestApiWrapper(BaseToolApiWrapper):
     def __execute_single_create_test_case_request(self, test_case_api_instance: TestCaseApi, body,
                                                   test_case_content: str) -> dict:
         try:
-            response = test_case_api_instance.create_test_case(self.project_id, body)
+            response = test_case_api_instance.create_test_case(self.qtest_project_id, body)
             test_case_id = response.pid
             url = response.web_url
             test_name = response.name
@@ -206,7 +210,7 @@ class QtestApiWrapper(BaseToolApiWrapper):
         except ApiException as e:
             logger.error("Exception when calling TestCaseApi->create_test_case: %s\n" % e)
             raise ToolException(
-                f"Unable to create test case in project - {self.project_id} with the following content:\n{test_case_content}.")
+                f"Unable to create test case in project - {self.qtest_project_id} with the following content:\n{test_case_content}.")
 
     def __parse_data(self, response_to_parse: dict, parsed_data: list):
         import html
@@ -241,7 +245,7 @@ class QtestApiWrapper(BaseToolApiWrapper):
         include_external_properties = 'true'
         parsed_data = []
         try:
-            api_response = search_instance.search_artifact(self.project_id, body, append_test_steps=append_test_steps,
+            api_response = search_instance.search_artifact(self.qtest_project_id, body, append_test_steps=append_test_steps,
                                                            include_external_properties=include_external_properties,
                                                            page_size=self.no_of_items_per_page, page=self.page)
             self.__parse_data(api_response, parsed_data)
@@ -249,7 +253,7 @@ class QtestApiWrapper(BaseToolApiWrapper):
             if api_response['links']:
                 while api_response['links'][0]['rel'] == 'next':
                     next_page = self.page + 1
-                    api_response = search_instance.search_artifact(self.project_id, body,
+                    api_response = search_instance.search_artifact(self.qtest_project_id, body,
                                                                    append_test_steps=append_test_steps,
                                                                    include_external_properties=include_external_properties,
                                                                    page_size=self.no_of_items_per_page, page=next_page)
@@ -257,7 +261,7 @@ class QtestApiWrapper(BaseToolApiWrapper):
         except ApiException as e:
             logger.error("Exception when calling SearchApi->search_artifact: %s\n" % e)
             raise ToolException(
-                f"""Unable to get the test cases by dql: {dql} from following qTest project - {self.project_id}.
+                f"""Unable to get the test cases by dql: {dql} from following qTest project - {self.qtest_project_id}.
                     Exception: \n%s""" % e)
         return parsed_data
 
@@ -271,7 +275,7 @@ class QtestApiWrapper(BaseToolApiWrapper):
         test_api_instance = self.__instantiate_test_api_instance()
         expand_props = 'true'
         try:
-            response = test_api_instance.get_test_cases(self.project_id, 1, 1, expand_props=expand_props)
+            response = test_api_instance.get_test_cases(self.qtest_project_id, 1, 1, expand_props=expand_props)
             return response[0]['properties']
         except ApiException as e:
             logger.error("Exception when calling TestCaseApi->get_test_cases: %s\n" % e)
@@ -283,7 +287,7 @@ class QtestApiWrapper(BaseToolApiWrapper):
         body = swagger_client.ArtifactSearchParams(object_type='requirements', fields=['*'],
                                                    query=dql)
         try:
-            response = search_instance.search_artifact(self.project_id, body)
+            response = search_instance.search_artifact(self.qtest_project_id, body)
             if response['total'] == 0:
                 return False, response
             return True, response
@@ -309,10 +313,10 @@ class QtestApiWrapper(BaseToolApiWrapper):
         requirement_id = self._get_jira_requirement_id(requirement_external_id)
 
         try:
-            response = link_object_api_instance.link_artifacts(self.project_id, object_id=requirement_id,
+            response = link_object_api_instance.link_artifacts(self.qtest_project_id, object_id=requirement_id,
                                                                type=linked_type,
                                                                object_type=source_type, body=list)
-            return f"The test cases with the following id's - {[link.pid for link in response[0].objects]} have been linked in following project {self.project_id} under following requirement {requirement_external_id}"
+            return f"The test cases with the following id's - {[link.pid for link in response[0].objects]} have been linked in following project {self.qtest_project_id} under following requirement {requirement_external_id}"
         except Exception as e:
             from traceback import format_exc
             logger.error(f"Error: {format_exc()}")
@@ -358,15 +362,15 @@ class QtestApiWrapper(BaseToolApiWrapper):
         test_cases_api_instance: TestCaseApi = self.__instantiate_test_api_instance()
         bodies = self.__build_body_for_create_test_case([test_case])
         try:
-            response = test_cases_api_instance.update_test_case(self.project_id, qtest_id, bodies[0])
-            return f"""Successfully updated test case in project with id - {self.project_id}.
+            response = test_cases_api_instance.update_test_case(self.qtest_project_id, qtest_id, bodies[0])
+            return f"""Successfully updated test case in project with id - {self.qtest_project_id}.
             Updated test case id - {response.pid}.
             Test id of updated test case - {test_id}.
             Updated with content:\n{test_case}"""
         except ApiException as e:
             logger.error("Exception when calling TestCaseApi->update_test_case: %s\n" % e)
             raise ToolException(
-                f"Unable to update test case in project with id - {self.project_id} and test id - {test_id}.") from e
+                f"Unable to update test case in project with id - {self.qtest_project_id} and test id - {test_id}.") from e
 
     def find_test_case_by_id(self, test_id: str) -> str:
         """ Find the test case by its id. Id should be in format TC-123. """
@@ -377,12 +381,12 @@ class QtestApiWrapper(BaseToolApiWrapper):
         """ Delete the test case by its id. Id should be in format 3534653120. """
         test_cases_api_instance: TestCaseApi = self.__instantiate_test_api_instance()
         try:
-            test_cases_api_instance.delete_test_case(self.project_id, qtest_id)
-            return f"Successfully deleted test case in project with id - {self.project_id} and qtest id - {qtest_id}."
+            test_cases_api_instance.delete_test_case(self.qtest_project_id, qtest_id)
+            return f"Successfully deleted test case in project with id - {self.qtest_project_id} and qtest id - {qtest_id}."
         except ApiException as e:
             logger.error("Exception when calling TestCaseApi->delete_test_case: %s\n" % e)
             raise ToolException(
-                f"Unable to delete test case in project with id - {self.project_id} and qtest_id - {qtest_id}") from e
+                f"Unable to delete test case in project with id - {self.qtest_project_id} and qtest_id - {qtest_id}") from e
 
     def get_available_tools(self):
         return [
