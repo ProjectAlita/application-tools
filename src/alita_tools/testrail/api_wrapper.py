@@ -73,14 +73,12 @@ addCase = create_model(
     "addCase",
     section_id=(str, Field(description="Section id")),
     title=(str, Field(description="Title")),
-    case_properties=(dict, Field(
+    case_properties=(Optional[dict], Field(
         description="""
-        New test case content in a key-value format: testcase_field_name=testcase_field_value.
-        Creates a new test case.
-
+        Properties of new test case in a key-value format: testcase_field_name=testcase_field_value.
         Possible arguments
             :key template_id: int
-                The ID of the template (field layout) (requires TestRail 5.2 or later)
+                The ID of the template (field layout)
             :key type_id: int
                 The ID of the case type
             :key priority_id: int
@@ -124,7 +122,7 @@ addCase = create_model(
             User: int
                 The ID of a user for the custom field
         """,
-        default=None))
+        default={}))
 )
 
 
@@ -151,8 +149,25 @@ class TestrailAPIWrapper(BaseToolApiWrapper):
         cls._client = TestRailAPI(url, email, password)
         return values
 
-    def add_case(self, section_id: str, title: str, case_properties: dict):
-        """ Adds new test case into Testrail"""
+    def add_case(self, section_id: str, title: str, case_properties: Optional[dict]):
+        """ Adds new test case into Testrail per defined parameters.
+                Parameters:
+                    section_id: str - test case section id.
+                    title: str - new test case title.
+                    case_properties: dict[str, str] - properties of new test case, for examples:
+                        :key template_id: int
+                        The ID of the template
+                        :key type_id: int
+                        The ID of the case type
+                        :key priority_id: int
+                        The ID of the case priority
+                        :key estimate: str
+                        The estimate, e.g. "30s" or "1m 45s"
+                        etc.
+                        Custom fields are supported with prefix 'custom_', e.g.:
+                        custom_preconds: str
+                        'These are the preconditions for a test case'
+            """
         try:
             created_case = self._client.cases.add_case(section_id=section_id, title=title, **case_properties)
         except StatusCodeError as e:
