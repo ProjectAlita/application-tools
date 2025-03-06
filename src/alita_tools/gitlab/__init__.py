@@ -53,8 +53,7 @@ class AlitaGitlabToolkit(BaseToolkit):
             if selected_tools:
                 if tool['name'] not in selected_tools:
                     continue
-            tool['tool']['name'] = prefix + tool['tool']['name']
-            tool['tool']['description'] = f"Repository: {gitlab_api_wrapper.repository}\n" + tool['tool']["description"],
+            tool['name'] = prefix + tool['name']
             tools.append(tool['tool'](api_wrapper=gitlab_api_wrapper))
         return cls(tools=tools)
 
