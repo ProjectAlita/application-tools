@@ -1,14 +1,15 @@
 import logging
-from typing import Optional, Any
+from typing import Optional
 
 from azure.devops.connection import Connection
+from azure.devops.exceptions import AzureDevOpsServiceError
 from azure.devops.v7_0.core import CoreClient
 from azure.devops.v7_0.wiki import WikiClient, WikiPageCreateOrUpdateParameters, WikiCreateParametersV2
 from azure.devops.v7_0.wiki.models import GitVersionDescriptor
-from pydantic import model_validator, BaseModel
 from langchain_core.tools import ToolException
 from msrest.authentication import BasicAuthentication
 from pydantic import create_model, PrivateAttr
+from pydantic import model_validator
 from pydantic.fields import Field
 
 from ...BaseToolApiWrapper import BaseToolApiWrapper
@@ -144,11 +145,27 @@ class AzureDevOpsApiWrapper(BaseToolApiWrapper):
                 else:
                     return ToolException(f"Unable to extract page by path {page_name}: {str(get_page_e)}")
 
-            return self._client.create_or_update_page(project=self.project, wiki_identifier=wiki_identified,
-                                                      path=page_name,
-                                                      parameters=WikiPageCreateOrUpdateParameters(content=page_content),
-                                                      version=version,
-                                                      version_descriptor=GitVersionDescriptor(version=version_identifier, version_type=version_type))
+            try:
+                return self._client.create_or_update_page(
+                    project=self.project,
+                    wiki_identifier=wiki_identified,
+                    path=page_name,
+                    parameters=WikiPageCreateOrUpdateParameters(content=page_content),
+                    version=version,
+                    version_descriptor=GitVersionDescriptor(version=version_identifier, version_type=version_type)
+                )
+            except AzureDevOpsServiceError as e:
+                if "The version '{0}' either is invalid or does not exist." in str(e):
+                    # Retry the request without version_descriptor
+                    return self._client.create_or_update_page(
+                        project=self.project,
+                        wiki_identifier=wiki_identified,
+                        path=page_name,
+                        parameters=WikiPageCreateOrUpdateParameters(content=page_content),
+                        version=version
+                    )
+                else:
+                    raise
         except Exception as e:
             logger.error(f"Unable to modify wiki page: {str(e)}")
             return ToolException(f"Unable to modify wiki page: {str(e)}")
