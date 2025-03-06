@@ -738,28 +738,25 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
             bins_with_llm: bool = False,
             **kwargs) -> Generator[str, None, None]:
         """
-        Loads content from Confluence based on the provided parameters.
-
+        Loads content from Confluence based on parameters.
         Parameters:
-            content_format (str): The format of the content to be retrieved.
-            page_ids (Optional[List[str]]): List of page IDs to retrieve.
-            label (Optional[str]): Label to filter pages.
-            cql (Optional[str]): CQL query to filter pages.
-            include_restricted_content (Optional[bool]): Include restricted content.
-            include_archived_content (Optional[bool]): Include archived content.
-            include_attachments (Optional[bool]): Include attachments.
-            include_comments (Optional[bool]): Include comments.
-            include_labels (Optional[bool]): Include labels.
-            limit (Optional[int]): Limit the number of results.
-            max_pages (Optional[int]): Maximum number of pages to retrieve.
-            ocr_languages (Optional[str]): OCR languages for processing attachments.
-            keep_markdown_format (Optional[bool]): Keep the markdown format.
-            keep_newlines (Optional[bool]): Keep newlines in the content.
+            content_format (str): Format of the content.
+            page_ids (List[str]): List of page IDs to retrieve.
+            label (str): Label to filter pages.
+            cql (str): CQL query to filter pages.
+            include_restricted_content (bool): Include restricted content.
+            include_archived_content (bool): Include archived content.
+            include_attachments (bool).
+            include_comments (bool).
+            include_labels (bool).
+            limit (int): Limit number of results.
+            max_pages (int): Number of pages to retrieve.
+            ocr_languages (str): OCR languages for attachments.
+            keep_markdown_format (bool): Keep md format.
+            keep_newlines (bool): Keep newlines.
             bins_with_llm (bool): Use LLM for processing binary files.
-            kwargs: Additional runtime arguments (deprecated).
-
         Returns:
-            Generator: A generator that yields the content of pages that match the specified criteria.
+            Generator: A generator that yields content of pages that match specified criteria
         """
         from .loader import AlitaConfluenceLoader
         
