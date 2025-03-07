@@ -739,22 +739,6 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
             **kwargs) -> Generator[str, None, None]:
         """
         Loads content from Confluence based on parameters.
-        Parameters:
-            content_format (str): Format of the content.
-            page_ids (List[str]): List of page IDs to retrieve.
-            label (str): Label to filter pages.
-            cql (str): CQL query to filter pages.
-            include_restricted_content (bool): Include restricted content.
-            include_archived_content (bool): Include archived content.
-            include_attachments (bool).
-            include_comments (bool).
-            include_labels (bool).
-            limit (int): Limit number of results.
-            max_pages (int): Number of pages to retrieve.
-            ocr_languages (str): OCR languages for attachments.
-            keep_markdown_format (bool): Keep md format.
-            keep_newlines (bool): Keep newlines.
-            bins_with_llm (bool): Use LLM for processing binary files.
         Returns:
             Generator: A generator that yields content of pages that match specified criteria
         """
