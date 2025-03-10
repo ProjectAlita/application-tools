@@ -203,7 +203,7 @@ class ReposApiWrapper(BaseToolApiWrapper):
         if base_branch:
             if not branch_exists(base_branch):
                 raise ToolException(f"The base branch '{base_branch}' does not exist.")
-        if active_branch and not branch_exists(active_branch):
+        if active_branch:
             if not branch_exists(active_branch):
                 raise ToolException(f"The active branch '{active_branch}' does not exist.")
 
