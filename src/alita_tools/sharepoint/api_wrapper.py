@@ -1,10 +1,10 @@
 import logging
-from typing import Any, Optional
+from typing import Optional
 
 from langchain_core.tools import ToolException
 from office365.runtime.auth.client_credential import ClientCredential
 from office365.sharepoint.client_context import ClientContext
-from pydantic import BaseModel, Field, PrivateAttr, create_model, model_validator
+from pydantic import Field, PrivateAttr, create_model, model_validator
 
 from .utils import read_docx_from_bytes
 from ..BaseToolApiWrapper import BaseToolApiWrapper

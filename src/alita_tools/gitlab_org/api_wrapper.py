@@ -2,11 +2,11 @@ import logging
 from typing import Optional, Any, List, Dict
 
 from gitlab import GitlabGetError
-from gitlab.v4.objects import Project
 from langchain_core.tools import ToolException
-from pydantic import BaseModel, model_validator, PrivateAttr, create_model
+from pydantic import model_validator, PrivateAttr, create_model
 from pydantic.fields import Field
 
+from ..BaseToolApiWrapper import BaseToolApiWrapper
 from ..gitlab.utils import get_diff_w_position, get_position
 
 logger = logging.getLogger(__name__)
@@ -126,12 +126,12 @@ _undefined_repo_alert = "Unable to get repository"
 
 
 # Toolkit API wrapper
-class GitLabWorkspaceAPIWrapper(BaseModel):
+class GitLabWorkspaceAPIWrapper(BaseToolApiWrapper):
     url: str
     private_token: str
     branch: Optional[str] = 'main'
-    _client: Optional[Any] = PrivateAttr()
-    _repo_instances: Dict[str, Any] = {}
+    client: Any = None
+    repo_instances: Dict[str, Any] = {}
     _active_branch: Optional[str] = PrivateAttr(default='main')
 
     class Config:
@@ -149,11 +149,12 @@ class GitLabWorkspaceAPIWrapper(BaseModel):
                 keep_base_url=True,
             )
             g.auth()
-            cls._client = g
+            values['client'] = g
             if values.get('repositories'):
+                values['repo_instances'] = {}
                 import re
                 for repo in re.split(',|;', values.get('repositories')):
-                    cls._repo_instances[repo] = g.projects.get(repo)
+                    values['repo_instances'][repo] = g.projects.get(repo)
             values['_active_branch'] = values.get('branch', 'main')
         except Exception as e:
             raise ImportError(f"Failed to connect to GitLab: {e}")
@@ -161,20 +162,20 @@ class GitLabWorkspaceAPIWrapper(BaseModel):
 
     def _get_repo_instance(self, repository: str):
         """Get the repository instance, defaulting to the initialized repository if not provided."""
-        return self._client.projects.get(repository)
+        return self.client.projects.get(repository)
 
     def _get_repo(self, repository_name: Optional[str] = None) -> Any:
         try:
             # Passed repo as None
             if not repository_name:
-                if len(self._repo_instances) == 0:
+                if len(self.repo_instances) == 0:
                     raise ToolException(f"{_misconfigured_alert} >> You haven't configured any repositories. Please, define repository name in chat or add it in tool's configuration.")
                 else:
-                    return list(self._repo_instances.items())[0][1]
+                    return list(self.repo_instances.items())[0][1]
             # Defined repo flow
-            if repository_name not in self._repo_instances:
-                self._repo_instances[repository_name] = self._get_repo_instance(repository_name)
-            return self._repo_instances.get(repository_name)
+            if repository_name not in self.repo_instances:
+                self.repo_instances[repository_name] = self._get_repo_instance(repository_name)
+            return self.repo_instances.get(repository_name)
         except Exception as e:
             if not isinstance(e, ToolException):
                 raise ToolException(f"{_undefined_repo_alert} >> {repository_name}: {str(e)}")
@@ -586,10 +587,3 @@ class GitLabWorkspaceAPIWrapper(BaseModel):
                 "ref": self.append_file,
             }
         ]
-
-    def run(self, mode: str, *args: Any, **kwargs: Any):
-        """Run the tool based on the selected mode."""
-        for tool in self.get_available_tools():
-            if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
-        raise ValueError(f"Unknown mode: {mode}")

@@ -2,10 +2,12 @@ from typing import Optional, Dict, Any, Union
 
 import boto3
 from botocore.config import Config
-from pydantic import BaseModel, Field, PrivateAttr, create_model, model_validator
+from pydantic import Field, PrivateAttr, create_model, model_validator
+
+from ...BaseToolApiWrapper import BaseToolApiWrapper
 
 
-class AWSToolConfig(BaseModel):
+class AWSToolConfig(BaseToolApiWrapper):
     region: str
     access_key_id: Optional[str] = None
     secret_access_key: Optional[str] = None

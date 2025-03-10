@@ -4,8 +4,10 @@ from typing import Tuple, Optional, Dict, Any, Union
 from kubernetes import client, config as k8s_config
 from pydantic import BaseModel, Field, PrivateAttr, ConfigDict, model_validator, create_model
 
+from ...BaseToolApiWrapper import BaseToolApiWrapper
 
-class KubernetesApiWrapper(BaseModel):
+
+class KubernetesApiWrapper(BaseToolApiWrapper):
     url: str
     token: Optional[str] = None
     _client: Optional[client.CoreV1Api] = PrivateAttr()

@@ -3,7 +3,10 @@ from pydantic import BaseModel, model_validator, create_model, Field, PrivateAtt
 import requests
 import json
 
-class KeycloakApiWrapper(BaseModel):
+from ..BaseToolApiWrapper import BaseToolApiWrapper
+
+
+class KeycloakApiWrapper(BaseToolApiWrapper):
     base_url: str
     realm: str
     client_id: str
@@ -69,10 +72,3 @@ class KeycloakApiWrapper(BaseModel):
                 ),
             }
         ]
-
-    def run(self, mode: str, *args: Any, **kwargs: Any):
-        for tool in self.get_available_tools():
-            if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
-        else:
-            raise ValueError(f"Unknown mode: {mode}")
