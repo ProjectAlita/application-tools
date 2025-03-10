@@ -2,7 +2,7 @@ import logging
 import re
 from enum import Enum
 from json import dumps
-from typing import Any, List, Union, Optional
+from typing import List, Union, Optional
 
 from azure.devops.v7_0.git.git_client import GitClient
 from azure.devops.v7_0.git.models import (
@@ -18,7 +18,7 @@ from azure.devops.v7_0.git.models import (
 )
 from langchain_core.tools import ToolException
 from msrest.authentication import BasicAuthentication
-from pydantic import BaseModel, Field, PrivateAttr, create_model, model_validator
+from pydantic import Field, PrivateAttr, create_model, model_validator
 
 from ..utils import extract_old_new_pairs, generate_diff
 from ...BaseToolApiWrapper import BaseToolApiWrapper
@@ -186,6 +186,8 @@ class ReposApiWrapper(BaseToolApiWrapper):
 
         try:
             cls._client = GitClient(base_url=organization_url, creds=credentials)
+            # workaround to check if user is authorized to access ADO Git
+            cls._client.get_repository(repository_id)
         except Exception as e:
             raise ToolException(f"Failed to connect to Azure DevOps: {e}")
 
@@ -195,13 +197,15 @@ class ReposApiWrapper(BaseToolApiWrapper):
                     repository_id=repository_id, name=branch_name, project=project
                 )
                 return branch is not None
-            except Exception as e:
+            except Exception:
                 return False
 
-        if base_branch and not branch_exists(base_branch):
-            raise ToolException(f"The base branch '{base_branch}' does not exist.")
+        if base_branch:
+            if not branch_exists(base_branch):
+                raise ToolException(f"The base branch '{base_branch}' does not exist.")
         if active_branch and not branch_exists(active_branch):
-            raise ToolException(f"The active branch '{active_branch}' does not exist.")
+            if not branch_exists(active_branch):
+                raise ToolException(f"The active branch '{active_branch}' does not exist.")
 
         return values
 
