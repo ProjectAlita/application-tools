@@ -9,6 +9,8 @@ from FigmaPy import FigmaPy
 from langchain_core.tools import ToolException
 from pydantic import BaseModel, Field, PrivateAttr, create_model, model_validator
 
+from ..BaseToolApiWrapper import BaseToolApiWrapper
+
 GLOBAL_LIMIT = 10000
 
 class ArgsSchema(Enum):
@@ -39,6 +41,7 @@ class ArgsSchema(Enum):
                 examples=[
                     r'("strokes"|"fills")\s*:\s*("[^"]*"|[^\s,}\[]+)\s*(?=,|\}|\n)'
                 ],
+                default=None
             ),
         ),
     )
@@ -222,7 +225,7 @@ class ArgsSchema(Enum):
     )
 
 
-class FigmaApiWrapper(BaseModel):
+class FigmaApiWrapper(BaseToolApiWrapper):
     token: Optional[str] = Field(default=None)
     oauth2: Optional[str] = Field(default=None)
     global_limit: Optional[int] = Field(default=GLOBAL_LIMIT)
@@ -332,6 +335,7 @@ class FigmaApiWrapper(BaseModel):
         return wrapper
 
     @process_output
+    # def get_file_nodes(self, file_key: str, ids: str, limit: Optional[str] = None, regexp: Optional[str] = None, **kwargs: Optional[Any]):
     def get_file_nodes(self, file_key: str, ids: str, **kwargs):
         """Reads a specified file nodes by field key from Figma."""
         return self._client.api_request(
@@ -403,56 +407,49 @@ class FigmaApiWrapper(BaseModel):
             {
                 "name": "get_file_nodes",
                 "description": self.get_file_nodes.__doc__,
-                "args_schema": ArgsSchema.FileNodes,
+                "args_schema": ArgsSchema.FileNodes.value,
                 "ref": self.get_file_nodes,
             },
             {
                 "name": "get_file",
                 "description": self.get_file.__doc__,
-                "args_schema": ArgsSchema.File,
+                "args_schema": ArgsSchema.File.value,
                 "ref": self.get_file,
             },
             {
                 "name": "get_file_versions",
                 "description": self.get_file_versions.__doc__,
-                "args_schema": ArgsSchema.FileKey,
+                "args_schema": ArgsSchema.FileKey.value,
                 "ref": self.get_file_versions,
             },
             {
                 "name": "get_file_comments",
                 "description": self.get_file_comments.__doc__,
-                "args_schema": ArgsSchema.FileKey,
+                "args_schema": ArgsSchema.FileKey.value,
                 "ref": self.get_file_comments,
             },
             {
                 "name": "post_file_comment",
                 "description": self.post_file_comment.__doc__,
-                "args_schema": ArgsSchema.FileComment,
+                "args_schema": ArgsSchema.FileComment.value,
                 "ref": self.post_file_comment,
             },
             {
                 "name": "get_file_images",
                 "description": self.get_file_images.__doc__,
-                "args_schema": ArgsSchema.FileImages,
+                "args_schema": ArgsSchema.FileImages.value,
                 "ref": self.get_file_images,
             },
             {
                 "name": "get_team_projects",
                 "description": self.get_team_projects.__doc__,
-                "args_schema": ArgsSchema.TeamProjects,
+                "args_schema": ArgsSchema.TeamProjects.value,
                 "ref": self.get_team_projects,
             },
             {
                 "name": "get_project_files",
                 "description": self.get_project_files.__doc__,
-                "args_schema": ArgsSchema.ProjectFiles,
+                "args_schema": ArgsSchema.ProjectFiles.value,
                 "ref": self.get_project_files,
             },
         ]
-
-    def run(self, mode: str, *args: Any, **kwargs: Any):
-        for tool in self.get_available_tools():
-            if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
-        else:
-            raise ValueError(f"Unknown mode: {mode}")
