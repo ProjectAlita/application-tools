@@ -4,9 +4,11 @@ from langchain_core.tools import BaseToolkit
 from langchain_core.tools import BaseTool
 from ..base.tool import BaseAction
 from pydantic import create_model, BaseModel, ConfigDict, Field
-from ..utils import clean_string, TOOLKIT_SPLITTER
+from ..utils import clean_string, TOOLKIT_SPLITTER, get_max_toolkit_length
 
 name = "gitlab_org"
+
+toolkit_max_length: int = 0
 
 def get_tools(tool):
     return AlitaGitlabSpaceToolkit().get_toolkit(
@@ -24,9 +26,10 @@ class AlitaGitlabSpaceToolkit(BaseToolkit):
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
         selected_tools = {x['name']: x['args_schema'].schema() for x in GitLabWorkspaceAPIWrapper.model_construct().get_available_tools()}
+        toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name,
-            url=(str, Field(description="GitLab URL", json_schema_extra={'toolkit_name': True})),
+            url=(str, Field(description="GitLab URL", json_schema_extra={'toolkit_name': True, 'max_length': toolkit_max_length})),
             repositories=(str, Field(
                 description="List of comma separated repositories user plans to interact with. Leave it empty in case you pass it in instruction.",
                 default=''
@@ -42,7 +45,7 @@ class AlitaGitlabSpaceToolkit(BaseToolkit):
         if selected_tools is None:
             selected_tools = []
         gitlab_wrapper = GitLabWorkspaceAPIWrapper(**kwargs)
-        prefix = clean_string(toolkit_name + TOOLKIT_SPLITTER) if toolkit_name else ''
+        prefix = clean_string(toolkit_name, toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
         available_tools = gitlab_wrapper.get_available_tools()
         tools = []
         for tool in available_tools:

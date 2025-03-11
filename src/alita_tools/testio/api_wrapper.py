@@ -1,10 +1,10 @@
-from typing import Any, Optional, List
+from typing import Optional, List
 
-from pydantic import BaseModel, model_validator, create_model, Field
+from pydantic import model_validator, create_model, Field
 from pydantic.fields import PrivateAttr
 
 from .testio_client import TestIOClient
-from ..BaseToolApiWrapper import BaseToolApiWrapper
+from ..elitea_base import BaseToolApiWrapper
 
 
 class TestIOApiWrapper(BaseToolApiWrapper):

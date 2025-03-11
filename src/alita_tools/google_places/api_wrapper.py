@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional
 import googlemaps
 from pydantic import create_model, Field, field_validator, PrivateAttr
 
-from ..BaseToolApiWrapper import BaseToolApiWrapper
+from ..elitea_base import BaseToolApiWrapper
 
 logger = logging.getLogger(__name__)
 

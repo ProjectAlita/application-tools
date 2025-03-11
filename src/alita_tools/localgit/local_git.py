@@ -8,6 +8,8 @@ from git import Repo
 from pydantic import BaseModel, Field, create_model, model_validator
 from langchain_core.tools import ToolException
 
+from ..elitea_base import BaseToolApiWrapper
+
 logger = logging.getLogger(__name__)
 CREATE_FILE_PROMPT = """Create new file in your local repository."""
 
@@ -102,7 +104,7 @@ UpdateFile = create_model(
 )
 
 
-class LocalGit(BaseModel):
+class LocalGit(BaseToolApiWrapper):
     repo_path: str
     base_path: str
     repo_url: str = None
@@ -410,10 +412,3 @@ class LocalGit(BaseModel):
                 "args_schema": CommitChanges,
             },
         ]
-
-    def run(self, name: str, *args: Any, **kwargs: Any):
-        for tool in self.get_available_tools():
-            if tool["name"] == name:
-                return tool["ref"](*args, **kwargs)
-        else:
-            raise ValueError(f"Unknown mode: {name}")

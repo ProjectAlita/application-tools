@@ -5,10 +5,11 @@ from pydantic import BaseModel, create_model, Field
 
 from .api_wrapper import PythonLinter
 from ...base.tool import BaseAction
-from ...utils import clean_string, TOOLKIT_SPLITTER
+from ...utils import clean_string, TOOLKIT_SPLITTER, get_max_toolkit_length
 
 name = "python_linter"
 
+toolkit_max_length: int = 0
 
 def get_tools(tool):
     return PythonLinterToolkit().get_toolkit(
@@ -23,6 +24,7 @@ class PythonLinterToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
+        toolkit_max_length = get_max_toolkit_length([])
         return create_model(
             name,
             error_codes=(str, Field(description="Error codes to be used by the linter")),
@@ -35,7 +37,8 @@ class PythonLinterToolkit(BaseToolkit):
         python_linter = PythonLinter(**kwargs)
         available_tools = python_linter.get_available_tools()
         tools = []
-        prefix = clean_string(toolkit_name + TOOLKIT_SPLITTER) if toolkit_name else ''
+        toolkit_max_length = get_max_toolkit_length(selected_tools)
+        prefix = clean_string(toolkit_name, toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
         for tool in available_tools:
             if selected_tools and tool["name"] not in selected_tools:
                 continue

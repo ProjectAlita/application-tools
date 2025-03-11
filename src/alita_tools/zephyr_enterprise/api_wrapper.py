@@ -1,10 +1,10 @@
-from typing import Optional, Any
+from typing import Optional
 
 from langchain_core.tools import ToolException
-from pydantic import create_model, model_validator, BaseModel, PrivateAttr, Field
+from pydantic import create_model, model_validator, PrivateAttr, Field
 
 from .zephyr_enterprise import ZephyrClient
-from ..BaseToolApiWrapper import BaseToolApiWrapper
+from ..elitea_base import BaseToolApiWrapper
 
 
 class ZephyrApiWrapper(BaseToolApiWrapper):

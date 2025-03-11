@@ -9,7 +9,7 @@ from pydantic import create_model
 from pydantic.fields import Field, PrivateAttr
 from testrail_api import StatusCodeError
 
-from ..BaseToolApiWrapper import BaseToolApiWrapper
+from ..elitea_base import BaseToolApiWrapper
 
 logger = logging.getLogger(__name__)
 

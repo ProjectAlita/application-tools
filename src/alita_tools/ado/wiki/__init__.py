@@ -4,11 +4,12 @@ from langchain_core.tools import BaseTool, BaseToolkit
 from pydantic import create_model, BaseModel, Field
 
 from ...base.tool import BaseAction
-from ...utils import clean_string, TOOLKIT_SPLITTER
+from ...utils import clean_string, TOOLKIT_SPLITTER, get_max_toolkit_length
 
 name = "azure_devops_wiki"
 name_alias = 'ado_wiki'
 
+toolkit_max_length: int = 0
 
 class AzureDevOpsWikiToolkit(BaseToolkit):
     tools: List[BaseTool] = []
@@ -16,10 +17,11 @@ class AzureDevOpsWikiToolkit(BaseToolkit):
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
         selected_tools = {x['name']: x['args_schema'].schema() for x in AzureDevOpsApiWrapper.model_construct().get_available_tools()}
+        toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name_alias,
-            organization_url=(str, Field(description="ADO organization url", json_schema_extra={'toolkit_name': True})),
-            project=(str, Field(description="ADO project")),
+            organization_url=(str, Field(description="ADO organization url")),
+            project=(str, Field(description="ADO project", json_schema_extra={'toolkit_name': True, 'max_length': toolkit_max_length})),
             token=(str, Field(description="ADO token", json_schema_extra={'secret': True})),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
             __config__={'json_schema_extra': {'metadata': {"label": "ADO wiki", "icon_url": None}}}
@@ -35,7 +37,7 @@ class AzureDevOpsWikiToolkit(BaseToolkit):
         azure_devops_api_wrapper = AzureDevOpsApiWrapper(**kwargs)
         available_tools = azure_devops_api_wrapper.get_available_tools()
         tools = []
-        prefix = clean_string(toolkit_name + TOOLKIT_SPLITTER) if toolkit_name else ''
+        prefix = clean_string(toolkit_name, toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
         for tool in available_tools:
             if selected_tools:
                 if tool["name"] not in selected_tools:

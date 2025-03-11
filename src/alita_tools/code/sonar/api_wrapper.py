@@ -7,7 +7,7 @@ import requests
 from langchain_core.tools import ToolException
 from pydantic import create_model, Field, PrivateAttr, model_validator
 
-from ...BaseToolApiWrapper import BaseToolApiWrapper
+from ...elitea_base import BaseToolApiWrapper
 
 
 class SonarApiWrapper(BaseToolApiWrapper):

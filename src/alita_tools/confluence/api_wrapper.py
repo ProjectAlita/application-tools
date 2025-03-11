@@ -19,7 +19,7 @@ from tenacity import (
     wait_exponential,
 )
 
-from ..BaseToolApiWrapper import BaseToolApiWrapper
+from ..elitea_base import BaseToolApiWrapper
 
 logger = logging.getLogger(__name__)
 

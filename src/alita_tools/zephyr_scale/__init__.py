@@ -10,6 +10,7 @@ from ..utils import clean_string, TOOLKIT_SPLITTER
 
 name = "zephyr_scale"
 
+toolkit_max_length: int = 0
 
 def get_tools(tool):
     return ZephyrScaleToolkit().get_toolkit(
@@ -26,10 +27,12 @@ def get_tools(tool):
 
 class ZephyrScaleToolkit(BaseToolkit):
     tools: List[BaseTool] = []
+    toolkit_max_length: int = 0
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
         selected_tools = {x['name']: x['args_schema'].schema() for x in ZephyrScaleApiWrapper.model_construct().get_available_tools()}
+        ZephyrScaleToolkit.toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name,
             base_url=(Optional[str], Field(default=None, description="Base URL")),
@@ -47,7 +50,7 @@ class ZephyrScaleToolkit(BaseToolkit):
         if selected_tools is None:
             selected_tools = []
         zephyr_wrapper = ZephyrScaleApiWrapper(**kwargs)
-        prefix = clean_string(toolkit_name + TOOLKIT_SPLITTER) if toolkit_name else ''
+        prefix = clean_string(toolkit_name, cls.toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
         available_tools = zephyr_wrapper.get_available_tools()
         tools = []
         for tool in available_tools:

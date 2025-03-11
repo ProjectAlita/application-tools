@@ -2,9 +2,9 @@ import logging
 import subprocess
 from typing import Tuple, Dict, List, Optional, Any
 
-from pydantic import BaseModel, model_validator, create_model, Field, PrivateAttr
+from pydantic import model_validator, create_model, Field, PrivateAttr
 
-from ...BaseToolApiWrapper import BaseToolApiWrapper
+from ...elitea_base import BaseToolApiWrapper
 
 logger = logging.getLogger(__name__)
 

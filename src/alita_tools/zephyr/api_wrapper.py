@@ -1,11 +1,12 @@
-from typing import List, Any, Optional
-from pydantic import BaseModel, model_validator, create_model, Field
 import json
 import logging
+from typing import List, Optional
+
+from pydantic import model_validator, create_model, Field
 from pydantic.fields import PrivateAttr
 
 from .Zephyr import Zephyr
-from ..BaseToolApiWrapper import BaseToolApiWrapper
+from ..elitea_base import BaseToolApiWrapper
 
 logger = logging.getLogger(__name__)
 

@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Optional, Any
+from typing import Optional
 
 from azure.devops.connection import Connection
 from azure.devops.v7_0.test_plan.models import TestPlanCreateParams, TestSuiteCreateParams, \
@@ -8,10 +8,10 @@ from azure.devops.v7_0.test_plan.models import TestPlanCreateParams, TestSuiteCr
 from azure.devops.v7_0.test_plan.test_plan_client import TestPlanClient
 from langchain_core.tools import ToolException
 from msrest.authentication import BasicAuthentication
-from pydantic import create_model, PrivateAttr, BaseModel, model_validator
+from pydantic import create_model, PrivateAttr, model_validator
 from pydantic.fields import FieldInfo as Field
 
-from ...BaseToolApiWrapper import BaseToolApiWrapper
+from ...elitea_base import BaseToolApiWrapper
 
 logger = logging.getLogger(__name__)
 

@@ -3,6 +3,8 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, create_model, Field, model_validator, PrivateAttr
 
+from ..elitea_base import BaseToolApiWrapper
+
 try:
     from elasticsearch import Elasticsearch
 except ImportError:
@@ -12,7 +14,7 @@ class ElasticConfig(BaseModel):
     url: str
     api_key: Optional[tuple[str, str]] = None
 
-class ELITEAElasticApiWrapper(BaseModel):
+class ELITEAElasticApiWrapper(BaseToolApiWrapper):
     url: str
     api_key: Optional[tuple[str, str]] = None
     _client: Optional[Elasticsearch] = PrivateAttr()
@@ -51,10 +53,3 @@ class ELITEAElasticApiWrapper(BaseModel):
                 ),
             }
         ]
-
-    def run(self, mode: str, *args: Any, **kwargs: Any):
-        for tool in self.get_available_tools():
-            if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
-        else:
-            raise ValueError(f"Unknown mode: {mode}")

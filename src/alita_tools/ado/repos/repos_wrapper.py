@@ -21,7 +21,7 @@ from msrest.authentication import BasicAuthentication
 from pydantic import Field, PrivateAttr, create_model, model_validator
 
 from ..utils import extract_old_new_pairs, generate_diff
-from ...BaseToolApiWrapper import BaseToolApiWrapper
+from ...elitea_base import BaseToolApiWrapper
 
 logger = logging.getLogger(__name__)
 
