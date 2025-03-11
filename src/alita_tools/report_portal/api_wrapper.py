@@ -5,7 +5,7 @@ import pymupdf
 from pydantic import BaseModel, Field, PrivateAttr, create_model, model_validator
 
 from .report_portal_client import RPClient
-from ..BaseToolApiWrapper import BaseToolApiWrapper
+from ..elitea_base import BaseToolApiWrapper
 
 logger = logging.getLogger(__name__)
 

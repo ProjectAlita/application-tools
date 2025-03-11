@@ -6,7 +6,7 @@ from langchain_core.tools import ToolException
 from pydantic import model_validator, PrivateAttr, create_model
 from pydantic.fields import Field
 
-from ..BaseToolApiWrapper import BaseToolApiWrapper
+from ..elitea_base import BaseToolApiWrapper
 from ..gitlab.utils import get_diff_w_position, get_position
 
 logger = logging.getLogger(__name__)

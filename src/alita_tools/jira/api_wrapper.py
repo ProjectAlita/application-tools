@@ -10,7 +10,7 @@ from atlassian import Jira
 from langchain_core.tools import ToolException
 from pydantic import Field, PrivateAttr, model_validator, create_model
 
-from ..BaseToolApiWrapper import BaseToolApiWrapper
+from ..elitea_base import BaseToolApiWrapper
 
 logger = logging.getLogger(__name__)
 

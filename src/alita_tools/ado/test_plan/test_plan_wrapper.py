@@ -11,7 +11,7 @@ from msrest.authentication import BasicAuthentication
 from pydantic import create_model, PrivateAttr, model_validator
 from pydantic.fields import FieldInfo as Field
 
-from ...BaseToolApiWrapper import BaseToolApiWrapper
+from ...elitea_base import BaseToolApiWrapper
 
 logger = logging.getLogger(__name__)
 

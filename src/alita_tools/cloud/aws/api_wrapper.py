@@ -4,7 +4,7 @@ import boto3
 from botocore.config import Config
 from pydantic import Field, PrivateAttr, create_model, model_validator
 
-from ...BaseToolApiWrapper import BaseToolApiWrapper
+from ...elitea_base import BaseToolApiWrapper
 
 
 class AWSToolConfig(BaseToolApiWrapper):

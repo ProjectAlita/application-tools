@@ -3,7 +3,7 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, create_model, Field, model_validator, PrivateAttr
 
-from ..BaseToolApiWrapper import BaseToolApiWrapper
+from ..elitea_base import BaseToolApiWrapper
 
 try:
     from elasticsearch import Elasticsearch

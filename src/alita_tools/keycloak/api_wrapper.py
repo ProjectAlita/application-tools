@@ -3,7 +3,7 @@ from pydantic import BaseModel, model_validator, create_model, Field, PrivateAtt
 import requests
 import json
 
-from ..BaseToolApiWrapper import BaseToolApiWrapper
+from ..elitea_base import BaseToolApiWrapper
 
 
 class KeycloakApiWrapper(BaseToolApiWrapper):

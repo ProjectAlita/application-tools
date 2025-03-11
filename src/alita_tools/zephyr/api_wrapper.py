@@ -6,7 +6,7 @@ from pydantic import model_validator, create_model, Field
 from pydantic.fields import PrivateAttr
 
 from .Zephyr import Zephyr
-from ..BaseToolApiWrapper import BaseToolApiWrapper
+from ..elitea_base import BaseToolApiWrapper
 
 logger = logging.getLogger(__name__)
 

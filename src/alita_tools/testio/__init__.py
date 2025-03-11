@@ -5,10 +5,11 @@ from pydantic import create_model, BaseModel, ConfigDict, Field
 
 from .api_wrapper import TestIOApiWrapper
 from ..base.tool import BaseAction
-from ..utils import clean_string, TOOLKIT_SPLITTER
+from ..utils import clean_string, TOOLKIT_SPLITTER, get_max_toolkit_length
 
 name = "testio"
 
+toolkit_max_length: int = 0
 
 def get_tools(tool):
     return TestIOToolkit().get_toolkit(
@@ -25,6 +26,7 @@ class TestIOToolkit(BaseToolkit):
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
         selected_tools = {x['name']: x['args_schema'].schema() for x in TestIOApiWrapper.model_construct().get_available_tools()}
+        toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name,
             endpoint=(str, Field(description="TestIO endpoint")),
@@ -38,7 +40,7 @@ class TestIOToolkit(BaseToolkit):
         if selected_tools is None:
             selected_tools = []
         testio_api_wrapper = TestIOApiWrapper(**kwargs)
-        prefix = clean_string(toolkit_name + TOOLKIT_SPLITTER) if toolkit_name else ''
+        prefix = clean_string(toolkit_name, toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
         available_tools = testio_api_wrapper.get_available_tools()
         tools = []
         for tool in available_tools:

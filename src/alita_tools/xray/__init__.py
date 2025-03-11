@@ -10,6 +10,7 @@ from ..base.tool import BaseAction
 from ..utils import clean_string, TOOLKIT_SPLITTER
 
 name = "xray_cloud"
+toolkit_max_length: int = 0
 
 
 def get_tools(tool):
@@ -26,13 +27,15 @@ def get_tools(tool):
 
 class XrayToolkit(BaseToolkit):
     tools: List[BaseTool] = []
+    toolkit_max_length: int = 0
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
         selected_tools = {x['name']: x['args_schema'].schema() for x in XrayApiWrapper.model_construct().get_available_tools()}
+        XrayToolkit.toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name,
-            base_url=(str, Field(description="Xray URL", json_schema_extra= {'toolkit_name': True})),
+            base_url=(str, Field(description="Xray URL", json_schema_extra={'toolkit_name': True, 'max_length': XrayToolkit.toolkit_max_length})),
             client_id=(str, Field(description="Client ID")),
             client_secret=(str, Field(description="Client secret", json_schema_extra={'secret': True})),
             limit=(Optional[int], Field(description="Limit", default=100)),
@@ -45,7 +48,7 @@ class XrayToolkit(BaseToolkit):
         if selected_tools is None:
             selected_tools = []
         xray_api_wrapper = XrayApiWrapper(**kwargs)
-        prefix = clean_string(toolkit_name + TOOLKIT_SPLITTER) if toolkit_name else ''
+        prefix = clean_string(toolkit_name, cls.toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
         available_tools = xray_api_wrapper.get_available_tools()
         tools = []
         for tool in available_tools:
