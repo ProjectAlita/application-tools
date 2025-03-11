@@ -100,16 +100,19 @@ DeleteTestCase = create_model(
 
 class QtestApiWrapper(BaseToolApiWrapper):
     base_url: str
-    qtest_project_id: int = Field(alias='project_id')
+    qtest_project_id: int
     qtest_api_token: str
     no_of_items_per_page: int = 100
     page: int = 1
     no_of_tests_shown_in_dql_search: int = 10
     _client: Any = PrivateAttr()
 
-    model_config = ConfigDict(
-        populate_by_name=True
-    )
+    @model_validator(mode='before')
+    @classmethod
+    def project_id_alias(cls, values):
+        if 'project_id' in values:
+            values['qtest_project_id'] = values.pop('project_id')
+        return values
 
     @model_validator(mode='before')
     @classmethod
