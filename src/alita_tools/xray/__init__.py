@@ -7,10 +7,9 @@ from pydantic import create_model, BaseModel, Field
 
 from .api_wrapper import XrayApiWrapper
 from ..base.tool import BaseAction
-from ..utils import clean_string, TOOLKIT_SPLITTER
+from ..utils import clean_string, get_max_toolkit_length, TOOLKIT_SPLITTER
 
 name = "xray_cloud"
-toolkit_max_length: int = 0
 
 
 def get_tools(tool):

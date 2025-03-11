@@ -5,7 +5,7 @@ from pydantic import create_model, BaseModel, ConfigDict, Field
 
 from .api_wrapper import QtestApiWrapper
 from .tool import QtestAction
-from ..utils import clean_string, TOOLKIT_SPLITTER
+from ..utils import clean_string, get_max_toolkit_length, TOOLKIT_SPLITTER
 
 name = "qtest"
 
@@ -22,14 +22,16 @@ def get_tools(tool):
 
 class QtestToolkit(BaseToolkit):
     tools: List[BaseTool] = []
+    toolkit_max_length: int = 0
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
         selected_tools = {x['name']: x['args_schema'].schema() for x in QtestApiWrapper.model_construct().get_available_tools()}
+        QtestToolkit.toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name,
-            base_url=(str, Field(description="QTest base url", json_schema_extra={'toolkit_name': True})),
-            qtest_project_id=(int, Field(description="QTest project id")),
+            base_url=(str, Field(description="QTest base url")),
+            qtest_project_id=(int, Field(description="QTest project id", json_schema_extra={'toolkit_name': True, 'max_length': QtestToolkit.toolkit_max_length})),
             qtest_api_token=(str, Field(description="QTest API token", json_schema_extra={'secret': True})),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "QTest", "icon_url": "qtest.svg"}})
@@ -40,7 +42,7 @@ class QtestToolkit(BaseToolkit):
         if selected_tools is None:
             selected_tools = []
         qtest_api_wrapper = QtestApiWrapper(**kwargs)
-        prefix = clean_string(toolkit_name + TOOLKIT_SPLITTER) if toolkit_name else ''
+        prefix = clean_string(toolkit_name, cls.toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
         available_tools = qtest_api_wrapper.get_available_tools()
         tools = []
         for tool in available_tools:
