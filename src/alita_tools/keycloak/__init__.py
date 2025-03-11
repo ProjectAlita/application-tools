@@ -1,12 +1,15 @@
-from typing import List, Literal
+from typing import List, Literal, Optional
 
 from langchain_core.tools import BaseToolkit, BaseTool
 from pydantic import BaseModel, ConfigDict, create_model, Field
 
 from .api_wrapper import KeycloakApiWrapper
 from ..base.tool import BaseAction
+from ..utils import clean_string, TOOLKIT_SPLITTER, get_max_toolkit_length
 
 name = "keycloak"
+
+toolkit_max_length: int = 0
 
 def get_tools(tool):
     return KeycloakToolkit().get_toolkit(
@@ -14,7 +17,8 @@ def get_tools(tool):
         base_url=tool['settings'].get('base_url', ''),
         realm=tool['settings'].get('realm', ''),
         client_id=tool['settings'].get('client_id', ''),
-        client_secret=tool['settings'].get('client_secret', '')
+        client_secret=tool['settings'].get('client_secret', ''),
+        toolkit_name=tool.get('toolkit_name')
     ).get_tools()
 
 class KeycloakToolkit(BaseToolkit):
@@ -23,6 +27,7 @@ class KeycloakToolkit(BaseToolkit):
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
         selected_tools = {x['name']: x['args_schema'].schema() for x in KeycloakApiWrapper.model_construct().get_available_tools()}
+        toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name,
             base_url=(str, Field(default="", title="Server URL", description="Keycloak server URL")),
@@ -34,10 +39,11 @@ class KeycloakToolkit(BaseToolkit):
         )
 
     @classmethod
-    def get_toolkit(cls, selected_tools: list[str] | None = None, **kwargs):
+    def get_toolkit(cls, selected_tools: list[str] | None = None, toolkit_name: Optional[str] = None ,**kwargs):
         if selected_tools is None:
             selected_tools = []
         keycloak_api_wrapper = KeycloakApiWrapper(**kwargs)
+        prefix = clean_string(toolkit_name, toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
         available_tools = keycloak_api_wrapper.get_available_tools()
         tools = []
         for tool in available_tools:
@@ -45,8 +51,8 @@ class KeycloakToolkit(BaseToolkit):
                 continue
             tools.append(BaseAction(
                 api_wrapper=keycloak_api_wrapper,
-                name=tool["name"],
-                description=tool["description"],
+                name=prefix + tool["name"],
+                description=f"{tool['description']}\nUrl: {keycloak_api_wrapper.base_url}",
                 args_schema=tool["args_schema"]
             ))
         return cls(tools=tools)

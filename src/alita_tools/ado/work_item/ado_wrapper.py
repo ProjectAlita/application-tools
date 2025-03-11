@@ -7,8 +7,10 @@ from azure.devops.v7_1.work_item_tracking import TeamContext, Wiql, WorkItemTrac
 from langchain_core.tools import ToolException
 from msrest.authentication import BasicAuthentication
 from pydantic import create_model, PrivateAttr
-from pydantic import model_validator, BaseModel
+from pydantic import model_validator
 from pydantic.fields import Field
+
+from ...elitea_base import BaseToolApiWrapper
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +73,7 @@ ADOGetComments = create_model(
 )
 
 
-class AzureDevOpsApiWrapper(BaseModel):
+class AzureDevOpsApiWrapper(BaseToolApiWrapper):
     organization_url: str
     project: str
     token: str
@@ -358,10 +360,3 @@ class AzureDevOpsApiWrapper(BaseModel):
                 "ref": self.get_comments,
             }
         ]
-
-    def run(self, mode: str, *args: Any, **kwargs: Any):
-        """Run the tool based on the selected mode."""
-        for tool in self.get_available_tools():
-            if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
-        raise ValueError(f"Unknown mode: {mode}")

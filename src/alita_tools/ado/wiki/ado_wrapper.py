@@ -1,15 +1,19 @@
 import logging
-from typing import Optional, Any
+from typing import Optional
 
 from azure.devops.connection import Connection
+from azure.devops.exceptions import AzureDevOpsServiceError
 from azure.devops.v7_0.core import CoreClient
-from azure.devops.v7_0.wiki import WikiClient, WikiPageCreateOrUpdateParameters, WikiCreateParametersV2
+from azure.devops.v7_0.wiki import WikiClient, WikiPageCreateOrUpdateParameters, WikiCreateParametersV2, \
+    WikiPageMoveParameters
 from azure.devops.v7_0.wiki.models import GitVersionDescriptor
-from pydantic import model_validator, BaseModel
 from langchain_core.tools import ToolException
 from msrest.authentication import BasicAuthentication
 from pydantic import create_model, PrivateAttr
+from pydantic import model_validator
 from pydantic.fields import Field
+
+from ...elitea_base import BaseToolApiWrapper
 
 logger = logging.getLogger(__name__)
 
@@ -39,8 +43,17 @@ ModifyPageInput = create_model(
     version_type=(Optional[str], Field(description="Version type (branch, tag, or commit). Determines how Id is interpreted", default="branch"))
 )
 
+RenamePageInput = create_model(
+    "RenamePageInput",
+    wiki_identified=(str, Field(description="Wiki ID or wiki name")),
+    old_page_name=(str, Field(description="Old Wiki page name to be renamed", examples= ["/TestPageName"])),
+    new_page_name=(str, Field(description="New Wiki page name", examples= ["/RenamedName"])),
+    version_identifier=(str, Field(description="Version string identifier (name of tag/branch, SHA1 of commit)")),
+    version_type=(Optional[str], Field(description="Version type (branch, tag, or commit). Determines how Id is interpreted", default="branch"))
+)
 
-class AzureDevOpsApiWrapper(BaseModel):
+
+class AzureDevOpsApiWrapper(BaseToolApiWrapper):
     organization_url: str
     project: str
     token: str
@@ -112,6 +125,42 @@ class AzureDevOpsApiWrapper(BaseModel):
             logger.error(f"Unable to delete wiki page: {str(e)}")
             return ToolException(f"Unable to delete wiki page: {str(e)}")
 
+    def rename_wiki_page(self, wiki_identified: str, old_page_name: str, new_page_name: str, version_identifier: str,
+                         version_type: str = "branch"):
+        """Rename page
+
+        Args:
+         wiki_identified (str): The identifier for the wiki.
+         old_page_name (str): The current name of the page to be renamed (e.g. '/old_page_name').
+         new_page_name (str): The new name for the page (e.g. '/new_page_name').
+         version_identifier (str): The identifier for the version (e.g., branch or commit). Defaults to None.
+         version_type (str, optional): The type of version identifier. Defaults to "branch".
+     """
+
+        try:
+            try:
+                return self._client.create_page_move(
+                    project=self.project,
+                    wiki_identifier=wiki_identified,
+                    comment=f"Page rename from '{old_page_name}' to '{new_page_name}'",
+                    page_move_parameters=WikiPageMoveParameters(new_path=new_page_name, path=old_page_name),
+                    version_descriptor=GitVersionDescriptor(version=version_identifier, version_type=version_type)
+                )
+            except AzureDevOpsServiceError as e:
+                if "The version '{0}' either is invalid or does not exist." in str(e):
+                    # Retry the request without version_descriptor
+                    return self._client.create_page_move(
+                        project=self.project,
+                        wiki_identifier=wiki_identified,
+                        comment=f"Page rename from '{old_page_name}' to '{new_page_name}'",
+                        page_move_parameters=WikiPageMoveParameters(new_path=new_page_name, path=old_page_name),
+                    )
+                else:
+                    raise
+        except Exception as e:
+            logger.error(f"Unable to rename wiki page: {str(e)}")
+            return ToolException(f"Unable to rename wiki page: {str(e)}")
+
     def modify_wiki_page(self, wiki_identified: str, page_name: str, page_content: str, version_identifier: str, version_type: str = "branch"):
         """Create or Update ADO wiki page content."""
         try:
@@ -142,11 +191,27 @@ class AzureDevOpsApiWrapper(BaseModel):
                 else:
                     return ToolException(f"Unable to extract page by path {page_name}: {str(get_page_e)}")
 
-            return self._client.create_or_update_page(project=self.project, wiki_identifier=wiki_identified,
-                                                      path=page_name,
-                                                      parameters=WikiPageCreateOrUpdateParameters(content=page_content),
-                                                      version=version,
-                                                      version_descriptor=GitVersionDescriptor(version=version_identifier, version_type=version_type))
+            try:
+                return self._client.create_or_update_page(
+                    project=self.project,
+                    wiki_identifier=wiki_identified,
+                    path=page_name,
+                    parameters=WikiPageCreateOrUpdateParameters(name="Update_Page_name",content=page_content),
+                    version=version,
+                    version_descriptor=GitVersionDescriptor(version=version_identifier, version_type=version_type)
+                )
+            except AzureDevOpsServiceError as e:
+                if "The version '{0}' either is invalid or does not exist." in str(e):
+                    # Retry the request without version_descriptor
+                    return self._client.create_or_update_page(
+                        project=self.project,
+                        wiki_identifier=wiki_identified,
+                        path=page_name,
+                        parameters=WikiPageCreateOrUpdateParameters(content=page_content),
+                        version=version
+                    )
+                else:
+                    raise
         except Exception as e:
             logger.error(f"Unable to modify wiki page: {str(e)}")
             return ToolException(f"Unable to modify wiki page: {str(e)}")
@@ -189,12 +254,11 @@ class AzureDevOpsApiWrapper(BaseModel):
                 "description": self.modify_wiki_page.__doc__,
                 "args_schema": ModifyPageInput,
                 "ref": self.modify_wiki_page,
+            },
+            {
+                "name": "rename_wiki_page",
+                "description": self.rename_wiki_page.__doc__,
+                "args_schema": RenamePageInput,
+                "ref": self.rename_wiki_page,
             }
         ]
-
-    def run(self, mode: str, *args: Any, **kwargs: Any):
-        """Run the tool based on the selected mode."""
-        for tool in self.get_available_tools():
-            if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
-        raise ValueError(f"Unknown mode: {mode}")

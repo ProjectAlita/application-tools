@@ -4,10 +4,12 @@ from typing import Any
 
 import swagger_client
 from langchain_core.tools import ToolException
-from pydantic import BaseModel, Field, PrivateAttr, model_validator, create_model
+from pydantic import Field, PrivateAttr, model_validator, create_model
 from sklearn.feature_extraction.text import strip_tags
 from swagger_client import TestCaseApi, SearchApi, PropertyResource
 from swagger_client.rest import ApiException
+
+from ..elitea_base import BaseToolApiWrapper
 
 QTEST_ID = "QTest Id"
 
@@ -66,7 +68,17 @@ QtestDataQuerySearch = create_model(
 QtestCreateTestCase = create_model(
     "QtestCreateTestCase",
     test_case_content=(str, Field(
-        description=TEST_CASES_IN_JSON_FORMAT))
+        description=TEST_CASES_IN_JSON_FORMAT)),
+    folder_to_place_test_cases_to=(
+        str, Field(description="Folder to place test cases to. Default is empty value", default="")),
+)
+
+QtestLinkTestCaseToJiraRequirement = create_model(
+    "QtestLinkTestCaseToJiraRequirement",
+    requirement_external_id=(str, Field("Qtest requirement external id which represent jira issue id linked to Qtest as a requirement e.g. SITEPOD-4038")),
+    json_list_of_test_case_ids=(str, Field("""List of the test case ids to be linked to particular requirement. 
+                                              Create a list of the test case ids in the following format '["TC-123", "TC-234", "TC-456"]' which represents json array as a string.
+                                              It should be capable to be extracted directly by python json.loads method."""))
 )
 
 UpdateTestCase = create_model(
@@ -86,14 +98,21 @@ DeleteTestCase = create_model(
     qtest_id=(int, Field(description="Qtest id e.g. 3253490123")),
 )
 
-class QtestApiWrapper(BaseModel):
+class QtestApiWrapper(BaseToolApiWrapper):
     base_url: str
-    project_id: int
+    qtest_project_id: int
     qtest_api_token: str
     no_of_items_per_page: int = 100
     page: int = 1
     no_of_tests_shown_in_dql_search: int = 10
     _client: Any = PrivateAttr()
+
+    @model_validator(mode='before')
+    @classmethod
+    def project_id_alias(cls, values):
+        if 'project_id' in values:
+            values['qtest_project_id'] = values.pop('project_id')
+        return values
 
     @model_validator(mode='before')
     @classmethod
@@ -120,8 +139,12 @@ class QtestApiWrapper(BaseModel):
         # Instantiate the TestCaseApi instance according to the qtest api documentation and swagger client
         return swagger_client.TestCaseApi(self._client)
 
-    def __build_body_for_create_test_case(self, test_cases_data: list[dict]) -> list:
+    def __build_body_for_create_test_case(self, test_cases_data: list[dict],
+                                          folder_to_place_test_cases_to: str = '') -> list:
         initial_project_properties = self.__get_properties_form_project()
+        modules = self._parse_modules()
+        parent_id = ''.join(str(module['module_id']) for module in modules if
+                            folder_to_place_test_cases_to and module['module_name'] == folder_to_place_test_cases_to)
         props = []
         for prop in initial_project_properties:
             props.append(PropertyResource(field_id=prop['field_id'], field_name=prop['field_name'],
@@ -133,6 +156,8 @@ class QtestApiWrapper(BaseModel):
             body.name = test_case.get('Name')
             body.precondition = test_case.get('Precondition')
             body.description = test_case.get('Description')
+            if parent_id:
+                body.parent_id = parent_id
             test_steps_resources = []
             for step in test_case.get('Steps'):
                 test_steps_resources.append(
@@ -142,16 +167,53 @@ class QtestApiWrapper(BaseModel):
             bodies.append(body)
         return bodies
 
-    def __execute_single_create_test_case_request(self, test_case_api_instance: TestCaseApi, body,
-                                                  test_case_content: str) -> tuple:
+    def __get_all_modules_for_project(self):
+        module_api = swagger_client.ModuleApi(self._client)
+        expand = 'descendants'
         try:
-            response = test_case_api_instance.create_test_case(self.project_id, body)
+            modules = module_api.get_sub_modules_of(self.qtest_project_id, expand=expand)
+        except ApiException as e:
+            logger.error("Exception when calling ModuleApi->get_sub_modules_of: %s\n" % e)
+            raise ValueError(
+                f"""Unable to get all the modules information from following qTest project - {self.qtest_project_id}.
+                                Exception: \n%s""" % e)
+        return modules
+
+    def _parse_modules(self) -> list[dict]:
+        modules = self.__get_all_modules_for_project()
+        result = []
+
+        def parse_module(mod):
+            module_id = mod.id
+            full_module_name = f"{mod.pid} {mod.name}"
+            result.append({
+                'module_id': module_id,
+                'module_name': mod.name,
+                'full_module_name': full_module_name,
+            })
+
+            # Recursively parse children if they exist
+            if mod.children:
+                for child in mod.children:
+                    parse_module(child)
+
+        for module in modules:
+            parse_module(module)
+
+        return result
+
+    def __execute_single_create_test_case_request(self, test_case_api_instance: TestCaseApi, body,
+                                                  test_case_content: str) -> dict:
+        try:
+            response = test_case_api_instance.create_test_case(self.qtest_project_id, body)
             test_case_id = response.pid
-            return f"The test case successfully created have been created in project-{self.project_id} with Id - {test_case_id}.", test_case_id
+            url = response.web_url
+            test_name = response.name
+            return {'test_case_id': test_case_id, 'test_case_name': test_name, 'url': url}
         except ApiException as e:
             logger.error("Exception when calling TestCaseApi->create_test_case: %s\n" % e)
             raise ToolException(
-                f"Unable to create test case in project - {self.project_id} with the following content:\n{test_case_content}.")
+                f"Unable to create test case in project - {self.qtest_project_id} with the following content:\n{test_case_content}.")
 
     def __parse_data(self, response_to_parse: dict, parsed_data: list):
         import html
@@ -186,7 +248,7 @@ class QtestApiWrapper(BaseModel):
         include_external_properties = 'true'
         parsed_data = []
         try:
-            api_response = search_instance.search_artifact(self.project_id, body, append_test_steps=append_test_steps,
+            api_response = search_instance.search_artifact(self.qtest_project_id, body, append_test_steps=append_test_steps,
                                                            include_external_properties=include_external_properties,
                                                            page_size=self.no_of_items_per_page, page=self.page)
             self.__parse_data(api_response, parsed_data)
@@ -194,7 +256,7 @@ class QtestApiWrapper(BaseModel):
             if api_response['links']:
                 while api_response['links'][0]['rel'] == 'next':
                     next_page = self.page + 1
-                    api_response = search_instance.search_artifact(self.project_id, body,
+                    api_response = search_instance.search_artifact(self.qtest_project_id, body,
                                                                    append_test_steps=append_test_steps,
                                                                    include_external_properties=include_external_properties,
                                                                    page_size=self.no_of_items_per_page, page=next_page)
@@ -202,18 +264,66 @@ class QtestApiWrapper(BaseModel):
         except ApiException as e:
             logger.error("Exception when calling SearchApi->search_artifact: %s\n" % e)
             raise ToolException(
-                f"""Unable to get the test cases by dql: {dql} from following qTest project - {self.project_id}.
+                f"""Unable to get the test cases by dql: {dql} from following qTest project - {self.qtest_project_id}.
                     Exception: \n%s""" % e)
         return parsed_data
 
-    def __get_properties_form_project(self) -> list[dict]:
+    def __find_qtest_id_by_test_id(self, test_id: str) -> int:
+        """ Search for a qtest id using the test id. Test id should be in format TC-123. """
+        dql = f"Id = '{test_id}'"
+        parsed_data = self.__perform_search_by_dql(dql)
+        return parsed_data[0]['QTest Id']
+
+    def __get_properties_form_project(self) -> list[dict] | None:
         test_api_instance = self.__instantiate_test_api_instance()
         expand_props = 'true'
         try:
-            response = test_api_instance.get_test_cases(self.project_id, 1, 1, expand_props=expand_props)
+            response = test_api_instance.get_test_cases(self.qtest_project_id, 1, 1, expand_props=expand_props)
             return response[0]['properties']
         except ApiException as e:
             logger.error("Exception when calling TestCaseApi->get_test_cases: %s\n" % e)
+
+    def __is_jira_requirement_present(self, jira_issue_id: str) -> (bool, dict):
+        """ Define if particular Jira requirement is present in qtest or not """
+        dql = f"'External Id' = '{jira_issue_id}'"
+        search_instance: SearchApi = swagger_client.SearchApi(self._client)
+        body = swagger_client.ArtifactSearchParams(object_type='requirements', fields=['*'],
+                                                   query=dql)
+        try:
+            response = search_instance.search_artifact(self.qtest_project_id, body)
+            if response['total'] == 0:
+                return False, response
+            return True, response
+        except Exception as e:
+            from traceback import format_exc
+            logger.error(f"Error: {format_exc()}")
+            raise e
+
+    def _get_jira_requirement_id(self, jira_issue_id: str) -> int | None:
+        """ Search for requirement id using the linked jira_issue_id. """
+        is_present, response = self.__is_jira_requirement_present(jira_issue_id)
+        if not is_present:
+            return None
+        return response['items'][0]['id']
+
+
+    def link_tests_to_jira_requirement(self, requirement_external_id: str, json_list_of_test_case_ids: str) -> str:
+        """ Link the list of the test cases represented as string like this '["TC-123", "TC-234"]' to the Jira requirement represented as external id e.g. PLAN-128 which is the Jira Issue Id"""
+        link_object_api_instance = swagger_client.ObjectLinkApi(self._client)
+        source_type = "requirements"
+        linked_type = "test-cases"
+        list = [self.__find_qtest_id_by_test_id(test_case_id) for test_case_id in json.loads(json_list_of_test_case_ids)]
+        requirement_id = self._get_jira_requirement_id(requirement_external_id)
+
+        try:
+            response = link_object_api_instance.link_artifacts(self.qtest_project_id, object_id=requirement_id,
+                                                               type=linked_type,
+                                                               object_type=source_type, body=list)
+            return f"The test cases with the following id's - {[link.pid for link in response[0].objects]} have been linked in following project {self.qtest_project_id} under following requirement {requirement_external_id}"
+        except Exception as e:
+            from traceback import format_exc
+            logger.error(f"Error: {format_exc()}")
+            raise e
 
     def search_by_dql(self, dql: str):
         """Search for the test cases in qTest using Data Query Language """
@@ -221,22 +331,25 @@ class QtestApiWrapper(BaseModel):
         return "Found " + str(
             len(parsed_data)) + f" Qtest test cases:\n" + str(parsed_data[:self.no_of_tests_shown_in_dql_search])
 
-    def create_test_cases(self, test_case_content: str) -> str:
+    def create_test_cases(self, test_case_content: str, folder_to_place_test_cases_to: str) -> dict:
         """ Create the tes case base on the incoming content. The input should be in json format. """
         test_cases_api_instance: TestCaseApi = self.__instantiate_test_api_instance()
         input_obj = json.loads(test_case_content)
         test_cases = input_obj if isinstance(input_obj, list) else [input_obj]
-        bodies = self.__build_body_for_create_test_case(test_cases)
+        bodies = self.__build_body_for_create_test_case(test_cases, folder_to_place_test_cases_to)
+        result = {'qtest_folder': folder_to_place_test_cases_to, 'test_cases': []}
+
         if len(bodies) == 1:
-            return \
-                self.__execute_single_create_test_case_request(test_cases_api_instance, bodies[0], test_case_content)[0]
+            test_result = self.__execute_single_create_test_case_request(test_cases_api_instance, bodies[0],
+                                                                         test_case_content)
+            result['test_cases'].append(test_result)
+            return result
         else:
-            test_case_ids = []
             for body in bodies:
-                _, test_case_id = self.__execute_single_create_test_case_request(test_cases_api_instance, body,
-                                                                                 test_case_content)
-                test_case_ids.append(test_case_id)
-            return f'Successfully created {len(bodies)} test case(s) in project with id - {self.project_id}. The ids of created test cases are - {test_case_ids}.'
+                test_result = self.__execute_single_create_test_case_request(test_cases_api_instance, body,
+                                                                             test_case_content)
+                result['test_cases'].append(test_result)
+            return result
 
     def update_test_case(self, test_id: str, test_case_content: str) -> str:
         """ Update the test case base on the incoming content. The input should be in json format. Also test id should be passed in following format TC-786. """
@@ -252,15 +365,15 @@ class QtestApiWrapper(BaseModel):
         test_cases_api_instance: TestCaseApi = self.__instantiate_test_api_instance()
         bodies = self.__build_body_for_create_test_case([test_case])
         try:
-            response = test_cases_api_instance.update_test_case(self.project_id, qtest_id, bodies[0])
-            return f"""Successfully updated test case in project with id - {self.project_id}.
+            response = test_cases_api_instance.update_test_case(self.qtest_project_id, qtest_id, bodies[0])
+            return f"""Successfully updated test case in project with id - {self.qtest_project_id}.
             Updated test case id - {response.pid}.
             Test id of updated test case - {test_id}.
             Updated with content:\n{test_case}"""
         except ApiException as e:
             logger.error("Exception when calling TestCaseApi->update_test_case: %s\n" % e)
             raise ToolException(
-                f"Unable to update test case in project with id - {self.project_id} and test id - {test_id}.") from e
+                f"Unable to update test case in project with id - {self.qtest_project_id} and test id - {test_id}.") from e
 
     def find_test_case_by_id(self, test_id: str) -> str:
         """ Find the test case by its id. Id should be in format TC-123. """
@@ -271,12 +384,12 @@ class QtestApiWrapper(BaseModel):
         """ Delete the test case by its id. Id should be in format 3534653120. """
         test_cases_api_instance: TestCaseApi = self.__instantiate_test_api_instance()
         try:
-            test_cases_api_instance.delete_test_case(self.project_id, qtest_id)
-            return f"Successfully deleted test case in project with id - {self.project_id} and qtest id - {qtest_id}."
+            test_cases_api_instance.delete_test_case(self.qtest_project_id, qtest_id)
+            return f"Successfully deleted test case in project with id - {self.qtest_project_id} and qtest id - {qtest_id}."
         except ApiException as e:
             logger.error("Exception when calling TestCaseApi->delete_test_case: %s\n" % e)
             raise ToolException(
-                f"Unable to delete test case in project with id - {self.project_id} and qtest_id - {qtest_id}") from e
+                f"Unable to delete test case in project with id - {self.qtest_project_id} and qtest_id - {qtest_id}") from e
 
     def get_available_tools(self):
         return [
@@ -315,11 +428,11 @@ class QtestApiWrapper(BaseModel):
                 "args_schema": DeleteTestCase,
                 "ref": self.delete_test_case,
             },
+            {
+                "name": "link_tests_to_requirement",
+                "mode": "link_tests_to_requirement",
+                "description": """Link tests to Jira requirements. The input is jira issue id and th list of test ids in format '["TC-123", "TC-234", "TC-345"]'""",
+                "args_schema": QtestLinkTestCaseToJiraRequirement,
+                "ref": self.link_tests_to_jira_requirement,
+            }
         ]
-
-    def run(self, mode: str, *args: Any, **kwargs: Any):
-        for tool in self.get_available_tools():
-            if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
-        else:
-            raise ValueError(f"Unknown mode: {mode}")

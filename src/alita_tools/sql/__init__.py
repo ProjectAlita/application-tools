@@ -1,4 +1,4 @@
-from typing import List, Literal
+from typing import List, Literal, Optional
 
 from langchain_core.tools import BaseToolkit, BaseTool
 from pydantic import create_model, BaseModel, ConfigDict, Field
@@ -6,8 +6,11 @@ from pydantic import create_model, BaseModel, ConfigDict, Field
 from .api_wrapper import SQLApiWrapper
 from ..base.tool import BaseAction
 from .models import SQLDialect
+from ..utils import TOOLKIT_SPLITTER, clean_string, get_max_toolkit_length
 
 name = "sql"
+
+toolkit_max_length: int = 0
 
 def get_tools(tool):
     return SQLToolkit().get_toolkit(
@@ -17,7 +20,8 @@ def get_tools(tool):
         port=tool['settings']['port'],
         username=tool['settings']['username'],
         password=tool['settings']['password'],
-        database_name=tool['settings']['database_name']
+        database_name=tool['settings']['database_name'],
+        toolkit_name=tool.get('toolkit_name')
     ).get_tools()
 
 
@@ -27,24 +31,26 @@ class SQLToolkit(BaseToolkit):
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
         selected_tools = {x['name']: x['args_schema'].schema() for x in SQLApiWrapper.model_construct().get_available_tools()}
+        toolkit_max_length = get_max_toolkit_length(selected_tools)
         supported_dialects = (d.value for d in SQLDialect)
         return create_model(
             name,
             dialect=(Literal[tuple(supported_dialects)], Field(description="Database dialect (mysql or postgres)")),
-            host=(str, Field(description="Database server address")),
+            host=(str, Field(description="Database server address", json_schema_extra= {'toolkit_name': True})),
             port=(str, Field(description="Database server port")),
             username=(str, Field(description="Database username")),
             password=(str, Field(description="Database password", json_schema_extra={'secret': True})),
             database_name=(str, Field(description="Database name")),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
-            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "SQL", "icon_url": None}})
+            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "SQL", "icon_url": "sql-icon.svg"}})
         )
 
     @classmethod
-    def get_toolkit(cls, selected_tools: list[str] | None = None, **kwargs):
+    def get_toolkit(cls, selected_tools: list[str] | None = None, toolkit_name: Optional[str] = None, **kwargs):
         if selected_tools is None:
             selected_tools = []
         sql_api_wrapper = SQLApiWrapper(**kwargs)
+        prefix = clean_string(toolkit_name, toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
         available_tools = sql_api_wrapper.get_available_tools()
         tools = []
         for tool in available_tools:
@@ -52,8 +58,8 @@ class SQLToolkit(BaseToolkit):
                 continue
             tools.append(BaseAction(
                 api_wrapper=sql_api_wrapper,
-                name=tool["name"],
-                description=tool["description"],
+                name=prefix + tool["name"],
+                description=f"{tool['description']}\nDatabase: {sql_api_wrapper.database_name}. Host: {sql_api_wrapper.host}",
                 args_schema=tool["args_schema"]
             ))
         return cls(tools=tools)

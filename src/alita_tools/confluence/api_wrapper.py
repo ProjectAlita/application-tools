@@ -2,15 +2,15 @@ import json
 import logging
 import re
 import traceback
-import requests
 from json import JSONDecodeError
 from typing import List, Optional, Any, Dict, Callable, Generator
 
+import requests
 from langchain_community.document_loaders.confluence import ContentFormat
 from langchain_core.documents import Document
 from langchain_core.tools import ToolException
 from markdownify import markdownify
-from pydantic import create_model, BaseModel, Field, model_validator
+from pydantic import create_model, Field, model_validator
 from pydantic.fields import PrivateAttr
 from tenacity import (
     before_sleep_log,
@@ -18,6 +18,8 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
 )
+
+from ..elitea_base import BaseToolApiWrapper
 
 logger = logging.getLogger(__name__)
 
@@ -145,7 +147,7 @@ def parse_payload_params(params: Optional[str]) -> Dict[str, Any]:
             return ToolException(f"Confluence tool exception. Passed params are not valid JSON. {stacktrace}")
     return {}
 
-class ConfluenceAPIWrapper(BaseModel):
+class ConfluenceAPIWrapper(BaseToolApiWrapper):
     _client: Any = PrivateAttr()
     base_url: str
     api_key: Optional[str] = None,
@@ -736,28 +738,9 @@ class ConfluenceAPIWrapper(BaseModel):
             bins_with_llm: bool = False,
             **kwargs) -> Generator[str, None, None]:
         """
-        Loads content from Confluence based on the provided parameters.
-
-        Parameters:
-            content_format (str): The format of the content to be retrieved.
-            page_ids (Optional[List[str]]): List of page IDs to retrieve.
-            label (Optional[str]): Label to filter pages.
-            cql (Optional[str]): CQL query to filter pages.
-            include_restricted_content (Optional[bool]): Include restricted content.
-            include_archived_content (Optional[bool]): Include archived content.
-            include_attachments (Optional[bool]): Include attachments.
-            include_comments (Optional[bool]): Include comments.
-            include_labels (Optional[bool]): Include labels.
-            limit (Optional[int]): Limit the number of results.
-            max_pages (Optional[int]): Maximum number of pages to retrieve.
-            ocr_languages (Optional[str]): OCR languages for processing attachments.
-            keep_markdown_format (Optional[bool]): Keep the markdown format.
-            keep_newlines (Optional[bool]): Keep newlines in the content.
-            bins_with_llm (bool): Use LLM for processing binary files.
-            kwargs: Additional runtime arguments (deprecated).
-
+        Loads content from Confluence based on parameters.
         Returns:
-            Generator: A generator that yields the content of pages that match the specified criteria.
+            Generator: A generator that yields content of pages that match specified criteria
         """
         from .loader import AlitaConfluenceLoader
         
@@ -907,10 +890,3 @@ class ConfluenceAPIWrapper(BaseModel):
                 "args_schema": loaderParams,
             }
         ]
-
-    def run(self, mode: str, *args: Any, **kwargs: Any):
-        for tool in self.get_available_tools():
-            if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
-        else:
-            raise ValueError(f"Unknown mode: {mode}")

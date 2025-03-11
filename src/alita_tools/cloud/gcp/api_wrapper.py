@@ -3,11 +3,13 @@ from typing import Any, Optional, List, Dict
 
 from google.auth.transport.requests import Request
 from google.oauth2.service_account import Credentials
-from pydantic import BaseModel, Field, PrivateAttr, model_validator, create_model
+from pydantic import Field, PrivateAttr, model_validator, create_model
 from requests import Session
 
+from ...elitea_base import BaseToolApiWrapper
 
-class GCPApiWrapper(BaseModel):
+
+class GCPApiWrapper(BaseToolApiWrapper):
     api_key: str
     _credentials: Optional[Credentials] = PrivateAttr()
     _session: Optional[Session] = PrivateAttr()
@@ -70,10 +72,3 @@ class GCPApiWrapper(BaseModel):
                 ),
             }
         ]
-
-    def run(self, mode: str, *args: Any, **kwargs: Any):
-        for tool in self.get_available_tools():
-            if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
-        else:
-            raise ValueError(f"Unknown mode: {mode}")

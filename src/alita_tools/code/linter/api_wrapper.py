@@ -2,11 +2,13 @@ import logging
 import subprocess
 from typing import Tuple, Dict, List, Optional, Any
 
-from pydantic import BaseModel, model_validator, create_model, Field, PrivateAttr
+from pydantic import model_validator, create_model, Field, PrivateAttr
+
+from ...elitea_base import BaseToolApiWrapper
 
 logger = logging.getLogger(__name__)
 
-class PythonLinter(BaseModel):
+class PythonLinter(BaseToolApiWrapper):
     error_codes: str
     _client: Optional['PythonLinter'] = PrivateAttr()
 
@@ -109,10 +111,3 @@ class PythonLinter(BaseModel):
                 ),
             }
         ]
-
-    def run(self, mode: str, *args: Any, **kwargs: Any):
-        for tool in self.get_available_tools():
-            if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
-        else:
-            raise ValueError(f"Unknown mode: {mode}")

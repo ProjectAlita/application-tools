@@ -5,6 +5,7 @@ from pydantic import create_model, BaseModel, Field
 
 from .data_mining_wrapper import AdvancedJiraMiningWrapper
 from ..base.tool import BaseAction
+from ..utils import clean_string, TOOLKIT_SPLITTER
 
 name = "advanced_jira_mining"
 
@@ -22,6 +23,7 @@ def get_tools(tool):
             jira_token=tool['settings'].get('jira_token', None),
             is_jira_cloud=tool['settings'].get('is_jira_cloud', True),
             verify_ssl=tool['settings'].get('verify_ssl', True),
+            toolkit_name=tool.get('toolkit_name'),
             ).get_tools()
 
 class AdvancedJiraMiningToolkit(BaseToolkit):
@@ -32,7 +34,7 @@ class AdvancedJiraMiningToolkit(BaseToolkit):
         selected_tools = {x['name']: x['args_schema'].schema() for x in AdvancedJiraMiningWrapper.model_construct().get_available_tools()}
         return create_model(
             name,
-            jira_base_url=(str, Field(default="", title="Jira URL", description="Jira URL")),
+            jira_base_url=(str, Field(default="", title="Jira URL", description="Jira URL", json_schema_extra={'toolkit_name': True})),
             confluence_base_url=(str, Field(default="", title="Confluence URL", description="Confluence URL")),
             llm_settings=(dict, Field(title="LLM Settings", description="LLM Settings (e.g., {\"temperature\": 0.7, \"max_tokens\": 150})")),
             model_type=(str, Field(default="", title="Model type", description="Model type")),
@@ -48,11 +50,12 @@ class AdvancedJiraMiningToolkit(BaseToolkit):
         )
 
     @classmethod
-    def get_toolkit(cls, selected_tools: list[str] | None = None, **kwargs):
+    def get_toolkit(cls, selected_tools: list[str] | None = None, toolkit_name: Optional[str] = None, **kwargs):
         if selected_tools is None:
             selected_tools = []
         jira_mining_wrapper = AdvancedJiraMiningWrapper(**kwargs)
         available_tools = jira_mining_wrapper.get_available_tools()
+        prefix = clean_string(toolkit_name + TOOLKIT_SPLITTER) if toolkit_name else ''
         tools = []
         for tool in available_tools:
             if selected_tools:
@@ -60,7 +63,7 @@ class AdvancedJiraMiningToolkit(BaseToolkit):
                     continue
             tools.append(BaseAction(
                 api_wrapper=jira_mining_wrapper,
-                name=tool["name"],
+                name=prefix + tool["name"],
                 description=tool["description"],
                 args_schema=tool["args_schema"]
             ))

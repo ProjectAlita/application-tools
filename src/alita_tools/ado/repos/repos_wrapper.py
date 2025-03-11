@@ -2,7 +2,7 @@ import logging
 import re
 from enum import Enum
 from json import dumps
-from typing import Any, List, Union, Optional
+from typing import List, Union, Optional
 
 from azure.devops.v7_0.git.git_client import GitClient
 from azure.devops.v7_0.git.models import (
@@ -18,9 +18,10 @@ from azure.devops.v7_0.git.models import (
 )
 from langchain_core.tools import ToolException
 from msrest.authentication import BasicAuthentication
-from pydantic import BaseModel, Field, PrivateAttr, create_model, model_validator
+from pydantic import Field, PrivateAttr, create_model, model_validator
 
 from ..utils import extract_old_new_pairs, generate_diff
+from ...elitea_base import BaseToolApiWrapper
 
 logger = logging.getLogger(__name__)
 
@@ -157,7 +158,7 @@ class ArgsSchema(Enum):
     )
 
 
-class ReposApiWrapper(BaseModel):
+class ReposApiWrapper(BaseToolApiWrapper):
     organization_url: Optional[str]
     project: Optional[str]
     repository_id: Optional[str]
@@ -185,6 +186,8 @@ class ReposApiWrapper(BaseModel):
 
         try:
             cls._client = GitClient(base_url=organization_url, creds=credentials)
+            # workaround to check if user is authorized to access ADO Git
+            cls._client.get_repository(repository_id)
         except Exception as e:
             raise ToolException(f"Failed to connect to Azure DevOps: {e}")
 
@@ -194,13 +197,15 @@ class ReposApiWrapper(BaseModel):
                     repository_id=repository_id, name=branch_name, project=project
                 )
                 return branch is not None
-            except Exception as e:
+            except Exception:
                 return False
 
-        if base_branch and not branch_exists(base_branch):
-            raise ToolException(f"The base branch '{base_branch}' does not exist.")
-        if active_branch and not branch_exists(active_branch):
-            raise ToolException(f"The active branch '{active_branch}' does not exist.")
+        if base_branch:
+            if not branch_exists(base_branch):
+                raise ToolException(f"The base branch '{base_branch}' does not exist.")
+        if active_branch:
+            if not branch_exists(active_branch):
+                raise ToolException(f"The active branch '{active_branch}' does not exist.")
 
         return values
 
@@ -970,10 +975,3 @@ class ReposApiWrapper(BaseModel):
                 "args_schema": ArgsSchema.CreatePullRequest.value,
             },
         ]
-
-    def run(self, mode: str, *args: Any, **kwargs: Any):
-        """Run the tool based on the selected mode."""
-        for tool in self.get_available_tools():
-            if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
-        raise ValueError(f"Unknown mode: {mode}")

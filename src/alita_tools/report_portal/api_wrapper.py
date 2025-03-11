@@ -5,6 +5,7 @@ import pymupdf
 from pydantic import BaseModel, Field, PrivateAttr, create_model, model_validator
 
 from .report_portal_client import RPClient
+from ..elitea_base import BaseToolApiWrapper
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +53,7 @@ GetDashboardData = create_model(
 )
 
 
-class ReportPortalApiWrapper(BaseModel):
+class ReportPortalApiWrapper(BaseToolApiWrapper):
     endpoint: str
     api_key: str
     project: str
@@ -218,10 +219,3 @@ class ReportPortalApiWrapper(BaseModel):
                 "ref": self.get_dashboard_data,
             }
         ]
-
-    def run(self, mode: str, *args: Any, **kwargs: Any):
-        for tool in self.get_available_tools():
-            if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
-        else:
-            raise ValueError(f"Unknown mode: {mode}")

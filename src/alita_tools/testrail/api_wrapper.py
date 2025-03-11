@@ -9,6 +9,8 @@ from pydantic import create_model
 from pydantic.fields import Field, PrivateAttr
 from testrail_api import StatusCodeError
 
+from ..elitea_base import BaseToolApiWrapper
+
 logger = logging.getLogger(__name__)
 
 getCase = create_model(
@@ -24,19 +26,107 @@ getCases = create_model(
 getCasesByFilter = create_model(
     "getCasesByFilter",
     project_id=(str, Field(description="Project id")),
-    json_case_arguments=(str, Field(description="JSON of the test case arguments used to filter test cases"))
+    json_case_arguments=(str, Field(description="""
+        JSON of the test case arguments used to filter test cases.
+
+        Supported args:
+        :key suite_id: int
+                The ID of the test suite (optional if the project is operating in
+                single suite mode)
+            :key created_after: int/datetime
+                Only return test cases created after this date (as UNIX timestamp).
+            :key created_before: int/datetime
+                Only return test cases created before this date (as UNIX timestamp).
+            :key created_by: List[int] or comma-separated string
+                A comma-separated list of creators (user IDs) to filter by.
+            :key filter: str
+                Only return cases with matching filter string in the case title
+            :key limit: int
+                The number of test cases the response should return
+                (The response size is 250 by default) (requires TestRail 6.7 or later)
+            :key milestone_id: List[int] or comma-separated string
+                A comma-separated list of milestone IDs to filter by (not available
+                if the milestone field is disabled for the project).
+            :key offset: int
+                Where to start counting the tests cases from (the offset)
+            :key priority_id: List[int] or comma-separated string
+                A comma-separated list of priority IDs to filter by.
+            :key refs: str
+                A single Reference ID (e.g. TR-1, 4291, etc.)
+            :key section_id: int
+                The ID of a test case section
+            :key template_id: List[int] or comma-separated string
+                A comma-separated list of template IDs to filter by
+            :key type_id: List[int] or comma-separated string
+                A comma-separated list of case type IDs to filter by.
+            :key updated_after: int/datetime
+                Only return test cases updated after this date (as UNIX timestamp).
+            :key updated_before: int/datetime
+                Only return test cases updated before this date (as UNIX timestamp).
+            :key updated_by: List[int] or comma-separated string
+                A comma-separated list of user IDs who updated test cases to filter by.
+        """
+                                    ))
 )
 
 addCase = create_model(
     "addCase",
     section_id=(str, Field(description="Section id")),
     title=(str, Field(description="Title")),
-    case_properties=(dict, Field(
-        description="New test case content in a key-value format: testcase_field_name=testcase_field_value"))
+    case_properties=(Optional[dict], Field(
+        description="""
+        Properties of new test case in a key-value format: testcase_field_name=testcase_field_value.
+        Possible arguments
+            :key template_id: int
+                The ID of the template (field layout)
+            :key type_id: int
+                The ID of the case type
+            :key priority_id: int
+                The ID of the case priority
+            :key estimate: str
+                The estimate, e.g. "30s" or "1m 45s"
+            :key milestone_id: int
+                The ID of the milestone to link to the test case
+            :key refs: str
+                A comma-separated list of references/requirements
+
+        Custom fields are supported as well and must be submitted with their
+        system name, prefixed with 'custom_', e.g.:
+        {
+            ..
+            "custom_preconds": "These are the preconditions for a test case"
+            ..
+        }
+        The following custom field types are supported:
+            Checkbox: bool
+                True for checked and false otherwise
+            Date: str
+                A date in the same format as configured for TestRail and API user
+                (e.g. "07/08/2013")
+            Dropdown: int
+                The ID of a dropdown value as configured in the field configuration
+            Integer: int
+                A valid integer
+            Milestone: int
+                The ID of a milestone for the custom field
+            Multi-select: list
+                An array of IDs as configured in the field configuration
+            Steps: list
+                An array of objects specifying the steps. Also see the example below.
+            String: str
+                A valid string with a maximum length of 250 characters
+            Text: str
+                A string without a maximum length
+            URL: str
+                A string with matches the syntax of a URL
+            User: int
+                The ID of a user for the custom field
+        """,
+        default={}))
 )
 
 
-class TestrailAPIWrapper(BaseModel):
+class TestrailAPIWrapper(BaseToolApiWrapper):
     url: str
     password: Optional[str] = None,
     email: Optional[str] = None,
@@ -59,8 +149,25 @@ class TestrailAPIWrapper(BaseModel):
         cls._client = TestRailAPI(url, email, password)
         return values
 
-    def add_case(self, section_id: str, title: str, case_properties: dict):
-        """ Adds new test case into Testrail"""
+    def add_case(self, section_id: str, title: str, case_properties: Optional[dict]):
+        """ Adds new test case into Testrail per defined parameters.
+                Parameters:
+                    section_id: str - test case section id.
+                    title: str - new test case title.
+                    case_properties: dict[str, str] - properties of new test case, for examples:
+                        :key template_id: int
+                        The ID of the template
+                        :key type_id: int
+                        The ID of the case type
+                        :key priority_id: int
+                        The ID of the case priority
+                        :key estimate: str
+                        The estimate, e.g. "30s" or "1m 45s"
+                        etc.
+                        Custom fields are supported with prefix 'custom_', e.g.:
+                        custom_preconds: str
+                        'These are the preconditions for a test case'
+            """
         try:
             created_case = self._client.cases.add_case(section_id=section_id, title=title, **case_properties)
         except StatusCodeError as e:
@@ -92,8 +199,7 @@ class TestrailAPIWrapper(BaseModel):
         try:
             params = json.loads(json_case_arguments)
             extracted_cases = self._client.cases.get_cases(project_id=project_id, **params)
-            steps_list = [str(case) for case in extracted_cases]
-            all_cases_concatenated = '\n'.join(steps_list)
+            return str(extracted_cases['cases'])
         except StatusCodeError as e:
             return ToolException(f"Unable to extract testcases {e}")
         return f"Extracted test case:\n{str(all_cases_concatenated)}"
@@ -125,10 +231,3 @@ class TestrailAPIWrapper(BaseModel):
                 "args_schema": addCase,
             }
         ]
-
-    def run(self, mode: str, *args: Any, **kwargs: Any):
-        for tool in self.get_available_tools():
-            if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
-        else:
-            raise ValueError(f"Unknown mode: {mode}")

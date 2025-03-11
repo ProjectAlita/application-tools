@@ -8,8 +8,8 @@ from tqdm.auto import tqdm
 
 logger = getLogger(__name__)
 
-from ..utils import tiktoken_length
 from .base import Chunk
+from ..utils import tiktoken_length
 
 
 def _encode_documents(embeddings: 'BaseModel', docs: List[str]) -> np.ndarray: # type: ignore
@@ -94,7 +94,7 @@ def _find_optimal_threshold(docs: List[str], similarity_scores: List[float],
                 [0] + split_indices, split_indices + [len(token_counts)]
             )
         ]
-
+        
         # Calculate the median token count for the chunks
         median_tokens = np.median(split_token_counts)
         logger.debug(
@@ -271,7 +271,7 @@ def statistical_chunker(file_content_generator: Generator[Document, None, None],
                                     chunk_size=max_tokens_doc, chunk_overlap=0
                                     ).split_text(doc_content)
             logger.info(f"Splitting {len(splits)} documents.")
-            chunk_index = 0
+            chunk_id = 0
             for i in tqdm(range(0, len(splits), batch_size)):
                 batch_splits = splits[i : i + batch_size]
                 if last_chunk is not None:
@@ -301,12 +301,13 @@ def statistical_chunker(file_content_generator: Generator[Document, None, None],
                     similarities=similarities,
                 )
                 for chunk in doc_chunks:
-                    chunk_index += 1
+                    chunk_id += 1
                     metadata = doc_metadata.copy()
-                    metadata['chunk_index'] = chunk_index
+                    metadata['chunk_id'] = chunk_id
                     metadata['chunk_token_count'] = chunk.token_count
+                    metadata['chunk_type'] = "document"
                     last_chunk = chunk
-                    logger.info(f"Chunk {chunk_index} created with {chunk.token_count} tokens.")
+                    logger.info(f"Chunk {chunk_id} created with {chunk.token_count} tokens.")
                     logger.info(f"Chunk metadata: {metadata}")
                     yield Document(
                         page_content=chunk.content,

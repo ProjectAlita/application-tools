@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Optional, Any
+from typing import Optional
 
 from azure.devops.connection import Connection
 from azure.devops.v7_0.test_plan.models import TestPlanCreateParams, TestSuiteCreateParams, \
@@ -8,8 +8,10 @@ from azure.devops.v7_0.test_plan.models import TestPlanCreateParams, TestSuiteCr
 from azure.devops.v7_0.test_plan.test_plan_client import TestPlanClient
 from langchain_core.tools import ToolException
 from msrest.authentication import BasicAuthentication
-from pydantic import create_model, PrivateAttr, BaseModel, model_validator
+from pydantic import create_model, PrivateAttr, model_validator
 from pydantic.fields import FieldInfo as Field
+
+from ...elitea_base import BaseToolApiWrapper
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +78,7 @@ TestCasesGetModel = create_model(
     suite_id=(int, Field(description="ID of the test suite for which test cases are requested"))
 )
 
-class TestPlanApiWrapper(BaseModel):
+class TestPlanApiWrapper(BaseToolApiWrapper):
     organization_url: str
     token: str
     limit: Optional[int] = 5
@@ -252,10 +254,3 @@ class TestPlanApiWrapper(BaseModel):
                 "ref": self.get_test_cases,
             }
         ]
-
-    def run(self, mode: str, *args: Any, **kwargs: Any):
-        """Run the tool based on the selected mode."""
-        for tool in self.get_available_tools():
-            if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
-        raise ValueError(f"Unknown mode: {mode}")

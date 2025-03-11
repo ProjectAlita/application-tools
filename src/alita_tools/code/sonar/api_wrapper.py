@@ -1,15 +1,16 @@
 import json
+import traceback
+from json import JSONDecodeError
 from typing import Any, Optional, Dict
 
-from pydantic import BaseModel, create_model, Field, PrivateAttr, model_validator
 import requests
-from json import JSONDecodeError
-import traceback
-
 from langchain_core.tools import ToolException
+from pydantic import create_model, Field, PrivateAttr, model_validator
+
+from ...elitea_base import BaseToolApiWrapper
 
 
-class SonarApiWrapper(BaseModel):
+class SonarApiWrapper(BaseToolApiWrapper):
     url: str
     sonar_token: str
     sonar_project_name: str
@@ -66,10 +67,3 @@ class SonarApiWrapper(BaseModel):
                 "ref": self.get_sonar_data,
             }
         ]
-
-    def run(self, mode: str, *args: Any, **kwargs: Any):
-        for tool in self.get_available_tools():
-            if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
-        else:
-            raise ValueError(f"Unknown mode: {mode}")

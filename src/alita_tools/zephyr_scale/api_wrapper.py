@@ -7,6 +7,8 @@ from langchain_core.tools import ToolException
 from pydantic import create_model, PrivateAttr
 from pydantic.fields import Field
 
+from ..elitea_base import BaseToolApiWrapper
+
 logger = logging.getLogger(__name__)
 
 ZephyrGetTestCases = create_model(
@@ -48,7 +50,7 @@ ZephyrCreateTestCase = create_model(
 )
 
 
-class ZephyrScaleApiWrapper(BaseModel):
+class ZephyrScaleApiWrapper(BaseToolApiWrapper):
     # url for a Zephyr server
     base_url: Optional[str] = ""
     # auth with Jira token (cloud & server)
@@ -202,10 +204,3 @@ class ZephyrScaleApiWrapper(BaseModel):
                 "ref": self.create_test_case,
             },
         ]
-
-    def run(self, mode: str, *args: Any, **kwargs: Any):
-        for tool in self.get_available_tools():
-            if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
-        else:
-            raise ValueError(f"Unknown mode: {mode}")

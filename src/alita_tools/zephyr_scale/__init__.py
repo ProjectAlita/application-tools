@@ -6,9 +6,11 @@ from pydantic import create_model, BaseModel, Field
 
 from .api_wrapper import ZephyrScaleApiWrapper
 from ..base.tool import BaseAction
+from ..utils import clean_string, TOOLKIT_SPLITTER
 
 name = "zephyr_scale"
 
+toolkit_max_length: int = 0
 
 def get_tools(tool):
     return ZephyrScaleToolkit().get_toolkit(
@@ -19,15 +21,18 @@ def get_tools(tool):
         password=tool['settings'].get('password', None),
         cookies=tool['settings'].get('cookies', None),
         max_results=tool['settings'].get('max_results', 100),
+        toolkit_name=tool.get('toolkit_name')
     ).get_tools()
 
 
 class ZephyrScaleToolkit(BaseToolkit):
     tools: List[BaseTool] = []
+    toolkit_max_length: int = 0
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
         selected_tools = {x['name']: x['args_schema'].schema() for x in ZephyrScaleApiWrapper.model_construct().get_available_tools()}
+        ZephyrScaleToolkit.toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name,
             base_url=(Optional[str], Field(default=None, description="Base URL")),
@@ -41,10 +46,11 @@ class ZephyrScaleToolkit(BaseToolkit):
         )
 
     @classmethod
-    def get_toolkit(cls, selected_tools: list[str] | None = None, **kwargs):
+    def get_toolkit(cls, selected_tools: list[str] | None = None, toolkit_name: Optional[str] = None, **kwargs):
         if selected_tools is None:
             selected_tools = []
         zephyr_wrapper = ZephyrScaleApiWrapper(**kwargs)
+        prefix = clean_string(toolkit_name, cls.toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
         available_tools = zephyr_wrapper.get_available_tools()
         tools = []
         for tool in available_tools:
@@ -53,7 +59,7 @@ class ZephyrScaleToolkit(BaseToolkit):
                     continue
             tools.append(BaseAction(
                 api_wrapper=zephyr_wrapper,
-                name=tool["name"],
+                name=prefix + tool["name"],
                 description=tool["description"],
                 args_schema=tool["args_schema"]
             ))
