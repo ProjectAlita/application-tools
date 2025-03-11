@@ -6,10 +6,9 @@ from typing import List, Literal, Optional
 
 from .api_wrapper import ZephyrApiWrapper
 from ..base.tool import BaseAction
-from ..utils import clean_string, TOOLKIT_SPLITTER
+from ..utils import clean_string, get_max_toolkit_length, TOOLKIT_SPLITTER
 
 name = "zephyrenterprise"
-toolkit_max_length: int = 0
 
 def get_tools(tool):
     return ZephyrEnterpriseToolkit().get_toolkit(
@@ -21,10 +20,12 @@ def get_tools(tool):
 
 class ZephyrEnterpriseToolkit(BaseToolkit):
     tools: List[BaseTool] = []
+    toolkit_max_length: int = 0
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
-        selected_tools = (x['name'] for x in ZephyrApiWrapper.model_construct().get_available_tools())
+        selected_tools = {x['name']: x['args_schema'].schema() for x in
+                          ZephyrApiWrapper.model_construct().get_available_tools()}
         ZephyrEnterpriseToolkit.toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name,

@@ -10,8 +10,6 @@ from ..utils import clean_string, TOOLKIT_SPLITTER, get_max_toolkit_length
 
 name = "report_portal"
 
-toolkit_max_length: int = 0
-
 def get_tools(tool):
     return ReportPortalToolkit().get_toolkit(
         selected_tools=tool['settings'].get('selected_tools', []),
@@ -24,14 +22,15 @@ def get_tools(tool):
 
 class ReportPortalToolkit(BaseToolkit):
     tools: list[BaseTool] = []
+    toolkit_max_length: int = 0
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
         selected_tools = {x['name']: x['args_schema'].schema() for x in ReportPortalApiWrapper.model_construct().get_available_tools()}
-        toolkit_max_length = get_max_toolkit_length(selected_tools)
+        ReportPortalToolkit.toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name,
-            endpoint=(str, Field(description="Report Portal endpoint", json_schema_extra={'toolkit_name': True})),
+            endpoint=(str, Field(description="Report Portal endpoint", json_schema_extra={'toolkit_name': True, 'max_length': ReportPortalToolkit.toolkit_max_length})),
             project=(str, Field(description="Report Portal project")),
             api_key=(str, Field(description="User API key", json_schema_extra={'secret': True})),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
@@ -43,7 +42,7 @@ class ReportPortalToolkit(BaseToolkit):
         if selected_tools is None:
             selected_tools = []
         report_portal_api_wrapper = ReportPortalApiWrapper(**kwargs)
-        prefix = clean_string(toolkit_name, toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
+        prefix = clean_string(toolkit_name, cls.toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
         available_tools = report_portal_api_wrapper.get_available_tools()
         tools = []
         for tool in available_tools:

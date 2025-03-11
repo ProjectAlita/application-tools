@@ -8,7 +8,6 @@ from ..utils import clean_string, TOOLKIT_SPLITTER, get_max_toolkit_length
 
 
 name = "bitbucket"
-toolkit_max_length: int = 0
 
 
 def get_tools(tool):
@@ -27,6 +26,7 @@ def get_tools(tool):
 
 class AlitaBitbucketToolkit(BaseToolkit):
     tools: List[BaseTool] = []
+    toolkit_max_length: int = 0
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
@@ -34,7 +34,7 @@ class AlitaBitbucketToolkit(BaseToolkit):
         for t in __all__:
             default = t['tool'].__pydantic_fields__['args_schema'].default
             selected_tools[t['name']] = default.schema() if default else default
-        toolkit_max_length = get_max_toolkit_length(selected_tools)
+        AlitaBitbucketToolkit.toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name,
             url=(str, Field(description="Bitbucket URL")),
@@ -56,7 +56,7 @@ class AlitaBitbucketToolkit(BaseToolkit):
             kwargs["cloud"] = True if "bitbucket.org" in kwargs.get('url') else False
         bitbucket_api_wrapper = BitbucketAPIWrapper(**kwargs)
         available_tools: List[Dict] = __all__
-        prefix = clean_string(toolkit_name, toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
+        prefix = clean_string(toolkit_name, cls.toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
         tools = []
         for tool in available_tools:
             if selected_tools:

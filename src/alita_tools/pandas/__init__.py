@@ -9,8 +9,6 @@ from ..utils import clean_string, TOOLKIT_SPLITTER, get_max_toolkit_length
 
 name = "pandas"
 
-toolkit_max_length: int = 0
-
 def get_tools(tool):
     return PandasToolkit().get_toolkit(
         selected_tools=tool['settings'].get('selected_tools', []),
@@ -28,14 +26,15 @@ def read_content(client: 'AlitaClient', artifact_bucket_name: str = None, file_n
 
 class PandasToolkit(BaseToolkit):
     tools: List[BaseTool] = []
+    toolkit_max_length: int = 0
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
         selected_tools = {x['name']: x['args_schema'].schema() for x in CSVToolApiWrapper.model_construct().get_available_tools()}
-        toolkit_max_length = get_max_toolkit_length(selected_tools)
+        PandasToolkit.toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name,
-            artifact_bucket_name=(str, Field(default=None, title="Bucket name", description="Bucket where the content file is stored", json_schema_extra={'toolkit_name': True, 'max_length': toolkit_max_length})),
+            artifact_bucket_name=(str, Field(default=None, title="Bucket name", description="Bucket where the content file is stored", json_schema_extra={'toolkit_name': True, 'max_length': PandasToolkit.toolkit_max_length})),
             file_name=(str, Field(default=None, title="File name", description="File to be processed")),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Pandas", "icon_url": None}})
@@ -46,7 +45,7 @@ class PandasToolkit(BaseToolkit):
         if selected_tools is None:
             selected_tools = []
         csv_tool_api_wrapper = CSVToolApiWrapper(**kwargs)
-        prefix = clean_string(toolkit_name, toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
+        prefix = clean_string(toolkit_name, cls.toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
         available_tools = csv_tool_api_wrapper.get_available_tools()
         tools = []
         for tool in available_tools:

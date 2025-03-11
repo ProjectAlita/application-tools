@@ -20,8 +20,6 @@ def get_tools(tool):
         toolkit_name=tool.get('toolkit_name')
     ).get_tools()
 
-toolkit_max_length: int = 0
-
 class ZephyrToolkit(BaseToolkit):
     tools: List[BaseTool] = []
     toolkit_max_length: int = 0
@@ -32,7 +30,7 @@ class ZephyrToolkit(BaseToolkit):
         ZephyrToolkit.toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name,
-            base_url=(str, Field(description="Base URL")),
+            base_url=(str, Field(description="Base URL", json_schema_extra={'toolkit_name': True, 'max_length': ZephyrToolkit.toolkit_max_length})),
             username=(str, Field(description="Username")),
             password=(str, Field(description="Password", json_schema_extra={'secret': True})),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),

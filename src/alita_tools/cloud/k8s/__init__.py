@@ -9,8 +9,6 @@ from ...utils import clean_string, TOOLKIT_SPLITTER, get_max_toolkit_length
 
 name = "kubernetes"
 
-toolkit_max_length: int = 0
-
 def get_tools(tool):
     return KubernetesToolkit().get_toolkit(
         selected_tools=tool['settings'].get('selected_tools', []),
@@ -22,11 +20,12 @@ def get_tools(tool):
 
 class KubernetesToolkit(BaseToolkit):
     tools: list[BaseTool] = []
+    toolkit_max_length: int = 0
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
         selected_tools = {x['name']: x['args_schema'].schema() for x in KubernetesApiWrapper.model_construct().get_available_tools()}
-        toolkit_max_length = get_max_toolkit_length(selected_tools)
+        KubernetesToolkit.toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name,
             url=(str, Field(default="", title="Cluster URL", description="The URL of the Kubernetes cluster")),
@@ -50,7 +49,7 @@ class KubernetesToolkit(BaseToolkit):
         kubernetes_api_wrapper = KubernetesApiWrapper(**kwargs)
         available_tools = kubernetes_api_wrapper.get_available_tools()
         tools = []
-        prefix = clean_string(toolkit_name, toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
+        prefix = clean_string(toolkit_name, cls.toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
         for tool in available_tools:
             if selected_tools and tool["name"] not in selected_tools:
                 continue

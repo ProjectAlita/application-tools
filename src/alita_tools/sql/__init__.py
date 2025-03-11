@@ -10,8 +10,6 @@ from ..utils import TOOLKIT_SPLITTER, clean_string, get_max_toolkit_length
 
 name = "sql"
 
-toolkit_max_length: int = 0
-
 def get_tools(tool):
     return SQLToolkit().get_toolkit(
         selected_tools=tool['settings'].get('selected_tools', []),
@@ -27,20 +25,21 @@ def get_tools(tool):
 
 class SQLToolkit(BaseToolkit):
     tools: list[BaseTool] = []
+    toolkit_max_length: int = 0
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
         selected_tools = {x['name']: x['args_schema'].schema() for x in SQLApiWrapper.model_construct().get_available_tools()}
-        toolkit_max_length = get_max_toolkit_length(selected_tools)
+        SQLToolkit.toolkit_max_length = get_max_toolkit_length(selected_tools)
         supported_dialects = (d.value for d in SQLDialect)
         return create_model(
             name,
             dialect=(Literal[tuple(supported_dialects)], Field(description="Database dialect (mysql or postgres)")),
-            host=(str, Field(description="Database server address", json_schema_extra= {'toolkit_name': True})),
+            host=(str, Field(description="Database server address")),
             port=(str, Field(description="Database server port")),
             username=(str, Field(description="Database username")),
             password=(str, Field(description="Database password", json_schema_extra={'secret': True})),
-            database_name=(str, Field(description="Database name")),
+            database_name=(str, Field(description="Database name", json_schema_extra={'toolkit_name': True, 'max_length': SQLToolkit.toolkit_max_length})),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "SQL", "icon_url": "sql-icon.svg"}})
         )
@@ -50,7 +49,7 @@ class SQLToolkit(BaseToolkit):
         if selected_tools is None:
             selected_tools = []
         sql_api_wrapper = SQLApiWrapper(**kwargs)
-        prefix = clean_string(toolkit_name, toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
+        prefix = clean_string(toolkit_name, cls.toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
         available_tools = sql_api_wrapper.get_available_tools()
         tools = []
         for tool in available_tools:

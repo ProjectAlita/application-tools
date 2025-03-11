@@ -20,18 +20,17 @@ def get_tools(tool):
         toolkit_name=tool.get('toolkit_name')
     ).get_tools()
 
-toolkit_max_length: int = 0
-
 class RallyToolkit(BaseToolkit):
     tools: List[BaseTool] = []
+    toolkit_max_length: int = 0
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
         selected_tools = {x['name']: x['args_schema'].schema() for x in RallyApiWrapper.model_construct().get_available_tools()}
-        toolkit_max_length = get_max_toolkit_length(selected_tools)
+        RallyToolkit.toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name,
-            server=(str, Field(description="Rally server url", json_schema_extra={'toolkit_name': True})),
+            server=(str, Field(description="Rally server url", json_schema_extra={'toolkit_name': True, 'max_length': RallyToolkit.toolkit_max_length})),
             api_key=(Optional[str], Field(default=None, description="User's API key", json_schema_extra={'secret': True})),
             username=(Optional[str], Field(default=None, description="Username")),
             password=(Optional[str], Field(default=None, description="User's password", json_schema_extra={'secret': True})),
@@ -46,7 +45,7 @@ class RallyToolkit(BaseToolkit):
         if selected_tools is None:
             selected_tools = []
         rally_api_wrapper = RallyApiWrapper(**kwargs)
-        prefix = clean_string(toolkit_name, toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
+        prefix = clean_string(toolkit_name, cls.toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
         available_tools = rally_api_wrapper.get_available_tools()
         tools = []
         for tool in available_tools:

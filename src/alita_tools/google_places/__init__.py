@@ -9,8 +9,6 @@ from ..utils import clean_string, TOOLKIT_SPLITTER, get_max_toolkit_length
 
 name = "google_places"
 
-toolkit_max_length: int = 0
-
 def get_tools(tool):
     return GooglePlacesToolkit().get_toolkit(
         selected_tools=tool['settings'].get('selected_tools', []),
@@ -22,14 +20,15 @@ def get_tools(tool):
 
 class GooglePlacesToolkit(BaseToolkit):
     tools: list[BaseTool] = []
+    toolkit_max_length: int = 0
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
         selected_tools = {x['name']: x['args_schema'].schema() for x in GooglePlacesAPIWrapper.model_construct().get_available_tools()}
-        toolkit_max_length = get_max_toolkit_length(selected_tools)
+        GooglePlacesToolkit.toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name,
-            api_key=(str, Field(description="Google Places API key", json_schema_extra={'secret': True, 'max_length': get_max_toolkit_length(selected_tools)})),
+            api_key=(str, Field(description="Google Places API key", json_schema_extra={'secret': True, 'max_length': GooglePlacesToolkit.toolkit_max_length})),
             results_count=(Optional[int], Field(description="Results number to show", default=None)),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Google Places", "icon_url": "gplaces-icon.svg"}})
@@ -40,7 +39,7 @@ class GooglePlacesToolkit(BaseToolkit):
         if selected_tools is None:
             selected_tools = []
         google_places_api_wrapper = GooglePlacesAPIWrapper(**kwargs)
-        prefix = clean_string(toolkit_name, toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
+        prefix = clean_string(toolkit_name, GooglePlacesToolkit.toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
         available_tools = google_places_api_wrapper.get_available_tools()
         tools = []
         for tool in available_tools:
