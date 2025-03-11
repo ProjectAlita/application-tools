@@ -5,7 +5,7 @@ from azure.identity import ClientSecretCredential
 from azure.mgmt.resource import ResourceManagementClient
 from pydantic import model_validator, create_model, Field, PrivateAttr
 
-from ...BaseToolApiWrapper import BaseToolApiWrapper
+from ...elitea_base import BaseToolApiWrapper
 
 ERROR_PREFIX = 'Error:'
 

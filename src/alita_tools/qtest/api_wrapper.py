@@ -4,12 +4,12 @@ from typing import Any
 
 import swagger_client
 from langchain_core.tools import ToolException
-from pydantic import BaseModel, Field, PrivateAttr, model_validator, create_model, ConfigDict
+from pydantic import Field, PrivateAttr, model_validator, create_model
 from sklearn.feature_extraction.text import strip_tags
 from swagger_client import TestCaseApi, SearchApi, PropertyResource
 from swagger_client.rest import ApiException
 
-from ..BaseToolApiWrapper import BaseToolApiWrapper
+from ..elitea_base import BaseToolApiWrapper
 
 QTEST_ID = "QTest Id"
 

@@ -5,9 +5,11 @@ from pydantic import BaseModel, ConfigDict, create_model, Field
 
 from .api_wrapper import ELITEAElasticApiWrapper
 from ..base.tool import BaseAction
-from ..utils import clean_string, TOOLKIT_SPLITTER
+from ..utils import clean_string, TOOLKIT_SPLITTER, get_max_toolkit_length
 
 name = "elastic"
+
+toolkit_max_length: int = 0
 
 def get_tools(tool):
     return ElasticToolkit().get_toolkit(
@@ -23,9 +25,10 @@ class ElasticToolkit(BaseToolkit):
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
         selected_tools = {x['name']: x['args_schema'].schema() for x in ELITEAElasticApiWrapper.model_construct().get_available_tools()}
+        toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name,
-            url=(str, Field(default=None, title="Elasticsearch URL", description="Elasticsearch URL", json_schema_extra={'toolkit_name': True})),
+            url=(str, Field(default=None, title="Elasticsearch URL", description="Elasticsearch URL", json_schema_extra={'toolkit_name': True, 'max_length': toolkit_max_length})),
             api_key=(
                 Optional[str],
                 Field(
@@ -46,7 +49,7 @@ class ElasticToolkit(BaseToolkit):
         elastic_api_wrapper = ELITEAElasticApiWrapper(**kwargs)
         available_tools = elastic_api_wrapper.get_available_tools()
         tools = []
-        prefix = clean_string(toolkit_name + TOOLKIT_SPLITTER) if toolkit_name else ''
+        prefix = clean_string(toolkit_name, toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
         for tool in available_tools:
             if selected_tools and tool["name"] not in selected_tools:
                 continue

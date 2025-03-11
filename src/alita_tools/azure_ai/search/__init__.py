@@ -4,11 +4,12 @@ from .api_wrapper import AzureSearchApiWrapper
 from ...base.tool import BaseAction
 from langchain_core.tools import BaseToolkit, BaseTool
 from pydantic import create_model, BaseModel, ConfigDict, Field
-from ...utils import clean_string, TOOLKIT_SPLITTER
+from ...utils import clean_string, TOOLKIT_SPLITTER, get_max_toolkit_length
 
 logger = getLogger(__name__)
 
 name = "azure_search"
+toolkit_max_length = 0
 
 def get_tools(tool):
     return AzureSearchToolkit().get_toolkit(
@@ -33,12 +34,13 @@ class AzureSearchToolkit(BaseToolkit):
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
         selected_tools = {x['name']: x['args_schema'].schema() for x in AzureSearchApiWrapper.model_construct().get_available_tools()}
+        toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name,
             api_key=(str, Field(description="API key", json_schema_extra={'secret': True})),
             endpoint=(str, Field(description="Azure Search endpoint")),
             index_name=(str, Field(description="Azure Search index name")),
-            api_base=(Optional[str], Field(description="Azure OpenAI base URL", default=None, json_schema_extra={'toolkit_name': True})),
+            api_base=(Optional[str], Field(description="Azure OpenAI base URL", default=None, json_schema_extra={'toolkit_name': True, 'max_length': toolkit_max_length})),
             api_version=(Optional[str], Field(description="API version", default=None)),
             openai_api_key=(Optional[str], Field(description="Azure OpenAI API Key", default=None, json_schema_extra={'secret': True})),
             model_name=(str, Field(description="Model name for Embeddings model", default=None)),
@@ -52,7 +54,7 @@ class AzureSearchToolkit(BaseToolkit):
             selected_tools = []
         azure_search_api_wrapper = AzureSearchApiWrapper(**kwargs)
         available_tools = azure_search_api_wrapper.get_available_tools()
-        prefix = clean_string(toolkit_name + TOOLKIT_SPLITTER) if toolkit_name else ''
+        prefix = clean_string(toolkit_name, toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
         tools = []
         for tool in available_tools:
             if selected_tools:

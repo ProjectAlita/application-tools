@@ -6,7 +6,7 @@ import chardet
 import pandas as pd
 from pydantic import create_model, Field
 
-from ..BaseToolApiWrapper import BaseToolApiWrapper
+from ..elitea_base import BaseToolApiWrapper
 
 
 class CSVToolApiWrapper(BaseToolApiWrapper):

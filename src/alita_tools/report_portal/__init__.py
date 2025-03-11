@@ -6,10 +6,11 @@ from pydantic import create_model, BaseModel, ConfigDict, Field
 
 from .api_wrapper import ReportPortalApiWrapper
 from ..base.tool import BaseAction
-from ..utils import clean_string, TOOLKIT_SPLITTER
+from ..utils import clean_string, TOOLKIT_SPLITTER, get_max_toolkit_length
 
 name = "report_portal"
 
+toolkit_max_length: int = 0
 
 def get_tools(tool):
     return ReportPortalToolkit().get_toolkit(
@@ -27,6 +28,7 @@ class ReportPortalToolkit(BaseToolkit):
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
         selected_tools = {x['name']: x['args_schema'].schema() for x in ReportPortalApiWrapper.model_construct().get_available_tools()}
+        toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name,
             endpoint=(str, Field(description="Report Portal endpoint", json_schema_extra={'toolkit_name': True})),
@@ -41,7 +43,7 @@ class ReportPortalToolkit(BaseToolkit):
         if selected_tools is None:
             selected_tools = []
         report_portal_api_wrapper = ReportPortalApiWrapper(**kwargs)
-        prefix = clean_string(toolkit_name + TOOLKIT_SPLITTER) if toolkit_name else ''
+        prefix = clean_string(toolkit_name, toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
         available_tools = report_portal_api_wrapper.get_available_tools()
         tools = []
         for tool in available_tools:

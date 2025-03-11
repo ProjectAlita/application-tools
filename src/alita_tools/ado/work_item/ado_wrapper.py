@@ -10,7 +10,7 @@ from pydantic import create_model, PrivateAttr
 from pydantic import model_validator
 from pydantic.fields import Field
 
-from ...BaseToolApiWrapper import BaseToolApiWrapper
+from ...elitea_base import BaseToolApiWrapper
 
 logger = logging.getLogger(__name__)
 

@@ -7,7 +7,7 @@ from office365.sharepoint.client_context import ClientContext
 from pydantic import Field, PrivateAttr, create_model, model_validator
 
 from .utils import read_docx_from_bytes
-from ..BaseToolApiWrapper import BaseToolApiWrapper
+from ..elitea_base import BaseToolApiWrapper
 
 NoInput = create_model(
     "NoInput"

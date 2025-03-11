@@ -4,7 +4,7 @@ from typing import Tuple, Optional, Dict, Any, Union
 from kubernetes import client, config as k8s_config
 from pydantic import BaseModel, Field, PrivateAttr, ConfigDict, model_validator, create_model
 
-from ...BaseToolApiWrapper import BaseToolApiWrapper
+from ...elitea_base import BaseToolApiWrapper
 
 
 class KubernetesApiWrapper(BaseToolApiWrapper):

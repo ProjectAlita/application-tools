@@ -5,9 +5,10 @@ from pydantic import BaseModel, Field, create_model
 
 from ...base.tool import BaseAction
 from .repos_wrapper import ReposApiWrapper
-from ...utils import clean_string, TOOLKIT_SPLITTER
+from ...utils import clean_string, TOOLKIT_SPLITTER, get_max_toolkit_length
 
 name = "azure_devops_repos"
+toolkit_max_length: int = 0
 
 class AzureDevOpsReposToolkit(BaseToolkit):
     tools: List[BaseTool] = []
@@ -15,10 +16,11 @@ class AzureDevOpsReposToolkit(BaseToolkit):
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
         selected_tools = {x['name']: x['args_schema'].schema() for x in ReposApiWrapper.model_construct().get_available_tools()}
+        toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name,
-            organization_url=(Optional[str], Field(default="", title="Organization URL", description="ADO organization url", json_schema_extra={'toolkit_name': True})),
-            project=(Optional[str], Field(default="", title="Project", description="ADO project")),
+            organization_url=(Optional[str], Field(default="", title="Organization URL", description="ADO organization url")),
+            project=(Optional[str], Field(default="", title="Project", description="ADO project", json_schema_extra={'toolkit_name': True, 'max_length': toolkit_max_length})),
             repository_id=(Optional[str], Field(default="", title="Repository ID", description="ADO repository ID")),
             token=(Optional[str], Field(default="", title="Token", description="ADO token", json_schema_extra={'secret': True})),
             base_branch=(Optional[str], Field(default="", title="Base branch", description="ADO base branch (e.g., main)")),
@@ -38,7 +40,7 @@ class AzureDevOpsReposToolkit(BaseToolkit):
         azure_devops_repos_wrapper = ReposApiWrapper(**kwargs)
         available_tools = azure_devops_repos_wrapper.get_available_tools()
         tools = []
-        prefix = clean_string(toolkit_name + TOOLKIT_SPLITTER) if toolkit_name else ''
+        prefix = clean_string(toolkit_name, toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
         for tool in available_tools:
             if selected_tools:
                 if tool["name"] not in selected_tools:

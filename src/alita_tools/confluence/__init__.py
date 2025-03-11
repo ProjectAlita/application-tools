@@ -4,11 +4,12 @@ from .api_wrapper import ConfluenceAPIWrapper
 from langchain_core.tools import BaseTool
 from ..base.tool import BaseAction
 from pydantic import create_model, BaseModel, ConfigDict, Field
-from ..utils import clean_string, TOOLKIT_SPLITTER
+from ..utils import clean_string, TOOLKIT_SPLITTER, get_max_toolkit_length
 
 
 name = "confluence"
 
+toolkit_max_length: int = 0
 
 def get_tools(tool):
     return ConfluenceToolkit().get_toolkit(
@@ -33,13 +34,14 @@ class ConfluenceToolkit(BaseToolkit):
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
         selected_tools = {x['name']: x['args_schema'].schema() for x in ConfluenceAPIWrapper.model_construct().get_available_tools()}
+        toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name,
-            base_url=(str, Field(description="Confluence URL", json_schema_extra={'toolkit_name': True})),
+            base_url=(str, Field(description="Confluence URL")),
             token=(str, Field(description="Token", default=None, json_schema_extra={'secret': True})),
             api_key=(str, Field(description="API key", default=None, json_schema_extra={'secret': True})),
             username=(str, Field(description="Username", default=None)),
-            space=(str, Field(description="Space", default=None)),
+            space=(str, Field(description="Space", default=None, json_schema_extra={'toolkit_name': True, 'max_length': toolkit_max_length})),
             cloud=(bool, Field(description="Hosting Option")),
             limit=(int, Field(description="Pages limit per request", default=5)),
             max_pages=(int, Field(description="Max total pages", default=10)),
@@ -55,7 +57,7 @@ class ConfluenceToolkit(BaseToolkit):
         if selected_tools is None:
             selected_tools = []
         confluence_api_wrapper = ConfluenceAPIWrapper(**kwargs)
-        prefix = clean_string(toolkit_name + TOOLKIT_SPLITTER) if toolkit_name else ''
+        prefix = clean_string(toolkit_name, toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
         available_tools = confluence_api_wrapper.get_available_tools()
         tools = []
         for tool in available_tools:

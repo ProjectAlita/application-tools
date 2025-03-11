@@ -6,7 +6,7 @@ from google.oauth2.service_account import Credentials
 from pydantic import Field, PrivateAttr, model_validator, create_model
 from requests import Session
 
-from ...BaseToolApiWrapper import BaseToolApiWrapper
+from ...elitea_base import BaseToolApiWrapper
 
 
 class GCPApiWrapper(BaseToolApiWrapper):

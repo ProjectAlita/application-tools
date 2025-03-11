@@ -6,9 +6,11 @@ from pydantic import create_model, BaseModel, ConfigDict, Field
 from .api_wrapper import SQLApiWrapper
 from ..base.tool import BaseAction
 from .models import SQLDialect
-from ..utils import TOOLKIT_SPLITTER, clean_string
+from ..utils import TOOLKIT_SPLITTER, clean_string, get_max_toolkit_length
 
 name = "sql"
+
+toolkit_max_length: int = 0
 
 def get_tools(tool):
     return SQLToolkit().get_toolkit(
@@ -29,6 +31,7 @@ class SQLToolkit(BaseToolkit):
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
         selected_tools = {x['name']: x['args_schema'].schema() for x in SQLApiWrapper.model_construct().get_available_tools()}
+        toolkit_max_length = get_max_toolkit_length(selected_tools)
         supported_dialects = (d.value for d in SQLDialect)
         return create_model(
             name,
@@ -47,7 +50,7 @@ class SQLToolkit(BaseToolkit):
         if selected_tools is None:
             selected_tools = []
         sql_api_wrapper = SQLApiWrapper(**kwargs)
-        prefix = clean_string(toolkit_name + TOOLKIT_SPLITTER) if toolkit_name else ''
+        prefix = clean_string(toolkit_name, toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
         available_tools = sql_api_wrapper.get_available_tools()
         tools = []
         for tool in available_tools:
