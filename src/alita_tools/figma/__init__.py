@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field, create_model
 
 from ..base.tool import BaseAction
 from .api_wrapper import FigmaApiWrapper, GLOBAL_LIMIT
+from ..utils import clean_string, TOOLKIT_SPLITTER
 
 name = "figma"
 
@@ -18,6 +19,7 @@ def get_tools(tool):
             oauth2=tool["settings"].get("oauth2", None),
             global_limit=tool["settings"].get("global_limit", GLOBAL_LIMIT),
             global_regexp=tool["settings"].get("global_regexp", None),
+            toolkit_name=tool.get('toolkit_name')
         )
         .get_tools()
     )
@@ -48,10 +50,11 @@ class FigmaToolkit(BaseToolkit):
         )
 
     @classmethod
-    def get_toolkit(cls, selected_tools: list[str] | None = None, **kwargs):
+    def get_toolkit(cls, selected_tools: list[str] | None = None, toolkit_name: Optional[str] = None, **kwargs):
         if selected_tools is None:
             selected_tools = []
         figma_api_wrapper = FigmaApiWrapper(**kwargs)
+        prefix = clean_string(toolkit_name + TOOLKIT_SPLITTER) if toolkit_name else ''
         available_tools = figma_api_wrapper.get_available_tools()
         tools = []
         for tool in available_tools:
@@ -61,7 +64,7 @@ class FigmaToolkit(BaseToolkit):
             tools.append(
                 BaseAction(
                     api_wrapper=figma_api_wrapper,
-                    name=tool["name"],
+                    name=prefix + tool["name"],
                     description=tool["description"],
                     args_schema=tool["args_schema"],
                 )
