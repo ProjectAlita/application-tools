@@ -2,8 +2,9 @@ import functools
 import json
 import logging
 import re
+import requests
 from enum import Enum
-from typing import Optional
+from typing import Optional, Dict, Union
 
 from FigmaPy import FigmaPy
 from langchain_core.tools import ToolException
@@ -30,18 +31,17 @@ class ArgsSchema(Enum):
                 examples=["8:6,1:7"],
             ),
         ),
-        limit=(
-            Optional[str],
-            Field(description="Sets limit to lenght of output", default=GLOBAL_LIMIT),
-        ),
-        regexp=(
-            Optional[str],
+        extra_params=(
+            Optional[Dict[str, Union[str, int, None]]],
             Field(
-                description="Specifies regex pattern to filter response data",
-                default=None,
+                description="Additional parameters including limit and regex pattern to be removed from response",
+                default={
+                    "limit": GLOBAL_LIMIT,
+                    "regexp": None
+                },
                 examples=[
-                    r'("strokes"|"fills")\s*:\s*("[^"]*"|[^\s,}\[]+)\s*(?=,|\}|\n)'
-                ],
+                    {"limit": "1000", "regexp": r'("strokes"|"fills")\s*:\s*("[^"]*"|[^\s,}\[]+)\s*(?=,|\}|\n)'}
+                ]
             ),
         ),
     )
@@ -62,18 +62,17 @@ class ArgsSchema(Enum):
             Optional[str],
             Field(description="Sets version of file"),
         ),
-        limit=(
-            Optional[str],
-            Field(description="Sets limit to lenght of output", default=GLOBAL_LIMIT),
-        ),
-        regexp=(
-            Optional[str],
+        extra_params=(
+            Optional[Dict[str, Union[str, int, None]]],
             Field(
-                description="Specifies regex pattern to filter response data",
-                default=None,
+                description="Additional parameters including limit and regex pattern to be removed from response",
+                default={
+                    "limit": GLOBAL_LIMIT,
+                    "regexp": None
+                },
                 examples=[
-                    r'("strokes"|"fills")\s*:\s*("[^"]*"|[^\s,}\[]+)\s*(?=,|\}|\n)'
-                ],
+                    {"limit": "1000", "regexp": r'("strokes"|"fills")\s*:\s*("[^"]*"|[^\s,}\[]+)\s*(?=,|\}|\n)'}
+                ]
             ),
         ),
     )
@@ -86,18 +85,17 @@ class ArgsSchema(Enum):
                 examples=["Fp24FuzPwH0L74ODSrCnQo"],
             ),
         ),
-        limit=(
-            Optional[str],
-            Field(description="Sets limit to lenght of output", default=GLOBAL_LIMIT),
-        ),
-        regexp=(
-            Optional[str],
+        extra_params=(
+            Optional[Dict[str, Union[str, int, None]]],
             Field(
-                description="Specifies regex pattern to filter response data",
-                default=None,
+                description="Additional parameters including limit and regex pattern to be removed from response",
+                default={
+                    "limit": GLOBAL_LIMIT,
+                    "regexp": None
+                },
                 examples=[
-                    r'("strokes"|"fills")\s*:\s*("[^"]*"|[^\s,}\[]+)\s*(?=,|\}|\n)'
-                ],
+                    {"limit": "1000", "regexp": r'("strokes"|"fills")\s*:\s*("[^"]*"|[^\s,}\[]+)\s*(?=,|\}|\n)'}
+                ]
             ),
         ),
     )
@@ -120,18 +118,17 @@ class ArgsSchema(Enum):
                 description="Positioning information of the comment (Vector, FrameOffset, Region, FrameOffsetRegion)"
             ),
         ),
-        limit=(
-            Optional[str],
-            Field(description="Sets limit to lenght of output", default=GLOBAL_LIMIT),
-        ),
-        regexp=(
-            Optional[str],
+        extra_params=(
+            Optional[Dict[str, Union[str, int, None]]],
             Field(
-                description="Specifies regex pattern to filter response data",
-                default=None,
+                description="Additional parameters including limit and regex pattern to be removed from response",
+                default={
+                    "limit": GLOBAL_LIMIT,
+                    "regexp": None
+                },
                 examples=[
-                    r'("strokes"|"fills")\s*:\s*("[^"]*"|[^\s,}\[]+)\s*(?=,|\}|\n)'
-                ],
+                    {"limit": "1000", "regexp": r'("strokes"|"fills")\s*:\s*("[^"]*"|[^\s,}\[]+)\s*(?=,|\}|\n)'}
+                ]
             ),
         ),
     )
@@ -166,18 +163,17 @@ class ArgsSchema(Enum):
             Optional[str],
             Field(description="A specific version ID to use"),
         ),
-        limit=(
-            Optional[str],
-            Field(description="Sets limit to lenght of output", default=GLOBAL_LIMIT),
-        ),
-        regexp=(
-            Optional[str],
+        extra_params=(
+            Optional[Dict[str, Union[str, int, None]]],
             Field(
-                description="Specifies regex pattern to filter response data",
-                default=None,
+                description="Additional parameters including limit and regex pattern to be removed from response",
+                default={
+                    "limit": GLOBAL_LIMIT,
+                    "regexp": None
+                },
                 examples=[
-                    r'("strokes"|"fills")\s*:\s*("[^"]*"|[^\s,}\[]+)\s*(?=,|\}|\n)'
-                ],
+                    {"limit": "1000", "regexp": r'("strokes"|"fills")\s*:\s*("[^"]*"|[^\s,}\[]+)\s*(?=,|\}|\n)'}
+                ]
             ),
         ),
     )
@@ -190,18 +186,17 @@ class ArgsSchema(Enum):
                 examples=["1101853299713989222"],
             ),
         ),
-        limit=(
-            Optional[str],
-            Field(description="Sets limit to lenght of output", default=GLOBAL_LIMIT),
-        ),
-        regexp=(
-            Optional[str],
+        extra_params=(
+            Optional[Dict[str, Union[str, int, None]]],
             Field(
-                description="Specifies regex pattern to filter response data",
-                default=None,
+                description="Additional parameters including limit and regex pattern to be removed from response",
+                default={
+                    "limit": GLOBAL_LIMIT,
+                    "regexp": None
+                },
                 examples=[
-                    r'("strokes"|"fills")\s*:\s*("[^"]*"|[^\s,}\[]+)\s*(?=,|\}|\n)'
-                ],
+                    {"limit": "1000", "regexp": r'("strokes"|"fills")\s*:\s*("[^"]*"|[^\s,}\[]+)\s*(?=,|\}|\n)'}
+                ]
             ),
         ),
     )
@@ -214,18 +209,17 @@ class ArgsSchema(Enum):
                 examples=["55391681"],
             ),
         ),
-        limit=(
-            Optional[str],
-            Field(description="Sets limit to lenght of output", default=GLOBAL_LIMIT),
-        ),
-        regexp=(
-            Optional[str],
+        extra_params=(
+            Optional[Dict[str, Union[str, int, None]]],
             Field(
-                description="Specifies regex pattern to filter response data",
-                default=None,
+                description="Additional parameters including limit and regex pattern to be removed from response",
+                default={
+                    "limit": GLOBAL_LIMIT,
+                    "regexp": None
+                },
                 examples=[
-                    r'("strokes"|"fills")\s*:\s*("[^"]*"|[^\s,}\[]+)\s*(?=,|\}|\n)'
-                ],
+                    {"limit": "1000", "regexp": r'("strokes"|"fills")\s*:\s*("[^"]*"|[^\s,}\[]+)\s*(?=,|\}|\n)'}
+                ]
             ),
         ),
     )
@@ -237,6 +231,30 @@ class FigmaApiWrapper(BaseToolApiWrapper):
     global_limit: Optional[int] = Field(default=GLOBAL_LIMIT)
     global_regexp: Optional[str] = Field(default=None)
     _client: Optional[FigmaPy] = PrivateAttr()
+
+    def _send_request(self, method: str, url: str, payload: Optional[Dict] = None,
+                      extra_headers: Optional[Dict[str, str]] = None):
+        """Send HTTP request to a specified URL with automated headers."""
+        headers = {
+            'Content-Type': 'application/json'
+        }
+
+        if self.oauth2:
+            headers['Authorization'] = f"Bearer {self.oauth2}"
+        else:
+            headers['X-Figma-Token'] = self.token
+
+        if extra_headers:
+            headers.update(extra_headers)
+
+        try:
+            response = requests.request(method, url, headers=headers, json=payload)
+            response.raise_for_status()
+            return response
+        except requests.exceptions.RequestException as e:
+            msg = f"HTTP request failed: {e}"
+            logging.error(msg)
+            raise ToolException(msg)
 
     @model_validator(mode="after")
     @classmethod
@@ -313,8 +331,10 @@ class FigmaApiWrapper(BaseToolApiWrapper):
 
         @functools.wraps(func)
         def wrapper(self, *args, **kwargs):
-            limit = kwargs.pop("limit", self.global_limit)
-            regexp = kwargs.get("regexp", self.global_regexp)
+            extra_params = kwargs.pop("extra_params", {})
+
+            limit = extra_params.get("limit", self.global_limit)
+            regexp = extra_params.get("regexp", self.global_regexp)
 
             try:
                 limit = int(limit)
@@ -376,13 +396,19 @@ class FigmaApiWrapper(BaseToolApiWrapper):
         self, file_key: str, message: str, client_meta: Optional[dict] = None
     ):
         """Posts a comment to a specific file in Figma."""
-        payload = {"message": message.title()}
+        payload = {'message': message}
         if client_meta:
             payload["client_meta"] = client_meta
 
-        return self._client.api_request(
-            f"files/{file_key}/comments", method="post", payload=payload
-        )
+        url = f"{self._client.api_uri}files/{file_key}/comments"
+
+        try:
+            response = self._send_request('POST', url, payload)
+            return response.json()
+        except ToolException as e:
+            msg = f"Failed to post comment. Error: {str(e)}"
+            logging.error(msg)
+            return ToolException(msg)
 
     @process_output
     def get_file_images(
