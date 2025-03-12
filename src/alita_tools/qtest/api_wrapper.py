@@ -144,7 +144,7 @@ class QtestApiWrapper(BaseToolApiWrapper):
         initial_project_properties = self.__get_properties_form_project()
         modules = self._parse_modules()
         parent_id = ''.join(str(module['module_id']) for module in modules if
-                            folder_to_place_test_cases_to and module['module_name'] == folder_to_place_test_cases_to)
+                            folder_to_place_test_cases_to and module['full_module_name'] == folder_to_place_test_cases_to)
         props = []
         for prop in initial_project_properties:
             props.append(PropertyResource(field_id=prop['field_id'], field_name=prop['field_name'],
