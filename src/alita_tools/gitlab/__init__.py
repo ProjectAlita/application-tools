@@ -12,8 +12,6 @@ from ..utils import clean_string, TOOLKIT_SPLITTER, get_max_toolkit_length
 
 name = "gitlab"
 
-toolkit_max_length: int = 0
-
 def get_tools(tool):
     return AlitaGitlabToolkit().get_toolkit(
         selected_tools=tool['settings'].get('selected_tools', []),
@@ -26,6 +24,7 @@ def get_tools(tool):
 
 class AlitaGitlabToolkit(BaseToolkit):
     tools: List[BaseTool] = []
+    toolkit_max_length: int = 0
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
@@ -33,11 +32,11 @@ class AlitaGitlabToolkit(BaseToolkit):
         for t in __all__:
             default = t['tool'].__pydantic_fields__['args_schema'].default
             selected_tools[t['name']] = default.schema() if default else default
-        toolkit_max_length = get_max_toolkit_length(selected_tools)
+        AlitaGitlabToolkit.toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name,
             url=(str, Field(description="GitLab URL")),
-            repository=(str, Field(description="GitLab repository", json_schema_extra={'toolkit_name': True, 'max_length': toolkit_max_length})),
+            repository=(str, Field(description="GitLab repository", json_schema_extra={'toolkit_name': True, 'max_length': AlitaGitlabToolkit.toolkit_max_length})),
             private_token=(str, Field(description="GitLab private token", json_schema_extra={'secret': True})),
             branch=(str, Field(description="Main branch", default="main")),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
@@ -49,7 +48,7 @@ class AlitaGitlabToolkit(BaseToolkit):
         if selected_tools is None:
             selected_tools = []
         gitlab_api_wrapper = GitLabAPIWrapper(**kwargs)
-        prefix = clean_string(toolkit_name, toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
+        prefix = clean_string(toolkit_name, cls.toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
         available_tools: List[Dict] = __all__
         tools = []
         for tool in available_tools:

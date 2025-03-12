@@ -5,10 +5,9 @@ from pydantic import BaseModel, ConfigDict, Field, create_model
 
 from ..base.tool import BaseAction
 from .api_wrapper import FigmaApiWrapper, GLOBAL_LIMIT
-from ..utils import clean_string, TOOLKIT_SPLITTER
+from ..utils import clean_string, TOOLKIT_SPLITTER, get_max_toolkit_length
 
 name = "figma"
-
 
 def get_tools(tool):
     return (
@@ -27,6 +26,7 @@ def get_tools(tool):
 
 class FigmaToolkit(BaseToolkit):
     tools: List[BaseTool] = []
+    toolkit_max_length: int = 0
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
@@ -34,6 +34,7 @@ class FigmaToolkit(BaseToolkit):
             x["name"]: x["args_schema"].schema()
             for x in FigmaApiWrapper.model_construct().get_available_tools()
         }
+        FigmaToolkit.toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name,
             token=(Optional[str], Field(description="Figma Token", json_schema_extra={"secret": True}, default=None)),
@@ -45,7 +46,7 @@ class FigmaToolkit(BaseToolkit):
                 Field(default=[], json_schema_extra={"args_schemas": selected_tools}),
             ),
             __config__=ConfigDict(
-                json_schema_extra={"metadata": {"label": "Figma", "icon_url": None}}
+                json_schema_extra={"metadata": {"label": "Figma", "icon_url": None, "max_length": FigmaToolkit.toolkit_max_length}},
             ),
         )
 
@@ -54,7 +55,7 @@ class FigmaToolkit(BaseToolkit):
         if selected_tools is None:
             selected_tools = []
         figma_api_wrapper = FigmaApiWrapper(**kwargs)
-        prefix = clean_string(toolkit_name + TOOLKIT_SPLITTER) if toolkit_name else ''
+        prefix = clean_string(toolkit_name, cls.toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
         available_tools = figma_api_wrapper.get_available_tools()
         tools = []
         for tool in available_tools:
