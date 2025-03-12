@@ -1,5 +1,19 @@
 # Figma
 
+### Tool configuration
+
+```json
+{
+    "token": "<figma_api_token>",
+    "oauth2": "<oauth2_token>",
+    "global_limit": "10000",
+    "global_regexp": ""
+}
+```
+Where token OR oauth2 is required; global_limit and global_regexp are optional; by default global_limit is 10000.
+- global_limit: parameter is used to limit the amount of returned symbols. In this case JSON output might become invalid, so please add phrase to your prompt accepting invalid JSON like this: Output should be raw JSON even if invalid.
+- global_regexp: parameter is used to filter output removing everything what matches this regex patter.
+
 ### Extra params
 Every function can accept as parameter extra params field:
 ```json
@@ -11,7 +25,7 @@ Every function can accept as parameter extra params field:
 Where:
 - `limit` parameter is used to limit the amount of returned symbols. In this case JSON output might become invalid, so please add phrase to your prompt accepting invalid JSON like this: `Output should be raw JSON even if invalid`
 - `regexp` parameter is used to filter output removing everything what matches this regex patter, for example:
-> regexp equals to `['"](?:id|description|img_url)['"]\s*:\s*(['"][^'"]*['"]|\{.*?\})(,?)(?=\s*[\},])`
+> regexp equals to ```['"](?:id|description|img_url)['"]\s*:\s*(['"][^'"]*['"]|\{.*?\})(,?)(?=\s*[\},])```
 
 ### Prompts
 
