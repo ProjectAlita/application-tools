@@ -42,7 +42,7 @@ class QtestToolkit(BaseToolkit):
         if selected_tools is None:
             selected_tools = []
         qtest_api_wrapper = QtestApiWrapper(**kwargs)
-        prefix = clean_string(toolkit_name, cls.toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
+        prefix = clean_string(str(toolkit_name), cls.toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
         available_tools = qtest_api_wrapper.get_available_tools()
         tools = []
         for tool in available_tools:

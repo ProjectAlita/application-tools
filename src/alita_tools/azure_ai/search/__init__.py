@@ -29,7 +29,7 @@ def get_toolkit():
 
 class AzureSearchToolkit(BaseToolkit):
     tools: List[BaseTool] = []
-    toolkit_max_length = 0
+    toolkit_max_length: int = 0
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
