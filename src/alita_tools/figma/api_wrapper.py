@@ -2,10 +2,10 @@ import functools
 import json
 import logging
 import re
-import requests
 from enum import Enum
-from typing import Optional, Dict, Union
+from typing import Dict, Optional, Union
 
+import requests
 from FigmaPy import FigmaPy
 from langchain_core.tools import ToolException
 from pydantic import Field, PrivateAttr, create_model, model_validator
@@ -13,6 +13,7 @@ from pydantic import Field, PrivateAttr, create_model, model_validator
 from ..elitea_base import BaseToolApiWrapper
 
 GLOBAL_LIMIT = 10000
+
 
 class ArgsSchema(Enum):
     NoInput = create_model("NoInput")
@@ -35,13 +36,13 @@ class ArgsSchema(Enum):
             Optional[Dict[str, Union[str, int, None]]],
             Field(
                 description="Additional parameters including limit and regex pattern to be removed from response",
-                default={
-                    "limit": GLOBAL_LIMIT,
-                    "regexp": None
-                },
+                default={"limit": GLOBAL_LIMIT, "regexp": None},
                 examples=[
-                    {"limit": "1000", "regexp": r'("strokes"|"fills")\s*:\s*("[^"]*"|[^\s,}\[]+)\s*(?=,|\}|\n)'}
-                ]
+                    {
+                        "limit": "1000",
+                        "regexp": r'("strokes"|"fills")\s*:\s*("[^"]*"|[^\s,}\[]+)\s*(?=,|\}|\n)',
+                    }
+                ],
             ),
         ),
     )
@@ -66,13 +67,13 @@ class ArgsSchema(Enum):
             Optional[Dict[str, Union[str, int, None]]],
             Field(
                 description="Additional parameters including limit and regex pattern to be removed from response",
-                default={
-                    "limit": GLOBAL_LIMIT,
-                    "regexp": None
-                },
+                default={"limit": GLOBAL_LIMIT, "regexp": None},
                 examples=[
-                    {"limit": "1000", "regexp": r'("strokes"|"fills")\s*:\s*("[^"]*"|[^\s,}\[]+)\s*(?=,|\}|\n)'}
-                ]
+                    {
+                        "limit": "1000",
+                        "regexp": r'("strokes"|"fills")\s*:\s*("[^"]*"|[^\s,}\[]+)\s*(?=,|\}|\n)',
+                    }
+                ],
             ),
         ),
     )
@@ -89,13 +90,13 @@ class ArgsSchema(Enum):
             Optional[Dict[str, Union[str, int, None]]],
             Field(
                 description="Additional parameters including limit and regex pattern to be removed from response",
-                default={
-                    "limit": GLOBAL_LIMIT,
-                    "regexp": None
-                },
+                default={"limit": GLOBAL_LIMIT, "regexp": None},
                 examples=[
-                    {"limit": "1000", "regexp": r'("strokes"|"fills")\s*:\s*("[^"]*"|[^\s,}\[]+)\s*(?=,|\}|\n)'}
-                ]
+                    {
+                        "limit": "1000",
+                        "regexp": r'("strokes"|"fills")\s*:\s*("[^"]*"|[^\s,}\[]+)\s*(?=,|\}|\n)',
+                    }
+                ],
             ),
         ),
     )
@@ -122,13 +123,13 @@ class ArgsSchema(Enum):
             Optional[Dict[str, Union[str, int, None]]],
             Field(
                 description="Additional parameters including limit and regex pattern to be removed from response",
-                default={
-                    "limit": GLOBAL_LIMIT,
-                    "regexp": None
-                },
+                default={"limit": GLOBAL_LIMIT, "regexp": None},
                 examples=[
-                    {"limit": "1000", "regexp": r'("strokes"|"fills")\s*:\s*("[^"]*"|[^\s,}\[]+)\s*(?=,|\}|\n)'}
-                ]
+                    {
+                        "limit": "1000",
+                        "regexp": r'("strokes"|"fills")\s*:\s*("[^"]*"|[^\s,}\[]+)\s*(?=,|\}|\n)',
+                    }
+                ],
             ),
         ),
     )
@@ -167,13 +168,13 @@ class ArgsSchema(Enum):
             Optional[Dict[str, Union[str, int, None]]],
             Field(
                 description="Additional parameters including limit and regex pattern to be removed from response",
-                default={
-                    "limit": GLOBAL_LIMIT,
-                    "regexp": None
-                },
+                default={"limit": GLOBAL_LIMIT, "regexp": None},
                 examples=[
-                    {"limit": "1000", "regexp": r'("strokes"|"fills")\s*:\s*("[^"]*"|[^\s,}\[]+)\s*(?=,|\}|\n)'}
-                ]
+                    {
+                        "limit": "1000",
+                        "regexp": r'("strokes"|"fills")\s*:\s*("[^"]*"|[^\s,}\[]+)\s*(?=,|\}|\n)',
+                    }
+                ],
             ),
         ),
     )
@@ -190,13 +191,13 @@ class ArgsSchema(Enum):
             Optional[Dict[str, Union[str, int, None]]],
             Field(
                 description="Additional parameters including limit and regex pattern to be removed from response",
-                default={
-                    "limit": GLOBAL_LIMIT,
-                    "regexp": None
-                },
+                default={"limit": GLOBAL_LIMIT, "regexp": None},
                 examples=[
-                    {"limit": "1000", "regexp": r'("strokes"|"fills")\s*:\s*("[^"]*"|[^\s,}\[]+)\s*(?=,|\}|\n)'}
-                ]
+                    {
+                        "limit": "1000",
+                        "regexp": r'("strokes"|"fills")\s*:\s*("[^"]*"|[^\s,}\[]+)\s*(?=,|\}|\n)',
+                    }
+                ],
             ),
         ),
     )
@@ -213,13 +214,13 @@ class ArgsSchema(Enum):
             Optional[Dict[str, Union[str, int, None]]],
             Field(
                 description="Additional parameters including limit and regex pattern to be removed from response",
-                default={
-                    "limit": GLOBAL_LIMIT,
-                    "regexp": None
-                },
+                default={"limit": GLOBAL_LIMIT, "regexp": None},
                 examples=[
-                    {"limit": "1000", "regexp": r'("strokes"|"fills")\s*:\s*("[^"]*"|[^\s,}\[]+)\s*(?=,|\}|\n)'}
-                ]
+                    {
+                        "limit": "1000",
+                        "regexp": r'("strokes"|"fills")\s*:\s*("[^"]*"|[^\s,}\[]+)\s*(?=,|\}|\n)',
+                    }
+                ],
             ),
         ),
     )
@@ -232,17 +233,20 @@ class FigmaApiWrapper(BaseToolApiWrapper):
     global_regexp: Optional[str] = Field(default=None)
     _client: Optional[FigmaPy] = PrivateAttr()
 
-    def _send_request(self, method: str, url: str, payload: Optional[Dict] = None,
-                      extra_headers: Optional[Dict[str, str]] = None):
+    def _send_request(
+        self,
+        method: str,
+        url: str,
+        payload: Optional[Dict] = None,
+        extra_headers: Optional[Dict[str, str]] = None,
+    ):
         """Send HTTP request to a specified URL with automated headers."""
-        headers = {
-            'Content-Type': 'application/json'
-        }
+        headers = {"Content-Type": "application/json"}
 
         if self.oauth2:
-            headers['Authorization'] = f"Bearer {self.oauth2}"
+            headers["Authorization"] = f"Bearer {self.oauth2}"
         else:
-            headers['X-Figma-Token'] = self.token
+            headers["X-Figma-Token"] = self.token
 
         if extra_headers:
             headers.update(extra_headers)
@@ -324,9 +328,9 @@ class FigmaApiWrapper(BaseToolApiWrapper):
             return obj
 
         def fix_trailing_commas(json_string):
-            json_string = re.sub(r',\s*,+', ',', json_string)
-            json_string = re.sub(r',\s*([\]}])', r'\1', json_string)
-            json_string = re.sub(r'([\[{])\s*,', r'\1', json_string)
+            json_string = re.sub(r",\s*,+", ",", json_string)
+            json_string = re.sub(r",\s*([\]}])", r"\1", json_string)
+            json_string = re.sub(r"([\[{])\s*,", r"\1", json_string)
             return json_string
 
         @functools.wraps(func)
@@ -342,7 +346,9 @@ class FigmaApiWrapper(BaseToolApiWrapper):
                 if result and "__dict__" in dir(result):
                     result = result.__dict__
                 elif not result:
-                    return ToolException("Response result is empty. Check input parameters")
+                    return ToolException(
+                        "Response result is empty. Check input parameters"
+                    )
 
                 if isinstance(result, (dict, list)):
                     processed_result = simplified_dict(result)
@@ -396,14 +402,14 @@ class FigmaApiWrapper(BaseToolApiWrapper):
         self, file_key: str, message: str, client_meta: Optional[dict] = None
     ):
         """Posts a comment to a specific file in Figma."""
-        payload = {'message': message}
+        payload = {"message": message}
         if client_meta:
             payload["client_meta"] = client_meta
 
         url = f"{self._client.api_uri}files/{file_key}/comments"
 
         try:
-            response = self._send_request('POST', url, payload)
+            response = self._send_request("POST", url, payload)
             return response.json()
         except ToolException as e:
             msg = f"Failed to post comment. Error: {str(e)}"

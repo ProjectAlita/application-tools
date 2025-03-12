@@ -1,5 +1,18 @@
 # Figma
 
+### Extra params
+Every function can accept as parameter extra params field:
+```json
+{
+    "limit": "1000",
+    "regexp": r'("strokes"|"fills")\s*:\s*("[^"]*"|[^\s,}\[]+)\s*(?=,|\}|\n)',
+}
+```
+Where:
+- `limit` parameter is used to limit the amount of returned symbols. In this case JSON output might become invalid, so please add phrase to your prompt accepting invalid JSON like this: `Output should be raw JSON even if invalid`
+- `regexp` parameter is used to filter output removing everything what matches this regex patter, for example:
+> regexp equals to `['"](?:id|description|img_url)['"]\s*:\s*(['"][^'"]*['"]|\{.*?\})(,?)(?=\s*[\},])`
+
 ### Prompts
 
 1. Get File Nodes
