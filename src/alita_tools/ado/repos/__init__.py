@@ -7,7 +7,7 @@ from ...base.tool import BaseAction
 from .repos_wrapper import ReposApiWrapper
 from ...utils import clean_string, TOOLKIT_SPLITTER, get_max_toolkit_length
 
-name = "azure_devops_repos"
+name = "ado_repos"
 
 class AzureDevOpsReposToolkit(BaseToolkit):
     tools: List[BaseTool] = []

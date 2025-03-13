@@ -187,7 +187,7 @@ class ReposApiWrapper(BaseToolApiWrapper):
         try:
             cls._client = GitClient(base_url=organization_url, creds=credentials)
             # workaround to check if user is authorized to access ADO Git
-            cls._client.get_repository(repository_id)
+            cls._client.get_repository(repository_id, project=project)
         except Exception as e:
             raise ToolException(f"Failed to connect to Azure DevOps: {e}")
 
