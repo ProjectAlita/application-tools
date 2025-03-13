@@ -1,17 +1,20 @@
+import json
+from typing import Optional
+
 import requests
-from typing import Optional, List, Dict, Any
 from langchain_core.tools import ToolException
-from pydantic import BaseModel, PrivateAttr
-from .models import (
-    SalesforceCreateCase, 
-    SalesforceCreateLead, 
-    SalesforceSearch, 
-    SalesforceUpdateCase, 
-    SalesforceUpdateLead, 
+from pydantic import PrivateAttr
+
+from .model import (
+    SalesforceCreateCase,
+    SalesforceCreateLead,
+    SalesforceSearch,
+    SalesforceUpdateCase,
+    SalesforceUpdateLead,
     SalesforceInput
 )
-import json
 from ..elitea_base import BaseToolApiWrapper
+
 
 class SalesforceApiWrapper(BaseToolApiWrapper):
     base_url: str
@@ -48,13 +51,13 @@ class SalesforceApiWrapper(BaseToolApiWrapper):
         """
         try:
             if response.status_code == 204:
-                return None  # ✅ No error, it's a successful No Content response
+                return None  # No error, it's a successful No Content response
 
             response_data = response.json()
 
-            # ✅ If response is successful, return None (no error)
+            # If response is successful, return None (no error)
             if response.status_code in [200, 201] and ("id" in response_data or response_data.get("success", False)):
-                return None  # ✅ No error, response is valid
+                return None  # No error, response is valid
 
             # If Salesforce returns a list of errors
             if isinstance(response_data, list):
@@ -65,7 +68,7 @@ class SalesforceApiWrapper(BaseToolApiWrapper):
 
                     # Handle Duplicate Record Error
                     if "DUPLICATES_DETECTED" in error_code:
-                        return "⚠️ Duplicate detected: Salesforce found similar records. Consider updating an existing record."
+                        return "Duplicate detected: Salesforce found similar records. Consider updating an existing record."
 
                     error_messages.append(message)
 
@@ -80,7 +83,7 @@ class SalesforceApiWrapper(BaseToolApiWrapper):
                 return f"Unexpected response format: {response_data}"
 
         except requests.exceptions.JSONDecodeError:
-            return f"⚠️ No JSON response from Salesforce. HTTP Status: {response.status_code}"
+            return f"No JSON response from Salesforce. HTTP Status: {response.status_code}"
 
 
 
@@ -108,7 +111,7 @@ class SalesforceApiWrapper(BaseToolApiWrapper):
 
         if response.status_code >= 400:
             error_message = self._parse_salesforce_error(response)
-            raise ToolException(f"❌ Failed to create Case. Error: {error_message}")
+            return ToolException(f"Failed to create Case. Error: {error_message}")
 
         return response.json()
 
@@ -129,7 +132,7 @@ class SalesforceApiWrapper(BaseToolApiWrapper):
 
         if response.status_code >= 400:
             error_message = self._parse_salesforce_error(response)
-            raise ToolException(f"❌ Failed to create Lead. Error: {error_message}")
+            return ToolException(f"Failed to create Lead. Error: {error_message}")
 
         return response.json()
 
@@ -150,9 +153,9 @@ class SalesforceApiWrapper(BaseToolApiWrapper):
                 else:
                     error_messages = errors.get("message", "Unknown error")
             except requests.exceptions.JSONDecodeError:
-                raise ToolException(f"❌ Failed to execute SOQL query. No JSON response. Status: {response.status_code}")
+                return ToolException(f"Failed to execute SOQL query. No JSON response. Status: {response.status_code}")
 
-            raise ToolException(f"❌ Failed to execute SOQL query. Errors: {error_messages}")
+            return ToolException(f"Failed to execute SOQL query. Errors: {error_messages}")
 
         return response.json()
 
@@ -171,7 +174,7 @@ class SalesforceApiWrapper(BaseToolApiWrapper):
             return {"success": True, "message": f"Case {case_id} updated successfully."}
 
         error_message = self._parse_salesforce_error(response)
-        raise ToolException(f"❌ Failed to update Case {case_id}. Error: {error_message}")
+        raise ToolException(f"Failed to update Case {case_id}. Error: {error_message}")
 
 
     def update_lead(self, lead_id: str, email: Optional[str] = None, phone: Optional[str] = None):
@@ -191,7 +194,7 @@ class SalesforceApiWrapper(BaseToolApiWrapper):
             return {"success": True, "message": f"Lead {lead_id} updated successfully."}
 
         error_message = self._parse_salesforce_error(response)
-        raise ToolException(f"❌ Failed to update Lead {lead_id}. Error: {error_message}")
+        return ToolException(f"Failed to update Lead {lead_id}. Error: {error_message}")
 
 
     def execute_generic_rq(self, method: str, relative_url: str, params: Optional[str] = "{}"):
@@ -211,22 +214,22 @@ class SalesforceApiWrapper(BaseToolApiWrapper):
         try:
             payload = json.loads(params) if params else {}
         except json.JSONDecodeError:
-            raise ToolException("❌ Invalid JSON format in 'params'.")
+            raise ToolException("Invalid JSON format in 'params'.")
 
         response = requests.request(method, url, headers=self._headers(), json=payload if method != "GET" else None)
 
-        # ✅ Handle 204 No Content as a success case
+        # Handle 204 No Content as a success case
         if response.status_code == 204:
             return {"success": True, "message": f"{method} request to {relative_url} executed successfully."}
 
-        # ✅ Handle GET requests properly
+        # Handle GET requests properly
         if method == "GET" and response.status_code == 200:
             return response.json()
 
-        # ✅ Check for actual errors before raising an exception
+        # Check for actual errors before raising an exception
         error_message = self._parse_salesforce_error(response)
         if error_message:
-            raise ToolException(f"❌ Failed {method} request to {relative_url}. Error: {error_message}")
+            return ToolException(f"Failed {method} request to {relative_url}. Error: {error_message}")
 
         return response.json()
 
