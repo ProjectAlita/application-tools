@@ -11,8 +11,9 @@ from .models import (
     SalesforceInput
 )
 import json
+from ..elitea_base import BaseToolApiWrapper
 
-class SalesforceApiWrapper(BaseModel):
+class SalesforceApiWrapper(BaseToolApiWrapper):
     base_url: str
     client_id: str
     client_secret: str
@@ -241,12 +242,3 @@ class SalesforceApiWrapper(BaseModel):
             {"name": "update_lead", "description": "Update a Lead", "args_schema": SalesforceUpdateLead, "ref": self.update_lead},
             {"name": "execute_generic_rq", "description": "Execute a generic Salesforce API request.", "args_schema": SalesforceInput, "ref": self.execute_generic_rq}
         ]
-
-    def run(self, mode: str, *args: Any, **kwargs: Any):
-        """
-        Executes the given Salesforce tool based on the mode.
-        """
-        for tool in self.get_available_tools():
-            if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
-        raise ValueError(f"Unknown mode: {mode}")
