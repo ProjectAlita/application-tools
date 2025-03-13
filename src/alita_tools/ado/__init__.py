@@ -24,7 +24,7 @@ def get_tools(tool_type, tool):
         return AzureDevOpsPlansToolkit().get_toolkit(**config_dict).get_tools()
     elif tool_type == 'ado_wiki':
         return AzureDevOpsWikiToolkit().get_toolkit(**config_dict).get_tools()
-    elif tool_type == 'ado_repos':
+    elif tool_type == 'ado_repos' or tool_type == 'azure_devops_repos':
         return AzureDevOpsReposToolkit().get_toolkit(**config_dict).get_tools()
     else:
         return AzureDevOpsWorkItemsToolkit().get_toolkit(**config_dict).get_tools()
