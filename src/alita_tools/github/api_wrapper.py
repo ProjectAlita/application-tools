@@ -465,7 +465,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
     def clean_repository_name(repo_link):
         import re
 
-        match = re.match(r"^(?:https?://github\.com/|git@github\.com:)?([^/]+/[^/.]+)(?:\.git)?$", repo_link)
+        match = re.match(r"^(?:https?://[^/]+/|git@[^:]+:)?([^/]+/[^/.]+)(?:\.git)?$", repo_link)
 
         if not match:
             raise ToolException("Repository field should be in '<owner>/<repo>' format.")
