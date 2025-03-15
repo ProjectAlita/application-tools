@@ -169,7 +169,7 @@ class GetPullRequesChanges(BaseTool):
 
     def _run(self, pr_number: str):
         try:
-            repo = self.api_wrapper.repo_instance
+            repo = self.api_wrapper._repo_instance
             try:
                 mr = repo.mergerequests.get(pr_number)
             except GitlabGetError as e:
@@ -209,7 +209,7 @@ class CreatePullRequestChangeComment(BaseTool):
     def _run(self, pr_number: str, file_path: str, line_number: int, comment: str, *args):
         if line_number == 0:
             raise ToolException("Line number for comment must be greater than 0")
-        repo = self.api_wrapper.repo_instance
+        repo = self.api_wrapper._repo_instance
         try:
             mr = repo.mergerequests.get(pr_number)
         except GitlabGetError as e:
