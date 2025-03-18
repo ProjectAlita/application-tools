@@ -1,45 +1,46 @@
 import logging
 from importlib import import_module
 
-from .github import get_tools as get_github, AlitaGitHubToolkit
-from .openapi import get_tools as get_openapi
-from .jira import get_tools as get_jira, JiraToolkit
-from .confluence import get_tools as get_confluence, ConfluenceToolkit
-from .gitlab import get_tools as get_gitlab, AlitaGitlabToolkit
-from .gitlab_org import get_tools as get_gitlab_org, AlitaGitlabSpaceToolkit
-from .zephyr import get_tools as get_zephyr, ZephyrToolkit
-from .browser import get_tools as get_browser, BrowserToolkit
-from .report_portal import get_tools as get_report_portal, ReportPortalToolkit
-from .bitbucket import get_tools as get_bitbucket, AlitaBitbucketToolkit
-from .testrail import get_tools as get_testrail, TestrailToolkit
-from .testio import get_tools as get_testio, TestIOToolkit
-from .xray import get_tools as get_xray_cloud, XrayToolkit
-from .sharepoint import get_tools as get_sharepoint, SharepointToolkit
-from .qtest import get_tools as get_qtest, QtestToolkit
-from .zephyr_scale import get_tools as get_zephyr_scale, ZephyrScaleToolkit
-from .zephyr_enterprise import get_tools as get_zephyr_enterprise, ZephyrEnterpriseToolkit
 from .ado import get_tools as get_ado
 from .ado.repos import AzureDevOpsReposToolkit
 from .ado.test_plan import AzureDevOpsPlansToolkit
-from .ado.work_item import AzureDevOpsWorkItemsToolkit
 from .ado.wiki import AzureDevOpsWikiToolkit
-from .rally import get_tools as get_rally, RallyToolkit
-from .sql import get_tools as get_sql, SQLToolkit
-from .code.sonar import get_tools as get_sonar, SonarToolkit
-from .google_places import get_tools as get_google_places, GooglePlacesToolkit
-from .yagmail import get_tools as get_yagmail, AlitaYagmailToolkit
+from .ado.work_item import AzureDevOpsWorkItemsToolkit
+from .azure_ai.search import AzureSearchToolkit, get_tools as get_azure_search
+from .bitbucket import get_tools as get_bitbucket, AlitaBitbucketToolkit
+from .browser import get_tools as get_browser, BrowserToolkit
 from .cloud.aws import AWSToolkit
 from .cloud.azure import AzureToolkit
 from .cloud.gcp import GCPToolkit
 from .cloud.k8s import KubernetesToolkit
+from .code.sonar import get_tools as get_sonar, SonarToolkit
+from .confluence import get_tools as get_confluence, ConfluenceToolkit
 from .custom_open_api import OpenApiToolkit as CustomOpenApiToolkit
 from .elastic import ElasticToolkit
+from .figma import get_tools as get_figma, FigmaToolkit
+from .github import get_tools as get_github, AlitaGitHubToolkit
+from .gitlab import get_tools as get_gitlab, AlitaGitlabToolkit
+from .gitlab_org import get_tools as get_gitlab_org, AlitaGitlabSpaceToolkit
+from .google_places import get_tools as get_google_places, GooglePlacesToolkit
+from .jira import get_tools as get_jira, JiraToolkit
 from .keycloak import KeycloakToolkit
 from .localgit import AlitaLocalGitToolkit
+from .openapi import get_tools as get_openapi
 from .pandas import get_tools as get_pandas, PandasToolkit
-from .azure_ai.search import AzureSearchToolkit, get_tools as get_azure_search
-from .figma import get_tools as get_figma, FigmaToolkit
+from .qtest import get_tools as get_qtest, QtestToolkit
+from .rally import get_tools as get_rally, RallyToolkit
+from .report_portal import get_tools as get_report_portal, ReportPortalToolkit
 from .salesforce import get_tools as get_salesforce, SalesforceToolkit
+from .sharepoint import get_tools as get_sharepoint, SharepointToolkit
+from .sql import get_tools as get_sql, SQLToolkit
+from .testio import get_tools as get_testio, TestIOToolkit
+from .testrail import get_tools as get_testrail, TestrailToolkit
+from .utils import get_codemie_toolkits
+from .xray import get_tools as get_xray_cloud, XrayToolkit
+from .yagmail import get_tools as get_yagmail, AlitaYagmailToolkit
+from .zephyr import get_tools as get_zephyr, ZephyrToolkit
+from .zephyr_enterprise import get_tools as get_zephyr_enterprise, ZephyrEnterpriseToolkit
+from .zephyr_scale import get_tools as get_zephyr_scale, ZephyrScaleToolkit
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +103,8 @@ def get_tools(tools_list, alita: 'AlitaClient', llm: 'LLMLikeObject', *args, **k
             tools.extend(get_figma(tool))
         elif tool['type'] == 'salesforce':
             tools.extend(get_salesforce(tool))
+        elif tool['type'] == 'codemie':
+            tools.extend(init_codemie_toolkit(tool).get_tools())
         else:
             if tool.get("settings", {}).get("module"):
                 try:
@@ -155,3 +158,20 @@ def get_toolkits():
         SalesforceToolkit.toolkit_config_schema(),
 
     ]
+
+def init_codemie_toolkit(tool):
+    """ Initialize Codemie toolkit per given tool's settings """
+
+    tool_settings = tool['settings']
+    # Find required codemie toolkit based on passed tool's class name
+    required_toolkit = [toolkit for toolkit in get_codemie_toolkits() if
+                        toolkit.__name__ == tool_settings['class']]
+    required_toolkit = required_toolkit[0] if required_toolkit else None
+    # Extract model fields for specific toolkit
+    fields = required_toolkit.model_fields.keys()
+    selected_tools = tool_settings.get('selected_tools', [])
+    arguments = {}
+    for field in fields:
+        # Whether we need to verify its presence in settings???
+        arguments.update({ field: tool_settings.get(field) })
+    return required_toolkit.get_toolkit(configs = arguments)
