@@ -4,6 +4,7 @@ from json import dumps, loads
 import fnmatch
 from typing import Dict, Any, Optional, List, Union
 import tiktoken
+from langchain_core.tools import ToolException
 from pydantic import model_validator, create_model, BaseModel, Field
 from pydantic.fields import PrivateAttr
 from langchain.utils import get_from_dict_or_env
@@ -461,6 +462,16 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
     github_app_id: Optional[str] = None
     github_app_private_key: Optional[str] = None
 
+    def clean_repository_name(repo_link):
+        import re
+
+        match = re.match(r"^(?:https?://[^/]+/|git@[^:]+:)?([^/]+/[^/.]+)(?:\.git)?$", repo_link)
+
+        if not match:
+            raise ToolException("Repository field should be in '<owner>/<repo>' format.")
+
+        return match.group(1)
+
     @model_validator(mode='before')
     @classmethod
     def validate_environment(cls, values: Dict) -> Dict:
@@ -487,6 +498,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
 
         github_repository = get_from_dict_or_env(
             values, "github_repository", "GITHUB_REPOSITORY")
+        github_repository = cls.clean_repository_name(github_repository)
 
         active_branch = get_from_dict_or_env(
             values, "active_branch", "ACTIVE_BRANCH", default='ai')
