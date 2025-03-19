@@ -1070,25 +1070,23 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                whitelist: Optional[List[str]] = None,
                blacklist: Optional[List[str]] = None) -> str:
         """
-        Generates file content from a branch using whitelist and blacklist filters.
+        Generates file content from a branch, respecting whitelist and blacklist patterns.
 
         Parameters:
-            branch (Optional[str]): Branch for file listing, defaults to current if None.
-            whitelist (Optional[List[str]]): Extensions or paths to include, defaults to all.
-            blacklist (Optional[List[str]]): Extensions or paths to exclude, defaults to none.
+        - branch (Optional[str]): Branch for listing files. Defaults to the current branch if None.
+        - whitelist (Optional[List[str]]): File extensions or paths to include. Defaults to all files if None.
+        - blacklist (Optional[List[str]]): File extensions or paths to exclude. Defaults to no exclusions if None.
 
         Returns:
-            generator: Yields content of files matching whitelist but not blacklist.
+        - generator: Yields content from files matching the whitelist but not the blacklist.
 
         Example:
-            # Use 'feature-branch', include only '.py', exclude 'test_' prefixed files
-            file_generator = loader(branch='feature-branch', whitelist=['*.py'], blacklist=['*test_*'])
-            for content in file_generator:
-                print(content)
+        # Use 'feature-branch', include '.py' files, exclude 'test_' files
+        file_generator = loader(branch='feature-branch', whitelist=['*.py'], blacklist=['*test_*'])
 
         Notes:
-            - Utilizes Unix shell-style wildcards.
-            - Inclusion requires passing both whitelist and blacklist criteria.
+        - Whitelist and blacklist use Unix shell-style wildcards.
+        - Files must match the whitelist and not the blacklist to be included.
         """
         from ..chunkers.code.codeparser import parse_code_files_for_db
         _files = self._get_files("", branch or self.active_branch)
