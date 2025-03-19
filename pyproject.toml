@@ -24,3 +24,41 @@ Issues = "https://github.com/ProjectAlita/application-tools/issues"
 
 [tool.setuptools.dynamic.dependencies]
 file = [ "requirements.txt",]
+
+[tool.pytest.ini_options]
+minversion = "8.3.3"
+pythonpath = "src"
+addopts = """
+        -v -ra -q -p no:warnings 
+        --ignore=src/alita_tools/ado/test_plan 
+        --rootdir=./src
+        src/tests/
+        """
+log_cli = true
+log_cli_level = "INFO"
+log_format = "%(asctime)s %(levelname)s %(message)s"
+log_date_format = "%Y-%m-%d %H:%M:%S"
+filterwarnings = "ignore"
+cache_dir = ".pytest_cache"
+python_files = "test_*.py"
+python_functions = "test_"
+testpaths = [
+    "tests",
+    "tests/ado"
+]
+markers = [
+    "unit: marks tests as unit (deselect with '-m \"not unit\"')",
+    "positive: marks positive tests",
+    "negative: marks negative tests",
+    "ado_repos: marks ADO Repos tests",
+]
+
+[tool.coverage.run]
+dynamic_context = "test_function"
+relative_files = "True"
+omit = [
+    "*/__init__.py",
+    "*/tests/*",
+    "model.py",
+    "*constants.py",
+    ]

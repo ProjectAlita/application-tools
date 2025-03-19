@@ -1,0 +1,94 @@
+name: Allure Report Workflow
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [refactoring/pytest-intro]
+
+concurrency:
+  group: ${{ github.event_name }}-${{ github.ref }}
+
+jobs:
+  run-tests-and-publish-report:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Cache pip packages
+      uses: actions/cache@v3
+      with:
+        path: .venv/
+        key: ${{ runner.os }}-venv-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-venv-
+
+    - name: Install dependencies
+      run: |
+        python -m venv .venv && . .venv/bin/activate &&
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r dev-requirements.txt
+        pip install pytest coverage allure-pytest
+
+    - name: Set PYTHONPATH
+      run: echo "PYTHONPATH=$PYTHONPATH:$(pwd)/src" >> $GITHUB_ENV
+
+    - name: Configure Coverage to use Relative Paths
+      run: |
+        cat > .coveragerc <<EOF
+        [run]
+        relative_files = True
+        EOF
+
+    - name: Run tests with coverage
+      run: |
+        . .venv/bin/activate &&
+        coverage run -m pytest --alluredir=allure-results &&
+        coverage report -m &&
+        coverage xml
+
+    - name: Coverage comment
+      id: coverage_comment
+      uses: py-cov-action/python-coverage-comment-action@main
+      with:
+        GITHUB_TOKEN: ${{ github.token }}
+        ANNOTATE_MISSING_LINES: true
+
+    - name: Store Pull Request comment to be posted
+      uses: actions/upload-artifact@v4
+      if: steps.coverage_comment.outputs.COMMENT_FILE_WRITTEN == 'true'
+      with:
+        name: python-coverage-comment-action
+        path: python-coverage-comment-action.txt
+
+    - name: Post Coverage Comment on PR
+      if: ${{ github.event_name == 'pull_request' }}
+      uses: marocchino/sticky-pull-request-comment@v2
+      with:
+        message: |
+          ### Code Coverage Report
+          ![Coverage Badge](https://img.shields.io/badge/Coverage-${{ steps.coverage.outputs.coverage }}%25-brightgreen)
+          Detailed report available in [coverage.xml](./coverage.xml).
+
+    - name: Generate Allure Report
+      uses: simple-elf/allure-report-action@master
+      id: allure-report
+      if: always()
+      with:
+        allure_results: allure-results
+
+    - name: Deploy Allure Report to GitHub Pages
+      uses: peaceiris/actions-gh-pages@v3
+      if: ${{ always() && (steps.allure-report.outcome == 'success') }}
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_branch: gh-pages
+        publish_dir: ./allure-report

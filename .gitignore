@@ -1,3 +1,6 @@
+# Allure Docs
+docs/*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -160,4 +163,5 @@ cython_debug/
 #.idea/
 test.py
 test*.py
+!*/tests/**/test_*.py
 .promptLib
