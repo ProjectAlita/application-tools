@@ -539,7 +539,7 @@ class ReposApiWrapper(BaseToolApiWrapper):
         new_branch_name = branch_name
         if bool(re.search(r"\s", new_branch_name)):
             return (
-                f"Branch '{new_branch_name}' contains spaces."
+                f"Branch '{new_branch_name}' contains spaces. "
                 "Please remove them or use special characters"
             )
 

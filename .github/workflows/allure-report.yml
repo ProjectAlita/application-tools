@@ -41,13 +41,6 @@ jobs:
     - name: Set PYTHONPATH
       run: echo "PYTHONPATH=$PYTHONPATH:$(pwd)/src" >> $GITHUB_ENV
 
-    - name: Configure Coverage to use Relative Paths
-      run: |
-        cat > .coveragerc <<EOF
-        [run]
-        relative_files = True
-        EOF
-
     - name: Run tests with coverage
       run: |
         . .venv/bin/activate &&
@@ -68,15 +61,6 @@ jobs:
       with:
         name: python-coverage-comment-action
         path: python-coverage-comment-action.txt
-
-    - name: Post Coverage Comment on PR
-      if: ${{ github.event_name == 'pull_request' }}
-      uses: marocchino/sticky-pull-request-comment@v2
-      with:
-        message: |
-          ### Code Coverage Report
-          ![Coverage Badge](https://img.shields.io/badge/Coverage-${{ steps.coverage.outputs.coverage }}%25-brightgreen)
-          Detailed report available in [coverage.xml](./coverage.xml).
 
     - name: Generate Allure Report
       uses: simple-elf/allure-report-action@master
