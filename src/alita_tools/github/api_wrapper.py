@@ -1058,25 +1058,23 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                whitelist: Optional[List[str]] = None,
                blacklist: Optional[List[str]] = None) -> str:
         """
-        Generates file content from the specified branch while honoring whitelist and blacklist patterns.
+        Generates file content from a branch, respecting whitelist and blacklist patterns.
 
         Parameters:
-            branch (Optional[str]): The branch to set as active before listing files. If None, the current active branch is used.
-            whitelist (Optional[List[str]]): A list of file extensions or paths to include. If None, all files are included.
-            blacklist (Optional[List[str]]): A list of file extensions or paths to exclude. If None, no files are excluded.
+        - branch (Optional[str]): Branch for listing files. Defaults to the current branch if None.
+        - whitelist (Optional[List[str]]): File extensions or paths to include. Defaults to all files if None.
+        - blacklist (Optional[List[str]]): File extensions or paths to exclude. Defaults to no exclusions if None.
 
         Returns:
-            generator: A generator that yields the content of files that match the whitelist and do not match the blacklist.
+        - generator: Yields content from files matching the whitelist but not the blacklist.
 
         Example:
-            # Set the active branch to 'feature-branch' and include only '.py' files, excluding 'test_' files
-            file_generator = loader(branch='feature-branch', whitelist=['*.py'], blacklist=['*test_*'])
-            for file_content in file_generator:
-                print(file_content)
+        # Use 'feature-branch', include '.py' files, exclude 'test_' files
+        file_generator = loader(branch='feature-branch', whitelist=['*.py'], blacklist=['*test_*'])
 
         Notes:
-            - The whitelist and blacklist patterns use Unix shell-style wildcards.
-            - If both whitelist and blacklist are provided, a file must match the whitelist and not match the blacklist to be included.
+        - Whitelist and blacklist use Unix shell-style wildcards.
+        - Files must match the whitelist and not the blacklist to be included.
         """
         from ..chunkers.code.codeparser import parse_code_files_for_db
         _files = self._get_files("", branch or self.active_branch)
