@@ -30,7 +30,7 @@ minversion = "8.3.3"
 pythonpath = "src"
 addopts = """
         -v -ra -q -p no:warnings 
-        --ignore=src/alita_tools/ado/test_plan 
+        --ignore=src/alita_tools/ado/test_plan
         --rootdir=./src
         src/tests/
         """
@@ -55,7 +55,7 @@ markers = [
 
 [tool.coverage.run]
 dynamic_context = "test_function"
-relative_files = "True"
+relative_files = "true"
 omit = [
     "*/__init__.py",
     "*/tests/*",
