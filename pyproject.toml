@@ -30,7 +30,7 @@ minversion = "8.3.3"
 pythonpath = "src"
 norecursedirs = ["venv", ".venv", "env", ".env", "src/alita_tools/ado/test_plan"]
 addopts = """
-        --strict-markers -v -ra -q -p no:warnings -p no:error --disable-warnings
+        -m "unit" --strict-markers -v -ra -q -p no:warnings -p no:error --disable-warnings
         """
 log_cli = false
 log_cli_level = "INFO"
@@ -56,6 +56,7 @@ markers = [
     "ado_test_plan: marks Azure DevOps Test Plan tests",
     "ado_wiki: marks Azure DevOps Wiki tests",
     "gitlab: marks Gitlab tests",
+    "sharepoint: marks Sharepoint tests",
 ]
 
 [tool.coverage.run]
