@@ -50,7 +50,10 @@ markers = [
     "unit: marks tests as unit (deselect with '-m \"not unit\"')",
     "positive: marks positive tests",
     "negative: marks negative tests",
+    "exception_handling: marks exception handling with logger tests",
     "ado_repos: marks ADO Repos tests",
+    "ado_test_plan: marks ADO Test Plan tests",
+    "ado_wiki: marks ADO Wiki tests",
 ]
 
 [tool.coverage.run]
