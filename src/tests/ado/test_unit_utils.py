@@ -3,7 +3,8 @@ import pytest
 from alita_tools.ado.utils import generate_diff
 
 @pytest.mark.unit
-@pytest.mark.ado_utils
+@pytest.mark.ado
+@pytest.mark.utils
 class TestAdoUtils:
     @pytest.mark.positive
     def test_generate_diff_positive(self):

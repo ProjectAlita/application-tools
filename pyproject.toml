@@ -50,10 +50,12 @@ markers = [
     "positive: marks positive tests",
     "negative: marks negative tests",
     "exception_handling: marks exception handling with logger tests",
-    "ado_repos: marks ADO Repos tests",
-    "ado_test_plan: marks ADO Test Plan tests",
-    "ado_wiki: marks ADO Wiki tests",
-    "ado_utils: marks ADO utils tests",
+    "utils: marks utils tests",
+    "ado: marks Azure DevOps tests",
+    "ado_repos: marks Azure DevOps Repos tests",
+    "ado_test_plan: marks Azure DevOps Test Plan tests",
+    "ado_wiki: marks Azure DevOps Wiki tests",
+    "gitlab: marks Gitlab tests",
 ]
 
 [tool.coverage.run]
