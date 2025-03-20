@@ -4,11 +4,11 @@ import json
 import pytest
 
 from azure.devops.v7_0.test_plan.models import (
-    TestPlanCreateParams,
-    TestSuiteCreateParams,
+    TestPlanCreateParams as TPlanCreateParams,
+    TestSuiteCreateParams as TSuiteCreateParams,
     SuiteTestCaseCreateUpdateParameters,
 )
-from alita_tools.ado.test_plan import TestPlanApiWrapper
+from alita_tools.ado.test_plan import TestPlanApiWrapper as TPlanApiWrapper
 from langchain_core.tools import ToolException
 
 
@@ -31,7 +31,7 @@ def mock_test_plan_client():
 
 @pytest.fixture
 def test_plan_wrapper(default_values):
-    instance = TestPlanApiWrapper(
+    instance = TPlanApiWrapper(
         organization_url=default_values["organization_url"],
         token=default_values["token"],
         limit=default_values["limit"],
@@ -93,7 +93,7 @@ class TestPlanApiWrapperValidateToolkit:
         ],
     )
     def test_run_tool(self, test_plan_wrapper, mode, expected_ref):
-        with patch.object(TestPlanApiWrapper, expected_ref) as mock_tool:
+        with patch.object(TPlanApiWrapper, expected_ref) as mock_tool:
             mock_tool.return_value = "success"
             result = test_plan_wrapper.run(mode)
             assert result == "success"
@@ -127,7 +127,7 @@ class TestPlanApiWrapperPositive:
             assert result == "Test plan 12345 created successfully."
             mock_create_test_plan.assert_called_once()
             mock_create_test_plan.assert_called_with(
-                TestPlanCreateParams(**sample_params), project
+                TPlanCreateParams(**sample_params), project
             )
 
     def test_delete_test_plan_success(self, test_plan_wrapper):
@@ -202,7 +202,7 @@ class TestPlanApiWrapperPositive:
 
             assert result == "Test suite 6789 created successfully."
             mock_create_test_suite.assert_called_once_with(
-                TestSuiteCreateParams(**params), project, plan_id
+                TSuiteCreateParams(**params), project, plan_id
             )
 
     def test_delete_test_suite_success(self, test_plan_wrapper):

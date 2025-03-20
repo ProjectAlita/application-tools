@@ -14,7 +14,7 @@ def check_env_vars(env_vars):
     """Ensure all required environment variables are set."""
     missing_vars = [var.name for var in env_vars if var.get_value() is None]
     if missing_vars:
-        pytest.fail(f"Required environment variables are not set: {missing_vars}\n")
+        pytest.skip(f"Required environment variables are not set: {missing_vars}\n")
 
 
 @pytest.hookimpl(tryfirst=True)

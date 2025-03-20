@@ -28,13 +28,11 @@ file = [ "requirements.txt",]
 [tool.pytest.ini_options]
 minversion = "8.3.3"
 pythonpath = "src"
+norecursedirs = ["venv", ".venv", "env", ".env", "src/alita_tools/ado/test_plan"]
 addopts = """
-        -v -ra -q -p no:warnings 
-        --ignore=src/alita_tools/ado/test_plan
-        --rootdir=./src
-        src/tests/
+        --strict-markers -v -ra -q -p no:warnings -p no:error --disable-warnings
         """
-log_cli = true
+log_cli = false
 log_cli_level = "INFO"
 log_format = "%(asctime)s %(levelname)s %(message)s"
 log_date_format = "%Y-%m-%d %H:%M:%S"
@@ -48,12 +46,14 @@ testpaths = [
 ]
 markers = [
     "unit: marks tests as unit (deselect with '-m \"not unit\"')",
+    "toolkit: marks toolkit tests",
     "positive: marks positive tests",
     "negative: marks negative tests",
     "exception_handling: marks exception handling with logger tests",
     "ado_repos: marks ADO Repos tests",
     "ado_test_plan: marks ADO Test Plan tests",
     "ado_wiki: marks ADO Wiki tests",
+    "ado_utils: marks ADO utils tests",
 ]
 
 [tool.coverage.run]
