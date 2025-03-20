@@ -46,6 +46,7 @@ testpaths = [
 ]
 markers = [
     "unit: marks tests as unit (deselect with '-m \"not unit\"')",
+    "base: marks base tool tests",
     "toolkit: marks toolkit tests",
     "positive: marks positive tests",
     "negative: marks negative tests",
