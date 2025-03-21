@@ -23,30 +23,62 @@ ZephyrGetTestCase = create_model(
 )
 
 ZephyrCreateTestCase = create_model(
-    "ZephyrCreateTestCase",
-    project_key=(str, Field(description="Jira project key")),
-    test_case_name=(str, Field(description="Test case name")),
-    test_case_json=(str, Field(
-        description="""New test case content in a JSON format: 
-        {
-           "keyword_argument":"keyword_argument_value",
-           "objective":"test objective",
-           "labels":[
-              "test",
-              "example"
-           ]
-        }.
-         
-        Available Keyword arguments:
-        :keyword objective: A description of the objective
-        :keyword precondition: Any conditions that need to be met
-        :keyword estimatedTime: Estimated duration in milliseconds
-        :keyword componentId: ID of a component from Jira
-        :keyword priorityName: The priority name
-        :keyword statusName: The status name
-        :keyword folderId: ID of a folder to place the entity within
-        :keyword ownerId: Atlassian Account ID of the Jira user
-        :keyword labels: Array of labels associated to this entity"""))
+    "TestCaseInput",
+    project_key=(str, Field(description="Jira project key.")),
+    test_case_name=(str, Field(description="Name of the test case.")),
+    additional_fields=(str, Field(
+        description=("JSON string containing additional optional fields such as: "
+                     "'objective' (description of the objective), "
+                     "'precondition' (any conditions that need to be met), "
+                     "'estimatedTime' (estimated duration in milliseconds), "
+                     "'componentId' (ID of a component from Jira), "
+                     "'priorityName' (the priority name), "
+                     "'statusName' (the status name), "
+                     "'folderId' (ID of a folder to place the entity within), "
+                     "'ownerId' (Atlassian Account ID of the Jira user), "
+                     "'labels' (array of labels associated to this entity), "
+                     "'customFields' (object containing custom fields such as build number, release date, etc.)."
+                     "Dates should be in the format 'yyyy-MM-dd', and multi-line text fields should denote a new line with the <br> syntax."),
+        default="{}"
+    ))
+)
+
+ZephyrTestStepsInputModel = create_model(
+    "ZephyrTestStepsInputModel",
+    test_case_key=(str, Field(
+        description="The key of the test case. Test case keys are of the format [A-Z]+-T[0-9]+")),
+    tc_mode=(str, Field(
+        description=("Valid values: 'APPEND', 'OVERWRITE'. "
+                     "'OVERWRITE' deletes and recreates the test steps and associated custom field values using the provided input. "
+                     "Attachments for existing steps are kept, but those for missing steps are deleted permanently. "
+                     "'APPEND' only adds extra steps to your test steps."))),
+    items=(str, Field(
+        description=("JSON string representing the list of test steps. Each step should be an object containing either 'inline' or 'testCase'. "
+                     "They should only include one of these fields at a time. Example: "
+                     "[{'inline': {'description': 'Attempt to login to the application', 'testData': 'Username = SmartBear Password = weLoveAtlassian', "
+                     "'expectedResult': 'Login succeeds, web-app redirects to the dashboard view', 'customFields': {'Build Number': 20, "
+                     "'Release Date': '2020-01-01', 'Pre-Condition(s)': 'User should have logged in. <br> User should have navigated to the administration panel.', "
+                     "'Implemented': false, 'Category': ['Performance', 'Regression'], 'Tester': 'fa2e582e-5e15-521e-92e3-47e6ca2e7256'}, 'reflectRef': 'Not available yet'}, "
+                     "'testCase': {'self': 'string', 'testCaseKey': 'PROJ-T123', 'parameters': [{'name': 'username', 'type': 'DEFAULT_VALUE', 'value': 'admin'}]}}]")
+    ))
+)
+
+ZephyrGetFolders = create_model(
+    "ZephyrGetFolders",
+    maxResults=(Optional[int], Field(
+        description=("A hint as to the maximum number of results to return in each call. "
+                     "Must be an integer >= 1. Default is 10. Note that the server may impose a lower limit."),
+        default=10)),
+    startAt=(Optional[int], Field(
+        description=("Zero-indexed starting position. Should be a multiple of maxResults. "
+                     "Must be an integer >= 0. Default is 0."),
+        default=0)),
+    projectKey=(Optional[str], Field(
+        description="Jira project key filter. Must match the pattern [A-Z][A-Z_0-9]+.",
+        default=None)),
+    folderType=(Optional[str], Field(
+        description=("Folder type filter. Valid values are 'TEST_CASE', 'TEST_PLAN', or 'TEST_CYCLE'."),
+        default=None))
 )
 
 
@@ -126,13 +158,33 @@ class ZephyrScaleApiWrapper(BaseToolApiWrapper):
             return ToolException(f"Unable to extract test case steps from test case with id: {test_case_id}:\n{str(e)}")
         return f"Extracted tests: {all_steps_concatenated}"
 
-    def create_test_case(self, project_key: str, test_case_name: str, test_case_json: str) -> str:
+    def create_test_case(self, project_key: str, test_case_name: str, additional_fields: str) -> str:
         """Creates test case per provided test case data"""
 
         create_test_case_response = self._api.test_cases.create_test_case(project_key=project_key,
                                                                           name=test_case_name,
-                                                                          **json.loads(test_case_json))
+                                                                          **json.loads(additional_fields))
         return f"Test case with name `{test_case_name}` was created: {str(create_test_case_response)}"
+
+    def add_test_steps(self, test_case_key: str, tc_mode: str, items: str) -> str:
+        """Add steps to test case"""
+
+        add_steps_response = self._api.test_cases.post_test_steps(test_case_key=test_case_key,mode=tc_mode,items=json.loads(items))
+        return f"Step to Test case `{test_case_key}` was (were) added: {str(add_steps_response)}"
+
+    def get_folders(self,
+            maxResults: Optional[int] = 10,
+            startAt: Optional[int] = 0,
+            projectKey: Optional[str] = None,
+            folderType: Optional[str] = None
+    ):
+        """Retrieves all folders. Query parameters can be used to filter the results: maxResults, startAt, projectKey, folderType"""
+
+        folders_str = []
+        for folder in self._api.folders.get_folders(maxResults=maxResults, startAt=startAt,
+                                                    projectKey=projectKey, folderType=folderType):
+            folders_str.append(folder)
+        return f"Extracted folders: {folders_str}"
 
     @staticmethod
     def _parse_tests(tests) -> list:
@@ -203,4 +255,16 @@ class ZephyrScaleApiWrapper(BaseToolApiWrapper):
                 "args_schema": ZephyrCreateTestCase,
                 "ref": self.create_test_case,
             },
+            {
+                "name": "add_test_steps",
+                "description": self.add_test_steps.__doc__,
+                "args_schema": ZephyrTestStepsInputModel,
+                "ref": self.add_test_steps,
+            },
+            {
+                "name": "get_folders",
+                "description": self.get_folders.__doc__,
+                "args_schema": ZephyrGetFolders,
+                "ref": self.get_folders,
+            }
         ]
