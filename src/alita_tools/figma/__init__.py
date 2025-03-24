@@ -46,7 +46,24 @@ class FigmaToolkit(BaseToolkit):
                 Field(default=[], json_schema_extra={"args_schemas": selected_tools}),
             ),
             __config__=ConfigDict(
-                json_schema_extra={"metadata": {"label": "Figma", "icon_url": None, "max_length": FigmaToolkit.toolkit_max_length}},
+                json_schema_extra={
+                    "metadata": {"label": "Figma", "icon_url": None, "max_length": FigmaToolkit.toolkit_max_length},
+                    "sections": {
+                        "auth": {
+                            "required": True,
+                            "subsections": [
+                                {
+                                    "name": "Token",
+                                    "fields": ["token", ]
+                                },
+                                {
+                                    "name": "Oath2",
+                                    "fields": ["oauth2", ]
+                                },
+                            ]
+                        }
+                    }
+                    },
             ),
         )
 
