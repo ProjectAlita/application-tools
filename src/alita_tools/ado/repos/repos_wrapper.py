@@ -21,7 +21,7 @@ from msrest.authentication import BasicAuthentication
 from pydantic import Field, PrivateAttr, create_model, model_validator
 
 from ..utils import extract_old_new_pairs, generate_diff
-from ...elitea_base import BaseToolApiWrapper
+from ...elitea_base import BaseCodeToolApiWrapper, LoaderSchema
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +102,15 @@ class ArgsSchema(Enum):
                 )
             ),
         ),
+        branch=(
+            str,
+            Field(
+                description=(
+                    "Branch to be used for read file operation."
+                ),
+                default=None
+            ),
+        )
     )
     CreateFile = create_model(
         "CreateFile",
@@ -158,7 +167,7 @@ class ArgsSchema(Enum):
     )
 
 
-class ReposApiWrapper(BaseToolApiWrapper):
+class ReposApiWrapper(BaseCodeToolApiWrapper):
     organization_url: Optional[str]
     project: Optional[str]
     repository_id: Optional[str]
@@ -656,16 +665,17 @@ class ReposApiWrapper(BaseToolApiWrapper):
             logger.error(msg)
             return ToolException(msg)
 
-    def read_file(self, file_path: str) -> str:
+    def _read_file(self, file_path: str, branch: str) -> str:
         """
         Read a file from this agent's branch, defined by self.active_branch,
         which supports PR branches in Azure DevOps.
         Parameters:
             file_path(str): the file path
+            branch(str): repository branch
         Returns:
             str: The file decoded as a string, or an error message if not found
         """
-        self.active_branch = (
+        self.active_branch = (branch or
             self.active_branch if self.active_branch else self.base_branch
         )
 
@@ -718,7 +728,7 @@ class ReposApiWrapper(BaseToolApiWrapper):
                 "Please create a new branch and try again."
             )
         try:
-            file_content = self.read_file(file_path)
+            file_content = self._read_file(file_path)
 
             updated_file_content = file_content
             for old, new in extract_old_new_pairs(update_query):
@@ -933,9 +943,9 @@ class ReposApiWrapper(BaseToolApiWrapper):
                 "args_schema": ArgsSchema.BranchName.value,
             },
             {
-                "ref": self.read_file,
+                "ref": self._read_file,
                 "name": "read_file",
-                "description": self.read_file.__doc__,
+                "description": self._read_file.__doc__,
                 "args_schema": ArgsSchema.ReadFile.value,
             },
             {
@@ -974,4 +984,10 @@ class ReposApiWrapper(BaseToolApiWrapper):
                 "description": self.create_pr.__doc__,
                 "args_schema": ArgsSchema.CreatePullRequest.value,
             },
+            {
+                "ref": self.loader,
+                "name": "loader",
+                "description": self.loader.__doc__,
+                "args_schema": LoaderSchema,
+            }
         ]

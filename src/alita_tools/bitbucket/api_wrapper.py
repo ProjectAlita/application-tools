@@ -10,6 +10,8 @@ from .bitbucket_constants import create_pr_data
 from .cloud_api_wrapper import BitbucketCloudApi, BitbucketServerApi
 from pydantic.fields import PrivateAttr
 
+from ..elitea_base import BaseCodeToolApiWrapper
+
 logger = logging.getLogger(__name__)
 
 
@@ -17,7 +19,7 @@ if TYPE_CHECKING:
     pass
 
 
-class BitbucketAPIWrapper(BaseModel):
+class BitbucketAPIWrapper(BaseCodeToolApiWrapper):
     """Wrapper for Bitbucket API."""
 
     _bitbucket: Any = PrivateAttr()
@@ -148,7 +150,18 @@ class BitbucketAPIWrapper(BaseModel):
         except Exception as e:
             return ToolException(f"File was not updated due to error: {str(e)}")
 
-    def read_file(self, file_path: str, branch: str) -> str:
+    def _get_files(self, file_path: str, branch: str) -> str:
+        """
+        Get files from the bitbucket repo
+        Parameters:
+            file_path(str): the file path
+            branch(str): branch name (by default: active_branch)
+        Returns:
+            str: List of the files
+        """
+        return str(self._bitbucket.get_files_list(file_path=file_path, branch=branch))
+
+    def _read_file(self, file_path: str, branch: str) -> str:
         """
         Reads a file from the gitlab repo
         Parameters:
