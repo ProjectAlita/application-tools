@@ -45,10 +45,10 @@ class ConfluenceToolkit(BaseToolkit):
                                                                                     'max_length': ConfluenceToolkit.toolkit_max_length})),
             cloud=(bool, Field(description="Hosting Option")),
             limit=(int, Field(description="Pages limit per request", default=5)),
-            labels=(Optional[List[str]], Field(
-                description="List of labels used for labeling of agent's created or updated entities",
-                default=[],
-                examples=["alita", "elitea"]
+            labels=(Optional[str], Field(
+                description="List of comma separated labels used for labeling of agent's created or updated entities",
+                default=None,
+                examples="alita,elitea;another-label"
             )),
             max_pages=(int, Field(description="Max total pages", default=10)),
             number_of_retries=(int, Field(description="Number of retries", default=2)),

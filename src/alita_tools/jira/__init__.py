@@ -37,10 +37,10 @@ class JiraToolkit(BaseToolkit):
             username=(Optional[str], Field(description="Jira Username", default=None)),
             token=(Optional[str], Field(description="Jira token", default=None, json_schema_extra={'secret': True})),
             limit=(int, Field(description="Limit issues", default=5)),
-            labels=(Optional[List[str]], Field(
-                description="List of labels used for labeling of agent's created or updated entities",
-                default=[],
-                examples=["alita", "elitea"]
+            labels=(Optional[str], Field(
+                description="List of comma separated labels used for labeling of agent's created or updated entities",
+                default=None,
+                examples="alita,elitea;another-label"
             )),
             verify_ssl=(bool, Field(description="Verify SSL", default=True)),
             additional_fields=(Optional[str], Field(description="Additional fields", default="")),
