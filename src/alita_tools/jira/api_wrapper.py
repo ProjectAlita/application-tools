@@ -457,8 +457,10 @@ class JiraApiWrapper(BaseToolApiWrapper):
             logger.error(f"Error creating Jira issue: {stacktrace}")
             return ToolException(f"Error creating Jira issue: {stacktrace}")
 
-    def update_issue(self, issue_json: str):
-        """ Update an issue in Jira."""
+    def _update_issue(self, issue_json: str):
+        """ Update an issue in Jira.
+            IMPORTANT: default labels won't be changed
+        """
         try:
             params = json.loads(issue_json)
             self.update_issue_validate(params)
@@ -469,7 +471,6 @@ class JiraApiWrapper(BaseToolApiWrapper):
             issue_url = f"{self._client.url.rstrip('/')}/browse/{key}"
             output = f"Done. Issue {key} has been updated successfully. You can view it at {issue_url}. Details: {str(issue)}"
             logger.info(output)
-            self._add_default_labels(issue_key=key)
             return output
         except ToolException as e:
             return ToolException(e)
@@ -477,6 +478,14 @@ class JiraApiWrapper(BaseToolApiWrapper):
             stacktrace = format_exc()
             logger.error(f"Error updating Jira issue: {stacktrace}")
             return f"Error updating Jira issue: {stacktrace}"
+
+    def update_issue(self, issue_json: str):
+        """ Update an issue in Jira."""
+        params = json.loads(issue_json)
+        key = params["key"]
+        result = self._update_issue(issue_json)
+        self._add_default_labels(issue_key=key)
+        return
 
     def modify_labels(self, issue_key: str, add_labels: list[str] = None, remove_labels: list[str] = None):
         """Updates labels of an issue in Jira."""
@@ -493,7 +502,7 @@ class JiraApiWrapper(BaseToolApiWrapper):
         if remove_labels:
             for label in remove_labels:
                 update_issue_json["update"]["labels"].append({"remove": label})
-        return self.update_issue(json.dumps(update_issue_json))
+        return self._update_issue(json.dumps(update_issue_json))
 
     def list_comments(self, issue_key: str):
         """ Extract the comments related to specified Jira issue """

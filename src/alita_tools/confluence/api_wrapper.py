@@ -367,7 +367,8 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
 
         if self.labels:
             logger.info(f'Add pre-defined labels to the issue: {self.labels}')
-            self.update_labels(page_ids=[page_id], new_labels=self.labels)
+            for label in self.labels:
+                self._client.set_page_label(page_id, label)
 
     def update_labels(self, page_ids: list = None, new_labels: list = None):
         """ Update a batch of pages in the Confluence space. """
