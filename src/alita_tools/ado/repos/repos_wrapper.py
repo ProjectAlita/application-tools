@@ -149,7 +149,7 @@ class ArgsSchema(Enum):
     )
     CommentOnPullRequest = create_model(
         "CommentOnPullRequest",
-        comment_query=(Optional[str], Field(description="Follow the required formatting.", examples=["1\n\nThis is a test comment"])),
+        comment_query=(Optional[str], Field(description="Follow the required formatting. Example: '1\n\nThis is a test comment' (PR number and comment)", examples=["1\n\nThis is a test comment"])),
         pull_request_id=(Optional[int], Field(description="ID of pull request as integer.")),
         inline_comments=(
             Optional[list],
