@@ -4,7 +4,7 @@ from langchain_core.tools import BaseTool, BaseToolkit
 from ..base.tool import BaseAction
 from pydantic import create_model, BaseModel, ConfigDict, Field
 
-from ..utils import clean_string, TOOLKIT_SPLITTER, get_max_toolkit_length
+from ..utils import clean_string, TOOLKIT_SPLITTER, get_max_toolkit_length, parse_list
 
 name = "jira"
 
@@ -17,6 +17,7 @@ def get_tools(tool):
             username=tool['settings'].get('username', None),
             token=tool['settings'].get('token', None),
             limit=tool['settings'].get('limit', 5),
+            labels=parse_list(tool['settings'].get('labels', [])),
             additional_fields=tool['settings'].get('additional_fields', []),
             verify_ssl=tool['settings'].get('verify_ssl', True)).get_tools()
 
@@ -36,6 +37,11 @@ class JiraToolkit(BaseToolkit):
             username=(Optional[str], Field(description="Jira Username", default=None)),
             token=(Optional[str], Field(description="Jira token", default=None, json_schema_extra={'secret': True})),
             limit=(int, Field(description="Limit issues", default=5)),
+            labels=(Optional[List[str]], Field(
+                description="List of labels used for labeling of agent's created or updated entities",
+                default=[],
+                examples=["alita", "elitea"]
+            )),
             verify_ssl=(bool, Field(description="Verify SSL", default=True)),
             additional_fields=(Optional[str], Field(description="Additional fields", default="")),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),

@@ -4,7 +4,7 @@ from .api_wrapper import ConfluenceAPIWrapper
 from langchain_core.tools import BaseTool
 from ..base.tool import BaseAction
 from pydantic import create_model, BaseModel, ConfigDict, Field
-from ..utils import clean_string, TOOLKIT_SPLITTER, get_max_toolkit_length
+from ..utils import clean_string, TOOLKIT_SPLITTER, get_max_toolkit_length, parse_list
 
 name = "confluence"
 
@@ -18,6 +18,7 @@ def get_tools(tool):
         username=tool['settings'].get('username', None),
         token=tool['settings'].get('token', None),
         limit=tool['settings'].get('limit', 5),
+        labels=parse_list(tool['settings'].get('labels', None)),
         additional_fields=tool['settings'].get('additional_fields', []),
         verify_ssl=tool['settings'].get('verify_ssl', True),
         alita=tool['settings'].get('alita'),
@@ -44,6 +45,11 @@ class ConfluenceToolkit(BaseToolkit):
                                                                                     'max_length': ConfluenceToolkit.toolkit_max_length})),
             cloud=(bool, Field(description="Hosting Option")),
             limit=(int, Field(description="Pages limit per request", default=5)),
+            labels=(Optional[List[str]], Field(
+                description="List of labels used for labeling of agent's created or updated entities",
+                default=[],
+                examples=["alita", "elitea"]
+            )),
             max_pages=(int, Field(description="Max total pages", default=10)),
             number_of_retries=(int, Field(description="Number of retries", default=2)),
             min_retry_seconds=(int, Field(description="Min retry, sec", default=10)),

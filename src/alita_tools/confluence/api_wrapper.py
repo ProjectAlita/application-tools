@@ -155,6 +155,7 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
     token: Optional[str] = None
     cloud: Optional[bool] = True
     limit: Optional[int] = 5
+    labels: Optional[List[str]] = []
     space: Optional[str] = None
     max_pages: Optional[int] = 10
     content_format: Optional[ContentFormat] = ContentFormat.VIEW
@@ -240,6 +241,8 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
             self._client.set_page_label(page_id=created_page['id'], label=label)
             logger.info(f"Label '{label}' added to the page '{title}'.")
             page_details['label'] = label
+
+        self._add_default_labels(page_id=created_page['id'])
 
         return f"The page '{title}' was created under the parent page '{parent_id_filled}': '{page_details['link']}'. \nDetails: {str(page_details)}"
 
@@ -334,6 +337,8 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
             logger.info(f"Labels updated for the page '{title_to_use}'.")
             update_details['labels'] = new_labels
 
+        self._add_default_labels(page_id=page_id)
+
         return f"The page '{page_id}' was updated successfully: '{webui_link}'. \nDetails: {str(update_details)}"
 
     def update_page_by_title(self, page_title: str, representation: str = 'storage', new_title: str = None, new_body: str = None, new_labels: list = None):
@@ -356,6 +361,13 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
             return str(statuses)
         else:
             return "Either list of page_ids or parent_id (to update descendants) should be provided."
+
+    def _add_default_labels(self, page_id: str):
+        """ Add default labels to the pages that has been created or modified by agent."""
+
+        if self.labels:
+            logger.info(f'Add pre-defined labels to the issue: {self.labels}')
+            self.update_labels(page_ids=[page_id], new_labels=self.labels)
 
     def update_labels(self, page_ids: list = None, new_labels: list = None):
         """ Update a batch of pages in the Confluence space. """

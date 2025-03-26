@@ -242,6 +242,7 @@ class JiraApiWrapper(BaseToolApiWrapper):
     token: Optional[str] = None
     cloud: Optional[bool] = True
     limit: Optional[int] = 5
+    labels: Optional[List[str]] = []
     additional_fields: list[str] | str | None = []
     verify_ssl: Optional[bool] = True
     _client: Jira = PrivateAttr()
@@ -408,6 +409,12 @@ class JiraApiWrapper(BaseToolApiWrapper):
         remote_links = self._client.get_issue_remotelinks(jira_issue_key)
         return f"Jira issue - {jira_issue_key} has the following remote links:\n{str(remote_links)}"
 
+    def _add_default_labels(self, issue_key: str):
+        """ Add default labels to the issue if they are not already present."""
+        if self.labels:
+            logger.info(f'Add pre-defined labels to the issue: {self.labels}')
+            self.modify_labels(issue_key=issue_key, add_labels=self.labels)
+
     def create_issue(self, issue_json: str):
         """ Create an issue in Jira."""
         try:
@@ -418,6 +425,7 @@ class JiraApiWrapper(BaseToolApiWrapper):
             issue = self._client.create_issue(fields=dict(params["fields"]), update=update)
             issue_url = f"{self._client.url}browse/{issue['key']}"
             logger.info(f"issue is created: {issue}")
+            self._add_default_labels(issue_key=issue['key'])
             return f"Done. Issue {issue['key']} is created successfully. You can view it at {issue_url}. Details: {str(issue)}"
         except ToolException as e:
             return ToolException(e)
@@ -440,6 +448,7 @@ class JiraApiWrapper(BaseToolApiWrapper):
                                           update=update)
             logger.info(f"issue is updated: {issue_key} with status {status_name}")
             issue_url = f"{self._client.url}browse/{issue_key}"
+            self._add_default_labels(issue_key=issue_key)
             return f"Done. Status for issue {issue_key} was updated successfully. You can view it at {issue_url}."
         except ToolException as e:
             return ToolException(e)
@@ -460,6 +469,7 @@ class JiraApiWrapper(BaseToolApiWrapper):
             issue_url = f"{self._client.url.rstrip('/')}/browse/{key}"
             output = f"Done. Issue {key} has been updated successfully. You can view it at {issue_url}. Details: {str(issue)}"
             logger.info(output)
+            self._add_default_labels(issue_key=key)
             return output
         except ToolException as e:
             return ToolException(e)
@@ -509,6 +519,7 @@ class JiraApiWrapper(BaseToolApiWrapper):
             issue_url = f"{self._client.url}browse/{issue_key}"
             output = f"Done. Comment is added for issue {issue_key}. You can view it at {issue_url}"
             logger.info(output)
+            self._add_default_labels(issue_key=issue_key)
             return output
         except Exception as e:
             stacktrace = format_exc()
