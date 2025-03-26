@@ -20,7 +20,7 @@ class AzureDevOpsWorkItemsToolkit(BaseToolkit):
         return create_model(
             name_alias,
             organization_url=(str, Field(description="ADO organization url")),
-            project=(str, Field(description="ADO project", json_schema_extra={'toolkit_name': True, 'max_length': AzureDevOpsWorkItemsToolkit.toolkit_max_length})),
+            project=(str, Field(description="ADO project", json_schema_extra={'toolkit_name': True, 'max_toolkit_length': AzureDevOpsWorkItemsToolkit.toolkit_max_length})),
             token=(str, Field(description="ADO token", json_schema_extra={'secret': True})),
             limit=(Optional[int], Field(description="ADO plans limit used for limitation of the list with results", default=5)),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),

@@ -36,7 +36,7 @@ class AdvancedJiraMiningToolkit(BaseToolkit):
         AdvancedJiraMiningToolkit.toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name,
-            jira_base_url=(str, Field(default="", title="Jira URL", description="Jira URL", json_schema_extra={'toolkit_name': True, 'max_length': AdvancedJiraMiningToolkit.toolkit_max_length})),
+            jira_base_url=(str, Field(default="", title="Jira URL", description="Jira URL", json_schema_extra={'toolkit_name': True, 'max_toolkit_length': AdvancedJiraMiningToolkit.toolkit_max_length})),
             confluence_base_url=(str, Field(default="", title="Confluence URL", description="Confluence URL")),
             llm_settings=(dict, Field(title="LLM Settings", description="LLM Settings (e.g., {\"temperature\": 0.7, \"max_tokens\": 150})")),
             model_type=(str, Field(default="", title="Model type", description="Model type")),

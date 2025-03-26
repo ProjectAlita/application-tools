@@ -30,7 +30,7 @@ class RallyToolkit(BaseToolkit):
         RallyToolkit.toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name,
-            server=(str, Field(description="Rally server url", json_schema_extra={'toolkit_name': True, 'max_length': RallyToolkit.toolkit_max_length})),
+            server=(str, Field(description="Rally server url", json_schema_extra={'toolkit_name': True, 'max_toolkit_length': RallyToolkit.toolkit_max_length})),
             api_key=(Optional[str], Field(default=None, description="User's API key", json_schema_extra={'secret': True})),
             username=(Optional[str], Field(default=None, description="Username")),
             password=(Optional[str], Field(default=None, description="User's password", json_schema_extra={'secret': True})),

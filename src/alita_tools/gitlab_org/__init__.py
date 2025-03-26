@@ -28,7 +28,7 @@ class AlitaGitlabSpaceToolkit(BaseToolkit):
         AlitaGitlabSpaceToolkit.toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name,
-            url=(str, Field(description="GitLab URL", json_schema_extra={'toolkit_name': True, 'max_length': AlitaGitlabSpaceToolkit.toolkit_max_length})),
+            url=(str, Field(description="GitLab URL", json_schema_extra={'toolkit_name': True, 'max_toolkit_length': AlitaGitlabSpaceToolkit.toolkit_max_length})),
             repositories=(str, Field(
                 description="List of comma separated repositories user plans to interact with. Leave it empty in case you pass it in instruction.",
                 default=''

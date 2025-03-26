@@ -42,7 +42,7 @@ class ConfluenceToolkit(BaseToolkit):
             api_key=(str, Field(description="API key", default=None, json_schema_extra={'secret': True})),
             username=(str, Field(description="Username", default=None)),
             space=(str, Field(description="Space", default=None, json_schema_extra={'toolkit_name': True,
-                                                                                    'max_length': ConfluenceToolkit.toolkit_max_length})),
+                                                                                    'max_toolkit_length': ConfluenceToolkit.toolkit_max_length})),
             cloud=(bool, Field(description="Hosting Option")),
             limit=(int, Field(description="Pages limit per request", default=5)),
             labels=(Optional[str], Field(

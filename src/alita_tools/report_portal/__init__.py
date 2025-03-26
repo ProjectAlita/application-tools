@@ -30,7 +30,7 @@ class ReportPortalToolkit(BaseToolkit):
         ReportPortalToolkit.toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name,
-            endpoint=(str, Field(description="Report Portal endpoint", json_schema_extra={'toolkit_name': True, 'max_length': ReportPortalToolkit.toolkit_max_length})),
+            endpoint=(str, Field(description="Report Portal endpoint", json_schema_extra={'toolkit_name': True, 'max_toolkit_length': ReportPortalToolkit.toolkit_max_length})),
             project=(str, Field(description="Report Portal project")),
             api_key=(str, Field(description="User API key", json_schema_extra={'secret': True})),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),

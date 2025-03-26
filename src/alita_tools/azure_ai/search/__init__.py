@@ -40,7 +40,7 @@ class AzureSearchToolkit(BaseToolkit):
             api_key=(str, Field(description="API key", json_schema_extra={'secret': True})),
             endpoint=(str, Field(description="Azure Search endpoint")),
             index_name=(str, Field(description="Azure Search index name")),
-            api_base=(Optional[str], Field(description="Azure OpenAI base URL", default=None, json_schema_extra={'toolkit_name': True, 'max_length': AzureSearchToolkit.toolkit_max_length})),
+            api_base=(Optional[str], Field(description="Azure OpenAI base URL", default=None, json_schema_extra={'toolkit_name': True, 'max_toolkit_length': AzureSearchToolkit.toolkit_max_length})),
             api_version=(Optional[str], Field(description="API version", default=None)),
             openai_api_key=(Optional[str], Field(description="Azure OpenAI API Key", default=None, json_schema_extra={'secret': True})),
             model_name=(str, Field(description="Model name for Embeddings model", default=None)),

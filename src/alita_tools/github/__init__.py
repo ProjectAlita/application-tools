@@ -49,7 +49,7 @@ class AlitaGitHubToolkit(BaseToolkit):
             username=(Optional[str], Field(description="Github Username", default=None)),
             password=(Optional[str], Field(description="Github Password", default=None, json_schema_extra={'secret': True})),
 
-            repository=(str, Field(description="Github repository", json_schema_extra={'toolkit_name': True, 'max_length': AlitaGitHubToolkit.toolkit_max_length})),
+            repository=(str, Field(description="Github repository", json_schema_extra={'toolkit_name': True, 'max_toolkit_length': AlitaGitHubToolkit.toolkit_max_length})),
             active_branch=(Optional[str], Field(description="Active branch", default="main")),
             base_branch=(Optional[str], Field(description="Github Base branch", default="main")),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools}))
