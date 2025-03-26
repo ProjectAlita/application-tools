@@ -4,6 +4,7 @@ from json import dumps, loads
 import fnmatch
 from typing import Dict, Any, Optional, List, Union
 import tiktoken
+from langchain_core.tools import ToolException
 from pydantic import model_validator, create_model, BaseModel, Field
 from pydantic.fields import PrivateAttr
 from langchain.utils import get_from_dict_or_env
@@ -461,6 +462,16 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
     github_app_id: Optional[str] = None
     github_app_private_key: Optional[str] = None
 
+    def clean_repository_name(repo_link):
+        import re
+
+        match = re.match(r"^(?:https?://[^/]+/|git@[^:]+:)?([^/]+/[^/.]+)(?:\.git)?$", repo_link)
+
+        if not match:
+            raise ToolException("Repository field should be in '<owner>/<repo>' format.")
+
+        return match.group(1)
+
     @model_validator(mode='before')
     @classmethod
     def validate_environment(cls, values: Dict) -> Dict:
@@ -487,6 +498,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
 
         github_repository = get_from_dict_or_env(
             values, "github_repository", "GITHUB_REPOSITORY")
+        github_repository = cls.clean_repository_name(github_repository)
 
         active_branch = get_from_dict_or_env(
             values, "active_branch", "ACTIVE_BRANCH", default='ai')
@@ -1058,25 +1070,23 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                whitelist: Optional[List[str]] = None,
                blacklist: Optional[List[str]] = None) -> str:
         """
-        Generates file content from the specified branch while honoring whitelist and blacklist patterns.
+        Generates file content from a branch, respecting whitelist and blacklist patterns.
 
         Parameters:
-            branch (Optional[str]): The branch to set as active before listing files. If None, the current active branch is used.
-            whitelist (Optional[List[str]]): A list of file extensions or paths to include. If None, all files are included.
-            blacklist (Optional[List[str]]): A list of file extensions or paths to exclude. If None, no files are excluded.
+        - branch (Optional[str]): Branch for listing files. Defaults to the current branch if None.
+        - whitelist (Optional[List[str]]): File extensions or paths to include. Defaults to all files if None.
+        - blacklist (Optional[List[str]]): File extensions or paths to exclude. Defaults to no exclusions if None.
 
         Returns:
-            generator: A generator that yields the content of files that match the whitelist and do not match the blacklist.
+        - generator: Yields content from files matching the whitelist but not the blacklist.
 
         Example:
-            # Set the active branch to 'feature-branch' and include only '.py' files, excluding 'test_' files
-            file_generator = loader(branch='feature-branch', whitelist=['*.py'], blacklist=['*test_*'])
-            for file_content in file_generator:
-                print(file_content)
+        # Use 'feature-branch', include '.py' files, exclude 'test_' files
+        file_generator = loader(branch='feature-branch', whitelist=['*.py'], blacklist=['*test_*'])
 
         Notes:
-            - The whitelist and blacklist patterns use Unix shell-style wildcards.
-            - If both whitelist and blacklist are provided, a file must match the whitelist and not match the blacklist to be included.
+        - Whitelist and blacklist use Unix shell-style wildcards.
+        - Files must match the whitelist and not the blacklist to be included.
         """
         from ..chunkers.code.codeparser import parse_code_files_for_db
         _files = self._get_files("", branch or self.active_branch)

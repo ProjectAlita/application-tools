@@ -1,5 +1,3 @@
-from sys import prefix
-
 from langchain_core.tools import BaseToolkit, BaseTool
 from pydantic import create_model, BaseModel, ConfigDict, Field
 from typing import List, Literal, Optional
@@ -8,7 +6,7 @@ from .api_wrapper import ZephyrApiWrapper
 from ..base.tool import BaseAction
 from ..utils import clean_string, get_max_toolkit_length, TOOLKIT_SPLITTER
 
-name = "zephyrenterprise"
+name = "zephyr_enterprise"
 
 def get_tools(tool):
     return ZephyrEnterpriseToolkit().get_toolkit(
@@ -29,7 +27,7 @@ class ZephyrEnterpriseToolkit(BaseToolkit):
         ZephyrEnterpriseToolkit.toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name,
-            base_url=(str, Field(description="Zephyr Enterprise base URL")),
+            base_url=(str, Field(description="Zephyr Enterprise base URL", json_schema_extra={'toolkit_name': True, 'max_length': ZephyrEnterpriseToolkit.toolkit_max_length })),
             token=(str, Field(description="API token", json_schema_extra={'secret': True})),
             selected_tools=(List[Literal[tuple(selected_tools)]], []),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Zephyr Enterprise", "icon_url": None}})

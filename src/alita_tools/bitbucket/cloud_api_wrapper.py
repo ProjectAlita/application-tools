@@ -36,6 +36,10 @@ class BitbucketApiAbstract(ABC):
         pass
 
     @abstractmethod
+    def get_files_list(self, file_path: str, branch: str) -> str:
+        pass
+
+    @abstractmethod
     def create_file(self, file_path: str, file_contents: str, branch: str) -> str:
         pass
 
@@ -72,6 +76,14 @@ class BitbucketServerApi(BitbucketApiAbstract):
     def get_file(self, file_path: str, branch: str) -> str:
         return self.api_client.get_content_of_file(project_key=self.project, repository_slug=self.repository, at=branch,
                                                    filename=file_path).decode('utf-8')
+
+    def get_files_list(self, file_path: str, branch: str) -> list:
+        files = self.api_client.get_file_list(project_key=self.project, repository_slug=self.repository, query=branch,
+                                      sub_folder=file_path)
+        files_list = []
+        for file in files:
+            files_list.append(file['path'])
+        return files_list
 
     def create_file(self, file_path: str, file_contents: str, branch: str) -> str:
         return self.api_client.upload_file(
@@ -150,6 +162,16 @@ class BitbucketCloudApi(BitbucketApiAbstract):
 
     def get_file(self, file_path: str, branch: str) -> str:
         return self.repository.get(path=f'src/{branch}/{file_path}')
+
+    def get_files_list(self, file_path: str, branch: str) -> list:
+        files_list = []
+        index = 0
+        # TODO: add pagination
+        for item in \
+        self.repository.get(path=f'src/{branch}/{file_path}?max_depth=100&pagelen=100&fields=values.path&q=type="commit_file"')[
+            'values']:
+            files_list.append(item['path'])
+        return files_list
 
     def create_file(self, file_path: str, file_contents: str, branch: str) -> str:
         form_data = {

@@ -1,12 +1,13 @@
 import logging
 import traceback
-from typing import Type
+from typing import Type, Optional, List
 
 from langchain_core.tools import BaseTool
 from pydantic import create_model, Field, BaseModel
 from .bitbucket_constants import create_pr_data
 
 from .api_wrapper import BitbucketAPIWrapper
+from ..elitea_base import LoaderSchema
 
 logger = logging.getLogger(__name__)
 
@@ -160,12 +161,44 @@ class ReadFileTool(BaseTool):
 
     def _run(self, file_path: str, branch: str):
         try:
-            return self.api_wrapper.read_file(file_path, branch)
+            return self.api_wrapper._read_file(file_path, branch)
         except Exception:
             stacktrace = traceback.format_exc()
             logger.error(f"Unable to read file: {stacktrace}")
             return f"Unable to read file: {stacktrace}"
 
+class GetFilesListTool(BaseTool):
+    api_wrapper: BitbucketAPIWrapper = Field(default_factory=BitbucketAPIWrapper)
+    name: str = "get_files"
+    description: str = "This tool returns list of files from defined package and branch"
+    args_schema: Type[BaseModel] = create_model(
+        "GetFilesListModel",
+        file_path=(str, Field(
+            description="Package path to read files from. e.g. `src/agents/developer/tools/git/`. **IMPORTANT**: the path must not start with a slash")),
+        branch=(str, Field(
+            description="branch - name of the branch file should be read from. e.g. `feature-1`. **IMPORTANT**: if branch not specified, try to determine from the chat history or clarify with user."))
+    )
+
+    def _run(self, file_path: str, branch: str):
+        try:
+            return self.api_wrapper._get_files(file_path, branch)
+        except Exception:
+            stacktrace = traceback.format_exc()
+            logger.error(f"Unable to read file: {stacktrace}")
+            return f"Unable to read file: {stacktrace}"
+
+class LoaderTool(BaseTool):
+    api_wrapper: BitbucketAPIWrapper = Field(default_factory=BitbucketAPIWrapper)
+    name: str = "loader"
+    description: str = """This tool is a wrapper for the Bitbucket API, useful when you need to create a file in a Bitbucket repository.
+    """
+    args_schema: Type[BaseModel] = LoaderSchema
+
+    def _run(self,
+               branch: Optional[str] = None,
+               whitelist: Optional[List[str]] = None,
+               blacklist: Optional[List[str]] = None):
+        return self.api_wrapper.loader(branch, whitelist, blacklist)
 
 __all__ = [
     {"name": "create_branch", "tool": CreateBitbucketBranchTool},
@@ -174,5 +207,7 @@ __all__ = [
     {"name": "set_active_branch", "tool": SetActiveBranchTool},
     {"name": "list_branches_in_repo", "tool": ListBranchesTool},
     {"name": "read_file", "tool": ReadFileTool},
-    {"name": "update_file", "tool": UpdateFileTool}
+    {"name": "get_files", "tool": GetFilesListTool},
+    {"name": "update_file", "tool": UpdateFileTool},
+    {"name": "loader", "tool": LoaderTool}
 ]
