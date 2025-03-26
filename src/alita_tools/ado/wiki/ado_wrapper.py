@@ -196,7 +196,7 @@ class AzureDevOpsApiWrapper(BaseToolApiWrapper):
                     project=self.project,
                     wiki_identifier=wiki_identified,
                     path=page_name,
-                    parameters=WikiPageCreateOrUpdateParameters(name="Update_Page_name",content=page_content),
+                    parameters=WikiPageCreateOrUpdateParameters(content=page_content),
                     version=version,
                     version_descriptor=GitVersionDescriptor(version=version_identifier, version_type=version_type)
                 )

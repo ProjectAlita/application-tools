@@ -79,6 +79,7 @@ TestCasesGetModel = create_model(
 )
 
 class TestPlanApiWrapper(BaseToolApiWrapper):
+    __test__ = False
     organization_url: str
     token: str
     limit: Optional[int] = 5
