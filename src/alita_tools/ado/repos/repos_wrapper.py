@@ -7,6 +7,8 @@ from typing import List, Union, Optional
 from azure.devops.v7_0.git.git_client import GitClient
 from azure.devops.v7_0.git.models import (
     Comment,
+    CommentPosition,
+    CommentThreadContext,
     GitCommit,
     GitCommitRef,
     GitPullRequest,
@@ -147,7 +149,33 @@ class ArgsSchema(Enum):
     )
     CommentOnPullRequest = create_model(
         "CommentOnPullRequest",
-        comment_query=(str, Field(description="Follow the required formatting.")),
+        comment_query=(Optional[str], Field(description="Follow the required formatting. Example: '1\n\nThis is a test comment' (PR number and comment)", examples=["1\n\nThis is a test comment"])),
+        pull_request_id=(Optional[int], Field(description="ID of pull request as integer.")),
+        inline_comments=(
+            Optional[list],
+            Field(
+                description="""List of comments, where each comment is a dictionary specifying details about the comment,
+                e.g. [{'file_path': 'src/main.py', 'comment_text': 'Logic needs improvement', 'right_line': 20}]""",
+                examples=[
+                    {
+                        "file_path": "src/main.py",
+                        "comment_text": "This logic needs improvement.",
+                        "left_line": 20,
+                        "right_line": None,
+                        "left_range": None,
+                        "right_range": (35, 37),
+                    },
+                    {
+                        "file_path": "src/utils.py",
+                        "comment_text": "Please review this addition.",
+                        "left_line": None,
+                        "right_line": 45,
+                        "left_range": None,
+                        "right_range": None,
+                    },
+                ],
+            ),
+        ),
     )
     GetWorkItems = create_model(
         "GetWorkItems",
@@ -173,6 +201,7 @@ class ReposApiWrapper(BaseCodeToolApiWrapper):
     repository_id: Optional[str]
     base_branch: Optional[str]
     active_branch: Optional[str]
+    token: Optional[str]
     _client: Optional[GitClient] = PrivateAttr()
 
     class Config:
@@ -828,34 +857,119 @@ class ReposApiWrapper(BaseCodeToolApiWrapper):
             return ToolException(msg)
         return work_item_ids
 
-    def comment_on_pull_request(self, comment_query: str):
+    def comment_on_pull_request(self, comment_query: Optional[str] = None, pull_request_id: Optional[int] = None, inline_comments: Optional[list] = None):
         """
-        Adds a comment to a specific pull request in Azure DevOps based on a formatted query.
-
+        Adds a comment to a pull request in Azure DevOps. Supports both general pull request comments and inline comments.
         Parameters:
-            comment_query (str): A string which contains the pull request ID, two newlines, and the comment.
-                                 For example: "1\n\nThis is a test comment" adds the comment "This is a test comment" to PR 1.
-
+            comment_query (str, optional): A string which contains the pull request ID, two newlines, and the comment.
+                Format: "1\n\nThis is a test comment" adds the comment "This is a test comment" to PR 1.
+            pull_request_id (int, optional): ID of the pull request.
+            comments (list, optional): A list of dictionaries, each specifying the details of inline comments.
+                Format: [{ "comment_text": "This logic needs improvement.", "file_path": "src/main.py", "left_line": 20 }]
         Returns:
             str: A success or failure message.
         """
         try:
-            pull_request_id = int(comment_query.split("\n\n")[0])
-            comment_text = comment_query[len(str(pull_request_id)) + 2 :]
+            if inline_comments:
+                if not pull_request_id:
+                    raise ValueError("`pull_request_id` must be provided when using `comments` for inline commenting.")
 
-            comment = Comment(comment_type="text", content=comment_text)
-            comment_thread = GitPullRequestCommentThread(
-                comments=[comment], status="active"
-            )
-            self._client.create_thread(
-                comment_thread,
-                repository_id=self.repository_id,
-                pull_request_id=pull_request_id,
-                project=self.project,
-            )
-            return f"Commented on pull request {pull_request_id}"
+                results = []
+                for comment_data in inline_comments:
+                    file_path = comment_data["file_path"]
+                    comment_text = comment_data["comment_text"][:1000]
+                    left_line = comment_data.get("left_line")
+                    right_line = comment_data.get("right_line")
+                    left_range = comment_data.get("left_range")
+                    right_range = comment_data.get("right_range")
+
+                    left_file_start = None
+                    left_file_end = None
+                    right_file_start = None
+                    right_file_end = None
+
+                    if right_range:
+                        if len(right_range) != 2:
+                            raise ValueError("`right_range` must be a tuple (line_start, line_end)")
+                        right_file_start = CommentPosition(line=right_range[0], offset=1)
+                        right_file_end = CommentPosition(line=right_range[1], offset=1)
+                    elif right_line:
+                        right_file_start = CommentPosition(line=right_line, offset=1)
+                        right_file_end = CommentPosition(line=right_line, offset=1)
+
+                    if left_range:
+                        if len(left_range) != 2:
+                            raise ValueError("`left_range` must be a tuple (line_start, line_end)")
+                        left_file_start = CommentPosition(line=left_range[0], offset=1)
+                        left_file_end = CommentPosition(line=left_range[1], offset=1)
+                    elif left_line:
+                        left_file_start = CommentPosition(line=left_line, offset=1)
+                        left_file_end = CommentPosition(line=left_line, offset=1)
+
+                    if not (left_line or right_line or left_range or right_range):
+                        raise ValueError("Comment must specify either `left_line`, `right_line`, `left_range`, or `right_range`.")
+
+                    thread_context = CommentThreadContext(
+                        file_path=file_path,
+                        left_file_start=left_file_start,
+                        left_file_end=left_file_end,
+                        right_file_start=right_file_start,
+                        right_file_end=right_file_end
+                    )
+
+                    comment = Comment(comment_type="text", content=comment_text)
+                    comment_thread = GitPullRequestCommentThread(
+                        comments=[comment],
+                        status="active",
+                        thread_context=thread_context
+                    )
+
+                    self._client.create_thread(
+                        comment_thread=comment_thread,
+                        repository_id=self.repository_id,
+                        pull_request_id=pull_request_id,
+                        project=self.project,
+                    )
+
+                    result_message = f"Comment added to file '{file_path}'"
+
+                    if right_range:
+                        result_message += f" (right file lines {right_range[0]}-{right_range[1]})"
+                    elif right_line:
+                        result_message += f" (right file line {right_line})"
+
+                    if left_range:
+                        result_message += f" (left file lines {left_range[0]}-{left_range[1]})"
+                    elif left_line:
+                        result_message += f" (left file line {left_line})"
+
+                    results.append(result_message)
+
+                return f"Successfully added {len(results)} comments:\n" + "\n".join(results)
+            elif comment_query:
+                pull_request_id = int(comment_query.split("\n\n")[0])
+                comment_text = comment_query[len(str(pull_request_id)) + 2:]
+
+                comment = Comment(comment_type="text", content=comment_text)
+                comment_thread = GitPullRequestCommentThread(
+                    comments=[comment], status="active"
+                )
+                self._client.create_thread(
+                    comment_thread,
+                    repository_id=self.repository_id,
+                    pull_request_id=pull_request_id,
+                    project=self.project,
+                )
+                return f"Commented on pull request {pull_request_id}"
+            else:
+                raise ValueError("Either `comment_query` or `comments` must be provided.")
+
+        except ValueError as ve:
+            msg = f"Invalid input parameters: {str(ve)}"
+            logger.error(msg)
+            return ToolException(msg)
         except Exception as e:
-            msg = f"Unable to make comment due to error:\n{str(e)}"
+            msg = f"An error occurred:\n{str(e)}"
             logger.error(msg)
             return ToolException(msg)
 
