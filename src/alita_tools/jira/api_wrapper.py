@@ -485,7 +485,7 @@ class JiraApiWrapper(BaseToolApiWrapper):
         key = params["key"]
         result = self._update_issue(issue_json)
         self._add_default_labels(issue_key=key)
-        return
+        return result
 
     def modify_labels(self, issue_key: str, add_labels: list[str] = None, remove_labels: list[str] = None):
         """Updates labels of an issue in Jira."""
