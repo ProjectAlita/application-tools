@@ -34,7 +34,7 @@ class XrayToolkit(BaseToolkit):
         XrayToolkit.toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name,
-            base_url=(str, Field(description="Xray URL", json_schema_extra={'toolkit_name': True, 'max_length': XrayToolkit.toolkit_max_length})),
+            base_url=(str, Field(description="Xray URL", json_schema_extra={'toolkit_name': True, 'max_toolkit_length': XrayToolkit.toolkit_max_length})),
             client_id=(str, Field(description="Client ID")),
             client_secret=(str, Field(description="Client secret", json_schema_extra={'secret': True})),
             limit=(Optional[int], Field(description="Limit", default=100)),

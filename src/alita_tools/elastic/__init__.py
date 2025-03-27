@@ -27,7 +27,7 @@ class ElasticToolkit(BaseToolkit):
         ElasticToolkit.toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name,
-            url=(str, Field(default=None, title="Elasticsearch URL", description="Elasticsearch URL", json_schema_extra={'toolkit_name': True, 'max_length': ElasticToolkit.toolkit_max_length})),
+            url=(str, Field(default=None, title="Elasticsearch URL", description="Elasticsearch URL", json_schema_extra={'toolkit_name': True, 'max_toolkit_length': ElasticToolkit.toolkit_max_length})),
             api_key=(
                 Optional[str],
                 Field(

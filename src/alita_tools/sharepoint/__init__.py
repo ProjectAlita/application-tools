@@ -28,7 +28,7 @@ class SharepointToolkit(BaseToolkit):
         SharepointToolkit.toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name,
-            site_url=(str, Field(description="Sharepoint site's URL", json_schema_extra={'toolkit_name': True, 'max_length': SharepointToolkit.toolkit_max_length})),
+            site_url=(str, Field(description="Sharepoint site's URL", json_schema_extra={'toolkit_name': True, 'max_toolkit_length': SharepointToolkit.toolkit_max_length})),
             client_id=(str, Field(description="Client ID")),
             client_secret=(str, Field(description="Client Secret", json_schema_extra={'secret': True})),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),

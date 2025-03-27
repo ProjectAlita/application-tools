@@ -36,7 +36,7 @@ class AlitaGitlabToolkit(BaseToolkit):
         return create_model(
             name,
             url=(str, Field(description="GitLab URL")),
-            repository=(str, Field(description="GitLab repository", json_schema_extra={'toolkit_name': True, 'max_length': AlitaGitlabToolkit.toolkit_max_length})),
+            repository=(str, Field(description="GitLab repository", json_schema_extra={'toolkit_name': True, 'max_toolkit_length': AlitaGitlabToolkit.toolkit_max_length})),
             private_token=(str, Field(description="GitLab private token", json_schema_extra={'secret': True})),
             branch=(str, Field(description="Main branch", default="main")),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
