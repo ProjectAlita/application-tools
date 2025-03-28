@@ -105,7 +105,6 @@ def get_tools(tools_list, alita: 'AlitaClient', llm: 'LLMLikeObject', *args, **k
         elif tool['type'] == 'salesforce':
             tools.extend(get_salesforce(tool))
         elif tool['type'] == 'carrier':
-            print("Inside Carrier")
             tools.extend(get_carrier(tool))
         else:
             if tool.get("settings", {}).get("module"):
