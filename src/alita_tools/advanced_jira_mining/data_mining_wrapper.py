@@ -82,9 +82,6 @@ class AdvancedJiraMiningWrapper(BaseModel):
     confluence_base_url: str
     """The base URL for the Confluence instance."""
 
-    llm_settings: dict
-    """Settings for the language model used for summarization."""
-
     model_type: str
     """The type of language model to be used."""
 
@@ -110,6 +107,7 @@ class AdvancedJiraMiningWrapper(BaseModel):
     """Indicates if SSL verification should be performed. Default is True."""
 
     _client: Optional[Jira] = PrivateAttr()
+    _llm: Optional[Any] = PrivateAttr()
 
     @model_validator(mode='before')
     @classmethod
@@ -140,7 +138,6 @@ class AdvancedJiraMiningWrapper(BaseModel):
             )
         url = values['jira_base_url']
         model_type = values['model_type']
-        llm_settings = values['llm_settings']
         api_key = values.get('jira_api_key')
         username = values.get('jira_username')
         token = values.get('jira_token')
@@ -150,7 +147,7 @@ class AdvancedJiraMiningWrapper(BaseModel):
         else:
             cls._client = Jira(url=url, username=username, password=api_key, cloud=is_cloud,
                                     verify_ssl=values['verify_ssl'])
-        values['llm'] = get_model(model_type, llm_settings)
+        cls._llm = values['llm']
         return values
 
     def __zip_directory(self, folder_path, output_path):
@@ -856,7 +853,7 @@ class AdvancedJiraMiningWrapper(BaseModel):
                     'question': RunnablePassthrough()
                 })
                 | RunnableLambda(self.__build_prompt)
-                | self.llm
+                | self._llm
                 | StrOutputParser()
             )
             return chain.invoke(query)
