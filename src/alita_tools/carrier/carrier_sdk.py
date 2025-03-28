@@ -27,29 +27,49 @@ class CarrierClient(BaseModel):
         arbitrary_types_allowed = True
 
     def model_post_init(self, __context):
-        self.session.headers.update({
+        headers = {
             'Authorization': f'Bearer {self.credentials.token}',
             'Content-Type': 'application/json',
             'X-Organization': self.credentials.organization
-        })
+        }
+        self.session.headers.update(headers)
 
     def request(self, method: str, endpoint: str, **kwargs) -> Any:
         full_url = f"{self.credentials.url.rstrip('/')}/{endpoint.lstrip('/')}"
         response = self.session.request(method, full_url, **kwargs)
         try:
-            response.raise_for_status()
+            response.raise_for_status()  # This will raise for 4xx/5xx
+        except requests.HTTPError as http_err:
+            # Log or parse potential HTML in response.text
+            logger.error(f"HTTP {response.status_code} error: {response.text[:500]}")  # short snippet
+            raise CarrierAPIError(f"Request to {full_url} failed with status {response.status_code}")
+
+        # If the response is JSON, parse it. If it’s HTML or something else, handle gracefully
+        try:
             return response.json()
-        except requests.HTTPError as e:
-            logger.error(f"HTTP error: {e.response.status_code} - {e.response.text}")
-            raise CarrierAPIError(e.response.text) from e
+        except json.JSONDecodeError:
+            # Possibly HTML error or unexpected format
+            logger.error(f"Response was not valid JSON. Body:\n{response.text[:500]}")
+            raise CarrierAPIError("Server returned non-JSON response")
 
     def fetch_test_data(self, start_time: str) -> List[Dict[str, Any]]:
         endpoint = f"api/v1/test-data?start_time={start_time}"
         return self.request('get', endpoint)
 
     def create_ticket(self, ticket_data: Dict[str, Any]) -> Dict[str, Any]:
-        endpoint = "api/v1/tickets"
-        return self.request('post', endpoint, json=ticket_data)
+        endpoint = f"api/v1/issues/issues/{self.credentials.project_id}"
+        logger.info(f"ENDPOINT: {endpoint}")
+        response = self.request('post', endpoint, json=ticket_data)
+
+        # Optionally check for successful creation:
+        # Some APIs return status=201, or an `item` field in JSON
+        if not response or "item" not in response:
+            # We expected "item" in the response
+            logger.warning(f"Unexpected response: {response}")
+            raise CarrierAPIError("Carrier did not return a valid ticket response")
+
+        # Return the entire JSON so the tool can parse "id", "hash_id", or others
+        return response
 
     def fetch_tickets(self, board_id: str) -> List[Dict[str, Any]]:
         endpoint = f"api/v1/issues/issues/{self.credentials.project_id}?board_id={board_id}&limit=100"

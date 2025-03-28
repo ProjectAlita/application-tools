@@ -1,6 +1,22 @@
 import json
 import logging
 
+from pydantic import BaseModel, Field
+from datetime import date
+from typing import List
+
+class TicketPayload(BaseModel):
+    title: str
+    board_id: str
+    severity: str = "Medium"
+    type: str
+    description: str
+    external_link: str
+    engagement: str
+    assignee: str
+    start_date: date
+    end_date: date
+    tags: List[str] = []
 
 def parse_config_from_string(config_str: str) -> dict:
     """

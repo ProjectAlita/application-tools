@@ -5,9 +5,11 @@ from pydantic import create_model, BaseModel, ConfigDict, Field
 from functools import lru_cache
 
 from .api_wrapper import CarrierAPIWrapper
+from .create_ticket_tool import __all__ as create_ticket_tool
 from .tools import __all__ as available_tools
 from ..utils import clean_string, TOOLKIT_SPLITTER, get_max_toolkit_length
 
+__all__ = create_ticket_tool + available_tools
 logger = logging.getLogger(__name__)
 
 
@@ -18,7 +20,8 @@ class AlitaCarrierToolkit(BaseToolkit):
     @classmethod
     @lru_cache(maxsize=32)
     def toolkit_config_schema(cls) -> BaseModel:
-        tool_names = {tool['name'] for tool in available_tools}
+
+        tool_names = {tool['name'] for tool in __all__}
         cls.toolkit_max_length = get_max_toolkit_length({name: None for name in tool_names})
 
         return create_model(
@@ -62,7 +65,7 @@ class AlitaCarrierToolkit(BaseToolkit):
         prefix = clean_string(toolkit_name, cls.toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
 
         tools = []
-        for tool_def in available_tools:
+        for tool_def in __all__:
             if selected_tools and tool_def['name'] not in selected_tools:
                 continue
             try:

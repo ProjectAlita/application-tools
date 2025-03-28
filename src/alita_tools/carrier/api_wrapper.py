@@ -1,7 +1,8 @@
 import logging
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field, model_validator
-from .carrier_sdk import CarrierClient, CarrierCredentials
+from .carrier_sdk import CarrierClient, CarrierCredentials, CarrierAPIError
+from .utils import TicketPayload
 
 logger = logging.getLogger(__name__)
 
@@ -43,14 +44,15 @@ class CarrierAPIWrapper(BaseModel):
     def fetch_tickets(self, board_id: str) -> List[Dict[str, Any]]:
         return self._client.fetch_tickets(board_id)
 
-    def create_ticket(self, ticket_data: Dict[str, Any]) -> bool:
+    def create_ticket(self, ticket_payload: TicketPayload) -> bool:
         try:
-            self._client.create_ticket(ticket_data)
-            logger.info("Ticket created successfully.")
-            return True
-        except Exception as e:
-            logger.error(f"Ticket creation error: {e}")
-            return False
+            json_response = self._client.create_ticket(ticket_payload)
+            # Log it
+            logger.info(f"Ticket successfully created: {json_response}")
+            return json_response
+        except CarrierAPIError as e:
+            logger.error(f"Carrier API error creating ticket: {e}")
+            return {}
 
     def fetch_test_data(self, start_time: str) -> List[Dict[str, Any]]:
         return self._client.fetch_test_data(start_time)

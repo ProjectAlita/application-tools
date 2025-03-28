@@ -1,15 +1,13 @@
 import logging
 import json
 import traceback
-from typing import Type, Optional
+from typing import Type, ClassVar, List, Optional
 from langchain_core.tools import BaseTool, ToolException
 from pydantic.fields import Field
-from pydantic import create_model, BaseModel, ValidationError
-
+from pydantic import create_model, BaseModel
 from .api_wrapper import CarrierAPIWrapper
 
 logger = logging.getLogger(__name__)
-
 
 class FetchTicketsTool(BaseTool):
     api_wrapper: CarrierAPIWrapper = Field(..., description="Carrier API Wrapper instance")
@@ -28,60 +26,6 @@ class FetchTicketsTool(BaseTool):
             stacktrace = traceback.format_exc()
             logger.error(f"Error fetching tickets: {stacktrace}")
             raise ToolException(stacktrace)
-
-
-class TicketData(BaseModel):
-    title: str = Field(..., description="Title of the ticket")
-    description: str = Field(..., description="Detailed description of the ticket")
-    severity: str = Field(..., description="Severity level, e.g., High, Medium, Low")
-    type: str = Field(..., description="Type of the ticket, e.g., Bug, Feature, Task")
-    board_id: str = Field(..., description="ID of the board where the ticket is created")
-
-
-class CreateTicketInput(BaseModel):
-    ticket_data: Optional[TicketData] = Field(
-        None, description="Data required to create a ticket"
-    )
-
-
-class CreateTicketTool(BaseTool):
-    api_wrapper: CarrierAPIWrapper = Field(
-        ..., description="Carrier API Wrapper instance"
-    )
-    name: str = "create_ticket"
-    description: str = "Create a new ticket on Carrier platform with detailed validation and user guidance."
-    args_schema: Type[BaseModel] = CreateTicketInput
-
-    def _run(self, ticket_data: Optional[dict] = None):
-        if not ticket_data:
-            fields_needed = ['title', 'description', 'severity', 'type', 'board_id']
-            error_msg = (
-                f"🚨 It seems you've tried to create a ticket without providing necessary details. "
-                f"Please provide the following required fields: {', '.join(fields_needed)}."
-            )
-            logger.warning(error_msg)
-            raise ToolException(error_msg)
-
-        try:
-            validated_data = TicketData.model_validate(ticket_data)
-        except ValidationError as ve:
-            missing_fields = [err['loc'][0] for err in ve.errors() if err['type'] == 'missing']
-            error_msg = (
-                f"🚨 Missing required fields: {', '.join(missing_fields)}. "
-                "Please include these details to create the ticket."
-            )
-            logger.warning(f"Validation error: {error_msg}")
-            raise ToolException(error_msg)
-
-        try:
-            ticket = self.api_wrapper.create_ticket(validated_data.model_dump())
-            success_msg = f"✅ Ticket created successfully: {json.dumps(ticket, indent=2)}"
-            logger.info(success_msg)
-            return success_msg
-        except Exception as e:
-            stacktrace = traceback.format_exc()
-            logger.error(f"Unexpected error creating ticket: {stacktrace}")
-            raise ToolException(f"Unexpected error: {stacktrace}")
 
 
 class FetchTestDataTool(BaseTool):
@@ -164,7 +108,6 @@ class GetReportFileTool(BaseTool):
 
 __all__ = [
     {"name": "get_ticket_list", "tool": FetchTicketsTool},
-    {"name": "create_ticket", "tool": CreateTicketTool},
     {"name": "fetch_test_data", "tool": FetchTestDataTool},
     {"name": "fetch_audit_logs", "tool": FetchAuditLogsTool},
     {"name": "download_reports", "tool": DownloadReportsTool},
