@@ -510,7 +510,7 @@ class AdvancedJiraMiningWrapper(BaseModel):
         description = self.__clean_text_from_color_identifiers(
             '\n'.join(self.__clean_text_lines(issue_from_bulk_response['fields']['description'])))
         if self.summarization_prompt:
-            return summarize(llm=self.llm, data_to_summarize=description, summarization_key='description',
+            return summarize(llm=self._llm, data_to_summarize=description, summarization_key='description',
                              summarization_prompt=self.summarization_prompt)
         else:
             return description
