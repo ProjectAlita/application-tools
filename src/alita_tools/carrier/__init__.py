@@ -20,10 +20,10 @@ class AlitaCarrierToolkit(BaseToolkit):
     @classmethod
     @lru_cache(maxsize=32)
     def toolkit_config_schema(cls) -> BaseModel:
-        selected_tools = {
-            x["name"]: x["args_schema"].schema()
-            for x in CarrierAPIWrapper.model_construct().get_available_tools()
-        }
+        selected_tools = {}
+        for t in __all__:
+            default = t['tool'].__pydantic_fields__['args_schema'].default
+            selected_tools[t['name']] = default.schema() if default else default
         cls.toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             'CarrierToolkitConfig',
