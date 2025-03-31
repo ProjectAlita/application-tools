@@ -12,6 +12,8 @@ from ..utils import clean_string, TOOLKIT_SPLITTER, get_max_toolkit_length
 __all__ = create_ticket_tool + available_tools
 logger = logging.getLogger(__name__)
 
+name = 'carrier'
+
 
 class AlitaCarrierToolkit(BaseToolkit):
     tools: List[BaseTool] = []
@@ -26,12 +28,12 @@ class AlitaCarrierToolkit(BaseToolkit):
             selected_tools[t['name']] = default.schema() if default else default
         cls.toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
-            'CarrierToolkitConfig',
+            name,
             url=(str, Field(description="Carrier Platform Base URL")),
             organization=(str, Field(description="Carrier Organization Name", json_schema_extra={'toolkit_name': True,
-                                                                                    'max_toolkit_length': cls.toolkit_max_length})),
+                                                                                                 'max_toolkit_length': cls.toolkit_max_length})),
             private_token=(
-            str, Field(description="Carrier Platform Authentication Token", json_schema_extra={'secret': True})),
+                str, Field(description="Carrier Platform Authentication Token", json_schema_extra={'secret': True})),
             project_id=(Optional[str], Field(None, description="Optional project ID for scoped operations")),
             selected_tools=(
                 List[Literal[tuple(selected_tools)]],
@@ -41,6 +43,7 @@ class AlitaCarrierToolkit(BaseToolkit):
                 'metadata': {
                     "label": "Carrier Platform Toolkit",
                     "version": "2.0.1",
+                    "icon_url": "https://getcarrier.io/assets/images/logo.svg",
                     "capabilities": {
                         "total_tools": len(selected_tools),
                         "tool_categories": ["Ticket Management", "Reporting", "Audit Logs"]

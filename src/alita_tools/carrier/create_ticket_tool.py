@@ -107,7 +107,7 @@ class CreateTicketTool(BaseTool):
             error_msg = (
                 "🚨 It looks like you haven't provided ticket data.\n"
                 f"**Required fields**: {', '.join(required_fields)}\n"
-                "Optional fields: external_link, engagement, assignee, start_date, end_date, tags\n"
+                "Optional fields: external_link, engagement, assignee, tags\n"
                 "💡 Example usage:\n"
                 "{\n"
                 "  'title': 'My Example Ticket',\n"
