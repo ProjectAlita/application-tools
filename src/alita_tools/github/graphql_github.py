@@ -88,7 +88,7 @@ class GraphQLTemplates(Enum):
         repository(owner: "$owner", name: "$repo_name") {
             id
             labels (first: 100) { nodes { id name } }
-            assignableUsers (first: 100) { nodes { id name } }
+            assignableUsers (first: 100) { nodes { id name login } }
         }
     }
     """)
