@@ -510,7 +510,7 @@ class AdvancedJiraMiningWrapper(BaseModel):
         description = self.__clean_text_from_color_identifiers(
             '\n'.join(self.__clean_text_lines(issue_from_bulk_response['fields']['description'])))
         if self.summarization_prompt:
-            return summarize(llm=self.llm, data_to_summarize=description, summarization_key='description',
+            return summarize(llm=self._llm, data_to_summarize=description, summarization_key='description',
                              summarization_prompt=self.summarization_prompt)
         else:
             return description
@@ -758,7 +758,8 @@ class AdvancedJiraMiningWrapper(BaseModel):
             result_confluence_docs = self.__split_the_confluence_documents(initial_confluence_docs)
             related_description_list = self.__create_ac_documents_content(jira_issue_key)
             _, vectorstore = self.__prepare_vectorstore(jira_issue_key, obtain_vectorstore=True)
-            vectorstore.add_documents(result_confluence_docs)
+            if result_confluence_docs:
+                vectorstore.add_documents(result_confluence_docs)
             vectorstore.add_documents(related_description_list)
             vectorstore.persist()
             self.__zip_directory(path, zip_file_name)
