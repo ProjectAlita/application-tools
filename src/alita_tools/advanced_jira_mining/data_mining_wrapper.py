@@ -758,7 +758,8 @@ class AdvancedJiraMiningWrapper(BaseModel):
             result_confluence_docs = self.__split_the_confluence_documents(initial_confluence_docs)
             related_description_list = self.__create_ac_documents_content(jira_issue_key)
             _, vectorstore = self.__prepare_vectorstore(jira_issue_key, obtain_vectorstore=True)
-            vectorstore.add_documents(result_confluence_docs)
+            if result_confluence_docs:
+                vectorstore.add_documents(result_confluence_docs)
             vectorstore.add_documents(related_description_list)
             vectorstore.persist()
             self.__zip_directory(path, zip_file_name)
