@@ -13,6 +13,8 @@ class GraphQLTemplates(Enum):
     Attributes:
         QUERY_GET_PROJECT_INFO_TEMPLATE (Template): Template for a query to gather detailed info about projects and their contents
         in a specific repository including labels, assignable users, and project items.
+
+        QUERY_GET_REPO_INFO_TEMPLATE (Template): Template for a query to get information about repository such as repository ID, labels, assignable users.
         
         MUTATION_CREATE_DRAFT_ISSUE (Template): Template for a mutation to create a draft issue in a specific project.
         
@@ -32,6 +34,7 @@ class GraphQLTemplates(Enum):
         
         MUTATION_REMOVE_ISSUE_ASSIGNEES (Template): Template for a mutation to remove assignees from an issue.
     """
+    # bad design, it needs to be refactored to get information about project/repository separately 
     QUERY_GET_PROJECT_INFO_TEMPLATE = Template("""
     query {
         repository(owner: "$owner", name: "$repo_name") {
@@ -76,6 +79,16 @@ class GraphQLTemplates(Enum):
                     }
                 }
             }
+        }
+    }
+    """)
+
+    QUERY_GET_REPO_INFO_TEMPLATE = Template("""
+    query {
+        repository(owner: "$owner", name: "$repo_name") {
+            id
+            labels (first: 100) { nodes { id name } }
+            assignableUsers (first: 100) { nodes { id name } }
         }
     }
     """)
@@ -333,6 +346,40 @@ class GraphQLClient:
         return {
             "project": project,
             "projectId": project['id'],
+            "repositoryId": repository['id'],
+            "labels": labels,
+            "assignableUsers": assignable_users
+        }
+
+    def get_issue_repo(self, owner: str, repo_name: str) -> Union[Dict[str, Any], str]:
+        """
+        Retrieves issue's repository details from a GitHub using GraphQL.
+
+        This method formulates a GraphQL query to fetch repository details, labels, and assignable users based on the owner and repository name provided.
+
+        Args:
+            owner (str): Repository owner.
+            repo_name (str): Repository name.
+
+        Returns:
+            Union[Dict[str, Any], str]: Returns repository details or an error message.
+
+        """
+        query_template = GraphQLTemplates.QUERY_GET_REPO_INFO_TEMPLATE.value
+        query = query_template.safe_substitute(owner=owner, repo_name=repo_name)
+        result = self._run_graphql_query(query)
+        
+        if result['error']:
+            return f"Error occurred: {result['details']}"
+        
+        repository = result.get('data', {}).get('repository')
+        if not repository:
+            return "No repository data found."
+        
+        labels = repository.get('labels', {}).get('nodes', [])
+        assignable_users = repository.get('assignableUsers', {}).get('nodes', [])
+        
+        return {
             "repositoryId": repository['id'],
             "labels": labels,
             "assignableUsers": assignable_users

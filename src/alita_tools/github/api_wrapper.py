@@ -380,8 +380,7 @@ CreateIssueOnProject = create_model(
         ),
     ),
     fields=(
-        Optional[Dict[str, Union[str, List[str]]]
-],
+        Optional[Dict[str, Union[str, List[str]]]],
         Field(
             default=None,
             description="A dictionary of additional fields to set on the issue. Each key should correspond to a field name, and each value to the desired field value. Declare but leave empty if you want to clear field.",
@@ -392,6 +391,13 @@ CreateIssueOnProject = create_model(
                 "Labels": ["bug", "documentation"],
                 "Assignees": ["assignee_name"],
             },
+        ),
+    ),
+    issue_repo=(
+        Optional[str],
+        Field(
+            description="The issue's organization and repository to link target issue on the board.",
+            examples=["OrganizationName/repository-name-2"]
         ),
     ),
 )
@@ -434,7 +440,15 @@ UpdateIssueOnProject = create_model(
                 "Assignees": ["developer_name"]
             }
         )
-    )
+    ),
+    issue_repo=(
+        Optional[str],
+        Field(
+            description="The issue's organization and repository to link target issue on the board.",
+            examples=["OrganizationName/repository-name-2"],
+            required=False
+        ),
+    ),
 )
 
 LoaderSchema = create_model(
@@ -1110,6 +1124,22 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
 
         return parse_code_files_for_db(file_content_generator())
 
+    def _parse_repo(self, repo):
+        """ Helper to extract owner and repository name from provided value. """
+        try:
+            owner_name, repo_name = repo.split("/")
+            return owner_name, repo_name
+        except Exception as e:
+            return f"'{repo}' repo format is invalid. It should be like 'org-name/repo-name'. Error: {str(e)}"
+    
+    def _get_repo_extra_info(self, repository):
+        """ Helper to extract repository ID, labels and assignable users of the repository. """
+        repository_id = repository.get("repositoryId")
+        labels = repository.get("labels")
+        assignable_users = repository.get("assignableUsers")
+
+        return repository_id, labels, assignable_users
+
     def create_issue_on_project(
         self,
         board_repo: str,
@@ -1117,6 +1147,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         title: str,
         body: str,
         fields: Optional[Dict[str, str]] = None,
+        issue_repo: Optional[str] = None
     ) -> str:
         """
         Creates an issue within a specified project using a series of GraphQL operations.
@@ -1131,6 +1162,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             title (str): Title for the newly created issue.
             body (str): Body text for the newly created issue.
             fields (Optional[Dict[str, str]]): Additional key value pairs for issue field configurations.
+            issue_repo (Optional[str]): The issue's organization and repository to link issue on the board. Example: 'org-name/repo-name-2'
 
         Returns:
             str: A message indicating the outcome of the operation, with details of the newly created issue
@@ -1141,29 +1173,38 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         """
         _graphql_client = self._get_graphql_client()
         try:
-            owner_name, repo_name = board_repo.split("/")
-        except Exception as e:
-            return f"Board repo format is invalid. It should be like 'org-name/repo-name'. Error: {str(e)}"
+            owner_name, repo_name = self._parse_repo(board_repo)
+        except ValueError as e:
+            return str(e)
 
         try:
             result = _graphql_client.get_project(owner=owner_name, repo_name=repo_name, project_title=project_title)
             project = result.get("project")
-            labels = result.get("labels")
-            assignableUsers = result.get("assignableUsers")
             project_id = result.get("projectId")
-            repository_id = result.get("repositoryId")
+            if issue_repo:
+                try:
+                    issue_owner_name, issue_repo_name = self._parse_repo(issue_repo)
+                except ValueError as e:
+                    return str(e)
+                
+                issue_repo_result = _graphql_client.get_issue_repo(owner=issue_owner_name, repo_name=issue_repo_name)\
+                
+                repository_id, labels, assignable_users = self._get_repo_extra_info(issue_repo_result)
+            else:
+                repository_id, labels, assignable_users = self._get_repo_extra_info(result)
         except Exception as e:
             return f"Project has not been found. Error: {str(e)}. {str(result)}"
 
-        try:
-            missing_fields = []
-            updated_fields = []
-            if fields:
+        missing_fields = []
+        updated_fields = []
+
+        if fields:
+            try:
                 fields_to_update, missing_fields = _graphql_client.get_project_fields(
-                    project, fields, labels, assignableUsers
+                    project, fields, labels, assignable_users
                 )
-        except Exception as e:
-            return f"Project fields are not returned. Error: {str(e)}"
+            except Exception as e:
+                return f"Project fields are not returned. Error: {str(e)}"
 
         try:
             draft_issue_item_id = _graphql_client.create_draft_issue(
@@ -1182,16 +1223,16 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         except Exception as e:
             return f"Convert Issue Failed. Error: {str(e)}. {str(issue_number)}"
 
-        try:
-            if fields:
+        if fields:
+            try:
                 updated_fields = _graphql_client.update_issue_fields(
                     project_id=project_id,
                     item_id=item_id,
                     issue_item_id=issue_item_id,
                     fields=fields_to_update
                 )
-        except Exception as e:
-            return f"Issue fields are not updated. Error: {str(e)}. {str(updated_fields)}"
+            except Exception as e:
+                return f"Issue fields are not updated. Error: {str(e)}. {str(updated_fields)}"
 
         base_message = f"The issue with number '{issue_number}' has been created."
         fields_message = ""
@@ -1209,7 +1250,8 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         project_title: str,
         title: str,
         body: str,
-        fields: Optional[Dict[str, str]],
+        fields: Optional[Dict[str, str]] = None,
+        issue_repo: Optional[str] = None
     ) -> str:
         """
         Updates an existing issue specified by issue number within a project, title, body, and other fields.
@@ -1220,7 +1262,8 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             project_title (str): The title of the project from which to fetch the issue.
             title (str): New title to set for the issue.
             body (str): New body content to set for the issue.
-            fields (Optional[Dict[str, str]]): A dictionary of additional field values by field names to update. Provide empty string to clear field
+            fields (Optional[Dict[str, str]]): A dictionary of additional field values by field names to update. Provide empty string to clear field.
+            issue_repo (Optional[str]): The issue's organization and repository to link issue on the board. Example: 'org-name/repo-name-2'.
 
         Returns:
             str: Summary of the update operation and any changes applied or errors encountered.
@@ -1231,25 +1274,39 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         _graphql_client = self._get_graphql_client()
         
         try:
-            owner_name, repo_name = board_repo.split("/")
+            owner_name, repo_name = self._parse_repo(board_repo)
         except Exception as e:
-            return f"Board repo format is invalid. It should be like 'org-name/repo-name'. Error: {str(e)}"
+            return str(e)
 
         try:
             result = _graphql_client.get_project(owner=owner_name, repo_name=repo_name, project_title=project_title)
             project = result.get("project")
-            labels = result.get("labels")
-            assignableUsers = result.get("assignableUsers")
             project_id = result.get("projectId")
+
+            if issue_repo:
+                try:
+                    issue_owner_name, issue_repo_name = self._parse_repo(issue_repo)
+                except ValueError as e:
+                    return str(e)
+                
+                issue_repo_result = _graphql_client.get_issue_repo(owner=issue_owner_name, repo_name=issue_repo_name)\
+                
+                repository_id, labels, assignable_users = self._get_repo_extra_info(issue_repo_result)
+            else:
+                repository_id, labels, assignable_users = self._get_repo_extra_info(result)
         except Exception as e:
             return f"Project has not been found. Error: {str(e)}. {str(result)}"
 
-        try:
-            fields_to_update, missing_fields = _graphql_client.get_project_fields(
-                project, fields, labels, assignableUsers
-            )
-        except Exception as e:
-            return f"Project fields are not returned. Error: {str(e)}"
+        missing_fields = []
+        fields_to_update = []
+
+        if fields:
+            try:
+                fields_to_update, missing_fields = _graphql_client.get_project_fields(
+                    project, fields, labels, assignable_users
+                )
+            except Exception as e:
+                return f"Project fields are not returned. Error: {str(e)}"
 
         issue_item_id = None
         items = project['items']['nodes']
@@ -1274,20 +1331,21 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         except Exception as e:
             return f"Issue title and body have not updated. Error: {str(e)}. {str(updated_issue)}"
 
-        try:
-            item_label_ids = [label["id"] for label in item_labels]
-            item_assignee_ids = [assignee["id"] for assignee in item_assignees]
+        if fields_to_update:
+            try:
+                item_label_ids = [label["id"] for label in item_labels]
+                item_assignee_ids = [assignee["id"] for assignee in item_assignees]
 
-            updated_fields = _graphql_client.update_issue_fields(
-                project_id=project_id,
-                item_id=item_id,
-                issue_item_id=issue_item_id,
-                fields=fields_to_update,
-                item_label_ids=item_label_ids,
-                item_assignee_ids=item_assignee_ids
-            )
-        except Exception as e:
-            return f"Issue fields are not updated. Error: {str(e)}. {str(updated_fields)}"
+                updated_fields = _graphql_client.update_issue_fields(
+                    project_id=project_id,
+                    item_id=item_id,
+                    issue_item_id=issue_item_id,
+                    fields=fields_to_update,
+                    item_label_ids=item_label_ids,
+                    item_assignee_ids=item_assignee_ids
+                )
+            except Exception as e:
+                return f"Issue fields are not updated. Error: {str(e)}. {str(updated_fields)}"
 
         base_message = f"The issue with number '{issue_number}' has been updated."
         fields_message = ""
