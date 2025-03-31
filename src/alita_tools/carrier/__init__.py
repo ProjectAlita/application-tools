@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Literal
 from langchain_core.tools import BaseToolkit, BaseTool
 from pydantic import create_model, BaseModel, ConfigDict, Field
 from functools import lru_cache
@@ -20,24 +20,29 @@ class AlitaCarrierToolkit(BaseToolkit):
     @classmethod
     @lru_cache(maxsize=32)
     def toolkit_config_schema(cls) -> BaseModel:
-
-        tool_names = {tool['name'] for tool in __all__}
-        cls.toolkit_max_length = get_max_toolkit_length({name: None for name in tool_names})
-
+        selected_tools = {
+            x["name"]: x["args_schema"].schema()
+            for x in CarrierAPIWrapper.model_construct().get_available_tools()
+        }
+        cls.toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             'CarrierToolkitConfig',
             url=(str, Field(description="Carrier Platform Base URL")),
-            organization=(str, Field(description="Carrier Organization Name")),
+            organization=(str, Field(description="Carrier Organization Name", json_schema_extra={'toolkit_name': True,
+                                                                                    'max_toolkit_length': cls.toolkit_max_length})),
             private_token=(
             str, Field(description="Carrier Platform Authentication Token", json_schema_extra={'secret': True})),
             project_id=(Optional[str], Field(None, description="Optional project ID for scoped operations")),
-            selected_tools=(List[str], Field(default=list(tool_names))),
+            selected_tools=(
+                List[Literal[tuple(selected_tools)]],
+                Field(default=[], json_schema_extra={"args_schemas": selected_tools}),
+            ),
             __config__=ConfigDict(json_schema_extra={
                 'metadata': {
                     "label": "Carrier Platform Toolkit",
                     "version": "2.0.1",
                     "capabilities": {
-                        "total_tools": len(tool_names),
+                        "total_tools": len(selected_tools),
                         "tool_categories": ["Ticket Management", "Reporting", "Audit Logs"]
                     }
                 }
@@ -70,7 +75,6 @@ class AlitaCarrierToolkit(BaseToolkit):
                 continue
             try:
                 tool_instance = tool_def['tool'](api_wrapper=carrier_api_wrapper)
-                #  tool_instance.name = prefix + tool_def['name']
                 tools.append(tool_instance)
                 logger.info(f"[AlitaCarrierToolkit] Successfully initialized tool '{tool_instance.name}'")
             except Exception as e:
