@@ -3,8 +3,9 @@ import os
 import re
 import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Optional, Tuple, Any, List, Set
+from typing import Optional, Tuple, Any, List, Set, Iterator
 
+from atlassian.errors import ApiError
 from langchain_community.document_loaders import ConfluenceLoader
 from langchain_community.document_loaders.confluence import ContentFormat
 from langchain_community.embeddings import HuggingFaceEmbeddings
@@ -146,7 +147,7 @@ class AdvancedJiraMiningWrapper(BaseModel):
             cls._client = Jira(url=url, token=token, cloud=is_cloud, verify_ssl=values['verify_ssl'])
         else:
             cls._client = Jira(url=url, username=username, password=api_key, cloud=is_cloud,
-                                    verify_ssl=values['verify_ssl'])
+                               verify_ssl=values['verify_ssl'])
         cls._llm = values['llm']
         return values
 
@@ -193,6 +194,48 @@ class AdvancedJiraMiningWrapper(BaseModel):
 
         return re.findall(r'\d{4,12}', '\n'.join(confluence_remote_links), re.DOTALL)
 
+    def __get_issues_by_jql_query(
+            self,
+            jql,
+            fields="*all",
+            start=0,
+            limit=None,
+            expand=None,
+            validate_query=None,
+    ) -> Iterator[List[dict]]:
+        params = {}
+        if limit is not None:
+            params["maxResults"] = int(limit)
+        if fields is not None:
+            if isinstance(fields, (list, tuple, set)):
+                fields = ",".join(fields)
+            params["fields"] = fields
+        if jql is not None:
+            params["jql"] = jql
+        if expand is not None:
+            params["expand"] = expand
+        if validate_query is not None:
+            params["validateQuery"] = validate_query
+        url = self._client.resource_url("search")
+
+        while True:
+            params["startAt"] = int(start)
+            try:
+                response = self._client.get(url, params=params)
+                if not response:
+                    break
+            except ApiError as e:
+                error_message = f"Jira API error: {str(e)}"
+                raise ValueError(f"Failed to fetch issues from Jira: {error_message}")
+
+            issues = response["issues"]
+            yield issues
+            if limit is not None and len(response["issues"]) + start >= limit:
+                break
+            if not response["issues"]:
+                break
+            start += len(issues)
+
     def __fetch_all_linked_jira_issue_keys(self, jira_issue_key: str) -> Set[str]:
         """
         Fetches all linked Jira issue keys that are not of type Bug, Task, or Sub-task.
@@ -208,20 +251,27 @@ class AdvancedJiraMiningWrapper(BaseModel):
             Set[str]: A set of linked Jira issue keys that are not of type Bug, Task, or Sub-task.
         """
         linked_issues_keys = set()
-        jira_issue = self._client.issue(jira_issue_key, fields='issuelinks')
-        linked_links = [link for link in jira_issue['fields']['issuelinks']]
-        for link in linked_links:
-            if link.get('outwardIssue') is not None:
-                # Include in result set ONLY those issues, which are not of type Bug, Task, or Sub-task
-                if not (link['outwardIssue']['fields']['issuetype']['name'] in ['Bug', 'Task', 'Sub-task']):
-                    linked_issues_keys.add(link['outwardIssue']['key'])
-            else:
-                # Include in result set ONLY those issues, which are not of type Bug, Task, or Sub-task
-                if not (link['inwardIssue']['fields']['issuetype']['name'] in ['Bug', 'Task', 'Sub-task']):
-                    linked_issues_keys.add(link['inwardIssue']['key'])
+        jira_issue_type = self._client.issue(jira_issue_key, fields='issuetype')
+        if jira_issue_type['fields']['issuetype']['name'] == 'Epic':
+            related_issues = self.__get_issues_by_jql_query(f'parentEpic = {jira_issue_key}', fields='description')
+            for issues_chunk in related_issues:
+                linked_issues_keys.update({item['key'] for item in issues_chunk})
+            return linked_issues_keys
+        else:
+            jira_issue = self._client.issue(jira_issue_key, fields='issuelinks')
+            linked_links = [link for link in jira_issue['fields']['issuelinks']]
+            for link in linked_links:
+                if link.get('outwardIssue') is not None:
+                    # Include in result set ONLY those issues, which are not of type Bug, Task, or Sub-task
+                    if not (link['outwardIssue']['fields']['issuetype']['name'] in ['Bug', 'Task', 'Sub-task']):
+                        linked_issues_keys.add(link['outwardIssue']['key'])
+                else:
+                    # Include in result set ONLY those issues, which are not of type Bug, Task, or Sub-task
+                    if not (link['inwardIssue']['fields']['issuetype']['name'] in ['Bug', 'Task', 'Sub-task']):
+                        linked_issues_keys.add(link['inwardIssue']['key'])
         return linked_issues_keys
 
-    def __bulk_fetch_specific_fields_from_jira_issue_key(self, jira_issue_keys: List[str], fields="*all") -> List[str]:
+    def __bulk_fetch_specific_fields_from_jira_issue_key(self, jira_issue_keys: List[str], fields="*all") -> List[dict]:
         """
         Fetches specific fields from multiple Jira issues in bulk.
 
@@ -233,9 +283,13 @@ class AdvancedJiraMiningWrapper(BaseModel):
             fields (str): The fields to be retrieved from the Jira issues. Default is "*all".
 
         Returns:
-            List[str]: A list of Jira issues with the specified fields.
+            List[dict]: A list of Jira issues with the specified fields.
         """
-        issues = self._client.bulk_issue(jira_issue_keys, fields=fields)
+        issues = []
+        jql = "key in ({})".format(", ".join(set(jira_issue_keys)))
+        issues_generator = self.__get_issues_by_jql_query(jql=jql, fields=fields)
+        for issues_chunk in issues_generator:
+            issues.extend(issues_chunk)
         return issues
 
     def __get_all_jira_issue_keys_from_issue_description(self, jira_issue_key: str) -> List[str]:
@@ -272,6 +326,8 @@ class AdvancedJiraMiningWrapper(BaseModel):
             List[str]: A list of unique Jira issue keys extracted from the AC field.
         """
         jira_issue = self._client.issue(jira_issue_key, 'customfield_10300')
+        if jira_issue['fields']['customfield_10300'] is None:
+            return set()
         ac = jira_issue['fields']['customfield_10300']
         return list(set(re.findall(r'[A-Z]{1,5}-\d{1,5}', ac, re.DOTALL)))
 
@@ -547,12 +603,12 @@ class AdvancedJiraMiningWrapper(BaseModel):
         # Get all the jJira issue keys related to jira issue passed in method argument
         jira_keys = self.__get_all_linked_and_in_text_jira_keys(jira_issue_key)
         # Find all the descriptions for all the related jira issues + issue passed in argument itself
-        found_issues, _ = self.__bulk_fetch_specific_fields_from_jira_issue_key(jira_keys, fields='description')
+        found_issues = self.__bulk_fetch_specific_fields_from_jira_issue_key(jira_keys, fields='description')
 
         with ThreadPoolExecutor(max_workers=10) as executor:
             future_to_issue = {
                 executor.submit(self.__process_issue_from_bulk_response, issue): issue for issue in
-                found_issues['issues']}
+                found_issues}
             for future in as_completed(future_to_issue):
                 jira_issue = future_to_issue[future]
                 try:
@@ -745,7 +801,6 @@ class AdvancedJiraMiningWrapper(BaseModel):
 
         return output
 
-
     def prepare_data(self, jira_issue_key: str) -> str:
         """ Prepare the embeddings for the specific jira issue key. They will include both Jira and Confluence info. """
         path, _ = self.__prepare_vectorstore(jira_issue_key)
@@ -849,13 +904,13 @@ class AdvancedJiraMiningWrapper(BaseModel):
         if self.gaps_analysis_prompt:
             # Create the LLM chain with the provided in settings gaps_analysis_prompt
             chain = (
-                RunnableParallel({
-                    'context': retriever | RunnableLambda(self.__build_search_results),
-                    'question': RunnablePassthrough()
-                })
-                | RunnableLambda(self.__build_prompt)
-                | self._llm
-                | StrOutputParser()
+                    RunnableParallel({
+                        'context': retriever | RunnableLambda(self.__build_search_results),
+                        'question': RunnablePassthrough()
+                    })
+                    | RunnableLambda(self.__build_prompt)
+                    | self._llm
+                    | StrOutputParser()
             )
             return chain.invoke(query)
         else:
