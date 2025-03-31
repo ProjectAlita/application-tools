@@ -37,7 +37,7 @@ class GraphQLTemplates(Enum):
         repository(owner: "$owner", name: "$repo_name") {
             id
             labels (first: 100) { nodes { id name } }
-            assignableUsers (first: 100) { nodes { id name } }
+            assignableUsers (first: 100) { nodes { id name login } }
             projectsV2(first: 10) {
                 nodes
                 {
@@ -273,9 +273,6 @@ class GraphQLClient:
                 ''',
                 variables={'number_of_repos': 5}
             )
-
-            print(result)
-
         Note:
             Handle this method with caution to prevent API misuse or high costs.
         """
@@ -364,7 +361,7 @@ class GraphQLClient:
                     project=my_project,
                     fields={"Due Date": ['2022-10-30'], "Assignee": ['username1']},
                     available_labels=[{"name": "bug", "id": "label123"}],
-                    available_assignees=[{"name": "dev1", "id": "user123"}]
+                    available_assignees=[{"name": "dev1", "id": "user123", "login": "dev1"}]
                 )
         """
         fields_to_update = []
@@ -373,7 +370,13 @@ class GraphQLClient:
         available_fields = {field.get("name"): field for field in project.get("fields", {}).get("nodes", []) if field}
 
         label_map = {label['name']: label['id'] for label in (available_labels or [])}
-        assignee_map = {assignee['name']: assignee['id'] for assignee in (available_assignees or [])}
+        assignee_map = {}
+        for assignee in (available_assignees or []):
+            if assignee['login'] not in assignee_map:
+                assignee_map[assignee['login']] = assignee['id']
+            if assignee['name'] and assignee['name'] not in assignee_map:
+                assignee_map[assignee['name']] = assignee['id']
+
 
         def handle_single_select(field, option_name):
             options = field.get("options", [])
