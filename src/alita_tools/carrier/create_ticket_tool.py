@@ -101,6 +101,8 @@ class CreateTicketTool(BaseTool):
         (title, description, severity, etc.) as separate arguments.
         """
         # 1) If no fields at all were provided
+        required_fields = ['title', 'description', 'severity', 'type', 'board_id', 'start_date', 'end_date']
+
         if not fields:
             error_msg = (
                 "🚨 It looks like you haven't provided ticket data.\n"
