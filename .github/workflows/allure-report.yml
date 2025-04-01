@@ -2,9 +2,9 @@ name: Allure Report Workflow
 
 on:
   workflow_dispatch:
-  pull_request:
-  push:
-    branches: [refactoring/pytest-intro]
+  # pull_request:
+  # push:
+  #   branches: [main]
 
 concurrency:
   group: ${{ github.event_name }}-${{ github.ref }}

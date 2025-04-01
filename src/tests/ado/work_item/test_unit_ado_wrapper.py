@@ -139,6 +139,22 @@ class TestAdoWorkItemWrapper:
 
         expected_error = ToolException("Error creating work item: API Error")
         assert str(expected_error) == str(result)
+    
+    @pytest.mark.negative
+    def test_create_work_item_api_error_unknown_value(self, ado_wrapper, mock_connection):
+        """Test create_work_item when the connection fails with 'unknown error'."""
+        work_item_data = {"fields": {"System.Title": "Test"}}
+        work_item_json = json.dumps(work_item_data)
+        mock_connection.create_work_item.side_effect = Exception("unknown value")
+        
+        expected_error_message = "Unable to create work item due to incorrect assignee: unknown value"
+        expected_error = ToolException(expected_error_message)
+
+        with patch("src.alita_tools.ado.work_item.ado_wrapper.logger.error") as mock_logger_error:
+            result = ado_wrapper.create_work_item(work_item_json=work_item_json, wi_type="Task")
+            
+            assert str(expected_error) == str(result)
+            mock_logger_error.assert_called_once_with(expected_error_message)
 
     @pytest.mark.positive
     def test_update_work_item_success(self, ado_wrapper, mock_connection):
