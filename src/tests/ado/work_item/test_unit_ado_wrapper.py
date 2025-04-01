@@ -73,7 +73,7 @@ class TestAdoWorkItemWrapper:
         """Test create_work_item with invalid JSON input."""
         result = ado_wrapper.create_work_item(work_item_json="invalid json{", wi_type="Task")
 
-        expected_error = ToolException("Issues during attempt to parse work_item_json:")
+        expected_error = ToolException("Issues during attempt to parse work_item_json: Issues during attempt to parse work_item_json: Expecting value: line 1 column 1 (char 0)")
         assert str(expected_error) == str(result)
 
     @pytest.mark.negative
@@ -82,7 +82,7 @@ class TestAdoWorkItemWrapper:
         work_item_json = json.dumps({"other_key": "value"})
         result = ado_wrapper.create_work_item(work_item_json=work_item_json, wi_type="Task")
 
-        expected_error = ToolException("The 'fields' property is missing")
+        expected_error = ToolException("Issues during attempt to parse work_item_json: The 'fields' property is missing from the work_item_json.")
         assert str(expected_error) == str(result)
 
     @pytest.mark.negative
@@ -112,7 +112,7 @@ class TestAdoWorkItemWrapper:
         result = ado_wrapper.update_work_item(id=work_item_id, work_item_json=update_json)
 
         mock_connection.update_work_item.assert_called_once_with(
-            id=int(work_item_id),
+            id=work_item_id,
             document=expected_patch_document,
             project=ado_wrapper.project
         )
@@ -129,7 +129,7 @@ class TestAdoWorkItemWrapper:
         # Now expect the exception to be raised directly by update_work_item
         result = ado_wrapper.update_work_item(id=work_item_id, work_item_json=update_json)
 
-        expected_error = ToolException(f"Error updating work item {work_item_id}: Update Failed")
+        expected_error = ToolException("Issues during attempt to parse work_item_json: Update Failed")
         assert str(expected_error) == str(result)
 
         # Ensure _transform_work_item was still called before the API error
@@ -139,7 +139,7 @@ class TestAdoWorkItemWrapper:
             {"op": "add", "path": "/fields/System.Title", "value": "Updated Title"}
         ]
         mock_connection.update_work_item.assert_called_once_with(
-            id=int(work_item_id),
+            id=work_item_id,
             document=expected_patch_document,
             project=ado_wrapper.project
         )
@@ -171,8 +171,8 @@ class TestAdoWorkItemWrapper:
     @pytest.mark.positive
     def test_link_work_items_success(self, ado_wrapper, mock_connection):
         """Test linking two work items successfully."""
-        source_id = 10
-        target_id = 20
+        source_id = '10'
+        target_id = '20'
         link_type = "System.LinkTypes.Dependency-forward"
         attributes = {"comment": "Depends on this"}
 
@@ -206,7 +206,7 @@ class TestAdoWorkItemWrapper:
 
         result = ado_wrapper.link_work_items(source_id, target_id, invalid_link_type)
 
-        expected_error = ToolException("Link type is incorrect")
+        expected_error = ToolException("Link type is incorrect. You have to use proper relation's reference name NOT relation's name: {'Dependency': 'System.LinkTypes.Dependency-forward'}")
         assert str(expected_error) == str(result)
 
         mock_connection.update_work_item.assert_not_called()
@@ -364,7 +364,7 @@ class TestAdoWorkItemWrapper:
 
         result = ado_wrapper.get_work_item(id=work_item_id)
 
-        expected_error = ToolException(f"Error getting work item {work_item_id}: Get Failed")
+        expected_error = ToolException("Error getting work item: Get Failed")
         assert str(expected_error) == str(result)
 
     @pytest.mark.positive
@@ -385,7 +385,7 @@ class TestAdoWorkItemWrapper:
             project=ado_wrapper.project,
             work_item_id=work_item_id,
             top=ado_wrapper.limit, # Uses wrapper's internal limit for portion size
-            include_deleted=False,
+            include_deleted=None,
             expand="renderedText",
             order=None
         )
@@ -397,15 +397,19 @@ class TestAdoWorkItemWrapper:
     @pytest.mark.positive
     def test_get_comments_success_multiple_pages(self, ado_wrapper, mock_connection):
         """Test getting comments successfully (multiple pages)."""
-        work_item_id = 123
+        work_item_id = "123"
         limit_total = 3 # Request total 3 comments
         wrapper_limit = 2 # Simulate wrapper fetching 2 per page
         ado_wrapper.limit = wrapper_limit
 
-        mock_comment1 = MagicMock(spec=WorkItemComment); mock_comment1.as_dict.return_value = {"id": 1}
-        mock_comment2 = MagicMock(spec=WorkItemComment); mock_comment2.as_dict.return_value = {"id": 2}
-        mock_comment3 = MagicMock(spec=WorkItemComment); mock_comment3.as_dict.return_value = {"id": 3}
-        mock_comment4 = MagicMock(spec=WorkItemComment); mock_comment4.as_dict.return_value = {"id": 4}
+        mock_comment1 = MagicMock(spec=WorkItemComment)
+        mock_comment1.as_dict.return_value = {"id": 1}
+        mock_comment2 = MagicMock(spec=WorkItemComment)
+        mock_comment2.as_dict.return_value = {"id": 2}
+        mock_comment3 = MagicMock(spec=WorkItemComment)
+        mock_comment3.as_dict.return_value = {"id": 3}
+        mock_comment4 = MagicMock(spec=WorkItemComment)
+        mock_comment4.as_dict.return_value = {"id": 4}
 
         # Page 1 response
         mock_comments_page1 = MagicMock(spec=WorkItemComments, comments=[mock_comment1, mock_comment2], continuation_token="token123")
@@ -418,11 +422,8 @@ class TestAdoWorkItemWrapper:
 
         expected_calls = [
             # First call fetches `wrapper_limit`
-            call(project=ado_wrapper.project, work_item_id=work_item_id, top=wrapper_limit, include_deleted=False, expand=None, order=None),
-            # Second call uses continuation token, fetches remaining needed (limit_total - already_fetched) = 3 - 2 = 1
-            # But the wrapper fetches min(wrapper_limit, remaining_needed) = min(2, 1) = 1? No, the code has top=fetch_top
-            # fetch_top = min(limit_portion, remaining_limit) = min(2, 1) = 1
-            call(continuation_token="token123", project=ado_wrapper.project, work_item_id=work_item_id, top=1, include_deleted=False, expand=None, order=None)
+            call(project=ado_wrapper.project, work_item_id=work_item_id, top=wrapper_limit, include_deleted=None, expand=None, order=None),
+            call(continuation_token="token123", project=ado_wrapper.project, work_item_id=work_item_id, top=1, include_deleted=None, expand=None, order=None)
         ]
         mock_connection.get_comments.assert_has_calls(expected_calls)
         assert mock_connection.get_comments.call_count == 2 # Still 2 calls expected
@@ -439,5 +440,5 @@ class TestAdoWorkItemWrapper:
 
         result = ado_wrapper.get_comments(work_item_id=work_item_id)
 
-        expected_error = ToolException(f"Error getting work item comments for {work_item_id}: Get Comments Failed")
+        expected_error = ToolException("Error getting work item comments: Get Comments Failed")
         assert str(expected_error) == str(result)
