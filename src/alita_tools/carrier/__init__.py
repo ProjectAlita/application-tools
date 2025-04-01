@@ -41,7 +41,7 @@ class AlitaCarrierToolkit(BaseToolkit):
             ),
             __config__=ConfigDict(json_schema_extra={
                 'metadata': {
-                    "label": "Carrier Platform Toolkit",
+                    "label": "Carrier",
                     "version": "2.0.1",
                     "icon_url": "https://getcarrier.io/assets/images/logo.svg",
                     "capabilities": {
