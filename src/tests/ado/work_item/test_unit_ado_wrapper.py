@@ -71,23 +71,19 @@ class TestAdoWorkItemWrapper:
     @pytest.mark.negative
     def test_create_work_item_invalid_json(self, ado_wrapper):
         """Test create_work_item with invalid JSON input."""
-        try:
-            ado_wrapper.create_work_item(work_item_json="invalid json{", wi_type="Task")
-        except ToolException as e:
-            assert str(e) == "Issues during attempt to parse work_item_json:"
-        else:
-            pytest.fail("ToolException was not raised")
+        result = ado_wrapper.create_work_item(work_item_json="invalid json{", wi_type="Task")
+
+        expected_error = ToolException("Issues during attempt to parse work_item_json:")
+        assert str(expected_error) == str(result)
 
     @pytest.mark.negative
     def test_create_work_item_missing_fields(self, ado_wrapper):
         """Test create_work_item with JSON missing 'fields' key."""
         work_item_json = json.dumps({"other_key": "value"})
-        try:
-            ado_wrapper.create_work_item(work_item_json=work_item_json, wi_type="Task")
-        except ToolException as e:
-            assert str(e) == "The 'fields' property is missing"
-        else:
-            pytest.fail("ToolException was not raised")
+        result = ado_wrapper.create_work_item(work_item_json=work_item_json, wi_type="Task")
+
+        expected_error = ToolException("The 'fields' property is missing")
+        assert str(expected_error) == str(result)
 
     @pytest.mark.negative
     def test_create_work_item_api_error(self, ado_wrapper, mock_connection):
@@ -96,12 +92,10 @@ class TestAdoWorkItemWrapper:
         work_item_json = json.dumps(work_item_data)
         mock_connection.create_work_item.side_effect = Exception("API Error")
 
-        try:
-            ado_wrapper.create_work_item(work_item_json=work_item_json, wi_type="Task")
-        except ToolException as e:
-            assert str(e) == "Error creating work item: API Error"
-        else:
-            pytest.fail("ToolException was not raised")
+        result = ado_wrapper.create_work_item(work_item_json=work_item_json, wi_type="Task")
+
+        expected_error = ToolException("Error creating work item: API Error")
+        assert str(expected_error) == str(result)
 
     @pytest.mark.positive
     def test_update_work_item_success(self, ado_wrapper, mock_connection):
@@ -133,12 +127,10 @@ class TestAdoWorkItemWrapper:
         mock_connection.update_work_item.side_effect = Exception("Update Failed")
 
         # Now expect the exception to be raised directly by update_work_item
-        try:
-            ado_wrapper.update_work_item(id=work_item_id, work_item_json=update_json)
-        except ToolException as e:
-            assert str(e) == f"Error updating work item {work_item_id}: Update Failed"
-        else:
-            pytest.fail("ToolException was not raised")
+        result = ado_wrapper.update_work_item(id=work_item_id, work_item_json=update_json)
+
+        expected_error = ToolException(f"Error updating work item {work_item_id}: Update Failed")
+        assert str(expected_error) == str(result)
 
         # Ensure _transform_work_item was still called before the API error
         # We need to check the mock_connection call args to see if transform happened
@@ -212,12 +204,10 @@ class TestAdoWorkItemWrapper:
         invalid_link_type = "Invalid.Link.Type"
         ado_wrapper._relation_types = {"Dependency": "System.LinkTypes.Dependency-forward"} # Populate cache
 
-        try:
-            ado_wrapper.link_work_items(source_id, target_id, invalid_link_type)
-        except ToolException as e:
-            assert str(e) == "Link type is incorrect"
-        else:
-            pytest.fail("ToolException was not raised")
+        result = ado_wrapper.link_work_items(source_id, target_id, invalid_link_type)
+
+        expected_error = ToolException("Link type is incorrect")
+        assert str(expected_error) == str(result)
 
         mock_connection.update_work_item.assert_not_called()
 
@@ -230,12 +220,10 @@ class TestAdoWorkItemWrapper:
         ado_wrapper._relation_types = {"Dependency": link_type} # Populate cache
         mock_connection.update_work_item.side_effect = Exception("Link Failed")
 
-        try:
-            ado_wrapper.link_work_items(source_id, target_id, link_type)
-        except ToolException as e:
-            assert str(e) == f"Error linking work item {source_id} to {target_id}: Link Failed"
-        else:
-            pytest.fail("ToolException was not raised")
+        result = ado_wrapper.link_work_items(source_id, target_id, link_type)
+
+        expected_error = ToolException(f"Error linking work item {source_id} to {target_id}: Link Failed")
+        assert str(expected_error) == str(result)
 
         mock_connection.update_work_item.assert_called_once() # Should still be called once
 
@@ -298,12 +286,10 @@ class TestAdoWorkItemWrapper:
         query = "SELECT [System.Id] FROM WorkItems"
         mock_connection.query_by_wiql.side_effect = Exception("Search Failed")
 
-        try:
-            ado_wrapper.search_work_items(query=query)
-        except ToolException as e:
-            assert str(e) == "Error searching work items: Search Failed"
-        else:
-            pytest.fail("ToolException was not raised")
+        result = ado_wrapper.search_work_items(query=query)
+
+        expected_error = ToolException("Error searching work items: Search Failed")
+        assert str(expected_error) == str(result)
 
     @pytest.mark.positive
     def test_get_work_item_success(self, ado_wrapper, mock_connection):
@@ -376,12 +362,10 @@ class TestAdoWorkItemWrapper:
         work_item_id = 999
         mock_connection.get_work_item.side_effect = Exception("Get Failed")
 
-        try:
-            ado_wrapper.get_work_item(id=work_item_id)
-        except ToolException as e:
-            assert str(e) == f"Error getting work item {work_item_id}: Get Failed"
-        else:
-            pytest.fail("ToolException was not raised")
+        result = ado_wrapper.get_work_item(id=work_item_id)
+
+        expected_error = ToolException(f"Error getting work item {work_item_id}: Get Failed")
+        assert str(expected_error) == str(result)
 
     @pytest.mark.positive
     def test_get_comments_success_single_page(self, ado_wrapper, mock_connection):
@@ -453,9 +437,7 @@ class TestAdoWorkItemWrapper:
         work_item_id = 123
         mock_connection.get_comments.side_effect = Exception("Get Comments Failed")
 
-        try:
-            ado_wrapper.get_comments(work_item_id=work_item_id)
-        except ToolException as e:
-            assert str(e) == f"Error getting work item comments for {work_item_id}: Get Comments Failed"
-        else:
-            pytest.fail("ToolException was not raised")
+        result = ado_wrapper.get_comments(work_item_id=work_item_id)
+
+        expected_error = ToolException(f"Error getting work item comments for {work_item_id}: Get Comments Failed")
+        assert str(expected_error) == str(result)
