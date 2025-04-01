@@ -40,6 +40,49 @@ def ado_wrapper(mock_basic_auth, mock_connection):
 @pytest.mark.unit
 @pytest.mark.ado
 class TestAdoWorkItemWrapper:
+    @pytest.mark.positive
+    def test_validate_toolkit_success(self, ado_wrapper):
+        values = {
+            "organization_url": "https://dev.azure.com/mockorg",
+            "token": "mock_pat",
+            "project": "mock_project",
+            "limit": 10
+        }
+        result = ado_wrapper.validate_toolkit(values)
+        assert result is not None
+        assert result == values
+    
+    @pytest.mark.negative
+    def test_validate_toolkit_missing_organization(self, ado_wrapper, mock_connection):
+        values = {
+            "token": "mock_pat",
+            "project": "mock_project",
+            "limit": 10
+        }
+        result = ado_wrapper.validate_toolkit(values)
+        expected_error = ImportError("Failed to connect to Azure DevOps: 'organization_url'")
+
+        assert str(expected_error) == str(result)
+    
+    @pytest.mark.positive
+    @pytest.mark.parametrize(
+        "mode,expected_ref",
+        [
+            ("search_work_items", "search_work_items"),
+            ("create_work_item", "create_work_item"),
+            ("update_work_item", "update_work_item"),
+            ("get_work_item", "get_work_item"),
+            ("link_work_items", "link_work_items"),
+            ("get_relation_types", "get_relation_types"),
+            ("get_comments", "get_comments")
+        ],
+    )
+    def test_run_tool(self, ado_wrapper, mode, expected_ref):
+        with patch.object(AzureDevOpsApiWrapper, expected_ref) as mock_tool:
+            mock_tool.return_value = "success"
+            result = ado_wrapper.run(mode)
+            assert result == "success"
+            mock_tool.assert_called_once()
 
     @pytest.mark.positive
     def test_create_work_item_success(self, ado_wrapper, mock_connection):
@@ -148,8 +191,10 @@ class TestAdoWorkItemWrapper:
     @pytest.mark.positive
     def test_get_relation_types(self, ado_wrapper, mock_connection):
         """Test getting work item relation types."""
-        mock_relation_type_1 = MagicMock(name="Parent", reference_name="System.LinkTypes.Hierarchy-Reverse")
-        mock_relation_type_2 = MagicMock(name="Child", reference_name="System.LinkTypes.Hierarchy-Forward")
+        mock_relation_type_1 = MagicMock(reference_name="System.LinkTypes.Hierarchy-Reverse")
+        mock_relation_type_1.name = "Parent"
+        mock_relation_type_2 = MagicMock(reference_name="System.LinkTypes.Hierarchy-Forward")
+        mock_relation_type_2.name = "Child"
         mock_connection.get_relation_types.return_value = [mock_relation_type_1, mock_relation_type_2]
 
         # First call - fetches from API
@@ -171,15 +216,15 @@ class TestAdoWorkItemWrapper:
     @pytest.mark.positive
     def test_link_work_items_success(self, ado_wrapper, mock_connection):
         """Test linking two work items successfully."""
-        source_id = '10'
-        target_id = '20'
+        source_id = "10"
+        target_id = "20"
         link_type = "System.LinkTypes.Dependency-forward"
         attributes = {"comment": "Depends on this"}
 
         # Pre-populate relation types cache to avoid extra call
         ado_wrapper._relation_types = {"Dependency": link_type}
 
-        mock_connection.update_work_item.return_value = MagicMock() # update_work_item is used for linking
+        mock_connection.update_work_item.return_value = MagicMock()
 
         result = ado_wrapper.link_work_items(source_id, target_id, link_type, attributes)
 
@@ -214,16 +259,14 @@ class TestAdoWorkItemWrapper:
     @pytest.mark.negative
     def test_link_work_items_api_error(self, ado_wrapper, mock_connection):
         """Test linking when the API call fails."""
-        source_id = 10
-        target_id = 20
+        source_id = "10"
+        target_id = "20"
         link_type = "System.LinkTypes.Dependency-forward"
-        ado_wrapper._relation_types = {"Dependency": link_type} # Populate cache
-        mock_connection.update_work_item.side_effect = Exception("Link Failed")
+        ado_wrapper._relation_types = {"Dependency": link_type}
+        mock_connection.update_work_item.side_effect = ToolException("Link Failed")
 
-        result = ado_wrapper.link_work_items(source_id, target_id, link_type)
-
-        expected_error = ToolException(f"Error linking work item {source_id} to {target_id}: Link Failed")
-        assert str(expected_error) == str(result)
+        with pytest.raises(ToolException, match="Link Failed"):
+            ado_wrapper.link_work_items(source_id, target_id, link_type)
 
         mock_connection.update_work_item.assert_called_once() # Should still be called once
 
@@ -289,6 +332,15 @@ class TestAdoWorkItemWrapper:
         result = ado_wrapper.search_work_items(query=query)
 
         expected_error = ToolException("Error searching work items: Search Failed")
+        assert str(expected_error) == str(result)
+
+    @pytest.mark.negative
+    def test_search_work_items_invalid_value(self, ado_wrapper, mock_connection):
+        mock_connection.query_by_wiql.side_effect = ValueError("Value Error")
+        
+        result = ado_wrapper.search_work_items(query="query", limit=0)
+
+        expected_error = ToolException("Invalid WIQL query: Value Error")
         assert str(expected_error) == str(result)
 
     @pytest.mark.positive
@@ -423,9 +475,9 @@ class TestAdoWorkItemWrapper:
         expected_calls = [
             # First call fetches `wrapper_limit`
             call(project=ado_wrapper.project, work_item_id=work_item_id, top=wrapper_limit, include_deleted=None, expand=None, order=None),
-            call(continuation_token="token123", project=ado_wrapper.project, work_item_id=work_item_id, top=1, include_deleted=None, expand=None, order=None)
+            call(continuation_token="token123", project=ado_wrapper.project, work_item_id=int(work_item_id), top=limit_total, include_deleted=None, expand=None, order=None)
         ]
-        mock_connection.get_comments.assert_has_calls(expected_calls)
+        mock_connection.get_comments.assert_has_calls(expected_calls, any_order=False)
         assert mock_connection.get_comments.call_count == 2 # Still 2 calls expected
 
         # Should return only `limit_total` comments

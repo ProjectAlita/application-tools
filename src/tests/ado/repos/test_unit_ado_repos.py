@@ -105,7 +105,7 @@ class TestReposApiWrapperValidateToolkit:
             ("get_pull_request", "get_pull_request"),
             ("list_pull_request_files", "list_pull_request_diffs"),
             ("create_branch", "create_branch"),
-            ("read_file", "read_file"),
+            ("read_file", "_read_file"),
             ("create_file", "create_file"),
             ("update_file", "update_file"),
             ("delete_file", "delete_file"),
@@ -589,7 +589,7 @@ class TestReposToolsPositive:
             return_value=MagicMock(version=branch_name, version_type="branch"),
         ) as mock_version_descriptor:
             mock_git_client.get_item_text.return_value = [b"Hello", b" ", b"World!"]
-            result = repos_wrapper.read_file(file_path)
+            result = repos_wrapper._read_file(file_path)
 
             expected_content = "Hello World!"
             assert result == expected_content
@@ -609,7 +609,7 @@ class TestReposToolsPositive:
         repos_wrapper.active_branch = branch_name
 
         with patch.object(
-            ReposApiWrapper, "read_file", return_value="Hello World"
+            ReposApiWrapper, "_read_file", return_value="Hello World"
         ) as mock_read_file:
             mock_git_client.get_branch.return_value = MagicMock(
                 commit=MagicMock(commit_id="123abc")
@@ -634,7 +634,7 @@ class TestReposToolsPositive:
 
         with (
             patch.object(
-                ReposApiWrapper, "read_file", return_value="Hello World"
+                ReposApiWrapper, "_read_file", return_value="Hello World"
             ) as mock_read_file,
             patch("alita_tools.ado.repos.repos_wrapper.GitCommit") as mock_git_commit,
             patch("alita_tools.ado.repos.repos_wrapper.GitPush") as mock_git_push,
@@ -939,7 +939,7 @@ class TestReposToolsNegative:
         repos_wrapper.active_branch = branch_name
 
         with patch.object(
-            ReposApiWrapper, "read_file", return_value="Original content"
+            ReposApiWrapper, "_read_file", return_value="Original content"
         ) as mock_read_file:
             result = repos_wrapper.update_file(branch_name, file_path, update_query)
 
@@ -1169,7 +1169,7 @@ class TestReposToolsExceptions:
         error_message = "File does not exist"
         mock_git_client.get_item_text.side_effect = Exception(error_message)
 
-        result = repos_wrapper.read_file(file_path)
+        result = repos_wrapper._read_file(file_path)
 
         assert isinstance(result, ToolException)
         assert (
@@ -1189,7 +1189,7 @@ class TestReposToolsExceptions:
         )
         repos_wrapper.active_branch = branch_name
 
-        with patch.object(ReposApiWrapper, "read_file", return_value="Hello World"):
+        with patch.object(ReposApiWrapper, "_read_file", return_value="Hello World"):
             mock_git_client.get_branch.return_value = MagicMock(
                 commit=MagicMock(commit_id="123abc")
             )
