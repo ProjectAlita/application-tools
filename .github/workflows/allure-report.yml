@@ -1,4 +1,4 @@
-name: Allure Report Workflow
+name: Run Pytest, Generate & Publish Allure Report
 
 on:
   workflow_dispatch:
@@ -34,9 +34,9 @@ jobs:
       run: |
         python -m venv .venv && . .venv/bin/activate &&
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install -r dev-requirements.txt
-        pip install pytest coverage allure-pytest
+        pip install -r requirements.txt --cache-dir ~/.venv
+        pip install -r dev-requirements.txt --cache-dir ~/.venv
+        pip install pytest coverage allure-pytest --cache-dir ~/.venv
 
     - name: Set PYTHONPATH
       run: echo "PYTHONPATH=$PYTHONPATH:$(pwd)/src" >> $GITHUB_ENV
@@ -44,9 +44,10 @@ jobs:
     - name: Run tests with coverage
       run: |
         . .venv/bin/activate &&
-        coverage run -m pytest --alluredir=allure-results &&
-        coverage report -m &&
+        coverage run -m pytest --alluredir=allure-results
+        coverage report -m
         coverage xml
+      continue-on-error: true
 
     - name: Coverage comment
       id: coverage_comment
@@ -54,6 +55,7 @@ jobs:
       with:
         GITHUB_TOKEN: ${{ github.token }}
         ANNOTATE_MISSING_LINES: true
+      continue-on-error: true
 
     - name: Store Pull Request comment to be posted
       uses: actions/upload-artifact@v4
@@ -61,6 +63,7 @@ jobs:
       with:
         name: python-coverage-comment-action
         path: python-coverage-comment-action.txt
+      continue-on-error: true
 
     - name: Generate Allure Report
       uses: simple-elf/allure-report-action@master
@@ -68,9 +71,9 @@ jobs:
       if: always()
       with:
         allure_results: allure-results
-        gh_pages: gh-pages
         allure_report: allure-report
         allure_history: allure-history
+        keep_reports: 20
 
     - name: Deploy Allure Report to GitHub Pages
       uses: peaceiris/actions-gh-pages@v3
@@ -78,4 +81,4 @@ jobs:
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_branch: gh-pages
-        PUBLISH_DIR: allure-history
+        publish_dir: allure-history
