@@ -1,5 +1,7 @@
 # Other
 .aider*
+tst*
+.vscode
 
 # Allure Docs
 docs/*

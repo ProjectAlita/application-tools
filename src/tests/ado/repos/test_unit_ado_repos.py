@@ -619,7 +619,7 @@ class TestReposToolsPositive:
             result = repos_wrapper.update_file(branch_name, file_path, update_query)
 
             assert result == "Updated file path/to/file.txt"
-            mock_read_file.assert_called_once_with(file_path)
+            mock_read_file.assert_called_once_with(file_path, branch_name)
             mock_git_client.create_push.assert_called_once()
 
     def test_update_file_success_check_push_arguments(
@@ -653,7 +653,7 @@ class TestReposToolsPositive:
             result = repos_wrapper.update_file(branch_name, file_path, update_query)
 
             assert result == "Updated file path/to/file.txt"
-            mock_read_file.assert_called_once_with(file_path)
+            mock_read_file.assert_called_once_with(file_path, branch_name)
             mock_git_client.create_push.assert_called_once_with(
                 push=push_instance,
                 repository_id=repos_wrapper.repository_id,
@@ -949,7 +949,7 @@ class TestReposToolsNegative:
                 "the current file contents."
             )
             assert result == expected_message
-            mock_read_file.assert_called_once_with(file_path)
+            mock_read_file.assert_called_once_with(file_path, branch_name)
 
     def test_delete_file_branch_not_found(self, repos_wrapper, mock_git_client):
         branch_name = "nonexistent-branch"
