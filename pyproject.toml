@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "alita_tools"
-version = "0.3.83"
+version = "0.3.84"
 description = "Default set of tools and toolkits available within ELITEA Agents."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -22,16 +22,11 @@ email = "artem_dubrovskii@epam.com"
 Homepage = "https://projectalita.ai"
 Issues = "https://github.com/ProjectAlita/application-tools/issues"
 
-[tool.setuptools.dynamic.dependencies]
-file = [ "requirements.txt",]
-
 [tool.pytest.ini_options]
 minversion = "8.3.3"
 pythonpath = "src"
-norecursedirs = ["venv", ".venv", "env", ".env", "src/alita_tools/ado/test_plan"]
-addopts = """
-        --strict-markers -v -ra -q -p no:warnings -p no:error --disable-warnings
-        """
+norecursedirs = [ "venv", ".venv", "env", ".env", "src/alita_tools/ado/test_plan",]
+addopts = "        --strict-markers -v -ra -q -p no:warnings -p no:error --disable-warnings\n        "
 log_cli = false
 log_cli_level = "INFO"
 log_format = "%(asctime)s %(levelname)s %(message)s"
@@ -40,34 +35,13 @@ filterwarnings = "ignore"
 cache_dir = ".pytest_cache"
 python_files = "test_*.py"
 python_functions = "test_"
-testpaths = [
-    "tests"
-]
-markers = [
-    "dependency: marks dependency from other tests",
-    "unit: marks tests as unit (deselect with '-m \"not unit\"')",
-    "e2e: marks tests as end-to-end (deselect with '-m \"not e2e\"')",
-    "base: marks base tool tests",
-    "toolkit: marks toolkit tests",
-    "positive: marks positive tests",
-    "negative: marks negative tests",
-    "exception_handling: marks exception handling with logger tests",
-    "utils: marks utils tests",
-    "ado: marks Azure DevOps tests",
-    "ado_repos: marks Azure DevOps Repos tests",
-    "ado_test_plan: marks Azure DevOps Test Plan tests",
-    "ado_wiki: marks Azure DevOps Wiki tests",
-    "gitlab: marks Gitlab tests",
-    "sharepoint: marks Sharepoint tests",
-    "azureai: marks Azure AI tests",
-]
+testpaths = [ "tests",]
+markers = [ "dependency: marks dependency from other tests", "unit: marks tests as unit (deselect with '-m \"not unit\"')", "e2e: marks tests as end-to-end (deselect with '-m \"not e2e\"')", "base: marks base tool tests", "toolkit: marks toolkit tests", "positive: marks positive tests", "negative: marks negative tests", "exception_handling: marks exception handling with logger tests", "utils: marks utils tests", "ado: marks Azure DevOps tests", "ado_repos: marks Azure DevOps Repos tests", "ado_test_plan: marks Azure DevOps Test Plan tests", "ado_wiki: marks Azure DevOps Wiki tests", "gitlab: marks Gitlab tests", "sharepoint: marks Sharepoint tests", "azureai: marks Azure AI tests",]
 
 [tool.coverage.run]
 dynamic_context = "test_function"
 relative_files = "true"
-omit = [
-    "*/__init__.py",
-    "*/tests/*",
-    "model.py",
-    "*constants.py",
-    ]
+omit = [ "*/__init__.py", "*/tests/*", "model.py", "*constants.py",]
+
+[tool.setuptools.dynamic.dependencies]
+file = [ "requirements.txt",]
