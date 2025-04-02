@@ -4,7 +4,7 @@
 
 | Name                                                      |    Stmts |     Miss |   Cover |   Missing |
 |---------------------------------------------------------- | -------: | -------: | ------: | --------: |
-| src/alita\_tools/ado/repos/repos\_wrapper.py              |      383 |       66 |     83% |238-239, 592-594, 707-730, 765, 874-948, 965, 968-970 |
+| src/alita\_tools/ado/repos/repos\_wrapper.py              |      385 |       67 |     83% |240-241, 594-596, 709-732, 765, 770, 880-955, 972, 975-977 |
 | src/alita\_tools/ado/test\_plan/test\_plan\_wrapper.py    |      118 |        0 |    100% |           |
 | src/alita\_tools/ado/utils.py                             |       13 |        0 |    100% |           |
 | src/alita\_tools/ado/wiki/ado\_wrapper.py                 |      117 |        7 |     94% |150-159, 203-214 |
@@ -68,7 +68,7 @@
 | src/alita\_tools/zephyr\_enterprise/api\_wrapper.py       |       73 |       53 |     27% |20-23, 28-31, 36-39, 49-59, 67-70, 80-121, 124 |
 | src/alita\_tools/zephyr\_enterprise/zephyr\_enterprise.py |       50 |       27 |     46% |26-27, 39-47, 59-73, 83, 93, 103, 112, 121, 140-153, 178 |
 | src/alita\_tools/zephyr\_scale/api\_wrapper.py            |      101 |       64 |     37% |108-131, 136-139, 144-148, 153-159, 164-167, 172-173, 183-187, 192-230, 233 |
-|                                                 **TOTAL** | **6007** | **3509** | **42%** |           |
+|                                                 **TOTAL** | **6009** | **3510** | **42%** |           |
 
 
 ## Setup coverage badge
