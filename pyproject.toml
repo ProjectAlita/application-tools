@@ -46,6 +46,7 @@ testpaths = [
 ]
 markers = [
     "unit: marks tests as unit (deselect with '-m \"not unit\"')",
+    "e2e: marks tests as end-to-end (deselect with '-m \"not e2e\"')",
     "base: marks base tool tests",
     "toolkit: marks toolkit tests",
     "positive: marks positive tests",
@@ -58,6 +59,7 @@ markers = [
     "ado_wiki: marks Azure DevOps Wiki tests",
     "gitlab: marks Gitlab tests",
     "sharepoint: marks Sharepoint tests",
+    "azureai: marks Azure AI tests",
 ]
 
 [tool.coverage.run]

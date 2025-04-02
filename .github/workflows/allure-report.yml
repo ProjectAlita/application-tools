@@ -2,6 +2,15 @@ name: Run Pytest, Generate & Publish Allure Report
 
 on:
   workflow_dispatch:
+    inputs:
+        level:
+          type: choice
+          description: 'Tests level'
+          required: true
+          default: 'unit'
+          options: 
+          - unit
+          - e2e
   # pull_request:
   # push:
   #   branches: [main]
@@ -44,9 +53,11 @@ jobs:
     - name: Run tests with coverage
       run: |
         . .venv/bin/activate &&
-        coverage run -m pytest --alluredir=allure-results
+        coverage run -m pytest -m "$TEST_LEVEL"  --alluredir=allure-results
         coverage report -m
         coverage xml
+      env:
+        TEST_LEVEL: ${{ inputs.level }}
       continue-on-error: true
 
     - name: Coverage comment
