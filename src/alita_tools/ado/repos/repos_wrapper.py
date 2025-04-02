@@ -149,7 +149,9 @@ class ArgsSchema(Enum):
     )
     CommentOnPullRequest = create_model(
         "CommentOnPullRequest",
-        comment_query=(Optional[str], Field(description="Follow the required formatting. Example: '1\n\nThis is a test comment' (PR number and comment)", examples=["1\n\nThis is a test comment"])),
+        comment_query=(Optional[str], Field(
+            description="Follow the required formatting. Example: '1\n\nThis is a test comment' (PR number and comment)",
+            examples=["1\n\nThis is a test comment"])),
         pull_request_id=(Optional[int], Field(description="ID of pull request as integer.")),
         inline_comments=(
             Optional[list],
@@ -248,10 +250,10 @@ class ReposApiWrapper(BaseCodeToolApiWrapper):
         return values
 
     def _get_files(
-        self,
-        directory_path: str = "",
-        branch_name: str = None,
-        recursion_level: str = "Full",
+            self,
+            directory_path: str = "",
+            branch_name: str = None,
+            recursion_level: str = "Full",
     ) -> str:
         """
         Params:
@@ -303,8 +305,8 @@ class ReposApiWrapper(BaseCodeToolApiWrapper):
             return f"Switched to branch `{branch_name}`"
         else:
             msg = (
-                f"Error {branch_name} does not exist, "
-                + f"in repo with current branches: {str(current_branches)}"
+                    f"Error {branch_name} does not exist, "
+                    + f"in repo with current branches: {str(current_branches)}"
             )
             return ToolException(msg)
 
@@ -353,7 +355,7 @@ class ReposApiWrapper(BaseCodeToolApiWrapper):
         )
 
     def parse_pull_request_comments(
-        self, comment_threads: List[GitPullRequestCommentThread]
+            self, comment_threads: List[GitPullRequestCommentThread]
     ) -> List[dict]:
         """
         Extracts comments from each comment thread and puts them in a dictionary.
@@ -406,10 +408,10 @@ class ReposApiWrapper(BaseCodeToolApiWrapper):
         if pull_requests:
             parsed_prs = self.parse_pull_requests(pull_requests)
             parsed_prs_str = (
-                "Found "
-                + str(len(parsed_prs))
-                + " open pull requests:\n"
-                + str(parsed_prs)
+                    "Found "
+                    + str(len(parsed_prs))
+                    + " open pull requests:\n"
+                    + str(parsed_prs)
             )
             return parsed_prs_str
         else:
@@ -438,7 +440,7 @@ class ReposApiWrapper(BaseCodeToolApiWrapper):
             return f"Pull request with '{pull_request_id}' ID is not found"
 
     def parse_pull_requests(
-        self, pull_requests: Union[GitPullRequest, List[GitPullRequest]]
+            self, pull_requests: Union[GitPullRequest, List[GitPullRequest]]
     ) -> List[dict]:
         """
         Extracts title and number from each Pull Request and puts them in a dictionary
@@ -668,9 +670,9 @@ class ReposApiWrapper(BaseCodeToolApiWrapper):
                 name=self.active_branch,
             )
             if (
-                branch is None
-                or not hasattr(branch, "commit")
-                or not hasattr(branch.commit, "commit_id")
+                    branch is None
+                    or not hasattr(branch, "commit")
+                    or not hasattr(branch.commit, "commit_id")
             ):
                 return (
                     f"Branch `{self.active_branch}` does not exist or has no commits."
@@ -705,8 +707,8 @@ class ReposApiWrapper(BaseCodeToolApiWrapper):
             str: The file decoded as a string, or an error message if not found
         """
         self.active_branch = (branch or
-            self.active_branch if self.active_branch else self.base_branch
-        )
+                              self.active_branch if self.active_branch else self.base_branch
+                              )
 
         try:
             version_descriptor = GitVersionDescriptor(
@@ -757,7 +759,10 @@ class ReposApiWrapper(BaseCodeToolApiWrapper):
                 "Please create a new branch and try again."
             )
         try:
-            file_content = self._read_file(file_path)
+            file_content = self._read_file(file_path, branch_name)
+
+            if isinstance(file_content, ToolException):
+                return file_content
 
             updated_file_content = file_content
             for old, new in extract_old_new_pairs(update_query):
@@ -857,7 +862,8 @@ class ReposApiWrapper(BaseCodeToolApiWrapper):
             return ToolException(msg)
         return work_item_ids
 
-    def comment_on_pull_request(self, comment_query: Optional[str] = None, pull_request_id: Optional[int] = None, inline_comments: Optional[list] = None):
+    def comment_on_pull_request(self, comment_query: Optional[str] = None, pull_request_id: Optional[int] = None,
+                                inline_comments: Optional[list] = None):
         """
         Adds a comment to a pull request in Azure DevOps. Supports both general pull request comments and inline comments.
         Parameters:
@@ -907,7 +913,8 @@ class ReposApiWrapper(BaseCodeToolApiWrapper):
                         left_file_end = CommentPosition(line=left_line, offset=1)
 
                     if not (left_line or right_line or left_range or right_range):
-                        raise ValueError("Comment must specify either `left_line`, `right_line`, `left_range`, or `right_range`.")
+                        raise ValueError(
+                            "Comment must specify either `left_line`, `right_line`, `left_range`, or `right_range`.")
 
                     thread_context = CommentThreadContext(
                         file_path=file_path,
@@ -974,7 +981,7 @@ class ReposApiWrapper(BaseCodeToolApiWrapper):
             return ToolException(msg)
 
     def create_pr(
-        self, pull_request_title: str, pull_request_body: str, branch_name: str
+            self, pull_request_title: str, pull_request_body: str, branch_name: str
     ) -> str:
         """
         Creates a pull request in Azure DevOps from the active branch to the base branch mentioned in params.
