@@ -30,3 +30,16 @@ def parse_list(list_str: str = None) -> List[str]:
         items_list = [item.strip() for item in re.split(r'[;,]', list_str)]
         return items_list
     return []
+
+# Atlassian related utilities
+def is_cookie_token(token: str) -> bool:
+    """
+    Checks if the given token string contains a cookie session identifier.
+    """
+    return "JSESSIONID" in token
+
+def parse_cookie_string(cookie_str: str) -> dict:
+    """
+    Parses a cookie string into a dictionary of cookie key-value pairs.
+    """
+    return dict(item.split("=", 1) for item in cookie_str.split("; ") if "=" in item)

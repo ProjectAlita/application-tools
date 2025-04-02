@@ -12,6 +12,7 @@ from pydantic import Field, PrivateAttr, model_validator, create_model
 import requests
 
 from ..elitea_base import BaseToolApiWrapper
+from ..utils import is_cookie_token, parse_cookie_string
 
 logger = logging.getLogger(__name__)
 
@@ -234,12 +235,6 @@ def process_search_response(jira_url, response, payload_params: Dict[str, Any] =
 
     return str(processed_issues)
 
-def is_cookie_token(token: str) -> bool:
-    return any(cookie_key in token for cookie_key in ["JSESSIONID"])
-
-def parse_cookie_string(cookie_str: str) -> dict:
-    return dict(item.split("=", 1) for item in cookie_str.split("; ") if "=" in item)
-
 class JiraApiWrapper(BaseToolApiWrapper):
     base_url: str
     api_version: Optional[str] = "2",
@@ -275,6 +270,8 @@ class JiraApiWrapper(BaseToolApiWrapper):
         if isinstance(additional_fields, str):
             values['additional_fields'] = [i.strip() for i in additional_fields.split(',')]
         if token and is_cookie_token(token):
+            # cookies-based flow
+            # TODO: move to separate auth item after testing
             session = requests.Session()
             session.cookies.update(parse_cookie_string(token))
             cls._client = Jira(url=url, session=session, cloud=cloud, verify_ssl=values['verify_ssl'], api_version=api_version)

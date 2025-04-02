@@ -20,6 +20,7 @@ from tenacity import (
 )
 
 from ..elitea_base import BaseToolApiWrapper
+from ..utils import is_cookie_token, parse_cookie_string
 
 logger = logging.getLogger(__name__)
 
@@ -146,12 +147,6 @@ def parse_payload_params(params: Optional[str]) -> Dict[str, Any]:
             stacktrace = traceback.format_exc()
             return ToolException(f"Confluence tool exception. Passed params are not valid JSON. {stacktrace}")
     return {}
-
-def is_cookie_token(token: str) -> bool:
-    return any(cookie_key in token for cookie_key in ["JSESSIONID"])
-
-def parse_cookie_string(cookie_str: str) -> dict:
-    return dict(item.split("=", 1) for item in cookie_str.split("; ") if "=" in item)
 
 class ConfluenceAPIWrapper(BaseToolApiWrapper):
     _client: Any = PrivateAttr()
