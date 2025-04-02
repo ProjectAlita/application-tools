@@ -1,0 +1,102 @@
+name: Run Pytest, Generate & Publish Allure Report
+
+on:
+  push:
+      branches:
+        - main
+  # workflow_dispatch:
+  #   inputs:
+  #       level:
+  #         type: choice
+  #         description: 'Tests level'
+  #         required: true
+  #         default: 'unit'
+  #         options: 
+  #         - unit
+  #         - e2e
+
+concurrency:
+  group: ${{ github.event_name }}-${{ github.ref }}
+
+jobs:
+  run-tests-and-publish-report:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Cache pip packages
+      uses: actions/cache@v3
+      with:
+        path: .venv/
+        key: ${{ runner.os }}-venv-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-venv-
+
+    - name: Install dependencies
+      run: |
+        python -m venv .venv && . .venv/bin/activate &&
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt --cache-dir ~/.venv
+        pip install -r dev-requirements.txt --cache-dir ~/.venv
+        pip install pytest coverage allure-pytest --cache-dir ~/.venv
+
+    - name: Set PYTHONPATH
+      run: echo "PYTHONPATH=$PYTHONPATH:$(pwd)/src" >> $GITHUB_ENV
+
+    - name: Run tests with coverage
+      run: |
+        . .venv/bin/activate &&
+        coverage run -m pytest -m "${TEST_LEVEL:-unit}"  --alluredir=allure-results
+        coverage report -m
+        coverage xml
+      env:
+        TEST_LEVEL: ${{ inputs.level }}
+      continue-on-error: true
+
+    - name: Coverage comment
+      id: coverage_comment
+      uses: py-cov-action/python-coverage-comment-action@main
+      with:
+        GITHUB_TOKEN: ${{ github.token }}
+        ANNOTATE_MISSING_LINES: true
+      continue-on-error: true
+
+    - name: Store Pull Request comment to be posted
+      uses: actions/upload-artifact@v4
+      if: steps.coverage_comment.outputs.COMMENT_FILE_WRITTEN == 'true'
+      with:
+        name: python-coverage-comment-action
+        path: python-coverage-comment-action.txt
+      continue-on-error: true
+
+    - name: Get Allure history
+      uses: actions/checkout@v3
+      if: always()
+      with:
+        ref: gh-pages
+        path: gh-pages
+      continue-on-error: true
+
+    - name: Generate Allure Report
+      uses: simple-elf/allure-report-action@master
+      id: allure-report
+      if: always()
+      with:
+        allure_results: allure-results
+        allure_history: allure-history
+        keep_reports: 20
+
+    - name: Deploy Allure Report to GitHub Pages
+      uses: peaceiris/actions-gh-pages@v3
+      if: ${{ always() && (steps.allure-report.outcome == 'success') }}
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_branch: gh-pages
+        publish_dir: allure-history
