@@ -147,6 +147,12 @@ def parse_payload_params(params: Optional[str]) -> Dict[str, Any]:
             return ToolException(f"Confluence tool exception. Passed params are not valid JSON. {stacktrace}")
     return {}
 
+def is_cookie_token(token: str) -> bool:
+    return any(cookie_key in token for cookie_key in ["JSESSIONID"])
+
+def parse_cookie_string(cookie_str: str) -> dict:
+    return dict(item.split("=", 1) for item in cookie_str.split("; ") if "=" in item)
+
 class ConfluenceAPIWrapper(BaseToolApiWrapper):
     _client: Any = PrivateAttr()
     base_url: str
@@ -187,7 +193,11 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
         username = values.get('username')
         token = values.get('token')
         cloud = values.get('cloud')
-        if token:
+        if token and is_cookie_token(token):
+            session = requests.Session()
+            session.cookies.update(parse_cookie_string(token))
+            cls._client = Confluence(url=url, session=session, cloud=cloud)
+        elif token:
             cls._client = Confluence(url=url, token=token, cloud=cloud)
         else:
             cls._client = Confluence(url=url,username=username, password=api_key, cloud=cloud)
