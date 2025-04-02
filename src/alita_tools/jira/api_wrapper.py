@@ -9,6 +9,7 @@ from typing import List, Optional, Any, Dict
 from atlassian import Jira
 from langchain_core.tools import ToolException
 from pydantic import Field, PrivateAttr, model_validator, create_model
+import requests
 
 from ..elitea_base import BaseToolApiWrapper
 
@@ -233,6 +234,11 @@ def process_search_response(jira_url, response, payload_params: Dict[str, Any] =
 
     return str(processed_issues)
 
+def is_cookie_token(token: str) -> bool:
+    return any(cookie_key in token for cookie_key in ["JSESSIONID"])
+
+def parse_cookie_string(cookie_str: str) -> dict:
+    return dict(item.split("=", 1) for item in cookie_str.split("; ") if "=" in item)
 
 class JiraApiWrapper(BaseToolApiWrapper):
     base_url: str
@@ -268,7 +274,11 @@ class JiraApiWrapper(BaseToolApiWrapper):
         additional_fields = values.get('additional_fields')
         if isinstance(additional_fields, str):
             values['additional_fields'] = [i.strip() for i in additional_fields.split(',')]
-        if token:
+        if token and is_cookie_token(token):
+            session = requests.Session()
+            session.cookies.update(parse_cookie_string(token))
+            cls._client = Jira(url=url, session=session, cloud=cloud, verify_ssl=values['verify_ssl'], api_version=api_version)
+        elif token:
             cls._client = Jira(url=url, token=token, cloud=cloud, verify_ssl=values['verify_ssl'], api_version=api_version)
         else:
             cls._client = Jira(url=url, username=username, password=api_key, cloud=cloud, verify_ssl=values['verify_ssl'], api_version=api_version)
