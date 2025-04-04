@@ -38,7 +38,7 @@ class BrowserToolkit(BaseToolkit):
 
         return create_model(
             name,
-            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Browser", "icon_url": "figma-icon.svg"}}),
+            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Browser", "icon_url": None}}),
             google_cse_id=(Optional[str], Field(description="Google CSE id", default=None)),
             google_api_key=(Optional[str], Field(description="Google API key", default=None, json_schema_extra={'secret': True})),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),

@@ -49,7 +49,7 @@ class FigmaToolkit(BaseToolkit):
                 json_schema_extra={
                      "metadata": {
                          "label": "Figma",
-                         "icon_url": None,
+                         "icon_url": "figma-icon.svg",
                          "max_length": FigmaToolkit.toolkit_max_length,
                          "sections": {
                              "auth": {
