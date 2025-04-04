@@ -40,7 +40,33 @@ class AlitaGitHubToolkit(BaseToolkit):
         AlitaGitHubToolkit.toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name,
-            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "GitHub", "icon_url": None}}),
+            __config__=ConfigDict(
+                json_schema_extra={
+                    'metadata': {
+                        "label": "GitHub",
+                        "icon_url": None,
+                        "sections": {
+                            "auth": {
+                                "required": True,
+                                "subsections": [
+                                    {
+                                        "name": "Token",
+                                        "fields": ["access_token"]
+                                    },
+                                    {
+                                        "name": "Password",
+                                        "fields": ["password"]
+                                    },
+                                    {
+                                        "name": "App private key",
+                                        "fields": ["app_private_key"]
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                }
+            ),
             app_id=(Optional[str], Field(description="Github APP ID", default=None)),
             app_private_key=(Optional[str], Field(description="Github APP private key", default=None, json_schema_extra={'secret': True})),
 

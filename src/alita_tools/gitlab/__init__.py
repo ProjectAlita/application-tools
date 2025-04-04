@@ -1,13 +1,12 @@
 from typing import Dict, List, Literal, Optional
 
-from .api_wrapper import GitLabAPIWrapper
-from .tools import __all__
-
-from langchain_core.tools import BaseToolkit
 from langchain_core.tools import BaseTool
+from langchain_core.tools import BaseToolkit
 from pydantic import create_model, BaseModel, ConfigDict
 from pydantic.fields import Field
 
+from .api_wrapper import GitLabAPIWrapper
+from .tools import __all__
 from ..utils import clean_string, TOOLKIT_SPLITTER, get_max_toolkit_length
 
 name = "gitlab"
@@ -55,8 +54,9 @@ class AlitaGitlabToolkit(BaseToolkit):
             if selected_tools:
                 if tool['name'] not in selected_tools:
                     continue
-            tool['name'] = prefix + tool['name']
-            tools.append(tool['tool'](api_wrapper=gitlab_api_wrapper))
+                initiated_tool = tool['tool'](api_wrapper=gitlab_api_wrapper)
+                initiated_tool.name = prefix + tool['name']
+                tools.append(initiated_tool)
         return cls(tools=tools)
 
     def get_tools(self):
