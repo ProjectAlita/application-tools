@@ -45,7 +45,7 @@ class AlitaBitbucketToolkit(BaseToolkit):
             password=(str, Field(description="GitLab private token", json_schema_extra={'secret': True})),
             cloud=(Optional[bool], Field(description="Hosting Option", default=None)),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
-            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Bitbucket", "icon_url": None}})
+            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Bitbucket", "icon_url": "bitbucket-icon.svg"}})
         )
 
     @classmethod

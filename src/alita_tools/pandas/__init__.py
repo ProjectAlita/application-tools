@@ -37,7 +37,7 @@ class PandasToolkit(BaseToolkit):
             artifact_bucket_name=(str, Field(default=None, title="Bucket name", description="Bucket where the content file is stored", json_schema_extra={'toolkit_name': True, 'max_toolkit_length': PandasToolkit.toolkit_max_length})),
             file_name=(str, Field(default=None, title="File name", description="File to be processed")),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
-            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Pandas", "icon_url": None}})
+            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Pandas", "icon_url": "pandas-icon.svg"}})
         )
 
     @classmethod

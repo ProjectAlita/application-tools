@@ -45,7 +45,7 @@ class AlitaGitlabToolkit(BaseToolkit):
                     "icon_url": None,
                     "sections": {
                         "auth": {
-                            "required": False,
+                            "required": True,
                             "subsections": [
                                 {
                                     "name": "GitLab private token",

@@ -55,11 +55,11 @@ class AlitaGitHubToolkit(BaseToolkit):
                                     },
                                     {
                                         "name": "Password",
-                                        "fields": ["password"]
+                                        "fields": ["username", "password"]
                                     },
                                     {
                                         "name": "App private key",
-                                        "fields": ["app_private_key"]
+                                        "fields": ["app_id", "app_private_key"]
                                     }
                                 ]
                             }
