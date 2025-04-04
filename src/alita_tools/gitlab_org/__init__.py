@@ -36,7 +36,23 @@ class AlitaGitlabSpaceToolkit(BaseToolkit):
             private_token=(str, Field(description="GitLab private token", json_schema_extra={'secret': True})),
             branch=(str, Field(description="Main branch", default="main")),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
-            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "GitLab Org", "icon_url": None}})
+            __config__=ConfigDict(json_schema_extra={
+                'metadata': {
+                    "label": "GitLab Org",
+                    "icon_url": None,
+                    "sections": {
+                        "auth": {
+                            "required": False,
+                            "subsections": [
+                                {
+                                    "name": "GitLab private token",
+                                    "fields": ["private_token"]
+                                }
+                            ]
+                        }
+                    }
+                }
+            })
         )
 
     @classmethod

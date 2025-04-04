@@ -47,7 +47,7 @@ class AlitaGitHubToolkit(BaseToolkit):
                         "icon_url": None,
                         "sections": {
                             "auth": {
-                                "required": True,
+                                "required": False,
                                 "subsections": [
                                     {
                                         "name": "Token",
