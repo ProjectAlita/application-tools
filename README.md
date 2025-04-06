@@ -45,6 +45,7 @@
 | src/alita\_tools/keycloak/api\_wrapper.py                 |       46 |       28 |     39% |19-26, 29-37, 41-53, 56-59, 62 |
 | src/alita\_tools/localgit/local\_git.py                   |      175 |      130 |     26% |117-129, 133-181, 185-192, 196, 200-205, 209-216, 220-221, 225-226, 230-235, 241-278, 282-287, 291-303, 307-308, 312-333, 336 |
 | src/alita\_tools/localgit/tool.py                         |       21 |        5 |     76% | 22, 31-34 |
+| src/alita\_tools/ocr/api\_wrapper.py                      |       89 |       57 |     36% |84-97, 101-139, 143-156, 164-185, 190 |
 | src/alita\_tools/pandas/api\_wrapper.py                   |       32 |       18 |     44% |20-25, 29-31, 39-50, 53 |
 | src/alita\_tools/qtest/api\_wrapper.py                    |      216 |      165 |     24% |113-115, 120-136, 140, 144-168, 171-180, 183-203, 207-215, 219-241, 244-269, 273-275, 278-284, 288-300, 304-307, 312-326, 330-331, 336-352, 356-375, 380-381, 385-391, 395 |
 | src/alita\_tools/qtest/tool.py                            |       14 |        1 |     93% |        21 |
@@ -59,7 +60,7 @@
 | src/alita\_tools/testio/api\_wrapper.py                   |       24 |        8 |     67% |18-21, 28, 35, 43, 46 |
 | src/alita\_tools/testio/testio\_client.py                 |       33 |       25 |     24% |8-10, 16-20, 23-26, 29-32, 36-44 |
 | src/alita\_tools/testrail/api\_wrapper.py                 |       62 |       34 |     45% |138-150, 171-175, 179-183, 187-195, 199-204, 208 |
-| src/alita\_tools/utils.py                                 |       20 |        6 |     70% |28-32, 39, 45 |
+| src/alita\_tools/utils.py                                 |       33 |       15 |     55% |30-34, 41, 47, 52-57, 61-64 |
 | src/alita\_tools/xray/api\_wrapper.py                     |       81 |       49 |     40% |91-95, 112-137, 142-163, 168-173, 178-182, 185 |
 | src/alita\_tools/yagmail/yagmail\_wrapper.py              |       32 |       12 |     62% |33-37, 41-47, 51, 61-65 |
 | src/alita\_tools/zephyr/Zephyr.py                         |       16 |        9 |     44% |18-21, 32-33, 42-48 |
@@ -68,7 +69,7 @@
 | src/alita\_tools/zephyr\_enterprise/api\_wrapper.py       |       73 |       53 |     27% |20-23, 28-31, 36-39, 49-59, 67-70, 80-121, 124 |
 | src/alita\_tools/zephyr\_enterprise/zephyr\_enterprise.py |       50 |       27 |     46% |26-27, 39-47, 59-73, 83, 93, 103, 112, 121, 140-153, 178 |
 | src/alita\_tools/zephyr\_scale/api\_wrapper.py            |      101 |       64 |     37% |108-131, 136-139, 144-148, 153-159, 164-167, 172-173, 183-187, 192-230, 233 |
-|                                                 **TOTAL** | **6009** | **3510** | **42%** |           |
+|                                                 **TOTAL** | **6111** | **3576** | **41%** |           |
 
 
 ## Setup coverage badge
