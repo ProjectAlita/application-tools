@@ -41,6 +41,7 @@ from .azure_ai.search import AzureSearchToolkit, get_tools as get_azure_search
 from .figma import get_tools as get_figma, FigmaToolkit
 from .salesforce import get_tools as get_salesforce, SalesforceToolkit
 from .carrier import get_tools as get_carrier, AlitaCarrierToolkit
+from .ocr import get_tools as get_ocr, OCRToolkit
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +107,8 @@ def get_tools(tools_list, alita: 'AlitaClient', llm: 'LLMLikeObject', *args, **k
             tools.extend(get_salesforce(tool))
         elif tool['type'] == 'carrier':
             tools.extend(get_carrier(tool))
+        elif tool['type'] == 'ocr':
+            tools.extend(get_ocr(tool))
         else:
             if tool.get("settings", {}).get("module"):
                 try:
@@ -158,4 +161,5 @@ def get_toolkits():
         FigmaToolkit.toolkit_config_schema(),
         SalesforceToolkit.toolkit_config_schema(),
         AlitaCarrierToolkit.toolkit_config_schema(),
+        OCRToolkit.toolkit_config_schema(),
     ]
