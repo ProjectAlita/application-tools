@@ -46,13 +46,13 @@
 | src/alita\_tools/localgit/local\_git.py                         |      175 |      130 |     26% |117-129, 133-181, 185-192, 196, 200-205, 209-216, 220-221, 225-226, 230-235, 241-278, 282-287, 291-303, 307-308, 312-333, 336 |
 | src/alita\_tools/localgit/tool.py                               |       21 |        5 |     76% | 22, 31-34 |
 | src/alita\_tools/ocr/api\_wrapper.py                            |       85 |       53 |     38% |85-91, 95-133, 137-150, 158-179, 184 |
-| src/alita\_tools/pandas/api\_wrapper.py                         |       69 |       40 |     42% |36-39, 43-45, 49-65, 69-73, 78-83, 87-89, 93-98, 120 |
+| src/alita\_tools/pandas/api\_wrapper.py                         |       89 |       58 |     35% |37-40, 44-46, 50-68, 72-76, 81-86, 90-92, 96-112, 118-124, 146 |
 | src/alita\_tools/pandas/dataframe/errors.py                     |        2 |        0 |    100% |           |
 | src/alita\_tools/pandas/dataframe/executor/code\_environment.py |       23 |       17 |     26% |14-19, 28-35, 74-90 |
 | src/alita\_tools/pandas/dataframe/executor/code\_executor.py    |       23 |       12 |     48% |14, 23, 26-30, 36-42, 46 |
-| src/alita\_tools/pandas/dataframe/generator/base.py             |       35 |       23 |     34% |13-16, 32-47, 51-59 |
+| src/alita\_tools/pandas/dataframe/generator/base.py             |       37 |       25 |     32% |13-16, 32-49, 53-61 |
 | src/alita\_tools/pandas/dataframe/generator/code\_cleaning.py   |       36 |       22 |     39% |21, 25-37, 40-41, 60-72, 78-81 |
-| src/alita\_tools/pandas/dataframe/generator/code\_validator.py  |       24 |       16 |     33% |16, 22-28, 41-43, 58-71 |
+| src/alita\_tools/pandas/dataframe/generator/code\_validator.py  |       26 |       18 |     31% |16, 22-28, 41-43, 58-74 |
 | src/alita\_tools/pandas/dataframe/prompts.py                    |        3 |        0 |    100% |           |
 | src/alita\_tools/pandas/dataframe/serializer.py                 |       27 |       19 |     30% |20-42, 48-57 |
 | src/alita\_tools/qtest/api\_wrapper.py                          |      216 |      165 |     24% |113-115, 120-136, 140, 144-168, 171-180, 183-203, 207-215, 219-241, 244-269, 273-275, 278-284, 288-300, 304-307, 312-326, 330-331, 336-352, 356-375, 380-381, 385-391, 395 |
@@ -77,7 +77,7 @@
 | src/alita\_tools/zephyr\_enterprise/api\_wrapper.py             |       73 |       53 |     27% |20-23, 28-31, 36-39, 49-59, 67-70, 80-121, 124 |
 | src/alita\_tools/zephyr\_enterprise/zephyr\_enterprise.py       |       50 |       27 |     46% |26-27, 39-47, 59-73, 83, 93, 103, 112, 121, 140-153, 178 |
 | src/alita\_tools/zephyr\_scale/api\_wrapper.py                  |      101 |       64 |     37% |108-131, 136-139, 144-148, 153-159, 164-167, 172-173, 183-187, 192-230, 233 |
-|                                                       **TOTAL** | **6317** | **3703** | **41%** |           |
+|                                                       **TOTAL** | **6341** | **3725** | **41%** |           |
 
 
 ## Setup coverage badge
