@@ -65,12 +65,6 @@ IMAGE_OCR_PROMPT_TEMPLATE = """Please extract all text from the image."""
 class RecognizeArgs(BaseModel):
     prompt: Optional[str] = Field(None, description="Optional prompt to guide OCR extraction")
 
-class ExtractPDFArgs(BaseModel):
-    prompt: Optional[str] = Field(None, description="Optional prompt to guide PDF extraction")
-
-class BatchProcessImagesArgs(BaseModel):
-    prompt: Optional[str] = Field(None, description="Optional prompt to process the batch of images")
-    detect_images: bool = Field(False, description="Whether to detect and crop images within pages before processing")
 
 class OCRApiWrapper(BaseToolApiWrapper):
     """Wrapper for OCR tools that can use either LLM-based vision capabilities or tesseract"""
@@ -382,7 +376,7 @@ class OCRApiWrapper(BaseToolApiWrapper):
             {
                 "name": "process_pdf",
                 "description": "Convert PDF pages to images and store in artifacts folder",
-                "args_schema": ExtractPDFArgs,
+                "args_schema": RecognizeArgs,
                 "ref": self.process_pdf
             }
         ]
