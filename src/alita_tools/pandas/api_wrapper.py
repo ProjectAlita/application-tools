@@ -18,7 +18,7 @@ from .dataframe.executor.code_executor import CodeExecutor
 
 logger = logging.getLogger(__name__)
 
-class PandasTookit(BaseToolApiWrapper):
+class PandasWrapper(BaseToolApiWrapper):
     alita: Any = None
     llm: Any = None
     bucket_name: str
