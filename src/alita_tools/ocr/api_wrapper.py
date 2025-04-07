@@ -81,12 +81,6 @@ class OCRApiWrapper(BaseToolApiWrapper):
     @model_validator(mode='after')
     def validate_settings(self):
         """Validate that either LLM or tesseract is properly configured"""
-        if not self.artifacts_folder:
-            logger.warning("No artifacts folder specified. OCR functionality will be limited.")
-        
-        if not os.path.exists(self.artifacts_folder):
-            logger.warning(f"Artifacts folder {self.artifacts_folder} does not exist. OCR functionality will be limited.")
-
         # self.artifact = self.alita.artifact(self.artifacts_folder)
         if self.structured_output and len(self.expected_fields.keys()) > 0:
             stuct_model = create_pydantic_model(f"OCR_{self.artifacts_folder}_Output", self.expected_fields)
