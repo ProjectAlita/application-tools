@@ -18,8 +18,6 @@ Update this initial code:
 import pandas as pd
 
 # Write code here 
-# Imporant to add calls of the functions you created and form a result based on results.
-# Avoid using __main__ or __name__ == "__main__" in the code.
 
 ```
 
@@ -28,7 +26,11 @@ import pandas as pd
 </user_task>
 
 At the end, declare "result" variable as a dictionary of type and value.
+IMPORTANT: Use get_dataframe function to get the dataframe to work with
+IMPORTANT: Imporant to add calls of the functions you created and form a result based on results.
+IMPORTANT: Avoid using __main__ or __name__ == "__main__" in the code.
 IMPORTANT: return dataset as "df" key in the result dictionary.
+
 
 Generate python code and return full updated code:
 """

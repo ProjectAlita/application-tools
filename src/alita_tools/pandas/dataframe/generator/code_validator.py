@@ -64,7 +64,10 @@ class CodeRequirementValidator:
             func_call_visitor.visit(tree)
 
             # TODO: Validate requirements
-        
+            if "get_dataframe" not in func_call_visitor.function_calls:
+                raise NameError(
+                    "get_dataframe function must be used in the code!"
+                )
             return True
         except SyntaxError:
             # If there's a syntax error, the code doesn't meet the requirements

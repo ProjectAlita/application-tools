@@ -5,6 +5,7 @@
 import csv
 from io import StringIO
 from typing import Any, Optional
+import traceback
 
 import chardet
 import logging
@@ -46,6 +47,8 @@ class PandasWrapper(BaseToolApiWrapper):
     
     def _get_dataframe(self) -> pd.DataFrame | None:
         """ Get the dataframe from the CSV file. """
+        if self._df is not None:
+            return self._df
         try:
             _df = self.alita.download_artifact(self.bucket_name, self.df_name)
         except Exception as e:
@@ -73,13 +76,13 @@ class PandasWrapper(BaseToolApiWrapper):
         return respone    
     
     
-    def generate_code(self, task_to_solve: str) -> str:
+    def generate_code(self, task_to_solve: str, error_trace: str=None) -> str:
         """Generate pandas code using LLM based on the task to solve."""
         code = CodeGenerator(
             df=self._get_dataframe(),
             df_description=self._df_info,
             llm=self.llm
-        ).generate_code(task_to_solve)
+        ).generate_code(task_to_solve, error_trace)
         return code 
     
     def execute_code(self, code: str) -> str:
@@ -88,9 +91,32 @@ class PandasWrapper(BaseToolApiWrapper):
         executor.add_to_env("get_dataframe", self._get_dataframe)
         return executor.execute_and_return_result(code)
     
+    def generate_code_with_retries(self, query: str) -> Any:
+        """Execute the code with retry logic."""
+        max_retries = 5
+        attempts = 0
+        try:
+            return self.generate_code(query)
+        except Exception as e:
+            error_trace = traceback.format_exc()
+            while attempts <= max_retries:
+                try:
+                    return self.generate_code(query, error_trace)
+                except Exception as e:
+                    attempts += 1
+                    if attempts > max_retries:
+                        logger.info(
+                            f"Maximum retry attempts exceeded. Last error: {e}"
+                        )
+                        raise
+                    logger.info(
+                        f"Retrying Code Generation ({attempts}/{max_retries})..."
+                    )
+    
     def process_query(self, query: str) -> str:
         """Analyze and process using query on dataset""" 
-        code = self.generate_code(query)
+        self._df = self._get_dataframe()
+        code = self.generate_code_with_retries(query)
         result = self.execute_code(code)
         if result.get("df") is not None:
             df = result.pop("df")

@@ -15,7 +15,7 @@ class CodeGenerator:
         self._code_cleaner = CodeCleaner(df=df)
         self._code_validator = CodeRequirementValidator()
 
-    def generate_code(self, prompt: str) -> str:
+    def generate_code(self, prompt: str, error_trace:str = None) -> str:
         """
         Generates code using a given LLM and performs validation and cleaning steps.
 
@@ -32,6 +32,8 @@ class CodeGenerator:
         try:
             logger.debug(f"Using Prompt: {prompt}")
             prompt = PLAN_CODE_PROMPT.format(dataframe=self._df_description, task=prompt)
+            if error_trace:
+                prompt += f"\n Last time you failed to generate the code <ErrorTrace>{error_trace}</ErrorTrace>"
             messages = [
                 {"role": "user",  "content": [{"type": "text", "text": prompt}]}
             ]
