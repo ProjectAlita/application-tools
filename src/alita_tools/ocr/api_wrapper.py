@@ -179,7 +179,8 @@ class OCRApiWrapper(BaseToolApiWrapper):
         return results
     
     def _pdf_to_images(self, pdf_path: str) -> List[str]:
-        """Convert PDF pages to images and store them in artifacts folder, removing white borders and skipping blank pages"""
+        """Convert PDF pages to images and store them in artifacts folder, removing white borders and skipping blank pages.
+        Detects and splits multiple images on a single page, and corrects image rotation for each segment to ensure text is horizontal."""
         try:
             # Get PDF data
             pdf_data = self.alita.download_artifact(self.artifacts_folder, pdf_path)
@@ -217,6 +218,150 @@ class OCRApiWrapper(BaseToolApiWrapper):
                     logger.info(f"Skipping blank page {page_num + 1} in {pdf_path}")
                     continue
                 
+                # Detect and segment multiple images on the page
+                try:
+                    import cv2
+                    import pytesseract
+                    
+                    # Convert to grayscale if not already
+                    if len(img_array.shape) == 3:
+                        gray_img = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
+                    else:
+                        gray_img = img_array
+                    
+                    # Apply threshold to get binary image
+                    _, binary = cv2.threshold(gray_img, 240, 255, cv2.THRESH_BINARY_INV)
+                    
+                    # Find contours
+                    contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                    
+                    # Filter significant contours (ignore small noise)
+                    min_area = img_array.shape[0] * img_array.shape[1] * 0.01  # 1% of image area
+                    significant_contours = [cnt for cnt in contours if cv2.contourArea(cnt) > min_area]
+                    
+                    # If multiple significant areas detected
+                    if len(significant_contours) > 1:
+                        logger.info(f"Found {len(significant_contours)} distinct areas on page {page_num + 1}")
+                        
+                        for i, contour in enumerate(significant_contours):
+                            # Get bounding box
+                            x, y, w, h = cv2.boundingRect(contour)
+                            
+                            # Add padding
+                            padding = 10
+                            x = max(0, x - padding)
+                            y = max(0, y - padding)
+                            w = min(img_array.shape[1] - x, w + 2*padding)
+                            h = min(img_array.shape[0] - y, h + 2*padding)
+                            
+                            # Crop the image
+                            cropped = img.crop((x, y, x+w, y+h))
+                            cropped_array = np.array(cropped)
+                            
+                            # Detect text orientation for this segment and rotate if needed
+                            try:
+                                # Convert to grayscale for OCR
+                                if len(cropped_array.shape) == 3:
+                                    cropped_gray = cv2.cvtColor(cropped_array, cv2.COLOR_RGB2GRAY)
+                                else:
+                                    cropped_gray = cropped_array
+                                
+                                # Check if there's enough text content by counting non-white pixels
+                                nonzero_pixels = np.count_nonzero(cropped_gray < 240)
+                                pixel_ratio = nonzero_pixels / (cropped_gray.shape[0] * cropped_gray.shape[1])
+                                
+                                # Only run OSD if there's enough text content
+                                if pixel_ratio > 0.01:  # Minimum 1% of non-white pixels
+                                    # Use pytesseract to detect orientation with more robust config
+                                    osd = pytesseract.image_to_osd(cropped_gray, config='--psm 0 -c min_characters_to_try=5')
+                                    angle = int(osd.splitlines()[1].split(':')[1].strip())
+                                    script = osd.splitlines()[2].split(':')[1].strip()
+                                    orientation_conf = float(osd.splitlines()[3].split(':')[1].strip())
+                                    
+                                    logger.info(f"Detected orientation for segment {i+1}: angle={angle}, script={script}, confidence={orientation_conf}")
+                                    
+                                    # Rotate segment to ensure text is horizontal and reads left-to-right
+                                    if angle != 0:
+                                        logger.info(f"Rotating segment {i+1} of page {page_num+1} by {angle} degrees")
+                                        cropped = cropped.rotate(angle, expand=True, fillcolor=(255, 255, 255))
+                                else:
+                                    logger.info(f"Segment {i+1} has insufficient text content for OCR orientation detection (pixel ratio: {pixel_ratio:.4f})")
+                                    raise Exception("Insufficient text content for OCR orientation detection")
+                                    
+                            except Exception as e:
+                                logger.warning(f"Error detecting text orientation for segment {i+1}: {str(e)}")
+                                
+                                # Enhanced fallback method using multiple approaches
+                                try:
+                                    # Try to detect orientation based on connected components
+                                    if len(cropped_array.shape) == 3:
+                                        c_gray = cv2.cvtColor(cropped_array, cv2.COLOR_RGB2GRAY)
+                                    else:
+                                        c_gray = cropped_array
+                                    
+                                    # Apply adaptive thresholding for better text detection
+                                    binary = cv2.adaptiveThreshold(c_gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+                                                                  cv2.THRESH_BINARY_INV, 11, 2)
+                                    
+                                    # Dilate to connect nearby text
+                                    kernel = np.ones((3, 3), np.uint8)
+                                    dilated = cv2.dilate(binary, kernel, iterations=1)
+                                    
+                                    # Find contours in the processed image
+                                    contours, _ = cv2.findContours(dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                                    
+                                    # Filter out very small contours that are likely noise
+                                    min_contour_area = (cropped_array.shape[0] * cropped_array.shape[1]) * 0.001  # 0.1% of image
+                                    significant_contours = [cnt for cnt in contours if cv2.contourArea(cnt) > min_contour_area]
+                                    
+                                    # If we have significant contours, analyze them
+                                    if significant_contours:
+                                        # Method 1: Use minimum area rectangle
+                                        all_points = []
+                                        for cnt in significant_contours:
+                                            all_points.extend([point[0] for point in cnt])
+                                        
+                                        if all_points:  # Check if we have any points
+                                            all_points = np.array(all_points)
+                                            rect = cv2.minAreaRect(all_points)
+                                            angle = rect[2]
+                                            
+                                            # Adjust angle (OpenCV angles can be confusing)
+                                            if angle < -45:
+                                                angle = 90 + angle
+                                            
+                                            logger.info(f"Fallback orientation detection: angle={angle}")
+                                            
+                                            # Only rotate if angle is significant
+                                            if abs(angle) > 1:
+                                                logger.info(f"Rotating segment {i+1} of page {page_num+1} by {angle} degrees (fallback method)")
+                                                cropped = cropped.rotate(angle, expand=True, fillcolor=(255, 255, 255))
+                                        else:
+                                            logger.info(f"No valid points found for orientation detection in segment {i+1}")
+                                    else:
+                                        logger.info(f"No significant contours found for orientation detection in segment {i+1}")
+                                except Exception as sub_e:
+                                    logger.warning(f"Fallback orientation detection failed for segment {i+1}: {str(sub_e)}")
+                                    # No rotation will be applied in this case
+                            
+                            # Save as separate image
+                            img_byte_arr = io.BytesIO()
+                            cropped.save(img_byte_arr, format='PNG')
+                            img_bytes = img_byte_arr.getvalue()
+                            
+                            # Create unique filename for this region
+                            image_filename = f"{base_filename}_page_{page_num + 1}_region_{i + 1}.png"
+                            
+                            # Upload to artifacts folder
+                            self.alita.create_artifact(self.artifacts_folder, image_filename, img_bytes)
+                            image_paths.append(image_filename)
+                        
+                        # Skip the default processing below since we've handled each region
+                        continue
+                except Exception as e:
+                    logger.warning(f"Error detecting multiple images on page: {e}")
+                
+                # Default processing for single image or when multi-image detection fails
                 # Detect the background color (usually white)
                 bg_color = img_array[0, 0, :]  # Top-left pixel color
                 
@@ -236,7 +381,50 @@ class OCRApiWrapper(BaseToolApiWrapper):
                     max_col = min(img_array.shape[1], max_col + padding)
                     
                     # Crop the image
-                    img = img.crop((min_col, min_row, max_col, max_row))
+                    cropped = img.crop((min_col, min_row, max_col, max_row))
+                    cropped_array = np.array(cropped)
+                    
+                    # Detect text orientation and rotate if needed
+                    try:
+                        import pytesseract
+                        
+                        # Convert to grayscale for OCR
+                        if len(cropped_array.shape) == 3:
+                            cropped_gray = cv2.cvtColor(cropped_array, cv2.COLOR_RGB2GRAY)
+                        else:
+                            cropped_gray = cropped_array
+                        
+                        # Use pytesseract to detect orientation
+                        osd = pytesseract.image_to_osd(cropped_gray)
+                        angle = int(osd.splitlines()[1].split(':')[1].strip())
+                        
+                        # Rotate image if needed
+                        if angle != 0:
+                            logger.info(f"Rotating image of page {page_num+1} by {angle} degrees")
+                            cropped = cropped.rotate(angle, expand=True)
+                    except Exception as e:
+                        logger.warning(f"Error detecting text orientation: {e}")
+                    
+                    # Use cropped image instead of the original
+                    img = cropped
+                else:
+                    # Try to detect orientation for the full page if no cropping occurred
+                    try:
+                        import pytesseract
+                        
+                        # Convert to grayscale for OCR
+                        gray_img = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
+                        
+                        # Use pytesseract to detect orientation
+                        osd = pytesseract.image_to_osd(gray_img)
+                        angle = int(osd.splitlines()[1].split(':')[1].strip())
+                        
+                        # Rotate image if needed
+                        if angle != 0:
+                            logger.info(f"Rotating page {page_num+1} by {angle} degrees")
+                            img = img.rotate(angle, expand=True)
+                    except Exception as e:
+                        logger.warning(f"Error detecting text orientation: {e}")
                 
                 # Convert to bytes
                 img_byte_arr = io.BytesIO()
