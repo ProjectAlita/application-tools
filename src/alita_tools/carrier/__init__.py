@@ -43,7 +43,7 @@ class AlitaCarrierToolkit(BaseToolkit):
                 'metadata': {
                     "label": "Carrier",
                     "version": "2.0.1",
-                    "icon_url": "https://getcarrier.io/assets/images/logo.svg",
+                    "icon_url": "carrier.svg",
                     "capabilities": {
                         "total_tools": len(selected_tools),
                         "tool_categories": ["Ticket Management", "Reporting", "Audit Logs"]

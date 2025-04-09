@@ -118,16 +118,17 @@ class ZephyrScaleApiWrapper(BaseToolApiWrapper):
             raise ToolException(
                 f"Define correct authentication flow: 1) token, 2) credential (username + password), 3) cookies")
 
-        auth = {"token": values['token']}
-        if values['username'] and values['password']:
-            auth = {"username": values['username'], "password": values['password']}
-        elif 'cookies' in values and values['cookies']:
-            auth = {"cookies": values['cookies']}
-
-        if 'base_url' in values and values['base_url']:
-            cls._api = ZephyrScale.server_api(base_url=values['base_url'], **auth).api
-        else:
-            cls._api = ZephyrScale(token=values['token']).api
+        # auth = {"token": values['token']}
+        # if values['username'] and values['password']:
+        #     auth = {"username": values['username'], "password": values['password']}
+        # elif 'cookies' in values and values['cookies']:
+        #     auth = {"cookies": values['cookies']}
+        #
+        # if 'base_url' in values and values['base_url']:
+        #     cls._api = ZephyrScale.server_api(base_url=values['base_url'], **auth).api
+        # else:
+        # Cloud version is enabled for now
+        cls._api = ZephyrScale(token=values['token']).api
         return values
 
     def get_tests(self, project_key: str, folder_id: str = None):
@@ -159,7 +160,10 @@ class ZephyrScaleApiWrapper(BaseToolApiWrapper):
         return f"Extracted tests: {all_steps_concatenated}"
 
     def create_test_case(self, project_key: str, test_case_name: str, additional_fields: str) -> str:
-        """Creates test case per provided test case data"""
+        """
+        Creates test case per provided test case data.
+        NOTE: Please note that if the user specifies a folder name, it is necessary to execute the get_folders() function first to find the correct mapping
+        """
 
         create_test_case_response = self._api.test_cases.create_test_case(project_key=project_key,
                                                                           name=test_case_name,

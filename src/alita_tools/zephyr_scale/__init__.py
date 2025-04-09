@@ -33,14 +33,35 @@ class ZephyrScaleToolkit(BaseToolkit):
         ZephyrScaleToolkit.toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name,
-            base_url=(Optional[str], Field(default=None, description="Base URL", json_schema_extra={'toolkit_name': True, 'max_toolkit_length': ZephyrScaleToolkit.toolkit_max_length})),
+            base_url=(Optional[str], Field(default=None, description="Base URL",
+                                           json_schema_extra={'toolkit_name': True,
+                                                              'max_toolkit_length': ZephyrScaleToolkit.toolkit_max_length})),
             token=(Optional[str], Field(default=None, description="Token", json_schema_extra={'secret': True})),
             username=(Optional[str], Field(default=None, description="Username")),
             password=(Optional[str], Field(default=None, description="Password", json_schema_extra={'secret': True})),
             cookies=(Optional[str], Field(default=None, description="Cookies", json_schema_extra={'secret': True})),
             max_results=(int, Field(default=100, description="Results count to show")),
-            selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
-            __config__={'json_schema_extra': {'metadata': {"label": "Zephyr Scale", "icon_url": None}}}
+            selected_tools=(List[Literal[tuple(selected_tools)]],
+                            Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
+            __config__={
+                'json_schema_extra': {
+                    'metadata': {
+                        "label": "Zephyr Scale",
+                        "icon_url": "zephyr.svg",
+                        "sections": {
+                            "auth": {
+                                "required": True,
+                                "subsections": [
+                                    {
+                                        "name": "Token",
+                                        "fields": ["token"]
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
         )
 
     @classmethod
