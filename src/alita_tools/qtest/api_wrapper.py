@@ -48,7 +48,7 @@ Precondition: List prerequisites in one cell, formatted as: <Step1> <Step2> Leav
     "Status": "New",
     "Priority": "",
     "Test Type": "Functional",
-    "Precondition": "Env is available. Browser is open.",
+    "Precondition": "<ONLY provided by user precondition>",
     "Steps": [
         {{ "Test Step Number": 1, "Test Step Description": "Navigate to url", "Test Step Expected Result": "Page content is loaded"}},
         {{ "Test Step Number": 2, "Test Step Description": "Click 'Login'", "Test Step Expected Result": "Form is expanded"}},
