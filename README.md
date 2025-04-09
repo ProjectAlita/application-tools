@@ -76,8 +76,8 @@
 | src/alita\_tools/zephyr/rest\_client.py                         |       92 |       64 |     30% |12-13, 38-42, 45, 48, 51, 57-65, 74, 78-85, 89-92, 95, 98, 136-165, 175-194 |
 | src/alita\_tools/zephyr\_enterprise/api\_wrapper.py             |       73 |       53 |     27% |20-23, 28-31, 36-39, 49-59, 67-70, 80-121, 124 |
 | src/alita\_tools/zephyr\_enterprise/zephyr\_enterprise.py       |       50 |       27 |     46% |26-27, 39-47, 59-73, 83, 93, 103, 112, 121, 140-153, 178 |
-| src/alita\_tools/zephyr\_scale/api\_wrapper.py                  |      101 |       64 |     37% |108-131, 136-139, 144-148, 153-159, 164-167, 172-173, 183-187, 192-230, 233 |
-|                                                       **TOTAL** | **6527** | **3910** | **40%** |           |
+| src/alita\_tools/zephyr\_scale/api\_wrapper.py                  |       94 |       57 |     39% |108-132, 137-140, 145-149, 154-160, 168-171, 176-177, 187-191, 196-234, 237 |
+|                                                       **TOTAL** | **6520** | **3903** | **40%** |           |
 
 
 ## Setup coverage badge
