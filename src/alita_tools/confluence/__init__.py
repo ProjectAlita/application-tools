@@ -56,7 +56,27 @@ class ConfluenceToolkit(BaseToolkit):
             max_retry_seconds=(int, Field(description="Max retry, sec", default=60)),
             selected_tools=(List[Literal[tuple(selected_tools)]],
                             Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
-            __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Confluence", "icon_url": None}})
+            __config__=ConfigDict(json_schema_extra={
+                'metadata': {
+                    "label": "Confluence",
+                    "icon_url": None,
+                    "sections": {
+                        "auth": {
+                            "required": True,
+                            "subsections": [
+                                {
+                                    "name": "Token",
+                                    "fields": ["token"]
+                                },
+                                {
+                                    "name": "API Key",
+                                    "fields": ["username", "api_key"]
+                                }
+                            ]
+                        }
+                    }
+                }
+            })
         )
 
     @classmethod
