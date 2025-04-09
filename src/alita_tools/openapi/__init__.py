@@ -46,7 +46,7 @@ def create_api_tool(name: str, op: Operation):
         fields['headers'] = (Optional[dict], Field(default = headers, description="The dict that represents headers for request:\n" + '\n'.join(headers_descriptions)))
 
     if op.spec.requestBody:
-        fields['json'] = (Optional[str], Field(default = None, description="JSON body for request"))
+        fields['json'] = (Optional[str], Field(default = None, description="JSON request body provided as a string"))
 
     op.server = Server.from_openapi_server(op.server)  # patch this
     op.server.get_url = partial(Server.get_url, op.server)
