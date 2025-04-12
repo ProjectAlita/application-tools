@@ -276,26 +276,26 @@ class OCRApiWrapper(BaseToolApiWrapper):
         
         result['extracted_text'] = extracted_text
             
-        # # Clean up temporary images after processing
-        # logger.info(f"Cleaning up temporary image files")
-        # for img_path in result['images']:
-        #     try:
-        #         self.alita.delete_artifact(self.artifacts_folder, img_path)
-        #         if img_path.endswith("_enhanced.png"):
-        #             # Remove the original image if it was enhanced
-        #             original_path = img_path.replace("_enhanced.png", ".png")
-        #             self.alita.delete_artifact(self.artifacts_folder, original_path)
-        #         logger.debug(f"Deleted temporary image: {img_path}")
-        #     except Exception as e:
-        #         logger.warning(f"Failed to delete temporary image {img_path}: {e}")
+        # Clean up temporary images after processing
+        logger.info(f"Cleaning up temporary image files")
+        for img_path in result['images']:
+            try:
+                self.alita.delete_artifact(self.artifacts_folder, img_path)
+                if img_path.endswith("_enhanced.png"):
+                    # Remove the original image if it was enhanced
+                    original_path = img_path.replace("_enhanced.png", ".png")
+                    self.alita.delete_artifact(self.artifacts_folder, original_path)
+                logger.debug(f"Deleted temporary image: {img_path}")
+            except Exception as e:
+                logger.warning(f"Failed to delete temporary image {img_path}: {e}")
                 
-        # # Also clean up temporary PDF if this was converted from an Office document
-        # if "original_file_type" in result and result["original_file_type"] == "office":
-        #     try:
-        #         self.alita.delete_artifact(self.artifacts_folder, file_path)
-        #         logger.debug(f"Deleted temporary PDF converted from Office: {file_path}")
-        #     except Exception as e:
-        #         logger.warning(f"Failed to delete temporary PDF {file_path}: {e}")
+        # Also clean up temporary PDF if this was converted from an Office document
+        if "original_file_type" in result and result["original_file_type"] == "office":
+            try:
+                self.alita.delete_artifact(self.artifacts_folder, file_path)
+                logger.debug(f"Deleted temporary PDF converted from Office: {file_path}")
+            except Exception as e:
+                logger.warning(f"Failed to delete temporary PDF {file_path}: {e}")
                 
         return result
         
