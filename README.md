@@ -45,7 +45,7 @@
 | src/alita\_tools/keycloak/api\_wrapper.py                       |       46 |       28 |     39% |19-26, 29-37, 41-53, 56-59, 62 |
 | src/alita\_tools/localgit/local\_git.py                         |      175 |      130 |     26% |117-129, 133-181, 185-192, 196, 200-205, 209-216, 220-221, 225-226, 230-235, 241-278, 282-287, 291-303, 307-308, 312-333, 336 |
 | src/alita\_tools/localgit/tool.py                               |       21 |        5 |     76% | 22, 31-34 |
-| src/alita\_tools/ocr/api\_wrapper.py                            |      271 |      238 |     12% |85-91, 95-133, 137-150, 158-179, 184-444, 453-553, 557 |
+| src/alita\_tools/ocr/api\_wrapper.py                            |      400 |      339 |     15% |72-77, 96-102, 115-168, 172-185, 201-294, 311-317, 320-330, 333-341, 359-409, 414-566, 580-612, 626-684, 696-747, 760-779, 787 |
 | src/alita\_tools/pandas/api\_wrapper.py                         |       89 |       58 |     35% |37-40, 44-46, 50-68, 72-76, 81-86, 90-92, 96-112, 118-124, 146 |
 | src/alita\_tools/pandas/dataframe/errors.py                     |        2 |        0 |    100% |           |
 | src/alita\_tools/pandas/dataframe/executor/code\_environment.py |       23 |       17 |     26% |14-19, 28-35, 74-90 |
@@ -77,7 +77,7 @@
 | src/alita\_tools/zephyr\_enterprise/api\_wrapper.py             |       73 |       53 |     27% |20-23, 28-31, 36-39, 49-59, 67-70, 80-121, 124 |
 | src/alita\_tools/zephyr\_enterprise/zephyr\_enterprise.py       |       50 |       27 |     46% |26-27, 39-47, 59-73, 83, 93, 103, 112, 121, 140-153, 178 |
 | src/alita\_tools/zephyr\_scale/api\_wrapper.py                  |       94 |       57 |     39% |108-132, 137-140, 145-149, 154-160, 168-171, 176-177, 187-191, 196-234, 237 |
-|                                                       **TOTAL** | **6520** | **3903** | **40%** |           |
+|                                                       **TOTAL** | **6649** | **4004** | **40%** |           |
 
 
 ## Setup coverage badge
