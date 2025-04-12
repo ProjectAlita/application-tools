@@ -54,9 +54,9 @@
             </div>
         </aside>
         <h2>
-            <span class="text">311 statements &nbsp;</span>
+            <span class="text">327 statements &nbsp;</span>
             <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">6<span class="text"> run</span></button>
-            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">305<span class="text"> missing</span></button>
+            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">321<span class="text"> missing</span></button>
             <button type="button" class="exc show_exc button_toggle_exc" value="exc" data-shortcut="x" title="Toggle lines excluded">0<span class="text"> excluded</span></button>
         </h2>
         <p class="text">
@@ -65,7 +65,7 @@
             <a id="nextFileLink" class="nav" href="z_2de9cb8db70443ff_api_wrapper_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.6.4">coverage.py v7.6.4</a>,
-            created at 2025-04-12 17:48 +0000
+            created at 2025-04-12 17:59 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -358,26 +358,26 @@
     <p class="pln"><span class="n"><a id="t276" href="#t276">276</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="mis show_mis"><span class="n"><a id="t277" href="#t277">277</a></span><span class="t">        <span class="nam">result</span><span class="op">[</span><span class="str">'extracted_text'</span><span class="op">]</span> <span class="op">=</span> <span class="nam">extracted_text</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t278" href="#t278">278</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t279" href="#t279">279</a></span><span class="t">        <span class="com"># # Clean up temporary images after processing</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t280" href="#t280">280</a></span><span class="t">        <span class="com"># logger.info(f"Cleaning up temporary image files")</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t281" href="#t281">281</a></span><span class="t">        <span class="com"># for img_path in result['images']:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t282" href="#t282">282</a></span><span class="t">        <span class="com">#     try:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t283" href="#t283">283</a></span><span class="t">        <span class="com">#         self.alita.delete_artifact(self.artifacts_folder, img_path)</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t284" href="#t284">284</a></span><span class="t">        <span class="com">#         if img_path.endswith("_enhanced.png"):</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t285" href="#t285">285</a></span><span class="t">        <span class="com">#             # Remove the original image if it was enhanced</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t286" href="#t286">286</a></span><span class="t">        <span class="com">#             original_path = img_path.replace("_enhanced.png", ".png")</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t287" href="#t287">287</a></span><span class="t">        <span class="com">#             self.alita.delete_artifact(self.artifacts_folder, original_path)</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t288" href="#t288">288</a></span><span class="t">        <span class="com">#         logger.debug(f"Deleted temporary image: {img_path}")</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t289" href="#t289">289</a></span><span class="t">        <span class="com">#     except Exception as e:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t290" href="#t290">290</a></span><span class="t">        <span class="com">#         logger.warning(f"Failed to delete temporary image {img_path}: {e}")</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t279" href="#t279">279</a></span><span class="t">        <span class="com"># Clean up temporary images after processing</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t280" href="#t280">280</a></span><span class="t">        <span class="nam">logger</span><span class="op">.</span><span class="nam">info</span><span class="op">(</span><span class="fst">f"</span><span class="fst">Cleaning up temporary image files</span><span class="fst">"</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t281" href="#t281">281</a></span><span class="t">        <span class="key">for</span> <span class="nam">img_path</span> <span class="key">in</span> <span class="nam">result</span><span class="op">[</span><span class="str">'images'</span><span class="op">]</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t282" href="#t282">282</a></span><span class="t">            <span class="key">try</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t283" href="#t283">283</a></span><span class="t">                <span class="nam">self</span><span class="op">.</span><span class="nam">alita</span><span class="op">.</span><span class="nam">delete_artifact</span><span class="op">(</span><span class="nam">self</span><span class="op">.</span><span class="nam">artifacts_folder</span><span class="op">,</span> <span class="nam">img_path</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t284" href="#t284">284</a></span><span class="t">                <span class="key">if</span> <span class="nam">img_path</span><span class="op">.</span><span class="nam">endswith</span><span class="op">(</span><span class="str">"_enhanced.png"</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t285" href="#t285">285</a></span><span class="t">                    <span class="com"># Remove the original image if it was enhanced</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t286" href="#t286">286</a></span><span class="t">                    <span class="nam">original_path</span> <span class="op">=</span> <span class="nam">img_path</span><span class="op">.</span><span class="nam">replace</span><span class="op">(</span><span class="str">"_enhanced.png"</span><span class="op">,</span> <span class="str">".png"</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t287" href="#t287">287</a></span><span class="t">                    <span class="nam">self</span><span class="op">.</span><span class="nam">alita</span><span class="op">.</span><span class="nam">delete_artifact</span><span class="op">(</span><span class="nam">self</span><span class="op">.</span><span class="nam">artifacts_folder</span><span class="op">,</span> <span class="nam">original_path</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t288" href="#t288">288</a></span><span class="t">                <span class="nam">logger</span><span class="op">.</span><span class="nam">debug</span><span class="op">(</span><span class="fst">f"</span><span class="fst">Deleted temporary image: </span><span class="op">{</span><span class="nam">img_path</span><span class="op">}</span><span class="fst">"</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t289" href="#t289">289</a></span><span class="t">            <span class="key">except</span> <span class="nam">Exception</span> <span class="key">as</span> <span class="nam">e</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t290" href="#t290">290</a></span><span class="t">                <span class="nam">logger</span><span class="op">.</span><span class="nam">warning</span><span class="op">(</span><span class="fst">f"</span><span class="fst">Failed to delete temporary image </span><span class="op">{</span><span class="nam">img_path</span><span class="op">}</span><span class="fst">: </span><span class="op">{</span><span class="nam">e</span><span class="op">}</span><span class="fst">"</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t291" href="#t291">291</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t292" href="#t292">292</a></span><span class="t">        <span class="com"># # Also clean up temporary PDF if this was converted from an Office document</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t293" href="#t293">293</a></span><span class="t">        <span class="com"># if "original_file_type" in result and result["original_file_type"] == "office":</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t294" href="#t294">294</a></span><span class="t">        <span class="com">#     try:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t295" href="#t295">295</a></span><span class="t">        <span class="com">#         self.alita.delete_artifact(self.artifacts_folder, file_path)</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t296" href="#t296">296</a></span><span class="t">        <span class="com">#         logger.debug(f"Deleted temporary PDF converted from Office: {file_path}")</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t297" href="#t297">297</a></span><span class="t">        <span class="com">#     except Exception as e:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t298" href="#t298">298</a></span><span class="t">        <span class="com">#         logger.warning(f"Failed to delete temporary PDF {file_path}: {e}")</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t292" href="#t292">292</a></span><span class="t">        <span class="com"># Also clean up temporary PDF if this was converted from an Office document</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t293" href="#t293">293</a></span><span class="t">        <span class="key">if</span> <span class="str">"original_file_type"</span> <span class="key">in</span> <span class="nam">result</span> <span class="key">and</span> <span class="nam">result</span><span class="op">[</span><span class="str">"original_file_type"</span><span class="op">]</span> <span class="op">==</span> <span class="str">"office"</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t294" href="#t294">294</a></span><span class="t">            <span class="key">try</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t295" href="#t295">295</a></span><span class="t">                <span class="nam">self</span><span class="op">.</span><span class="nam">alita</span><span class="op">.</span><span class="nam">delete_artifact</span><span class="op">(</span><span class="nam">self</span><span class="op">.</span><span class="nam">artifacts_folder</span><span class="op">,</span> <span class="nam">file_path</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t296" href="#t296">296</a></span><span class="t">                <span class="nam">logger</span><span class="op">.</span><span class="nam">debug</span><span class="op">(</span><span class="fst">f"</span><span class="fst">Deleted temporary PDF converted from Office: </span><span class="op">{</span><span class="nam">file_path</span><span class="op">}</span><span class="fst">"</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t297" href="#t297">297</a></span><span class="t">            <span class="key">except</span> <span class="nam">Exception</span> <span class="key">as</span> <span class="nam">e</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t298" href="#t298">298</a></span><span class="t">                <span class="nam">logger</span><span class="op">.</span><span class="nam">warning</span><span class="op">(</span><span class="fst">f"</span><span class="fst">Failed to delete temporary PDF </span><span class="op">{</span><span class="nam">file_path</span><span class="op">}</span><span class="fst">: </span><span class="op">{</span><span class="nam">e</span><span class="op">}</span><span class="fst">"</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t299" href="#t299">299</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="mis show_mis"><span class="n"><a id="t300" href="#t300">300</a></span><span class="t">        <span class="key">return</span> <span class="nam">result</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t301" href="#t301">301</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
@@ -768,7 +768,7 @@
             <a class="nav" href="z_2de9cb8db70443ff_api_wrapper_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.6.4">coverage.py v7.6.4</a>,
-            created at 2025-04-12 17:48 +0000
+            created at 2025-04-12 17:59 +0000
         </p>
     </div>
 </footer>
