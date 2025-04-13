@@ -537,13 +537,13 @@ class ReposApiWrapper(BaseCodeToolApiWrapper):
                 if isinstance(base_content, ToolException):
                     msg = f"Failed to process base file content for path: {path}: {str(base_content)}"
                     logger.error(msg)
-                    return str(ToolException(msg))
+                    return msg
 
                 target_content = self.get_file_content(source_commit_id, path)
                 if isinstance(target_content, ToolException):
                     msg = f"Failed to process target file content for path: {path}: {str(target_content)}"
                     logger.error(msg)
-                    return str(ToolException(msg))
+                    return msg
 
                 diff = generate_diff(base_content, target_content, path)
             else:
