@@ -22,7 +22,7 @@ from langchain_core.tools import ToolException
 from msrest.authentication import BasicAuthentication
 from pydantic import Field, PrivateAttr, create_model, model_validator
 
-from ..utils import extract_old_new_pairs, generate_diff
+from ..utils import extract_old_new_pairs, generate_diff, get_content_from_generator
 from ...elitea_base import BaseCodeToolApiWrapper, LoaderSchema
 
 logger = logging.getLogger(__name__)
@@ -535,7 +535,17 @@ class ReposApiWrapper(BaseCodeToolApiWrapper):
             if change_type == "edit":
                 base_content = self.get_file_content(target_commit_id, path)
                 target_content = self.get_file_content(source_commit_id, path)
-                diff = generate_diff(base_content, target_content, path)
+
+                if isinstance(base_content, ToolException):
+                    msg = f"Failed to process file content for path: {path}: {str(base_content)}"
+                    logger.error(msg)
+                    return str(ToolException(msg))
+                elif isinstance(target_content, ToolException):
+                    msg = f"Failed to process file content for path: {path}: {str(target_content)}"
+                    logger.error(msg)
+                    return str(ToolException(msg))
+                else:
+                    diff = generate_diff(base_content, target_content, path)
             else:
                 diff = f"Change Type: {change_type}"
 
@@ -554,7 +564,7 @@ class ReposApiWrapper(BaseCodeToolApiWrapper):
                 path=path,
                 version_descriptor=version_descriptor,
             )
-            content = "".join(chunk.decode("utf-8") for chunk in content_generator)
+            content = get_content_from_generator(content_generator)
         except Exception as e:
             msg = f"Failed to get item text. Error: {str(e)}"
             logger.error(msg)

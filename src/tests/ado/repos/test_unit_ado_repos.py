@@ -589,7 +589,7 @@ class TestReposToolsPositive:
             return_value=MagicMock(version=branch_name, version_type="branch"),
         ) as mock_version_descriptor:
             mock_git_client.get_item_text.return_value = [b"Hello", b" ", b"World!"]
-            result = repos_wrapper._read_file(file_path)
+            result = repos_wrapper._read_file(file_path, branch_name)
 
             expected_content = "Hello World!"
             assert result == expected_content
@@ -1169,7 +1169,7 @@ class TestReposToolsExceptions:
         error_message = "File does not exist"
         mock_git_client.get_item_text.side_effect = Exception(error_message)
 
-        result = repos_wrapper._read_file(file_path)
+        result = repos_wrapper._read_file(file_path, branch_name)
 
         assert isinstance(result, ToolException)
         assert (
@@ -1245,9 +1245,9 @@ class TestReposToolsExceptions:
         result = repos_wrapper.comment_on_pull_request(comment_query)
 
         assert isinstance(result, ToolException)
-        assert str(result) == "Unable to make comment due to error:\nAPI Error"
+        assert str(result) == "An error occurred:\nAPI Error"
         mock_logger.error.assert_called_once_with(
-            "Unable to make comment due to error:\nAPI Error"
+            "An error occurred:\nAPI Error"
         )
     
     @patch("alita_tools.ado.repos.repos_wrapper.logger")

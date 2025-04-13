@@ -27,3 +27,12 @@ def generate_diff(base_text, target_text, file_path):
     )
 
     return "".join(diff)
+
+def get_content_from_generator(content_generator):
+    def safe_decode(chunk):
+        try:
+            return chunk.decode("utf-8")
+        except UnicodeDecodeError:
+            return chunk.decode("ascii", errors="backslashreplace")
+
+    return "".join(safe_decode(chunk) for chunk in content_generator)
