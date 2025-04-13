@@ -27,10 +27,9 @@ def mock_git_client():
 
 @pytest.fixture
 def repos_wrapper(default_values, mock_git_client):
-    with patch(
-        "alita_tools.ado.repos.repos_wrapper.ReposApiWrapper._client",
-        new=mock_git_client,
-    ):
+    # Patch the GitClient class *before* ReposApiWrapper instantiation
+    # so the validator uses the mock.
+    with patch("alita_tools.ado.repos.repos_wrapper.GitClient", return_value=mock_git_client):
         instance = ReposApiWrapper(
             organization_url=default_values["organization_url"],
             project=default_values["project"],
@@ -65,7 +64,22 @@ class TestReposApiWrapperValidateToolkit:
 
         result = repos_wrapper.validate_toolkit(default_values)
         assert result is not None
-    
+
+    @pytest.mark.positive
+    def test_validate_toolkit_branches_exist_no_active(
+        self, repos_wrapper, default_values, mock_git_client
+    ):
+        # Simulate base branch exists, active branch is None initially but set to base
+        default_values["active_branch"] = None
+        mock_git_client.get_branch.return_value = MagicMock() # Base branch exists
+
+        result = repos_wrapper.validate_toolkit(default_values)
+        assert result is not None
+        # Check that get_branch was called once for base_branch
+        mock_git_client.get_branch.assert_called_with(
+            repository_id=default_values["repository_id"], name=default_values["base_branch"], project=default_values["project"]
+        )
+
     @pytest.mark.parametrize(
         "missing_parameter", [("project"), ("organization_url"), ("repository_id")]
     )
@@ -93,6 +107,25 @@ class TestReposApiWrapperValidateToolkit:
             exception.value
         )
         assert error_message in str(exception.value)
+
+    @pytest.mark.negative
+    def test_validate_toolkit_branch_exists_exception(self, mock_git_client, default_values):
+        # Test the except block within the branch_exists helper function
+        error_message = "Simulated API error on get_branch"
+        # Make get_branch raise an exception when called for the base branch
+        mock_git_client.get_branch.side_effect = Exception(error_message)
+
+        with pytest.raises(ToolException) as exception:
+            # Instantiating the wrapper triggers the validator
+            ReposApiWrapper(**default_values)
+
+        # The validator should raise ToolException because branch_exists returned False
+        assert f"The base branch '{default_values['base_branch']}' does not exist." == str(exception.value)
+        # Ensure get_branch was called (and raised the exception)
+        mock_git_client.get_branch.assert_called_once_with(
+            repository_id=default_values["repository_id"], name=default_values["base_branch"], project=default_values["project"]
+        )
+
 
     @pytest.mark.positive
     @pytest.mark.parametrize(
@@ -127,6 +160,45 @@ class TestReposApiWrapperValidateToolkit:
         with pytest.raises(ValueError) as exception:
             repos_wrapper.run(mode)
         assert str(exception.value) == f"Unknown mode: {mode}"
+    
+    @pytest.mark.positive
+    def test_get_available_tools(self, repos_wrapper):
+        tools = repos_wrapper.get_available_tools()
+        assert isinstance(tools, list)
+        assert len(tools) > 10  # Check for a reasonable number of tools
+
+        expected_tool_names = [
+            "list_branches_in_repo",
+            "set_active_branch",
+            "list_files",
+            "list_open_pull_requests",
+            "get_pull_request",
+            "list_pull_request_files",
+            "create_branch",
+            "read_file",
+            "create_file",
+            "update_file",
+            "delete_file",
+            "get_work_items",
+            "comment_on_pull_request",
+            "create_pull_request",
+            "loader",
+        ]
+        actual_tool_names = [tool["name"] for tool in tools]
+
+        # Check if all expected tools are present
+        for name in expected_tool_names:
+            assert name in actual_tool_names
+
+        # Check structure of a sample tool
+        list_files_tool = next(t for t in tools if t["name"] == "list_files")
+        assert "ref" in list_files_tool
+        assert "name" in list_files_tool
+        assert "description" in list_files_tool
+        assert "args_schema" in list_files_tool
+        assert callable(list_files_tool["ref"])
+        assert isinstance(list_files_tool["description"], str)
+        assert hasattr(list_files_tool["args_schema"], "__fields__") # Check if it's a Pydantic model
 
 
 @pytest.mark.unit
@@ -222,6 +294,11 @@ class TestReposToolsPositive:
 
         assert result == str(["/repo/file.txt"])
         mock_git_client.get_items.assert_called_once()
+        # Check args passed to GitVersionDescriptor constructor
+        mock_version_descriptor.assert_called_with(version="develop", version_type="branch")
+        # Check args passed to get_items
+        args, kwargs = mock_git_client.get_items.call_args
+        assert kwargs["version_descriptor"] == mock_version # Ensure the mock instance was passed
 
     @patch("alita_tools.ado.repos.repos_wrapper.GitVersionDescriptor")
     def test_get_files_no_recursion(
@@ -259,6 +336,37 @@ class TestReposToolsPositive:
         args, kwargs = mock_git_client.get_items.call_args
         assert kwargs["version_descriptor"] == mock_version
         assert result == str(["/repo/file.txt"])
+        # Check args passed to GitVersionDescriptor constructor
+        mock_version_descriptor.assert_called_with(version=repos_wrapper.base_branch, version_type="branch")
+        # Check args passed to get_items
+        args, kwargs = mock_git_client.get_items.call_args
+        assert kwargs["version_descriptor"] == mock_version # Ensure the mock instance was passed
+
+    @patch("alita_tools.ado.repos.repos_wrapper.GitVersionDescriptor")
+    def test_get_files_skips_non_blob(
+        self, mock_version_descriptor, repos_wrapper, mock_git_client
+    ):
+        # Mock items: one blob (file) and one tree (directory)
+        mock_blob_item = MagicMock()
+        mock_blob_item.git_object_type = "blob"
+        mock_blob_item.path = "/repo/file.txt"
+
+        mock_tree_item = MagicMock()
+        mock_tree_item.git_object_type = "tree"
+        mock_tree_item.path = "/repo/directory"
+
+        mock_git_client.get_items.return_value = [mock_blob_item, mock_tree_item]
+        mock_version = MagicMock()
+        mock_version_descriptor.return_value = mock_version
+
+        result = repos_wrapper._get_files(directory_path="src/", branch_name="develop")
+
+        # Assert that only the blob item's path is included
+        assert result == str(["/repo/file.txt"])
+        mock_git_client.get_items.assert_called_once()
+        mock_version_descriptor.assert_called_with(version="develop", version_type="branch")
+        args, kwargs = mock_git_client.get_items.call_args
+        assert kwargs["version_descriptor"] == mock_version
 
     def test_parse_pull_request_comments(self, repos_wrapper):
         from datetime import datetime
@@ -280,10 +388,21 @@ class TestReposToolsPositive:
         thread1.status = "active"
 
         thread2 = MagicMock()
-        thread2.comments = []
+        thread2.comments = [] # No comments in this thread
         thread2.status = None
 
-        result = repos_wrapper.parse_pull_request_comments([thread1, thread2])
+        comment3 = MagicMock()
+        comment3.id = 3
+        comment3.author.display_name = "Alice"
+        comment3.content = "Another comment"
+        comment3.published_date = None # No published date
+
+        thread3 = MagicMock()
+        thread3.comments = [comment3]
+        thread3.status = "closed"
+
+
+        result = repos_wrapper.parse_pull_request_comments([thread1, thread2, thread3])
 
         expected = [
             {
@@ -300,8 +419,19 @@ class TestReposToolsPositive:
                 "published_date": "2021-01-02 15:45:00 ",
                 "status": "active",
             },
+            {
+                "id": 3,
+                "author": "Alice",
+                "content": "Another comment",
+                "published_date": None,
+                "status": "closed",
+            }
         ]
         assert result == expected
+
+    def test_parse_pull_request_comments_empty(self, repos_wrapper):
+        result = repos_wrapper.parse_pull_request_comments([])
+        assert result == []
 
     def test_list_open_pull_requests_with_results(self, repos_wrapper, mock_git_client):
         mock_pr1 = MagicMock()
@@ -528,6 +658,82 @@ class TestReposToolsPositive:
             mock_git_client.get_pull_request_iterations.assert_called_once()
             mock_git_client.get_pull_request_iteration_changes.assert_called_once()
 
+    def test_list_pull_request_diffs_get_file_content_error(self, repos_wrapper, mock_git_client):
+        pull_request_id = "123"
+        mock_iteration = MagicMock()
+        mock_iteration.id = 2
+        source_ref_commit = MagicMock(commit_id="abc123")
+        target_ref_commit = MagicMock(commit_id="def456")
+        mock_iteration.source_ref_commit = source_ref_commit
+        mock_iteration.target_ref_commit = target_ref_commit
+        mock_git_client.get_pull_request_iterations.return_value = [mock_iteration]
+        mock_change_entry = MagicMock()
+        mock_change_entry.additional_properties = {
+            "item": {"path": "/file1.txt"},
+            "changeType": "edit",
+        }
+        mock_changes = MagicMock()
+        mock_changes.change_entries = [mock_change_entry]
+        mock_git_client.get_pull_request_iteration_changes.return_value = mock_changes
+
+        error_message = "Failed to get item text. Error: Network Failure"
+        with patch.object(
+            ReposApiWrapper, "get_file_content", return_value=ToolException(error_message)
+        ) as mock_get_file_content:
+            result = repos_wrapper.list_pull_request_diffs(pull_request_id)
+
+            assert isinstance(result, str) # Returns string representation of ToolException
+            assert f"Failed to process base file content for path: /file1.txt: {error_message}" in result
+            mock_get_file_content.assert_called_once() # Called once for base_content
+
+    def test_list_pull_request_diffs_get_target_file_content_error(self, repos_wrapper, mock_git_client):
+        pull_request_id = "123"
+        mock_iteration = MagicMock()
+        mock_iteration.id = 2
+        source_ref_commit = MagicMock(commit_id="abc123")
+        target_ref_commit = MagicMock(commit_id="def456")
+        mock_iteration.source_ref_commit = source_ref_commit
+        mock_iteration.target_ref_commit = target_ref_commit
+        mock_git_client.get_pull_request_iterations.return_value = [mock_iteration]
+        mock_change_entry = MagicMock()
+        mock_change_entry.additional_properties = {
+            "item": {"path": "/file1.txt"},
+            "changeType": "edit",
+        }
+        mock_changes = MagicMock()
+        mock_changes.change_entries = [mock_change_entry]
+        mock_git_client.get_pull_request_iteration_changes.return_value = mock_changes
+
+        error_message = "Failed to get target item text. Error: Network Failure"
+        
+        # Define a side_effect function to control return values precisely
+        call_count = 0
+        def mock_side_effect(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                # First call (base_content) succeeds
+                return "Valid base content"
+            elif call_count == 2:
+                # Second call (target_content) returns the ToolException instance
+                return ToolException(error_message)
+            else:
+                # Fail test if called more than expected
+                raise AssertionError("get_file_content called more than twice")
+
+        # Mock get_file_content to use the side_effect function
+        with patch.object(
+            ReposApiWrapper, "get_file_content", side_effect=mock_side_effect
+        ) as mock_get_file_content:
+            result = repos_wrapper.list_pull_request_diffs(pull_request_id)
+
+            # The function should return a string representation of the ToolException
+            assert isinstance(result, str) 
+            # Check for the error message specific to the target content failure
+            assert f"Failed to process target file content for path: /file1.txt: {error_message}" in result
+            # Ensure get_file_content was called twice
+            assert mock_get_file_content.call_count == 2
+
     def test_get_file_content_success(self, repos_wrapper, mock_git_client):
         commit_id = "abc123"
         path = "/test/file.txt"
@@ -561,8 +767,29 @@ class TestReposToolsPositive:
             result
             == f"Branch '{branch_name}' created successfully, and set as current active branch."
         )
-        assert mock_git_client.get_branch.call_count == 4
+        assert mock_git_client.get_branch.call_count == 4 # Check existing, get base, check existing again, get base again? Seems excessive, but matches code.
         mock_git_client.update_refs.assert_called_once()
+
+    def test_create_branch_fallback_to_base(self, repos_wrapper, mock_git_client):
+        branch_name = "feature-branch"
+        repos_wrapper.active_branch = None # Simulate no active branch set
+        base_branch_mock = MagicMock()
+        base_branch_mock.commit.commit_id = "base12345"
+        # First call checks if new branch exists (None), second gets base branch
+        mock_git_client.get_branch.side_effect = [None, base_branch_mock]
+
+        result = repos_wrapper.create_branch(branch_name)
+
+        assert (
+            result
+            == f"Branch '{branch_name}' created successfully, and set as current active branch."
+        )
+        assert repos_wrapper.active_branch == branch_name
+        # Check it used base_branch for creation
+        get_branch_calls = mock_git_client.get_branch.call_args_list
+        assert get_branch_calls[1][1]['name'] == repos_wrapper.base_branch
+        mock_git_client.update_refs.assert_called_once()
+
 
     def test_create_file_success(self, repos_wrapper, mock_git_client):
         file_path = "newfile.txt"
@@ -578,6 +805,30 @@ class TestReposToolsPositive:
 
         assert result == f"Created file {file_path}"
         mock_git_client.create_push.assert_called_once()
+
+    def test_create_file_fallback_to_base_branch(self, repos_wrapper, mock_git_client):
+        file_path = "newfile_base.txt"
+        file_contents = "Content for base branch"
+        # branch_name is None, should use base_branch
+        repos_wrapper.active_branch = None # Ensure active is not set
+        mock_git_client.get_item.side_effect = Exception("File not found")
+        mock_commit = MagicMock(commit_id="base123")
+        # Should fetch the base branch
+        mock_git_client.get_branch.return_value = MagicMock(commit=mock_commit)
+        mock_git_client.create_push.return_value = None
+
+        result = repos_wrapper.create_file(file_path, file_contents, branch_name=None)
+        
+        # Assert the expected error message due to protected branch
+        expected_error = (
+            "You're attempting to commit directly to the "
+            f"{repos_wrapper.base_branch} branch, which is protected. "
+            "Please create a new branch and try again."
+        )
+        assert result == expected_error
+        # Ensure push was not called because of the protection error
+        mock_git_client.create_push.assert_not_called()
+
 
     def test_read_file_success(self, repos_wrapper, mock_git_client):
         file_path = "path/to/file.txt"
@@ -599,6 +850,59 @@ class TestReposToolsPositive:
                 path=file_path,
                 version_descriptor=mock_version_descriptor.return_value,
             )
+
+    def test_read_file_fallback_branch(self, repos_wrapper, mock_git_client):
+        file_path = "path/to/file.txt"
+        # branch is None, should use active_branch if set, else base_branch
+        repos_wrapper.active_branch = "active-feature" # Set active branch
+
+        with patch(
+            "alita_tools.ado.repos.repos_wrapper.GitVersionDescriptor",
+        ) as mock_version_descriptor_class:
+            # Setup mock return value for the class instance
+            mock_version_descriptor_instance = MagicMock()
+            mock_version_descriptor_class.return_value = mock_version_descriptor_instance
+
+            mock_git_client.get_item_text.return_value = [b"Content from active"]
+            result = repos_wrapper._read_file(file_path, branch=None) # Pass None for branch
+
+            assert result == "Content from active"
+            # Verify GitVersionDescriptor was called with the active branch
+            mock_version_descriptor_class.assert_called_once_with(
+                version=repos_wrapper.active_branch, version_type="branch"
+            )
+            mock_git_client.get_item_text.assert_called_once_with(
+                repository_id=repos_wrapper.repository_id,
+                project=repos_wrapper.project,
+                path=file_path,
+                version_descriptor=mock_version_descriptor_instance,
+            )
+
+        # Reset mock and test fallback to base_branch
+        mock_git_client.reset_mock()
+        mock_version_descriptor_class.reset_mock()
+        repos_wrapper.active_branch = None # Unset active branch
+
+        with patch(
+            "alita_tools.ado.repos.repos_wrapper.GitVersionDescriptor",
+        ) as mock_version_descriptor_class_base:
+            mock_version_descriptor_instance_base = MagicMock()
+            mock_version_descriptor_class_base.return_value = mock_version_descriptor_instance_base
+            mock_git_client.get_item_text.return_value = [b"Content from base"]
+            result = repos_wrapper._read_file(file_path, branch=None)
+
+            assert result == "Content from base"
+            # Verify GitVersionDescriptor was called with the base branch
+            mock_version_descriptor_class_base.assert_called_once_with(
+                version=repos_wrapper.base_branch, version_type="branch"
+            )
+            mock_git_client.get_item_text.assert_called_once_with(
+                repository_id=repos_wrapper.repository_id,
+                project=repos_wrapper.project,
+                path=file_path,
+                version_descriptor=mock_version_descriptor_instance_base,
+            )
+
 
     def test_update_file_success(self, repos_wrapper, mock_git_client):
         branch_name = "feature-branch"
@@ -663,6 +967,46 @@ class TestReposToolsPositive:
             mock_git_push.assert_called_once_with(
                 commits=[commit_instance], ref_updates=[ref_update_instance]
             )
+
+    def test_update_file_read_error(self, repos_wrapper, mock_git_client):
+        branch_name = "feature-branch"
+        file_path = "path/to/file.txt"
+        update_query = "OLD <<<<\nOld\n>>>> OLD\nNEW <<<<\nNew\n>>>> NEW"
+        repos_wrapper.active_branch = branch_name
+        error_message = "File not found error"
+
+        with patch.object(
+            ReposApiWrapper, "_read_file", return_value=ToolException(error_message)
+        ) as mock_read_file:
+            result = repos_wrapper.update_file(branch_name, file_path, update_query)
+
+            assert result == mock_read_file.return_value # Should return the ToolException
+            mock_read_file.assert_called_once_with(file_path, branch_name)
+            mock_git_client.create_push.assert_not_called()
+
+    def test_update_file_empty_old_content_in_query(self, repos_wrapper, mock_git_client):
+        branch_name = "feature-branch"
+        file_path = "path/to/file.txt"
+        # Query where the OLD block is empty or just whitespace
+        update_query = "OLD <<<<\n \n>>>> OLD\nNEW <<<<\nNew Content\n>>>> NEW"
+        repos_wrapper.active_branch = branch_name
+        original_content = "Original file content"
+
+        with patch.object(
+            ReposApiWrapper, "_read_file", return_value=original_content
+        ) as mock_read_file:
+            result = repos_wrapper.update_file(branch_name, file_path, update_query)
+
+            # Expecting no update because the 'old' part was empty/whitespace
+            expected_message = (
+                "File content was not updated because old content was not found or empty. "
+                "It may be helpful to use the read_file action to get "
+                "the current file contents."
+            )
+            assert result == expected_message
+            mock_read_file.assert_called_once_with(file_path, branch_name)
+            mock_git_client.create_push.assert_not_called()
+
 
     def test_delete_file_success(self, repos_wrapper, mock_git_client):
         branch_name = "feature-branch"
@@ -740,6 +1084,73 @@ class TestReposToolsPositive:
                 project=repos_wrapper.project,
             )
 
+    @patch("alita_tools.ado.repos.repos_wrapper.Comment")
+    @patch("alita_tools.ado.repos.repos_wrapper.GitPullRequestCommentThread")
+    @patch("alita_tools.ado.repos.repos_wrapper.CommentThreadContext")
+    @patch("alita_tools.ado.repos.repos_wrapper.CommentPosition")
+    def test_comment_on_pull_request_inline_success(
+        self, mock_comment_pos, mock_thread_context, mock_comment_thread_class, mock_comment_class, repos_wrapper, mock_git_client
+    ):
+        pull_request_id = 5
+        inline_comments = [
+            {
+                "file_path": "src/main.py",
+                "comment_text": "Right line comment",
+                "right_line": 20,
+            },
+            {
+                "file_path": "src/utils.py",
+                "comment_text": "Left line comment",
+                "left_line": 15,
+            },
+            {
+                "file_path": "README.md",
+                "comment_text": "Right range comment",
+                "right_range": (30, 32),
+            },
+            {
+                "file_path": "config.yaml",
+                "comment_text": "Left range comment",
+                "left_range": (5, 7),
+            },
+        ]
+
+        # Mock return values for Pydantic models
+        mock_comment_instance = MagicMock()
+        mock_comment_class.return_value = mock_comment_instance
+        mock_thread_context_instance = MagicMock()
+        mock_thread_context.return_value = mock_thread_context_instance
+        mock_comment_thread_instance = MagicMock()
+        mock_comment_thread_class.return_value = mock_comment_thread_instance
+        mock_pos_instance = MagicMock()
+        mock_comment_pos.return_value = mock_pos_instance
+
+        mock_git_client.create_thread.return_value = None
+
+        result = repos_wrapper.comment_on_pull_request(pull_request_id=pull_request_id, inline_comments=inline_comments)
+
+        assert "Successfully added 4 comments" in result
+        assert "Comment added to file 'src/main.py' (right file line 20)" in result
+        assert "Comment added to file 'src/utils.py' (left file line 15)" in result
+        assert "Comment added to file 'README.md' (right file lines 30-32)" in result
+        assert "Comment added to file 'config.yaml' (left file lines 5-7)" in result
+        assert mock_git_client.create_thread.call_count == 4
+        mock_git_client.create_thread.assert_called_with(
+            comment_thread=mock_comment_thread_instance,
+            repository_id=repos_wrapper.repository_id,
+            pull_request_id=pull_request_id,
+            project=repos_wrapper.project,
+        )
+        # Check CommentPosition calls
+        assert mock_comment_pos.call_count == 8 # 4 comments * 2 positions (start/end)
+        # Check CommentThreadContext calls
+        assert mock_thread_context.call_count == 4
+        # Check Comment calls
+        assert mock_comment_class.call_count == 4
+        # Check GitPullRequestCommentThread calls
+        assert mock_comment_thread_class.call_count == 4
+
+
     def test_create_pr_success(self, repos_wrapper, mock_git_client):
         pull_request_title = "Add new feature"
         pull_request_body = "Description of the new feature"
@@ -805,7 +1216,7 @@ class TestReposToolsNegative:
         result = repos_wrapper.list_open_pull_requests()
 
         assert result == "No open pull requests available"
-    
+
     def test_get_pull_request_not_found(self, repos_wrapper, mock_git_client):
         pull_request_id = "404"
         mock_git_client.get_pull_request_by_id.return_value = None
@@ -831,7 +1242,7 @@ class TestReposToolsNegative:
             assert result[0]["pull_request_id"] == "322"
             assert result[0]["commits"] == []
             assert result[0]["comments"] == "No comments"
-    
+
     def test_list_pull_request_diffs_invalid_id(self, repos_wrapper, mock_git_client):
         pull_request_id = "abc"
 
@@ -977,6 +1388,38 @@ class TestReposToolsNegative:
 
         expected_message = f"Cannot create a pull request because the source branch '{branch_name}' is the same as the target branch '{branch_name}'"
         assert result == expected_message
+
+    def test_comment_on_pull_request_missing_pr_id_for_inline(self, repos_wrapper):
+        inline_comments = [{"file_path": "a.py", "comment_text": "text", "right_line": 1}]
+        result = repos_wrapper.comment_on_pull_request(inline_comments=inline_comments) # Missing pull_request_id
+        assert isinstance(result, ToolException)
+        assert "pull_request_id` must be provided when using `comments`" in str(result)
+
+    def test_comment_on_pull_request_invalid_range_length(self, repos_wrapper):
+        pull_request_id = 5
+        inline_comments = [{"file_path": "a.py", "comment_text": "text", "right_range": (1,)}] # Invalid range tuple
+        result = repos_wrapper.comment_on_pull_request(pull_request_id=pull_request_id, inline_comments=inline_comments)
+        assert isinstance(result, ToolException)
+        assert "`right_range` must be a tuple (line_start, line_end)" in str(result)
+
+    def test_comment_on_pull_request_invalid_left_range_length(self, repos_wrapper):
+        pull_request_id = 5
+        inline_comments = [{"file_path": "a.py", "comment_text": "text", "left_range": (1, 2, 3)}] # Invalid range tuple length
+        result = repos_wrapper.comment_on_pull_request(pull_request_id=pull_request_id, inline_comments=inline_comments)
+        assert isinstance(result, ToolException)
+        assert "`left_range` must be a tuple (line_start, line_end)" in str(result)
+
+    def test_comment_on_pull_request_missing_line_or_range(self, repos_wrapper):
+        pull_request_id = 5
+        inline_comments = [{"file_path": "a.py", "comment_text": "text"}] # Missing line/range specifier
+        result = repos_wrapper.comment_on_pull_request(pull_request_id=pull_request_id, inline_comments=inline_comments)
+        assert isinstance(result, ToolException)
+        assert "Comment must specify either" in str(result)
+
+    def test_comment_on_pull_request_missing_query_and_comments(self, repos_wrapper):
+        result = repos_wrapper.comment_on_pull_request() # No args provided
+        assert isinstance(result, ToolException)
+        assert "Either `comment_query` or `comments` must be provided" in str(result)
 
 
 @pytest.mark.unit

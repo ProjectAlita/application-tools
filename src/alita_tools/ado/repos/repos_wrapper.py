@@ -534,18 +534,18 @@ class ReposApiWrapper(BaseCodeToolApiWrapper):
             # but the model is not accessible in azure.devops.v7_0.git.models
             if change_type == "edit":
                 base_content = self.get_file_content(target_commit_id, path)
-                target_content = self.get_file_content(source_commit_id, path)
-
                 if isinstance(base_content, ToolException):
-                    msg = f"Failed to process file content for path: {path}: {str(base_content)}"
+                    msg = f"Failed to process base file content for path: {path}: {str(base_content)}"
                     logger.error(msg)
                     return str(ToolException(msg))
-                elif isinstance(target_content, ToolException):
-                    msg = f"Failed to process file content for path: {path}: {str(target_content)}"
+
+                target_content = self.get_file_content(source_commit_id, path)
+                if isinstance(target_content, ToolException):
+                    msg = f"Failed to process target file content for path: {path}: {str(target_content)}"
                     logger.error(msg)
                     return str(ToolException(msg))
-                else:
-                    diff = generate_diff(base_content, target_content, path)
+
+                diff = generate_diff(base_content, target_content, path)
             else:
                 diff = f"Change Type: {change_type}"
 
