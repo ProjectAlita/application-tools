@@ -19,6 +19,12 @@ class AzureDevOpsWikiToolkit(BaseToolkit):
         AzureDevOpsWikiToolkit.toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name_alias,
+            name=(str, Field(description="Toolkit name",
+                             json_schema_extra={
+                                 'toolkit_name': True,
+                                 'max_toolkit_length': AzureDevOpsWikiToolkit.toolkit_max_length},
+                             default="ADO wiki")
+                  ),
             organization_url=(str, Field(description="ADO organization url")),
             project=(str, Field(description="ADO project", json_schema_extra={'toolkit_name': True, 'max_toolkit_length': AzureDevOpsWikiToolkit.toolkit_max_length})),
             token=(str, Field(description="ADO token", json_schema_extra={'secret': True})),
