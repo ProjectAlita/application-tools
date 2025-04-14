@@ -26,7 +26,22 @@ class AzureDevOpsReposToolkit(BaseToolkit):
             base_branch=(Optional[str], Field(default="", title="Base branch", description="ADO base branch (e.g., main)")),
             active_branch=(Optional[str], Field(default="", title="Active branch", description="ADO active branch (e.g., main)")),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
-            __config__={'json_schema_extra': {'metadata': {"label": "ADO repos", "icon_url": "ado-repos-icon.svg"}}}
+            __config__={'json_schema_extra': {'metadata':
+                {
+                    "label": "ADO repos",
+                    "icon_url": "ado-repos-icon.svg",
+                    "sections": {
+                        "auth": {
+                            "required": True,
+                            "subsections": [
+                                {
+                                    "name": "Token",
+                                    "fields": ["token"]
+                                }
+                            ]
+                        }
+                    }
+                }}}
         )
 
     @classmethod
