@@ -1,5 +1,6 @@
 import json
 import logging
+from traceback import format_exc
 from typing import Any
 
 import swagger_client
@@ -147,6 +148,8 @@ class QtestApiWrapper(BaseToolApiWrapper):
                             folder_to_place_test_cases_to and module['full_module_name'] == folder_to_place_test_cases_to)
         props = []
         for prop in initial_project_properties:
+            if prop.get('field_name', '') == 'Shared' or prop.get('field_name', '') == 'Projects Shared to':
+                continue
             props.append(PropertyResource(field_id=prop['field_id'], field_name=prop['field_name'],
                                           field_value_name=prop.get('field_value_name', None),
                                           field_value=prop['field_value']))
@@ -173,10 +176,11 @@ class QtestApiWrapper(BaseToolApiWrapper):
         try:
             modules = module_api.get_sub_modules_of(self.qtest_project_id, expand=expand)
         except ApiException as e:
-            logger.error("Exception when calling ModuleApi->get_sub_modules_of: %s\n" % e)
+            stacktrace = format_exc()
+            logger.error(f"Exception when calling ModuleApi->get_sub_modules_of:\n {stacktrace}")
             raise ValueError(
                 f"""Unable to get all the modules information from following qTest project - {self.qtest_project_id}.
-                                Exception: \n%s""" % e)
+                                Exception: \n {stacktrace}""")
         return modules
 
     def _parse_modules(self) -> list[dict]:
@@ -211,9 +215,10 @@ class QtestApiWrapper(BaseToolApiWrapper):
             test_name = response.name
             return {'test_case_id': test_case_id, 'test_case_name': test_name, 'url': url}
         except ApiException as e:
-            logger.error("Exception when calling TestCaseApi->create_test_case: %s\n" % e)
+            stacktrace = format_exc()
+            logger.error(f"Exception when calling TestCaseApi->create_test_case:\n {stacktrace}")
             raise ToolException(
-                f"Unable to create test case in project - {self.qtest_project_id} with the following content:\n{test_case_content}.")
+                f"Unable to create test case in project - {self.qtest_project_id} with the following content:\n{test_case_content}.\n\n Stacktrace was {stacktrace}") from e
 
     def __parse_data(self, response_to_parse: dict, parsed_data: list):
         import html
@@ -262,10 +267,11 @@ class QtestApiWrapper(BaseToolApiWrapper):
                                                                    page_size=self.no_of_items_per_page, page=next_page)
                     self.__parse_data(api_response, parsed_data)
         except ApiException as e:
-            logger.error("Exception when calling SearchApi->search_artifact: %s\n" % e)
+            stacktrace = format_exc()
+            logger.error(f"Exception when calling SearchApi->search_artifact: \n {stacktrace}")
             raise ToolException(
                 f"""Unable to get the test cases by dql: {dql} from following qTest project - {self.qtest_project_id}.
-                    Exception: \n%s""" % e)
+                    Exception: \n{stacktrace}""")
         return parsed_data
 
     def __find_qtest_id_by_test_id(self, test_id: str) -> int:
@@ -281,7 +287,9 @@ class QtestApiWrapper(BaseToolApiWrapper):
             response = test_api_instance.get_test_cases(self.qtest_project_id, 1, 1, expand_props=expand_props)
             return response[0]['properties']
         except ApiException as e:
-            logger.error("Exception when calling TestCaseApi->get_test_cases: %s\n" % e)
+            stacktrace = format_exc()
+            logger.error(f"Exception when calling TestCaseApi->get_test_cases: \n {stacktrace}")
+            raise e
 
     def __is_jira_requirement_present(self, jira_issue_id: str) -> (bool, dict):
         """ Define if particular Jira requirement is present in qtest or not """
@@ -371,9 +379,10 @@ class QtestApiWrapper(BaseToolApiWrapper):
             Test id of updated test case - {test_id}.
             Updated with content:\n{test_case}"""
         except ApiException as e:
-            logger.error("Exception when calling TestCaseApi->update_test_case: %s\n" % e)
+            stacktrace = format_exc()
+            logger.error(f"Exception when calling TestCaseApi->update_test_case: \n {stacktrace}")
             raise ToolException(
-                f"Unable to update test case in project with id - {self.qtest_project_id} and test id - {test_id}.") from e
+                f"""Unable to update test case in project with id - {self.qtest_project_id} and test id - {test_id}.\n Exception: \n {stacktrace}""") from e
 
     def find_test_case_by_id(self, test_id: str) -> str:
         """ Find the test case by its id. Id should be in format TC-123. """
@@ -387,9 +396,10 @@ class QtestApiWrapper(BaseToolApiWrapper):
             test_cases_api_instance.delete_test_case(self.qtest_project_id, qtest_id)
             return f"Successfully deleted test case in project with id - {self.qtest_project_id} and qtest id - {qtest_id}."
         except ApiException as e:
-            logger.error("Exception when calling TestCaseApi->delete_test_case: %s\n" % e)
+            stacktrace = format_exc()
+            logger.error(f"Exception when calling TestCaseApi->delete_test_case: \n {stacktrace}")
             raise ToolException(
-                f"Unable to delete test case in project with id - {self.qtest_project_id} and qtest_id - {qtest_id}") from e
+                f"""Unable to delete test case in project with id - {self.qtest_project_id} and qtest_id - {qtest_id}. \n Exception: \n {stacktrace}""") from e
 
     def get_available_tools(self):
         return [
