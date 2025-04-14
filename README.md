@@ -8,7 +8,7 @@
 | src/alita\_tools/ado/test\_plan/test\_plan\_wrapper.py          |      118 |       77 |     35% |93-99, 103-110, 114-119, 123-132, 136-143, 147-152, 156-165, 169-176, 180-189, 193-198, 202 |
 | src/alita\_tools/ado/utils.py                                   |       20 |       15 |     25% |13-19, 23-29, 32-38 |
 | src/alita\_tools/ado/wiki/ado\_wrapper.py                       |      117 |       79 |     32% |70-82, 86-90, 94-99, 103-108, 112-117, 121-126, 140-162, 166-217, 221 |
-| src/alita\_tools/ado/work\_item/ado\_wrapper.py                 |      156 |      114 |     27% |91-102, 106-130, 133-151, 155-173, 178-183, 189-194, 199-223, 227-253, 258-287, 292-314, 319 |
+| src/alita\_tools/ado/work\_item/ado\_wrapper.py                 |      259 |      207 |     20% |110-123, 127-151, 154-172, 176-194, 199-204, 210-215, 220-249, 253-279, 284-313, 318-340, 344-371, 375-427, 431-501, 505 |
 | src/alita\_tools/azure\_ai/search/api\_wrapper.py               |       77 |       32 |     58% |51-70, 82-89, 99-101, 112-117, 128-133, 141 |
 | src/alita\_tools/base/tool.py                                   |       15 |        4 |     73% |     25-28 |
 | src/alita\_tools/bitbucket/api\_wrapper.py                      |       82 |       45 |     45% |19, 48-70, 74-75, 79, 83-93, 103-110, 122-126, 147-151, 162, 173-176 |
@@ -77,7 +77,7 @@
 | src/alita\_tools/zephyr\_enterprise/api\_wrapper.py             |       73 |       53 |     27% |20-23, 28-31, 36-39, 49-59, 67-70, 80-121, 124 |
 | src/alita\_tools/zephyr\_enterprise/zephyr\_enterprise.py       |       50 |       27 |     46% |26-27, 39-47, 59-73, 83, 93, 103, 112, 121, 140-153, 178 |
 | src/alita\_tools/zephyr\_scale/api\_wrapper.py                  |       94 |       57 |     39% |108-132, 137-140, 145-149, 154-160, 168-171, 176-177, 187-191, 196-234, 237 |
-|                                                       **TOTAL** | **6591** | **4589** | **30%** |           |
+|                                                       **TOTAL** | **6694** | **4682** | **30%** |           |
 
 
 ## Setup coverage badge
