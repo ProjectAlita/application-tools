@@ -1,8 +1,11 @@
 import json
 import logging
-from typing import Optional, Any, Dict
+import urllib.parse
+from typing import Optional, Dict, List
 
 from azure.devops.connection import Connection
+from azure.devops.v7_1.core import CoreClient
+from azure.devops.v7_1.wiki import WikiClient
 from azure.devops.v7_1.work_item_tracking import TeamContext, Wiql, WorkItemTrackingClient
 from langchain_core.tools import ToolException
 from msrest.authentication import BasicAuthentication
@@ -72,6 +75,20 @@ ADOGetComments = create_model(
     order=(Optional[str], Field(description="Order in which the comments should be returned. Possible options are { asc, desc }", default=None))
 )
 
+ADOLinkWorkItemsToWikiPage = create_model(
+    "ADOLinkWorkItemsToWikiPage",
+    work_item_ids=(List[int], Field(description="List of work item IDs to link to the wiki page")),
+    wiki_identified=(str, Field(description="Wiki ID or wiki name")),
+    page_name=(str, Field(description="Wiki page path to link the work items to", examples=["/TargetPage"]))
+)
+
+ADOUnlinkWorkItemsFromWikiPage = create_model(
+    "ADOUnlinkWorkItemsFromWikiPage",
+    work_item_ids=(List[int], Field(description="List of work item IDs to unlink from the wiki page")),
+    wiki_identified=(str, Field(description="Wiki ID or wiki name")),
+    page_name=(str, Field(description="Wiki page path to unlink the work items from", examples=["/TargetPage"]))
+)
+
 
 class AzureDevOpsApiWrapper(BaseToolApiWrapper):
     organization_url: str
@@ -79,10 +96,12 @@ class AzureDevOpsApiWrapper(BaseToolApiWrapper):
     token: str
     limit: Optional[int] = 5
     _client: Optional[WorkItemTrackingClient] = PrivateAttr()
+    _wiki_client: Optional[WikiClient] = PrivateAttr() # Add WikiClient instance
+    _core_client: Optional[CoreClient] = PrivateAttr() # Add CoreClient instance
     _relation_types: Dict = PrivateAttr(default_factory=dict) # track actual relation types for instance
 
     class Config:
-        arbitrary_types_allowed = True  # Allow arbitrary types (e.g., WorkItemTrackingClient)
+        arbitrary_types_allowed = True  # Allow arbitrary types (e.g., WorkItemTrackingClient, WikiClient, CoreClient)
 
     @model_validator(mode='before')
     @classmethod
@@ -95,6 +114,8 @@ class AzureDevOpsApiWrapper(BaseToolApiWrapper):
 
             # Retrieve the work item tracking client and assign it to the private _client attribute
             cls._client = connection.clients_v7_1.get_work_item_tracking_client()
+            cls._wiki_client = connection.clients_v7_1.get_wiki_client()
+            cls._core_client = connection.clients_v7_1.get_core_client()
 
         except Exception as e:
             return ImportError(f"Failed to connect to Azure DevOps: {e}")
@@ -210,16 +231,21 @@ class AzureDevOpsApiWrapper(BaseToolApiWrapper):
         if attributes:
             relation.update({"attributes": attributes})
 
-        self._client.update_work_item(
-            document=[
-                {
-                    "op": "add",
-                    "path": "/relations/-",
-                    "value": relation
-                }
-            ],
-            id=source_id
-        )
+        try:
+            self._client.update_work_item(
+                document=[
+                    {
+                        "op": "add",
+                        "path": "/relations/-",
+                        "value": relation
+                    }
+                ],
+                id=source_id
+            )
+        except Exception as e:
+            logger.error(f"Error linking work items: {e}")
+            return ToolException(f"Error linking work items: {e}")
+
         return f"Work item {source_id} linked to {target_id} with link type {link_type}"
 
     def search_work_items(self, query: str, limit: int = None, fields=None):
@@ -313,6 +339,166 @@ class AzureDevOpsApiWrapper(BaseToolApiWrapper):
             logger.error(f"Error getting work item comments: {e}")
             return ToolException(f"Error getting work item comments: {e}")
 
+    def _get_wiki_artifact_uri(self, wiki_identified: str, page_name: str) -> str:
+        """Helper method to construct the artifact URI for a wiki page."""
+        if not self._wiki_client:
+            raise ToolException("Wiki client not initialized.")
+        if not self._core_client:
+            raise ToolException("Core client not initialized.")
+
+        # 1. Get Project ID
+        project_details = self._core_client.get_project(self.project)
+        if not project_details or not project_details.id:
+            raise ToolException(f"Could not retrieve project details or ID for project '{self.project}'.")
+        project_id = project_details.id
+        # logger.info(f"Found project ID: {project_id}")
+
+        # 2. Get Wiki ID
+        wiki_details = self._wiki_client.get_wiki(project=self.project, wiki_identifier=wiki_identified)
+        if not wiki_details or not wiki_details.id:
+            raise ToolException(f"Could not retrieve wiki details or ID for wiki '{wiki_identified}'.")
+        wiki_id = wiki_details.id
+        # logger.info(f"Found wiki ID: {wiki_id}")
+
+        # 3. Get Wiki Page
+        wiki_page = self._wiki_client.get_page(project=self.project, wiki_identifier=wiki_identified, path=page_name)
+
+        # 4. Construct the Artifact URI
+        url = f"{project_id}/{wiki_id}{wiki_page.page.path}"
+        encoded_url = urllib.parse.quote(url, safe="")
+        artifact_uri = f"vstfs:///Wiki/WikiPage/{encoded_url}"
+        # logger.info(f"Constructed Artifact URI: {artifact_uri}")
+        return artifact_uri
+
+    def link_work_items_to_wiki_page(self, work_item_ids: List[int], wiki_identified: str, page_name: str):
+        """Links one or more work items to a specific wiki page using an ArtifactLink."""
+        if not work_item_ids:
+            return "No work item IDs provided. No links created."
+        if not self._client:
+            return ToolException("Work item client not initialized.")
+
+        try:
+            # 1. Get Artifact URI using helper method
+            artifact_uri = self._get_wiki_artifact_uri(wiki_identified, page_name)
+
+            # 2. Define the relation payload using the Artifact URI
+            relation = {
+                "rel": "ArtifactLink",
+                "url": artifact_uri,
+                "attributes": {"name": "Wiki Page"} # Standard attribute for wiki links
+            }
+
+            patch_document = [
+                {
+                    "op": 0,
+                    "path": "/relations/-",
+                    "value": relation
+                }
+            ]
+
+            # 3. Update each work item
+            successful_links = []
+            failed_links = {}
+            for work_item_id in work_item_ids:
+                try:
+                    self._client.update_work_item(
+                        document=patch_document,
+                        id=work_item_id,
+                        project=self.project # Assuming work items are in the same project
+                    )
+                    successful_links.append(str(work_item_id))
+                    # logger.info(f"Successfully linked work item {work_item_id} to wiki page '{page_name}'.")
+                except Exception as update_e:
+                    error_msg = f"Failed to link work item {work_item_id}: {str(update_e)}"
+                    logger.error(error_msg)
+                    failed_links[str(work_item_id)] = str(update_e)
+
+            # 4. Construct response message
+            response = ""
+            if successful_links:
+                response += f"Successfully linked work items [{', '.join(successful_links)}] to wiki page '{page_name}' in wiki '{wiki_identified}'.\n"
+            if failed_links:
+                response += f"Failed to link work items: {json.dumps(failed_links)}"
+
+            return response.strip()
+
+        except Exception as e:
+            logger.error(f"Error linking work items to wiki page '{page_name}': {str(e)}")
+            return ToolException(f"An unexpected error occurred while linking work items to wiki page '{page_name}': {str(e)}")
+
+    def unlink_work_items_from_wiki_page(self, work_item_ids: List[int], wiki_identified: str, page_name: str):
+        """Unlinks one or more work items from a specific wiki page by removing the ArtifactLink."""
+        if not work_item_ids:
+            return "No work item IDs provided. No links removed."
+        if not self._client:
+            return ToolException("Work item client not initialized.")
+
+        try:
+            # 1. Get Artifact URI using helper method
+            artifact_uri = self._get_wiki_artifact_uri(wiki_identified, page_name)
+
+            # 2. Process each work item to remove the link
+            successful_unlinks = []
+            failed_unlinks = {}
+            no_link_found = []
+
+            for work_item_id in work_item_ids:
+                try:
+                    # Get the work item with its relations
+                    work_item = self._client.get_work_item(id=work_item_id, project=self.project, expand='Relations')
+                    if not work_item or not work_item.relations:
+                        no_link_found.append(str(work_item_id))
+                        logger.info(f"Work item {work_item_id} has no relations. Skipping unlink.")
+                        continue
+
+                    # Find the index of the relation to remove
+                    relation_index_to_remove = -1
+                    for i, relation in enumerate(work_item.relations):
+                        if relation.rel == "ArtifactLink" and relation.url == artifact_uri:
+                            relation_index_to_remove = i
+                            break
+
+                    if relation_index_to_remove == -1:
+                        no_link_found.append(str(work_item_id))
+                        # logger.info(f"No link to wiki page '{page_name}' found on work item {work_item_id}.")
+                        continue
+
+                    # Create the patch document to remove the relation by index
+                    patch_document = [
+                        {
+                            "op": "remove", # Use "remove" operation
+                            "path": f"/relations/{relation_index_to_remove}"
+                        }
+                    ]
+
+                    # Update the work item
+                    self._client.update_work_item(
+                        document=patch_document,
+                        id=work_item_id,
+                        project=self.project
+                    )
+                    successful_unlinks.append(str(work_item_id))
+                    logger.info(f"Successfully unlinked work item {work_item_id} from wiki page '{page_name}'.")
+
+                except Exception as update_e:
+                    error_msg = f"Failed to unlink work item {work_item_id}: {str(update_e)}"
+                    logger.error(error_msg)
+                    failed_unlinks[str(work_item_id)] = str(update_e)
+
+            # 5. Construct response message
+            response = ""
+            if successful_unlinks:
+                response += f"Successfully unlinked work items [{', '.join(successful_unlinks)}] from wiki page '{page_name}' in wiki '{wiki_identified}'.\n"
+            if no_link_found:
+                 response += f"No link to wiki page '{page_name}' found for work items [{', '.join(no_link_found)}].\n"
+            if failed_unlinks:
+                response += f"Failed to unlink work items: {json.dumps(failed_unlinks)}"
+
+            return response.strip() if response else "No action taken or required."
+
+        except Exception as e:
+            logger.error(f"Error unlinking work items from wiki page '{page_name}': {str(e)}")
+            return ToolException(f"An unexpected error occurred while unlinking work items from wiki page '{page_name}': {str(e)}")
 
     def get_available_tools(self):
         """Return a list of available tools."""
@@ -358,5 +544,17 @@ class AzureDevOpsApiWrapper(BaseToolApiWrapper):
                 "description": self.get_comments.__doc__,
                 "args_schema": ADOGetComments,
                 "ref": self.get_comments,
+            },
+            {
+                "name": "link_work_items_to_wiki_page",
+                "description": self.link_work_items_to_wiki_page.__doc__,
+                "args_schema": ADOLinkWorkItemsToWikiPage,
+                "ref": self.link_work_items_to_wiki_page,
+            },
+            {
+                "name": "unlink_work_items_from_wiki_page",
+                "description": self.unlink_work_items_from_wiki_page.__doc__,
+                "args_schema": ADOUnlinkWorkItemsFromWikiPage,
+                "ref": self.unlink_work_items_from_wiki_page,
             }
         ]
