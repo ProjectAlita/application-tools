@@ -3,7 +3,7 @@ from .api_wrapper import GitLabWorkspaceAPIWrapper
 from langchain_core.tools import BaseToolkit
 from langchain_core.tools import BaseTool
 from ..base.tool import BaseAction
-from pydantic import create_model, BaseModel, ConfigDict, Field
+from pydantic import create_model, BaseModel, ConfigDict, Field, SecretStr
 from ..utils import clean_string, TOOLKIT_SPLITTER, get_max_toolkit_length
 
 name = "gitlab_org"
@@ -33,7 +33,7 @@ class AlitaGitlabSpaceToolkit(BaseToolkit):
                 description="List of comma separated repositories user plans to interact with. Leave it empty in case you pass it in instruction.",
                 default=''
             )),
-            private_token=(str, Field(description="GitLab private token", json_schema_extra={'secret': True})),
+            private_token=(SecretStr, Field(description="GitLab private token", json_schema_extra={'secret': True})),
             branch=(str, Field(description="Main branch", default="main")),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
             __config__=ConfigDict(json_schema_extra={

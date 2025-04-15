@@ -78,6 +78,7 @@ class AlitaCarrierToolkit(BaseToolkit):
                 continue
             try:
                 tool_instance = tool_def['tool'](api_wrapper=carrier_api_wrapper)
+                tool_instance.name = prefix + tool_instance.name
                 tools.append(tool_instance)
                 logger.info(f"[AlitaCarrierToolkit] Successfully initialized tool '{tool_instance.name}'")
             except Exception as e:
