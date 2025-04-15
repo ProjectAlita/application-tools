@@ -1,8 +1,7 @@
-import os
 import logging
 import numpy as np
 import cv2
-from typing import List, Tuple, Any, Optional, Dict
+from typing import Any, Dict
 import pytesseract
 
 logger = logging.getLogger(__name__)
