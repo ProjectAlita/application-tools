@@ -2,7 +2,7 @@ from typing import Dict, List, Literal, Optional
 
 from langchain_core.tools import BaseTool
 from langchain_core.tools import BaseToolkit
-from pydantic import create_model, BaseModel, ConfigDict
+from pydantic import create_model, BaseModel, ConfigDict, SecretStr
 from pydantic.fields import Field
 
 from .api_wrapper import GitLabAPIWrapper
@@ -36,7 +36,7 @@ class AlitaGitlabToolkit(BaseToolkit):
             name,
             url=(str, Field(description="GitLab URL")),
             repository=(str, Field(description="GitLab repository", json_schema_extra={'toolkit_name': True, 'max_toolkit_length': AlitaGitlabToolkit.toolkit_max_length})),
-            private_token=(str, Field(description="GitLab private token", json_schema_extra={'secret': True})),
+            private_token=(SecretStr, Field(description="GitLab private token", json_schema_extra={'secret': True})),
             branch=(str, Field(description="Main branch", default="main")),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
             __config__=ConfigDict(json_schema_extra={
