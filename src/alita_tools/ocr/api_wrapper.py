@@ -1,9 +1,7 @@
 import io
 import os
-import re
 import logging
 import fitz  # PyMuPDF
-import cv2
 from PIL import Image
 import numpy as np
 from typing import Optional, Any, Dict, List
