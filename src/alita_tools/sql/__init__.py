@@ -1,7 +1,7 @@
 from typing import List, Literal, Optional
 
 from langchain_core.tools import BaseToolkit, BaseTool
-from pydantic import create_model, BaseModel, ConfigDict, Field
+from pydantic import create_model, BaseModel, ConfigDict, Field, SecretStr
 
 from .api_wrapper import SQLApiWrapper
 from ..base.tool import BaseAction
@@ -38,7 +38,7 @@ class SQLToolkit(BaseToolkit):
             host=(str, Field(description="Database server address")),
             port=(str, Field(description="Database server port")),
             username=(str, Field(description="Database username")),
-            password=(str, Field(description="Database password", json_schema_extra={'secret': True})),
+            password=(SecretStr, Field(description="Database password", json_schema_extra={'secret': True})),
             database_name=(str, Field(description="Database name", json_schema_extra={'toolkit_name': True, 'max_toolkit_length': SQLToolkit.toolkit_max_length})),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "SQL", "icon_url": "sql-icon.svg"}})

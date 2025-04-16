@@ -1,7 +1,7 @@
 from typing import List, Literal, Optional
 
 from langchain_core.tools import BaseToolkit, BaseTool
-from pydantic import create_model, BaseModel, ConfigDict, Field
+from pydantic import create_model, BaseModel, ConfigDict, Field, SecretStr
 
 from .api_wrapper import KubernetesApiWrapper
 from ...base.tool import BaseAction
@@ -30,7 +30,7 @@ class KubernetesToolkit(BaseToolkit):
             name,
             url=(str, Field(default="", title="Cluster URL", description="The URL of the Kubernetes cluster")),
             token=(
-                Optional[str], 
+                Optional[SecretStr],
                 Field(
                     default=None,
                     title="Token",

@@ -3,7 +3,7 @@ from typing import List, Optional, Literal
 from .api_wrapper import AzureSearchApiWrapper
 from ...base.tool import BaseAction
 from langchain_core.tools import BaseToolkit, BaseTool
-from pydantic import create_model, BaseModel, ConfigDict, Field
+from pydantic import create_model, BaseModel, ConfigDict, Field, SecretStr
 from ...utils import clean_string, TOOLKIT_SPLITTER, get_max_toolkit_length
 
 logger = getLogger(__name__)
@@ -37,7 +37,7 @@ class AzureSearchToolkit(BaseToolkit):
         AzureSearchToolkit.toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name,
-            api_key=(str, Field(description="API key", json_schema_extra={'secret': True})),
+            api_key=(SecretStr, Field(description="API key", json_schema_extra={'secret': True})),
             endpoint=(str, Field(description="Azure Search endpoint")),
             index_name=(str, Field(description="Azure Search index name")),
             api_base=(Optional[str], Field(description="Azure OpenAI base URL", default=None, json_schema_extra={'toolkit_name': True, 'max_toolkit_length': AzureSearchToolkit.toolkit_max_length})),

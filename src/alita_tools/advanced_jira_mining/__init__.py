@@ -1,7 +1,7 @@
 from typing import List, Literal, Optional
 
 from langchain_core.tools import BaseToolkit, BaseTool
-from pydantic import create_model, BaseModel, Field
+from pydantic import create_model, BaseModel, Field, SecretStr
 
 from .data_mining_wrapper import AdvancedJiraMiningWrapper
 from ..base.tool import BaseAction
@@ -40,9 +40,9 @@ class AdvancedJiraMiningToolkit(BaseToolkit):
             model_type=(str, Field(default="", title="Model type", description="Model type")),
             summarization_prompt=(Optional[str], Field(default=None, title="Summarization prompt", description="Summarization prompt")),
             gaps_analysis_prompt=(Optional[str], Field(default=None, title="Gap analysis prompt", description="Gap analysis prompt")),
-            jira_api_key=(Optional[str], Field(default=None, title="API key", description="JIRA API key", json_schema_extra={'secret': True})),
+            jira_api_key=(Optional[SecretStr], Field(default=None, title="API key", description="JIRA API key", json_schema_extra={'secret': True})),
             jira_username=(Optional[str], Field(default=None, title="Username", description="JIRA Username")),
-            jira_token=(Optional[str], Field(default=None, title="Token", description="JIRA Token", json_schema_extra={'secret': True})),
+            jira_token=(Optional[SecretStr], Field(default=None, title="Token", description="JIRA Token", json_schema_extra={'secret': True})),
             is_jira_cloud=(bool, Field(default=True, title="Cloud", description="JIRA Cloud")),
             verify_ssl=(bool, Field(default=True, title="Verify SSL", description="Verify SSL")),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),

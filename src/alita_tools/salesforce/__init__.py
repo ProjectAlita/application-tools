@@ -2,7 +2,7 @@ from typing import List, Optional, Literal
 from .api_wrapper import SalesforceApiWrapper
 from langchain_core.tools import BaseTool, BaseToolkit
 from ..base.tool import BaseAction
-from pydantic import create_model, BaseModel, ConfigDict, Field
+from pydantic import create_model, BaseModel, ConfigDict, Field, SecretStr
 from ..utils import clean_string, TOOLKIT_SPLITTER,get_max_toolkit_length
 
 name = "salesforce"
@@ -27,7 +27,7 @@ class SalesforceToolkit(BaseToolkit):
             name,
             base_url=(str, Field(description="Salesforce instance URL", json_schema_extra={'toolkit_name': True})),
             client_id=(str, Field(description="Salesforce Connected App Client ID")),
-            client_secret=(str, Field(description="Salesforce Connected App Client Secret", json_schema_extra={'secret': True})),
+            client_secret=(SecretStr, Field(description="Salesforce Connected App Client Secret", json_schema_extra={'secret': True})),
             api_version=(str, Field(description="Salesforce API Version", default='v59.0')),
             selected_tools=(List[Literal[tuple(available_tools)]], Field(default=[], json_schema_extra={'args_schemas': available_tools})),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Salesforce", "icon_url": "salesforce-icon.svg"}})

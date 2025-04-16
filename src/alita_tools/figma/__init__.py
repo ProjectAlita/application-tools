@@ -1,7 +1,7 @@
 from typing import List, Literal, Optional
 
 from langchain_core.tools import BaseTool, BaseToolkit
-from pydantic import BaseModel, ConfigDict, Field, create_model
+from pydantic import BaseModel, ConfigDict, Field, create_model, SecretStr
 
 from ..base.tool import BaseAction
 from .api_wrapper import FigmaApiWrapper, GLOBAL_LIMIT
@@ -37,8 +37,8 @@ class FigmaToolkit(BaseToolkit):
         FigmaToolkit.toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name,
-            token=(Optional[str], Field(description="Figma Token", json_schema_extra={"secret": True}, default=None)),
-            oauth2=(Optional[str], Field(description="OAuth2 Token", json_schema_extra={"secret": True}, default=None)),
+            token=(Optional[SecretStr], Field(description="Figma Token", json_schema_extra={"secret": True}, default=None)),
+            oauth2=(Optional[SecretStr], Field(description="OAuth2 Token", json_schema_extra={"secret": True}, default=None)),
             global_limit=(Optional[int], Field(description="Global limit", default=GLOBAL_LIMIT)),
             global_regexp=(Optional[str], Field(description="Global regex pattern", default=None)),
             selected_tools=(

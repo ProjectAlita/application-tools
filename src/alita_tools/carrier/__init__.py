@@ -1,7 +1,7 @@
 import logging
 from typing import Dict, List, Optional, Literal
 from langchain_core.tools import BaseToolkit, BaseTool
-from pydantic import create_model, BaseModel, ConfigDict, Field
+from pydantic import create_model, BaseModel, ConfigDict, Field, SecretStr
 from functools import lru_cache
 
 from .api_wrapper import CarrierAPIWrapper
@@ -33,7 +33,7 @@ class AlitaCarrierToolkit(BaseToolkit):
             organization=(str, Field(description="Carrier Organization Name", json_schema_extra={'toolkit_name': True,
                                                                                                  'max_toolkit_length': cls.toolkit_max_length})),
             private_token=(
-                str, Field(description="Carrier Platform Authentication Token", json_schema_extra={'secret': True})),
+                SecretStr, Field(description="Carrier Platform Authentication Token", json_schema_extra={'secret': True})),
             project_id=(Optional[str], Field(None, description="Optional project ID for scoped operations")),
             selected_tools=(
                 List[Literal[tuple(selected_tools)]],

@@ -2,7 +2,7 @@ from typing import List, Optional, Literal
 from .api_wrapper import JiraApiWrapper
 from langchain_core.tools import BaseTool, BaseToolkit
 from ..base.tool import BaseAction
-from pydantic import create_model, BaseModel, ConfigDict, Field
+from pydantic import create_model, BaseModel, ConfigDict, Field, SecretStr
 
 from ..utils import clean_string, TOOLKIT_SPLITTER, get_max_toolkit_length, parse_list
 
@@ -33,9 +33,9 @@ class JiraToolkit(BaseToolkit):
             name,
             base_url=(str, Field(description="Jira URL", json_schema_extra={'toolkit_name': True, 'max_toolkit_length': JiraToolkit.toolkit_max_length})),
             cloud=(bool, Field(description="Hosting Option")),
-            api_key=(Optional[str], Field(description="API key", default=None, json_schema_extra={'secret': True})),
+            api_key=(Optional[SecretStr], Field(description="API key", default=None, json_schema_extra={'secret': True})),
             username=(Optional[str], Field(description="Jira Username", default=None)),
-            token=(Optional[str], Field(description="Jira token", default=None, json_schema_extra={'secret': True})),
+            token=(Optional[SecretStr], Field(description="Jira token", default=None, json_schema_extra={'secret': True})),
             limit=(int, Field(description="Limit issues", default=5)),
             labels=(Optional[str], Field(
                 description="List of comma separated labels used for labeling of agent's created or updated entities",

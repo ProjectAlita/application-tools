@@ -3,7 +3,7 @@ from typing import List, Literal, Optional
 
 from langchain_community.agent_toolkits.base import BaseToolkit
 from langchain_core.tools import BaseTool
-from pydantic import create_model, BaseModel, Field
+from pydantic import create_model, BaseModel, Field, SecretStr
 
 from ..base.tool import BaseAction
 from .api_wrapper import ZephyrV1ApiWrapper
@@ -32,7 +32,7 @@ class ZephyrToolkit(BaseToolkit):
             name,
             base_url=(str, Field(description="Base URL", json_schema_extra={'toolkit_name': True, 'max_toolkit_length': ZephyrToolkit.toolkit_max_length})),
             username=(str, Field(description="Username")),
-            password=(str, Field(description="Password", json_schema_extra={'secret': True})),
+            password=(SecretStr, Field(description="Password", json_schema_extra={'secret': True})),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
             __config__={'json_schema_extra': {'metadata': {"label": "Zephyr", "icon_url": "zephyr.svg", "hidden": True}}}
         )

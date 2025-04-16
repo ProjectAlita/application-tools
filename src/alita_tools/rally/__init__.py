@@ -1,6 +1,6 @@
 from typing import List, Literal, Optional
 from langchain_core.tools import BaseToolkit
-from pydantic import BaseModel, ConfigDict, Field, create_model
+from pydantic import BaseModel, ConfigDict, Field, create_model, SecretStr
 from .api_wrapper import RallyApiWrapper
 from langchain_core.tools import BaseTool
 from ..base.tool import BaseAction
@@ -31,9 +31,9 @@ class RallyToolkit(BaseToolkit):
         return create_model(
             name,
             server=(str, Field(description="Rally server url", json_schema_extra={'toolkit_name': True, 'max_toolkit_length': RallyToolkit.toolkit_max_length})),
-            api_key=(Optional[str], Field(default=None, description="User's API key", json_schema_extra={'secret': True})),
+            api_key=(Optional[SecretStr], Field(default=None, description="User's API key", json_schema_extra={'secret': True})),
             username=(Optional[str], Field(default=None, description="Username")),
-            password=(Optional[str], Field(default=None, description="User's password", json_schema_extra={'secret': True})),
+            password=(Optional[SecretStr], Field(default=None, description="User's password", json_schema_extra={'secret': True})),
             workspace=(Optional[str], Field(default=None, description="Rally workspace")),
             project=(Optional[str], Field(default=None, description="Rally project")),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),

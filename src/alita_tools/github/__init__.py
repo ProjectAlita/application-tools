@@ -1,7 +1,7 @@
 from typing import Dict, List, Optional, Literal
 
 from langchain_core.tools import BaseTool, BaseToolkit
-from pydantic import create_model, BaseModel, ConfigDict, Field
+from pydantic import create_model, BaseModel, ConfigDict, Field, SecretStr
 
 from .api_wrapper import AlitaGitHubAPIWrapper
 from .tool import GitHubAction
@@ -68,12 +68,12 @@ class AlitaGitHubToolkit(BaseToolkit):
                 }
             ),
             app_id=(Optional[str], Field(description="Github APP ID", default=None)),
-            app_private_key=(Optional[str], Field(description="Github APP private key", default=None, json_schema_extra={'secret': True})),
+            app_private_key=(Optional[SecretStr], Field(description="Github APP private key", default=None, json_schema_extra={'secret': True})),
 
-            access_token=(Optional[str], Field(description="Github Access Token", default=None, json_schema_extra={'secret': True})),
+            access_token=(Optional[SecretStr], Field(description="Github Access Token", default=None, json_schema_extra={'secret': True})),
 
             username=(Optional[str], Field(description="Github Username", default=None)),
-            password=(Optional[str], Field(description="Github Password", default=None, json_schema_extra={'secret': True})),
+            password=(Optional[SecretStr], Field(description="Github Password", default=None, json_schema_extra={'secret': True})),
 
             repository=(str, Field(description="Github repository", json_schema_extra={'toolkit_name': True, 'max_toolkit_length': AlitaGitHubToolkit.toolkit_max_length})),
             active_branch=(Optional[str], Field(description="Active branch", default="main")),
