@@ -2,7 +2,7 @@ import json
 import logging
 from typing import Any, Optional
 
-from pydantic import model_validator, BaseModel
+from pydantic import model_validator, BaseModel, SecretStr
 from langchain_core.tools import ToolException
 from pydantic import create_model, PrivateAttr
 from pydantic.fields import Field
@@ -86,10 +86,10 @@ class ZephyrScaleApiWrapper(BaseToolApiWrapper):
     # url for a Zephyr server
     base_url: Optional[str] = ""
     # auth with Jira token (cloud & server)
-    token: Optional[str] = ""
+    token: Optional[SecretStr] = ""
     # auth with username and password
     username: Optional[str] = ""
-    password: Optional[str] = ""
+    password: Optional[SecretStr] = ""
     # auth with a session cookie dict
     cookies: Optional[str] = ""
 

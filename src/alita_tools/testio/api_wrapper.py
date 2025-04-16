@@ -1,6 +1,6 @@
 from typing import Optional, List
 
-from pydantic import model_validator, create_model, Field
+from pydantic import model_validator, create_model, Field, SecretStr
 from pydantic.fields import PrivateAttr
 
 from .testio_client import TestIOClient
@@ -9,7 +9,7 @@ from ..elitea_base import BaseToolApiWrapper
 
 class TestIOApiWrapper(BaseToolApiWrapper):
     endpoint: str
-    api_key: str
+    api_key: SecretStr
     _client: Optional[TestIOClient] = PrivateAttr()
 
     @model_validator(mode='before')

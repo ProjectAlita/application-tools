@@ -3,14 +3,14 @@ from typing import Any, Optional, List, Dict
 
 from google.auth.transport.requests import Request
 from google.oauth2.service_account import Credentials
-from pydantic import Field, PrivateAttr, model_validator, create_model
+from pydantic import Field, PrivateAttr, model_validator, create_model, SecretStr
 from requests import Session
 
 from ...elitea_base import BaseToolApiWrapper
 
 
 class GCPApiWrapper(BaseToolApiWrapper):
-    api_key: str
+    api_key: SecretStr
     _credentials: Optional[Credentials] = PrivateAttr()
     _session: Optional[Session] = PrivateAttr()
 

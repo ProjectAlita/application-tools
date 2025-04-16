@@ -2,7 +2,7 @@ import json
 import logging
 from typing import List, Optional
 
-from pydantic import model_validator, create_model, Field
+from pydantic import model_validator, create_model, Field, SecretStr
 from pydantic.fields import PrivateAttr
 
 from .Zephyr import Zephyr
@@ -35,7 +35,7 @@ ZephyrAddTestCase = create_model(
 class ZephyrV1ApiWrapper(BaseToolApiWrapper):
     base_url: str
     username: str
-    password: str
+    password: SecretStr
     _client: Optional[Zephyr] = PrivateAttr()
 
     @model_validator(mode='before')

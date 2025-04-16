@@ -8,7 +8,7 @@ from azure.devops.v7_0.test_plan.models import TestPlanCreateParams, TestSuiteCr
 from azure.devops.v7_0.test_plan.test_plan_client import TestPlanClient
 from langchain_core.tools import ToolException
 from msrest.authentication import BasicAuthentication
-from pydantic import create_model, PrivateAttr, model_validator
+from pydantic import create_model, PrivateAttr, model_validator, SecretStr
 from pydantic.fields import FieldInfo as Field
 
 from ...elitea_base import BaseToolApiWrapper
@@ -81,7 +81,7 @@ TestCasesGetModel = create_model(
 class TestPlanApiWrapper(BaseToolApiWrapper):
     __test__ = False
     organization_url: str
-    token: str
+    token: SecretStr
     limit: Optional[int] = 5
     _client: Optional[TestPlanClient] = PrivateAttr()
 

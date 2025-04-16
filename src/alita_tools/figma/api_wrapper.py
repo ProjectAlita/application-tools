@@ -8,7 +8,7 @@ from typing import Dict, Optional, Union
 import requests
 from FigmaPy import FigmaPy
 from langchain_core.tools import ToolException
-from pydantic import Field, PrivateAttr, create_model, model_validator
+from pydantic import Field, PrivateAttr, create_model, model_validator, SecretStr
 
 from ..elitea_base import BaseToolApiWrapper
 
@@ -227,8 +227,8 @@ class ArgsSchema(Enum):
 
 
 class FigmaApiWrapper(BaseToolApiWrapper):
-    token: Optional[str] = Field(default=None)
-    oauth2: Optional[str] = Field(default=None)
+    token: Optional[SecretStr] = Field(default=None)
+    oauth2: Optional[SecretStr] = Field(default=None)
     global_limit: Optional[int] = Field(default=GLOBAL_LIMIT)
     global_regexp: Optional[str] = Field(default=None)
     _client: Optional[FigmaPy] = PrivateAttr()

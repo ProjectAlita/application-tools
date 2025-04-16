@@ -20,7 +20,7 @@ from azure.devops.v7_0.git.models import (
 )
 from langchain_core.tools import ToolException
 from msrest.authentication import BasicAuthentication
-from pydantic import Field, PrivateAttr, create_model, model_validator
+from pydantic import Field, PrivateAttr, create_model, model_validator, SecretStr
 
 from ..utils import extract_old_new_pairs, generate_diff, get_content_from_generator
 from ...elitea_base import BaseCodeToolApiWrapper, LoaderSchema
@@ -203,7 +203,7 @@ class ReposApiWrapper(BaseCodeToolApiWrapper):
     repository_id: Optional[str]
     base_branch: Optional[str]
     active_branch: Optional[str]
-    token: Optional[str]
+    token: Optional[SecretStr]
     _client: Optional[GitClient] = PrivateAttr()
 
     class Config:

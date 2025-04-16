@@ -3,7 +3,7 @@ from typing import Any, Optional, Dict, Union
 import requests
 from azure.identity import ClientSecretCredential
 from azure.mgmt.resource import ResourceManagementClient
-from pydantic import model_validator, create_model, Field, PrivateAttr
+from pydantic import model_validator, create_model, Field, PrivateAttr, SecretStr
 
 from ...elitea_base import BaseToolApiWrapper
 
@@ -13,7 +13,7 @@ class AzureApiWrapper(BaseToolApiWrapper):
     subscription_id: str
     tenant_id: str
     client_id: str
-    client_secret: str
+    client_secret: SecretStr
     _credentials: Optional[ClientSecretCredential] = PrivateAttr()
     _client: Optional[ResourceManagementClient] = PrivateAttr()
 

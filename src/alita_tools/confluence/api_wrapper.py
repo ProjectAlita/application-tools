@@ -10,7 +10,7 @@ from langchain_community.document_loaders.confluence import ContentFormat
 from langchain_core.documents import Document
 from langchain_core.tools import ToolException
 from markdownify import markdownify
-from pydantic import create_model, Field, model_validator
+from pydantic import create_model, Field, model_validator, SecretStr
 from pydantic.fields import PrivateAttr
 from tenacity import (
     before_sleep_log,
@@ -151,9 +151,9 @@ def parse_payload_params(params: Optional[str]) -> Dict[str, Any]:
 class ConfluenceAPIWrapper(BaseToolApiWrapper):
     _client: Any = PrivateAttr()
     base_url: str
-    api_key: Optional[str] = None,
+    api_key: Optional[SecretStr] = None,
     username: Optional[str] = None
-    token: Optional[str] = None
+    token: Optional[SecretStr] = None
     cloud: Optional[bool] = True
     limit: Optional[int] = 5
     labels: Optional[List[str]] = []

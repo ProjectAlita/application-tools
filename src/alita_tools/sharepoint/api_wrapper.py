@@ -4,7 +4,7 @@ from typing import Optional
 from langchain_core.tools import ToolException
 from office365.runtime.auth.client_credential import ClientCredential
 from office365.sharepoint.client_context import ClientContext
-from pydantic import Field, PrivateAttr, create_model, model_validator
+from pydantic import Field, PrivateAttr, create_model, model_validator, SecretStr
 
 from .utils import read_docx_from_bytes
 from ..elitea_base import BaseToolApiWrapper
@@ -34,8 +34,8 @@ ReadDocument = create_model(
 class SharepointApiWrapper(BaseToolApiWrapper):
     site_url: str
     client_id: str = None
-    client_secret: str = None
-    token: str = None
+    client_secret: SecretStr = None
+    token: SecretStr = None
     _client: Optional[ClientContext] = PrivateAttr()  # Private attribute for the office365 client
 
     @model_validator(mode='before')

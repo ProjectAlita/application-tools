@@ -5,7 +5,7 @@ import fnmatch
 from typing import Dict, Any, Optional, List, Union
 import tiktoken
 from langchain_core.tools import ToolException
-from pydantic import model_validator, create_model, BaseModel, Field
+from pydantic import model_validator, create_model, BaseModel, Field, SecretStr
 from pydantic.fields import PrivateAttr
 from langchain.utils import get_from_dict_or_env
 
@@ -470,11 +470,11 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
     github_repository: Optional[str] = None
     active_branch: Optional[str] = None
     github_base_branch: Optional[str] = None
-    github_access_token: Optional[str] = None
+    github_access_token: Optional[SecretStr] = None
     github_username: Optional[str] = None
-    github_password: Optional[str] = None
+    github_password: Optional[SecretStr] = None
     github_app_id: Optional[str] = None
-    github_app_private_key: Optional[str] = None
+    github_app_private_key: Optional[SecretStr] = None
 
     def clean_repository_name(repo_link):
         import re

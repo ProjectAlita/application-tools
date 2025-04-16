@@ -3,7 +3,7 @@ import logging
 from typing import Optional, Any
 
 from testrail_api import TestRailAPI
-from pydantic import model_validator, BaseModel
+from pydantic import model_validator, BaseModel, SecretStr
 from langchain_core.tools import ToolException
 from pydantic import create_model
 from pydantic.fields import Field, PrivateAttr
@@ -128,7 +128,7 @@ addCase = create_model(
 
 class TestrailAPIWrapper(BaseToolApiWrapper):
     url: str
-    password: Optional[str] = None,
+    password: Optional[SecretStr] = None,
     email: Optional[str] = None,
     _client: Optional[TestRailAPI] = PrivateAttr()  # Private attribute for the Rally client
 

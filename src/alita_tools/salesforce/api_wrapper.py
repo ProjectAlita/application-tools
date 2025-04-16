@@ -3,7 +3,7 @@ from typing import Optional
 
 import requests
 from langchain_core.tools import ToolException
-from pydantic import PrivateAttr
+from pydantic import PrivateAttr, SecretStr
 
 from .model import (
     SalesforceCreateCase,
@@ -19,7 +19,7 @@ from ..elitea_base import BaseToolApiWrapper
 class SalesforceApiWrapper(BaseToolApiWrapper):
     base_url: str
     client_id: str
-    client_secret: str
+    client_secret: SecretStr
     api_version: str = "v59.0"
     
     _access_token: Optional[str] = PrivateAttr(default=None)

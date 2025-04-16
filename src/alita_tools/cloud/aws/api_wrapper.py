@@ -2,7 +2,7 @@ from typing import Optional, Dict, Any, Union
 
 import boto3
 from botocore.config import Config
-from pydantic import Field, PrivateAttr, create_model, model_validator
+from pydantic import Field, PrivateAttr, create_model, model_validator, SecretStr
 
 from ...elitea_base import BaseToolApiWrapper
 
@@ -10,7 +10,7 @@ from ...elitea_base import BaseToolApiWrapper
 class AWSToolConfig(BaseToolApiWrapper):
     region: str
     access_key_id: Optional[str] = None
-    secret_access_key: Optional[str] = None
+    secret_access_key: Optional[SecretStr] = None
     _client: Optional[boto3.client] = PrivateAttr()
 
     @model_validator(mode='before')
