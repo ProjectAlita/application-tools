@@ -3,7 +3,7 @@ import json
 from typing import Optional, Any
 
 from pyral import Rally
-from pydantic import BaseModel, ConfigDict, Field, create_model, model_validator
+from pydantic import BaseModel, ConfigDict, Field, create_model, model_validator, SecretStr
 from pydantic.fields import PrivateAttr
 from langchain_core.tools import ToolException
 
@@ -85,9 +85,9 @@ RallyUpdateArtifact = create_model(
 # Toolkit API wrapper
 class RallyApiWrapper(BaseToolApiWrapper):
     server: str
-    api_key: Optional[str] = None
+    api_key: Optional[SecretStr] = None
     username: Optional[str] = None
-    password: Optional[str] = None
+    password: Optional[SecretStr] = None
     workspace: Optional[str] = None
     project: Optional[str] = None
     _client: Optional[Rally] = PrivateAttr()  # Private attribute for the Rally client

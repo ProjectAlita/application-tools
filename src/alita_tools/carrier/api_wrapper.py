@@ -1,6 +1,6 @@
 import logging
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, model_validator, SecretStr
 from .carrier_sdk import CarrierClient, CarrierCredentials, CarrierAPIError
 from .utils import TicketPayload
 
@@ -18,7 +18,7 @@ class CarrierAPIWrapper(BaseModel):
 
     url: str = Field(..., description="Carrier API Base URL")
     organization: str = Field(..., description="Organization identifier")
-    private_token: str = Field(..., description="API authentication token")
+    private_token: SecretStr = Field(..., description="API authentication token")
     project_id: str = Field(..., description="Carrier Project ID")
 
     _client: Optional[CarrierClient] = None

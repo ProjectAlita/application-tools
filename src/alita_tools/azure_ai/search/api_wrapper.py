@@ -1,6 +1,6 @@
 import logging
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field, PrivateAttr, model_validator
+from pydantic import BaseModel, Field, PrivateAttr, model_validator, SecretStr
 from azure.core.credentials import AzureKeyCredential
 from azure.search.documents import SearchClient
 from langchain_openai import AzureOpenAIEmbeddings
@@ -36,12 +36,12 @@ class HybridSearchInput(BaseModel):
 class AzureSearchApiWrapper(BaseToolApiWrapper):
     _client: Any = PrivateAttr()
     _AzureOpenAIClient: Any = PrivateAttr()
-    api_key: str
+    api_key: SecretStr
     endpoint: str
     index_name: str
     api_base: Optional[str] = None
     api_version: Optional[str] = None
-    openai_api_key: Optional[str] = None
+    openai_api_key: Optional[SecretStr] = None
     model_name: Optional[str] = None
     
 

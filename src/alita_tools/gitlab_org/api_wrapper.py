@@ -3,7 +3,7 @@ from typing import Optional, Any, List, Dict
 
 from gitlab import GitlabGetError
 from langchain_core.tools import ToolException
-from pydantic import model_validator, PrivateAttr, create_model
+from pydantic import model_validator, PrivateAttr, create_model, SecretStr
 from pydantic.fields import Field
 
 from ..elitea_base import BaseToolApiWrapper
@@ -128,7 +128,7 @@ _undefined_repo_alert = "Unable to get repository"
 # Toolkit API wrapper
 class GitLabWorkspaceAPIWrapper(BaseToolApiWrapper):
     url: str
-    private_token: str
+    private_token: SecretStr
     branch: Optional[str] = 'main'
     client: Any = None
     repo_instances: Dict[str, Any] = {}

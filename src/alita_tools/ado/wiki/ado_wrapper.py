@@ -9,7 +9,7 @@ from azure.devops.v7_0.wiki import WikiClient, WikiPageCreateOrUpdateParameters,
 from azure.devops.v7_0.wiki.models import GitVersionDescriptor
 from langchain_core.tools import ToolException
 from msrest.authentication import BasicAuthentication
-from pydantic import create_model, PrivateAttr
+from pydantic import create_model, PrivateAttr, SecretStr
 from pydantic import model_validator
 from pydantic.fields import Field
 
@@ -56,7 +56,7 @@ RenamePageInput = create_model(
 class AzureDevOpsApiWrapper(BaseToolApiWrapper):
     organization_url: str
     project: str
-    token: str
+    token: SecretStr
     _client: Optional[WikiClient] = PrivateAttr()  # Private attribute for the wiki client
     _core_client: Optional[CoreClient] = PrivateAttr()  # Private attribute for the CoreClient client
 

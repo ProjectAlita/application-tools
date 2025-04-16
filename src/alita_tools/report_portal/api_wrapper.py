@@ -2,7 +2,7 @@ import logging
 from typing import Any, Optional
 
 import pymupdf
-from pydantic import BaseModel, Field, PrivateAttr, create_model, model_validator
+from pydantic import BaseModel, Field, PrivateAttr, create_model, model_validator, SecretStr
 
 from .report_portal_client import RPClient
 from ..elitea_base import BaseToolApiWrapper
@@ -55,7 +55,7 @@ GetDashboardData = create_model(
 
 class ReportPortalApiWrapper(BaseToolApiWrapper):
     endpoint: str
-    api_key: str
+    api_key: SecretStr
     project: str
     _client: Optional[RPClient] = PrivateAttr()
 

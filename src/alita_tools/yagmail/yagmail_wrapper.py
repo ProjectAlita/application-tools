@@ -1,6 +1,6 @@
 import logging
 from typing import List, Any, Optional
-from pydantic import model_validator, BaseModel
+from pydantic import model_validator, BaseModel, SecretStr
 from pydantic import create_model
 from pydantic.fields import Field
 import yagmail
@@ -24,7 +24,7 @@ SendEmail = create_model(
 
 class YagmailWrapper(BaseModel):
     username: str
-    password: str
+    password: SecretStr
     host: Optional[str] = SMTP_SERVER
 
     @model_validator(mode='before')

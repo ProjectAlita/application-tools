@@ -8,7 +8,7 @@ from typing import List, Optional, Any, Dict
 
 from atlassian import Jira
 from langchain_core.tools import ToolException
-from pydantic import Field, PrivateAttr, model_validator, create_model
+from pydantic import Field, PrivateAttr, model_validator, create_model, SecretStr
 import requests
 
 from ..elitea_base import BaseToolApiWrapper
@@ -238,9 +238,9 @@ def process_search_response(jira_url, response, payload_params: Dict[str, Any] =
 class JiraApiWrapper(BaseToolApiWrapper):
     base_url: str
     api_version: Optional[str] = "2",
-    api_key: Optional[str] = None,
+    api_key: Optional[SecretStr] = None,
     username: Optional[str] = None
-    token: Optional[str] = None
+    token: Optional[SecretStr] = None
     cloud: Optional[bool] = True
     limit: Optional[int] = 5
     labels: Optional[List[str]] = []

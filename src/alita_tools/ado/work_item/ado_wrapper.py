@@ -9,7 +9,7 @@ from azure.devops.v7_1.wiki import WikiClient
 from azure.devops.v7_1.work_item_tracking import TeamContext, Wiql, WorkItemTrackingClient
 from langchain_core.tools import ToolException
 from msrest.authentication import BasicAuthentication
-from pydantic import create_model, PrivateAttr
+from pydantic import create_model, PrivateAttr, SecretStr
 from pydantic import model_validator
 from pydantic.fields import Field
 
@@ -93,7 +93,7 @@ ADOUnlinkWorkItemsFromWikiPage = create_model(
 class AzureDevOpsApiWrapper(BaseToolApiWrapper):
     organization_url: str
     project: str
-    token: str
+    token: SecretStr
     limit: Optional[int] = 5
     _client: Optional[WorkItemTrackingClient] = PrivateAttr()
     _wiki_client: Optional[WikiClient] = PrivateAttr() # Add WikiClient instance

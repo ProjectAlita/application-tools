@@ -2,7 +2,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 import googlemaps
-from pydantic import create_model, Field, field_validator, PrivateAttr
+from pydantic import create_model, Field, field_validator, PrivateAttr, SecretStr
 
 from ..elitea_base import BaseToolApiWrapper
 
@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 # TODO: review langchain-google-community: places_api.py
 class GooglePlacesAPIWrapper(BaseToolApiWrapper):
-    api_key: Optional[str] = None
+    api_key: Optional[SecretStr] = None
     results_count: Optional[int] = None
     _client: Optional[googlemaps.Client] = PrivateAttr()
 

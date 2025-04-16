@@ -2,7 +2,7 @@ import logging
 from typing import Optional, List
 
 from langchain_core.tools import ToolException
-from pydantic import create_model, model_validator, PrivateAttr, Field
+from pydantic import create_model, model_validator, PrivateAttr, Field, SecretStr
 
 from .zephyr_enterprise import ZephyrClient
 from ..elitea_base import BaseToolApiWrapper
@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 class ZephyrApiWrapper(BaseToolApiWrapper):
     base_url: str
-    token: str
+    token: SecretStr
     _client: Optional[ZephyrClient] = PrivateAttr()
 
     @model_validator(mode='before')

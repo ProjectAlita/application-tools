@@ -5,14 +5,14 @@ from typing import Any, Optional, Dict
 
 import requests
 from langchain_core.tools import ToolException
-from pydantic import create_model, Field, PrivateAttr, model_validator
+from pydantic import create_model, Field, PrivateAttr, model_validator, SecretStr
 
 from ...elitea_base import BaseToolApiWrapper
 
 
 class SonarApiWrapper(BaseToolApiWrapper):
     url: str
-    sonar_token: str
+    sonar_token: SecretStr
     sonar_project_name: str
     _client: Optional[requests.Session] = PrivateAttr()
 

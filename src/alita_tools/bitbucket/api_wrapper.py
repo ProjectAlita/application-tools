@@ -5,7 +5,7 @@ import logging
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from langchain_core.tools import ToolException
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, model_validator, SecretStr
 from .bitbucket_constants import create_pr_data
 from .cloud_api_wrapper import BitbucketCloudApi, BitbucketServerApi
 from pydantic.fields import PrivateAttr
@@ -31,7 +31,7 @@ class BitbucketAPIWrapper(BaseCodeToolApiWrapper):
     """The name of the Bitbucket repository"""
     username: str = None
     """Username required for authentication."""
-    password: str = None
+    password: SecretStr = None
     # """User's password or OAuth token required for authentication."""
     branch: Optional[str] = 'main'
     """The specific branch in the Bitbucket repository where the bot will make 

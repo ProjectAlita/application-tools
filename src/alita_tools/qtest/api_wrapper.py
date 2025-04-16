@@ -5,7 +5,7 @@ from typing import Any
 
 import swagger_client
 from langchain_core.tools import ToolException
-from pydantic import Field, PrivateAttr, model_validator, create_model
+from pydantic import Field, PrivateAttr, model_validator, create_model, SecretStr
 from sklearn.feature_extraction.text import strip_tags
 from swagger_client import TestCaseApi, SearchApi, PropertyResource
 from swagger_client.rest import ApiException
@@ -102,7 +102,7 @@ DeleteTestCase = create_model(
 class QtestApiWrapper(BaseToolApiWrapper):
     base_url: str
     qtest_project_id: int
-    qtest_api_token: str
+    qtest_api_token: SecretStr
     no_of_items_per_page: int = 100
     page: int = 1
     no_of_tests_shown_in_dql_search: int = 10

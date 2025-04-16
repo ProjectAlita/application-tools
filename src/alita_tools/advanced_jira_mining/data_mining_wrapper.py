@@ -14,7 +14,7 @@ from langchain_core.documents import Document
 from langchain_core.messages import BaseMessage
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
-from pydantic import model_validator, BaseModel
+from pydantic import model_validator, BaseModel, SecretStr
 from langchain_core.runnables import RunnableLambda, RunnableParallel, RunnablePassthrough
 from langchain_text_splitters import MarkdownHeaderTextSplitter
 from pydantic import create_model
@@ -92,13 +92,13 @@ class AdvancedJiraMiningWrapper(BaseModel):
     gaps_analysis_prompt: Optional[str] = None
     """The prompt to be used for gaps analysis. Default is None."""
 
-    jira_api_key: Optional[str] = None
+    jira_api_key: Optional[SecretStr] = None
     """The API key for accessing Jira. Default is None."""
 
     jira_username: Optional[str] = None
     """The username for accessing Jira. Default is None."""
 
-    jira_token: Optional[str] = None
+    jira_token: Optional[SecretStr] = None
     """The token for accessing Jira. Default is None."""
 
     is_jira_cloud: Optional[bool] = True

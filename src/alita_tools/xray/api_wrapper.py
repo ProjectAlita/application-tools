@@ -3,7 +3,7 @@ from typing import Optional, Any, List
 
 import requests
 from langchain_core.tools import ToolException
-from pydantic import create_model, PrivateAttr
+from pydantic import create_model, PrivateAttr, SecretStr
 from pydantic import model_validator
 from pydantic.fields import Field
 from python_graphql_client import GraphqlClient
@@ -99,7 +99,7 @@ class XrayApiWrapper(BaseToolApiWrapper):
     _default_base_url: str = 'https://xray.cloud.getxray.app'
     base_url: str = ""
     client_id: str = None,
-    client_secret: str = None,
+    client_secret: SecretStr = None,
     limit: Optional[int] = 100,
     _client: Optional[GraphqlClient] = PrivateAttr()
 
