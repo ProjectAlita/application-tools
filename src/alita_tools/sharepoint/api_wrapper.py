@@ -1,6 +1,9 @@
 import logging
 from typing import Optional
 
+from pptx import Presentation
+import io
+import pymupdf
 from langchain_core.tools import ToolException
 from office365.runtime.auth.client_credential import ClientCredential
 from office365.sharepoint.client_context import ClientContext
@@ -136,6 +139,20 @@ class SharepointApiWrapper(BaseToolApiWrapper):
                 logging.error(f"Error decoding file content: {e}")
         elif file.name.endswith('.docx'):
             file_content_str = read_docx_from_bytes(file_content)
+        elif file.name.endswith('.pdf'):
+            with pymupdf.open(stream=file_content, filetype="pdf") as report:
+                text_content = ''
+                for page in report:
+                    text_content += page.get_text()
+                file_content_str = text_content
+        elif file.name.endswith('.pptx'):
+            prs = Presentation(io.BytesIO(file_content))
+            text_content = ''
+            for slide in prs.slides:
+                for shape in slide.shapes:
+                    if hasattr(shape, "text"):
+                        text_content += shape.text + "\n"
+            file_content_str = text_content
         else:
             return ToolException("Not supported type of files entered. Supported types are TXT and DOCX only.")
         return file_content_str
