@@ -2,7 +2,7 @@ from typing import Optional, List, Literal
 
 from langchain_community.agent_toolkits.base import BaseToolkit
 from langchain_core.tools import BaseTool
-from pydantic import create_model, BaseModel, Field
+from pydantic import create_model, BaseModel, Field, SecretStr
 
 from .api_wrapper import ZephyrScaleApiWrapper
 from ..base.tool import BaseAction
@@ -36,9 +36,9 @@ class ZephyrScaleToolkit(BaseToolkit):
             base_url=(Optional[str], Field(default=None, description="Base URL",
                                            json_schema_extra={'toolkit_name': True,
                                                               'max_toolkit_length': ZephyrScaleToolkit.toolkit_max_length})),
-            token=(Optional[str], Field(default=None, description="Token", json_schema_extra={'secret': True})),
+            token=(Optional[SecretStr], Field(default=None, description="Token", json_schema_extra={'secret': True})),
             username=(Optional[str], Field(default=None, description="Username")),
-            password=(Optional[str], Field(default=None, description="Password", json_schema_extra={'secret': True})),
+            password=(Optional[SecretStr], Field(default=None, description="Password", json_schema_extra={'secret': True})),
             cookies=(Optional[str], Field(default=None, description="Cookies", json_schema_extra={'secret': True})),
             max_results=(int, Field(default=100, description="Results count to show")),
             selected_tools=(List[Literal[tuple(selected_tools)]],

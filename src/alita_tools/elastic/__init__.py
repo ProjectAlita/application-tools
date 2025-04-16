@@ -1,7 +1,7 @@
 from typing import List, Literal, Optional
 
 from langchain_core.tools import BaseToolkit, BaseTool
-from pydantic import BaseModel, ConfigDict, create_model, Field
+from pydantic import BaseModel, ConfigDict, create_model, Field, SecretStr
 
 from .api_wrapper import ELITEAElasticApiWrapper
 from ..base.tool import BaseAction
@@ -29,7 +29,7 @@ class ElasticToolkit(BaseToolkit):
             name,
             url=(str, Field(default=None, title="Elasticsearch URL", description="Elasticsearch URL", json_schema_extra={'toolkit_name': True, 'max_toolkit_length': ElasticToolkit.toolkit_max_length})),
             api_key=(
-                Optional[str],
+                Optional[SecretStr],
                 Field(
                     default=None,
                     title="Cluster URL",

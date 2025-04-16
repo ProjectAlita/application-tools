@@ -3,7 +3,7 @@ from langchain_community.agent_toolkits.base import BaseToolkit
 from .api_wrapper import ConfluenceAPIWrapper
 from langchain_core.tools import BaseTool
 from ..base.tool import BaseAction
-from pydantic import create_model, BaseModel, ConfigDict, Field
+from pydantic import create_model, BaseModel, ConfigDict, Field, SecretStr
 from ..utils import clean_string, TOOLKIT_SPLITTER, get_max_toolkit_length, parse_list
 
 name = "confluence"
@@ -38,8 +38,8 @@ class ConfluenceToolkit(BaseToolkit):
         return create_model(
             name,
             base_url=(str, Field(description="Confluence URL")),
-            token=(str, Field(description="Token", default=None, json_schema_extra={'secret': True})),
-            api_key=(str, Field(description="API key", default=None, json_schema_extra={'secret': True})),
+            token=(SecretStr, Field(description="Token", default=None, json_schema_extra={'secret': True})),
+            api_key=(SecretStr, Field(description="API key", default=None, json_schema_extra={'secret': True})),
             username=(str, Field(description="Username", default=None)),
             space=(str, Field(description="Space", default=None, json_schema_extra={'toolkit_name': True,
                                                                                     'max_toolkit_length': ConfluenceToolkit.toolkit_max_length})),

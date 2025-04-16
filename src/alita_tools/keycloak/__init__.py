@@ -1,7 +1,7 @@
 from typing import List, Literal, Optional
 
 from langchain_core.tools import BaseToolkit, BaseTool
-from pydantic import BaseModel, ConfigDict, create_model, Field
+from pydantic import BaseModel, ConfigDict, create_model, Field, SecretStr
 
 from .api_wrapper import KeycloakApiWrapper
 from ..base.tool import BaseAction
@@ -32,7 +32,7 @@ class KeycloakToolkit(BaseToolkit):
             base_url=(str, Field(default="", title="Server URL", description="Keycloak server URL", json_schema_extra={'toolkit_name': True, 'max_toolkit_length': KeycloakToolkit.toolkit_max_length})),
             realm=(str, Field(default="", title="Realm", description="Keycloak realm")),
             client_id=(str, Field(default="", title="Client ID", description="Keycloak client ID")),
-            client_secret=(str, Field(default="", title="Client sercet", description="Keycloak client secret", json_schema_extra={'secret': True})),
+            client_secret=(SecretStr, Field(default="", title="Client sercet", description="Keycloak client secret", json_schema_extra={'secret': True})),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Keycloak", "icon_url": None, "hidden": True}})
         )

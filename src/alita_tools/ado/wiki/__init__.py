@@ -1,7 +1,7 @@
 from typing import List, Literal, Optional
 from .ado_wrapper import AzureDevOpsApiWrapper  # Import the API wrapper for Azure DevOps
 from langchain_core.tools import BaseTool, BaseToolkit
-from pydantic import create_model, BaseModel, Field
+from pydantic import create_model, BaseModel, Field, SecretStr
 
 from ...base.tool import BaseAction
 from ...utils import clean_string, TOOLKIT_SPLITTER, get_max_toolkit_length
@@ -21,7 +21,7 @@ class AzureDevOpsWikiToolkit(BaseToolkit):
             name_alias,
             organization_url=(str, Field(description="ADO organization url")),
             project=(str, Field(description="ADO project", json_schema_extra={'toolkit_name': True, 'max_toolkit_length': AzureDevOpsWikiToolkit.toolkit_max_length})),
-            token=(str, Field(description="ADO token", json_schema_extra={'secret': True})),
+            token=(SecretStr, Field(description="ADO token", json_schema_extra={'secret': True})),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
             __config__={'json_schema_extra': {'metadata': {"label": "ADO wiki", "icon_url": None}}}
         )

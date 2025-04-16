@@ -3,7 +3,7 @@ from .api_wrapper import BitbucketAPIWrapper
 from .tools import __all__
 from langchain_core.tools import BaseToolkit
 from langchain_core.tools import BaseTool
-from pydantic import BaseModel, Field, ConfigDict, create_model
+from pydantic import BaseModel, Field, ConfigDict, create_model, SecretStr
 from ..utils import clean_string, TOOLKIT_SPLITTER, get_max_toolkit_length
 
 
@@ -42,7 +42,7 @@ class AlitaBitbucketToolkit(BaseToolkit):
             repository=(str, Field(description="Repository", json_schema_extra={'toolkit_name': True, 'max_toolkit_length': AlitaBitbucketToolkit.toolkit_max_length})),
             branch=(str, Field(description="Main branch", default="main")),
             username=(str, Field(description="Username")),
-            password=(str, Field(description="GitLab private token", json_schema_extra={'secret': True})),
+            password=(SecretStr, Field(description="GitLab private token", json_schema_extra={'secret': True})),
             cloud=(Optional[bool], Field(description="Hosting Option", default=None)),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Bitbucket", "icon_url": "bitbucket-icon.svg"}})

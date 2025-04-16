@@ -1,7 +1,7 @@
 from typing import List, Literal, Optional
 
 from langchain_core.tools import BaseTool, BaseToolkit
-from pydantic import create_model, BaseModel, ConfigDict, Field
+from pydantic import create_model, BaseModel, ConfigDict, Field, SecretStr
 
 from .api_wrapper import TestrailAPIWrapper
 from ..base.tool import BaseAction
@@ -31,7 +31,7 @@ class TestrailToolkit(BaseToolkit):
             name,
             url=(str, Field(description="Testrail URL", json_schema_extra={'toolkit_name': True, "max_length": TestrailToolkit.toolkit_max_length})),
             email=(str, Field(description="User's email")),
-            password=(str, Field(description="User's password", json_schema_extra={'secret': True})),
+            password=(SecretStr, Field(description="User's password", json_schema_extra={'secret': True})),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Testrail", "icon_url": "testrail-icon.svg"}})
         )

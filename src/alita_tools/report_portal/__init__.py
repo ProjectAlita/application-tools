@@ -2,7 +2,7 @@ from typing import List, Literal, Optional
 
 from langchain_core.tools import BaseToolkit, BaseTool
 
-from pydantic import create_model, BaseModel, ConfigDict, Field
+from pydantic import create_model, BaseModel, ConfigDict, Field, SecretStr
 
 from .api_wrapper import ReportPortalApiWrapper
 from ..base.tool import BaseAction
@@ -32,7 +32,7 @@ class ReportPortalToolkit(BaseToolkit):
             name,
             endpoint=(str, Field(description="Report Portal endpoint", json_schema_extra={'toolkit_name': True, 'max_toolkit_length': ReportPortalToolkit.toolkit_max_length})),
             project=(str, Field(description="Report Portal project")),
-            api_key=(str, Field(description="User API key", json_schema_extra={'secret': True})),
+            api_key=(SecretStr, Field(description="User API key", json_schema_extra={'secret': True})),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Report Portal", "icon_url": "reportportal-icon.svg"}})
         )

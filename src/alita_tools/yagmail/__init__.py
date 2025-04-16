@@ -2,7 +2,7 @@ from typing import List, Literal, Optional
 
 from langchain_core.tools import BaseToolkit
 from langchain_core.tools import BaseTool
-from pydantic import create_model, BaseModel, Field
+from pydantic import create_model, BaseModel, Field, SecretStr
 
 from .yagmail_wrapper import YagmailWrapper, SMTP_SERVER
 from ..base.tool import BaseAction
@@ -28,7 +28,7 @@ class AlitaYagmailToolkit(BaseToolkit):
             name,
             host=(Optional[str], Field(default=SMTP_SERVER, description="SMTP Host")),
             username=(str, Field(description="Username")),
-            password=(str, Field(description="Password", json_schema_extra={'secret': True})),
+            password=(SecretStr, Field(description="Password", json_schema_extra={'secret': True})),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
             __config__={'json_schema_extra': {'metadata': {"label": "Yet Another Gmail", "icon_url": None, "hidden": True}}}
         )

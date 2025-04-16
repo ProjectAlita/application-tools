@@ -3,7 +3,7 @@ from typing import List, Optional, Literal
 
 from langchain_community.agent_toolkits.base import BaseToolkit
 from langchain_core.tools import BaseTool
-from pydantic import create_model, BaseModel, Field
+from pydantic import create_model, BaseModel, Field, SecretStr
 
 from .api_wrapper import XrayApiWrapper
 from ..base.tool import BaseAction
@@ -36,7 +36,7 @@ class XrayToolkit(BaseToolkit):
             name,
             base_url=(str, Field(description="Xray URL", json_schema_extra={'toolkit_name': True, 'max_toolkit_length': XrayToolkit.toolkit_max_length})),
             client_id=(str, Field(description="Client ID")),
-            client_secret=(str, Field(description="Client secret", json_schema_extra={'secret': True})),
+            client_secret=(SecretStr, Field(description="Client secret", json_schema_extra={'secret': True})),
             limit=(Optional[int], Field(description="Limit", default=100)),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
             __config__={'json_schema_extra': {'metadata': {"label": "XRAY cloud", "icon_url": "xray.svg"}}}

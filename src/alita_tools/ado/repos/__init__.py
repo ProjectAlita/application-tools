@@ -1,7 +1,7 @@
 from typing import List, Literal, Optional
 
 from langchain_core.tools import BaseTool, BaseToolkit
-from pydantic import BaseModel, Field, create_model
+from pydantic import BaseModel, Field, create_model, SecretStr
 
 from ...base.tool import BaseAction
 from .repos_wrapper import ReposApiWrapper
@@ -22,7 +22,7 @@ class AzureDevOpsReposToolkit(BaseToolkit):
             organization_url=(Optional[str], Field(default="", title="Organization URL", description="ADO organization url")),
             project=(Optional[str], Field(default="", title="Project", description="ADO project", json_schema_extra={'toolkit_name': True, 'max_toolkit_length': AzureDevOpsReposToolkit.toolkit_max_length})),
             repository_id=(Optional[str], Field(default="", title="Repository ID", description="ADO repository ID")),
-            token=(Optional[str], Field(default="", title="Token", description="ADO token", json_schema_extra={'secret': True})),
+            token=(Optional[SecretStr], Field(default="", title="Token", description="ADO token", json_schema_extra={'secret': True})),
             base_branch=(Optional[str], Field(default="", title="Base branch", description="ADO base branch (e.g., main)")),
             active_branch=(Optional[str], Field(default="", title="Active branch", description="ADO active branch (e.g., main)")),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
