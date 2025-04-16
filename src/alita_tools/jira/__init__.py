@@ -19,6 +19,7 @@ def get_tools(tool):
             limit=tool['settings'].get('limit', 5),
             labels=parse_list(tool['settings'].get('labels', [])),
             additional_fields=tool['settings'].get('additional_fields', []),
+            toolkit_name=tool.get('toolkit_name'),
             verify_ssl=tool['settings'].get('verify_ssl', True)).get_tools()
 
 class JiraToolkit(BaseToolkit):
