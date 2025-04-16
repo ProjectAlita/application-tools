@@ -20,13 +20,28 @@ class AzureDevOpsReposToolkit(BaseToolkit):
         return create_model(
             name,
             organization_url=(Optional[str], Field(default="", title="Organization URL", description="ADO organization url")),
-            project=(Optional[str], Field(default="", title="Project", description="ADO project", json_schema_extra={'toolkit_name': True, 'max_toolkit_length': AzureDevOpsReposToolkit.toolkit_max_length})),
-            repository_id=(Optional[str], Field(default="", title="Repository ID", description="ADO repository ID")),
+            project=(Optional[str], Field(default="", title="Project", description="ADO project")),
+            repository_id=(Optional[str], Field(default="", title="Repository ID", description="ADO repository ID", json_schema_extra={'toolkit_name': True, 'max_toolkit_length': AzureDevOpsReposToolkit.toolkit_max_length})),
             token=(Optional[SecretStr], Field(default="", title="Token", description="ADO token", json_schema_extra={'secret': True})),
             base_branch=(Optional[str], Field(default="", title="Base branch", description="ADO base branch (e.g., main)")),
             active_branch=(Optional[str], Field(default="", title="Active branch", description="ADO active branch (e.g., main)")),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
-            __config__={'json_schema_extra': {'metadata': {"label": "ADO repos", "icon_url": "ado-repos-icon.svg"}}}
+            __config__={'json_schema_extra': {'metadata':
+                {
+                    "label": "ADO repos",
+                    "icon_url": "ado-repos-icon.svg",
+                    "sections": {
+                        "auth": {
+                            "required": True,
+                            "subsections": [
+                                {
+                                    "name": "Token",
+                                    "fields": ["token"]
+                                }
+                            ]
+                        }
+                    }
+                }}}
         )
 
     @classmethod
