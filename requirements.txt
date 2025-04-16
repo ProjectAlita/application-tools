@@ -55,3 +55,4 @@ pytesseract~=0.3.13
 pypdf2~=3.0.1
 astor~=0.8.1
 opencv-python==4.11.0.86 # for cv2 library
+python-pptx==1.0.2
