@@ -1,13 +1,16 @@
 import logging
 from typing import Optional
 
+from PIL import Image
 from pptx import Presentation
+from pptx.enum.shapes import MSO_SHAPE_TYPE
 import io
 import pymupdf
 from langchain_core.tools import ToolException
 from office365.runtime.auth.client_credential import ClientCredential
 from office365.sharepoint.client_context import ClientContext
 from pydantic import Field, PrivateAttr, create_model, model_validator, SecretStr
+from transformers import BlipProcessor, BlipForConditionalGeneration
 
 from .utils import read_docx_from_bytes
 from ..elitea_base import BaseToolApiWrapper
@@ -30,7 +33,8 @@ GetFiles = create_model(
 
 ReadDocument = create_model(
     "ReadDocument",
-    path=(str, Field(description="Contains the server-relative path of a document for reading."))
+    path=(str, Field(description="Contains the server-relative path of a document for reading.")),
+    is_capture_image=(Optional[bool], Field(description="Determines is pictures in the document should be recognized.", default=False))
 )
 
 
@@ -120,7 +124,7 @@ class SharepointApiWrapper(BaseToolApiWrapper):
             logging.error(f"Failed to load files from sharepoint: {e}")
             return ToolException("Can not get files. Please, double check folder name and read permissions.")
 
-    def read_file(self, path):
+    def read_file(self, path, is_capture_image: bool = False):
         """ Reads file located at the specified server-relative path. """
         try:
             file = self._client.web.get_file_by_server_relative_path(path)
@@ -144,6 +148,12 @@ class SharepointApiWrapper(BaseToolApiWrapper):
                 text_content = ''
                 for page in report:
                     text_content += page.get_text()
+                    images = page.get_images(full=True)
+                    for i, img in enumerate(images):
+                        xref = img[0]
+                        base_image = report.extract_image(xref)
+                        img_bytes = base_image["image"]
+                        text_content += self.describe_image(Image.open(io.BytesIO(img_bytes)).convert("RGB"))
                 file_content_str = text_content
         elif file.name.endswith('.pptx'):
             prs = Presentation(io.BytesIO(file_content))
@@ -152,10 +162,23 @@ class SharepointApiWrapper(BaseToolApiWrapper):
                 for shape in slide.shapes:
                     if hasattr(shape, "text"):
                         text_content += shape.text + "\n"
+                    elif is_capture_image and shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
+                        try:
+                            caption = self.describe_image(Image.open(io.BytesIO(shape.image.blob)).convert("RGB"))
+                        except:
+                            caption = "\n[Picture: unknown]\n"
+                        text_content += caption
             file_content_str = text_content
         else:
             return ToolException("Not supported type of files entered. Supported types are TXT and DOCX only.")
         return file_content_str
+
+    def describe_image(self, image):
+        processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
+        model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-base")
+        inputs = processor(image, return_tensors="pt")
+        out = model.generate(**inputs)
+        return "\n[Picture: " + processor.decode(out[0], skip_special_tokens=True) + "]\n"
 
     def get_available_tools(self):
         return [
