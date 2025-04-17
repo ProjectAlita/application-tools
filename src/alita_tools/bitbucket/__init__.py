@@ -62,8 +62,9 @@ class AlitaBitbucketToolkit(BaseToolkit):
             if selected_tools:
                 if tool['name'] not in selected_tools:
                     continue
-            tool['name'] = prefix + tool['name']
-            tools.append(tool['tool'](api_wrapper=bitbucket_api_wrapper))
+            initiated_tool = tool['tool'](api_wrapper=bitbucket_api_wrapper)
+            initiated_tool.name = prefix + tool['name']
+            tools.append(initiated_tool)
         return cls(tools=tools)
 
     def get_tools(self):
