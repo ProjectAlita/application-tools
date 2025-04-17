@@ -13,6 +13,7 @@ name = "github"
 def _get_toolkit(tool) -> BaseToolkit:
     return AlitaGitHubToolkit().get_toolkit(
         selected_tools=tool['settings'].get('selected_tools', []),
+        github_base_url=tool['settings'].get('base_url', ''),
         github_repository=tool['settings']['repository'],
         active_branch=tool['settings']['active_branch'],
         github_base_branch=tool['settings']['base_branch'],
@@ -67,6 +68,7 @@ class AlitaGitHubToolkit(BaseToolkit):
                     },
                 }
             ),
+            base_url=(Optional[str], Field(description="Base API URL", default="https://api.github.com")),
             app_id=(Optional[str], Field(description="Github APP ID", default=None)),
             app_private_key=(Optional[SecretStr], Field(description="Github APP private key", default=None, json_schema_extra={'secret': True})),
 

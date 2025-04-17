@@ -464,6 +464,7 @@ LoaderSchema = create_model(
 
 class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
     github_api: Any = None
+    github_base_url: Optional[str] = None
     github_repo_instance: Any = None
     _github_graphql_instance: Any = PrivateAttr()
     _graphql_client: Optional[GraphQLClient] = PrivateAttr(None)
