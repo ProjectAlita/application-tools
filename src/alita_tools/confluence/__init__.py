@@ -65,11 +65,11 @@ class ConfluenceToolkit(BaseToolkit):
                             "required": True,
                             "subsections": [
                                 {
-                                    "name": "Token",
+                                    "name": "Bearer",
                                     "fields": ["token"]
                                 },
                                 {
-                                    "name": "API Key",
+                                    "name": "Basic",
                                     "fields": ["username", "api_key"]
                                 }
                             ]

@@ -9,6 +9,9 @@ from .google_search_rag import GoogleSearchResults
 from .crawler import SingleURLCrawler, MultiURLCrawler, GetHTMLContent, GetPDFContent
 from .wiki import WikipediaQueryRun
 from ..utils import get_max_toolkit_length, clean_string, TOOLKIT_SPLITTER
+from logging import getLogger
+
+logger = getLogger(__name__)
 
 name = "browser"
 
@@ -75,7 +78,7 @@ class BrowserToolkit(BaseToolkit):
                     )
                     tool_entry = GoogleSearchResults(api_wrapper=google_api_wrapper)
                 except Exception as e:
-                    print(f"Google API Wrapper failed to initialize: {e}")
+                    logger.error(f"Google API Wrapper failed to initialize: {e}")
             elif tool == 'wiki':
                 tool_entry = WikipediaQueryRun(api_wrapper=WikipediaAPIWrapper())
 

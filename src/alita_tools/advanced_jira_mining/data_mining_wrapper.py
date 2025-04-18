@@ -21,7 +21,11 @@ from pydantic import create_model
 from pydantic.fields import Field, PrivateAttr
 from atlassian import Jira
 
+from logging import getLogger
+
 from ..llm.llm_utils import get_model, summarize
+
+logger = getLogger(__name__)
 
 PrepareDataSchema = create_model(
     "PrepareDataSchema",
@@ -614,7 +618,7 @@ class AdvancedJiraMiningWrapper(BaseModel):
                 try:
                     jira_data_cache[jira_issue['key']] = future.result()
                 except Exception as e:
-                    print(f"Error fetching data for Jira issue {jira_issue}: {e}")
+                    logger.error(f"Error fetching data for Jira issue {jira_issue}: {e}")
         return jira_data_cache, jira_keys
 
     def __create_ac_documents_content(self, jira_issue_key: str) -> List[Document]:
@@ -681,7 +685,7 @@ class AdvancedJiraMiningWrapper(BaseModel):
         """
         attachment_ids = self._client.get_attachments_ids_from_issue(jira_issue_key)
         filtered_ids = list(filter(lambda attachment: attachment['filename'] == file_name, attachment_ids))
-        print(f"Filtered attachment ids len: {len(filtered_ids)} and value: {filtered_ids}")
+        logger.info(f"Filtered attachment ids len: {len(filtered_ids)} and value: {filtered_ids}")
         if len(filtered_ids) > 0:
             return filtered_ids[0]['attachment_id']
         else:
