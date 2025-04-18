@@ -24,7 +24,7 @@ class PandasWrapper(BaseToolApiWrapper):
     llm: Any = None
     bucket_name: str
     file_name: str = None
-    df_name: str = None
+    df_name: Optional[str] = None
     
     _length_to_sniff: int = 1024
     _df: pd.DataFrame = None
