@@ -481,13 +481,13 @@ GetCommits = create_model(
         ),
     ),
     since=(
-        Optional[datetime],
+        Optional[str],
         Field(
             description="Only commits after this date will be returned. Use ISO 8601 format (e.g., '2023-01-01T00:00:00Z')."
         ),
     ),
     until=(
-        Optional[datetime],
+        Optional[str],
         Field(
             description="Only commits before this date will be returned. Use ISO 8601 format (e.g., '2023-12-31T23:59:59Z')."
         ),
@@ -696,8 +696,8 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             self,
             sha: Optional[str] = None,
             path: Optional[str] = None,
-            since: Optional[datetime] = None,
-            until: Optional[datetime] = None,
+            since: Optional[str] = None,
+            until: Optional[str] = None,
             author: Optional[str] = None,
     ) -> str:
         """
@@ -718,8 +718,8 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             params = {
                 "sha": sha,
                 "path": path,
-                "since": since if since else None,
-                "until": until if until else None,
+                "since": datetime.fromisoformat(since) if since else None,
+                "until": datetime.fromisoformat(until) if until else None,
                 "author": author if isinstance(author, str) else None,
             }
             # Remove None values from the parameters
