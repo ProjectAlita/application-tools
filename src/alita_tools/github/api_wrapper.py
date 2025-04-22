@@ -4,8 +4,9 @@ from json import dumps, loads
 import fnmatch
 from typing import Dict, Any, Optional, List, Union
 import tiktoken
+from github.Repository import Repository
 from langchain_core.tools import ToolException
-from pydantic import model_validator, create_model, BaseModel, Field, SecretStr
+from pydantic import model_validator, create_model, Field, SecretStr
 from pydantic.fields import PrivateAttr
 from langchain.utils import get_from_dict_or_env
 
@@ -461,11 +462,51 @@ LoaderSchema = create_model(
                Field(description="A list of file extensions or paths to exclude. If None, no files are excluded."))
 )
 
+from datetime import datetime
+from typing import Optional, Union
+from pydantic import Field, create_model
+
+GetCommits = create_model(
+    "GetCommits",
+    sha=(
+        Optional[str],
+        Field(
+            description="The commit SHA to start listing commits from. If not provided, the default branch is used."
+        ),
+    ),
+    path=(
+        Optional[str],
+        Field(
+            description="The file path to filter commits by. Only commits affecting this path will be returned."
+        ),
+    ),
+    since=(
+        Optional[datetime],
+        Field(
+            description="Only commits after this date will be returned. Use ISO 8601 format (e.g., '2023-01-01T00:00:00Z')."
+        ),
+    ),
+    until=(
+        Optional[datetime],
+        Field(
+            description="Only commits before this date will be returned. Use ISO 8601 format (e.g., '2023-12-31T23:59:59Z')."
+        ),
+    ),
+    author=(
+        Optional[str],
+        Field(
+            description=(
+                "The author of the commits. Can be a username (string)"
+            )
+        ),
+    ),
+)
+
 
 class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
     github_api: Any = None
     github_base_url: Optional[str] = None
-    github_repo_instance: Any = None
+    github_repo_instance: Repository = None
     _github_graphql_instance: Any = PrivateAttr()
     _graphql_client: Optional[GraphQLClient] = PrivateAttr(None)
     github_repository: Optional[str] = None
@@ -476,6 +517,9 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
     github_password: Optional[SecretStr] = None
     github_app_id: Optional[str] = None
     github_app_private_key: Optional[SecretStr] = None
+
+    class Config:
+        arbitrary_types_allowed = True
 
     def clean_repository_name(repo_link):
         import re
@@ -647,6 +691,59 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             str: A plaintext report containing the paths and names of the files.
         """
         return dumps(self._get_files("", self.active_branch))
+
+    def get_commits(
+            self,
+            sha: Optional[str] = None,
+            path: Optional[str] = None,
+            since: Optional[datetime] = None,
+            until: Optional[datetime] = None,
+            author: Optional[str] = None,
+    ) -> str:
+        """
+        Retrieves a list of commits from the repository.
+
+        Parameters:
+            sha (Optional[str]): The commit SHA to start listing commits from.
+            path (Optional[str]): The file path to filter commits by.
+            since (Optional[datetime]): Only commits after this date will be returned.
+            until (Optional[datetime]): Only commits before this date will be returned.
+            author (Optional[str]): The author of the commits.
+
+        Returns:
+            str: A list of commit data or an error message.
+        """
+        try:
+            # Prepare the parameters for the API call
+            params = {
+                "sha": sha,
+                "path": path,
+                "since": since if since else None,
+                "until": until if until else None,
+                "author": author if isinstance(author, str) else None,
+            }
+            # Remove None values from the parameters
+            params = {key: value for key, value in params.items() if value is not None}
+
+            # Call the GitHub API to get commits
+            commits = self.github_repo_instance.get_commits(**params)
+
+            # Convert the commits to a list of dictionaries for easier processing
+            commit_list = [
+                {
+                    "sha": commit.sha,
+                    "author": commit.commit.author.name,
+                    "date": commit.commit.author.date,
+                    "message": commit.commit.message,
+                    "url": commit.html_url,
+                }
+                for commit in commits
+            ]
+
+            return commit_list
+
+        except Exception as e:
+            return ToolException(f"Unable to retrieve commits due to error:\n{str(e)}")
 
     def get_pull_request(self, pr_number: str) -> str:
         """
@@ -1131,7 +1228,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             return owner_name, repo_name
         except Exception as e:
             return f"'{repo}' repo format is invalid. It should be like 'org-name/repo-name'. Error: {str(e)}"
-    
+
     def _get_repo_extra_info(self, repository):
         """ Helper to extract repository ID, labels and assignable users of the repository. """
         repository_id = repository.get("repositoryId")
@@ -1141,13 +1238,13 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         return repository_id, labels, assignable_users
 
     def create_issue_on_project(
-        self,
-        board_repo: str,
-        project_title: str,
-        title: str,
-        body: str,
-        fields: Optional[Dict[str, str]] = None,
-        issue_repo: Optional[str] = None
+            self,
+            board_repo: str,
+            project_title: str,
+            title: str,
+            body: str,
+            fields: Optional[Dict[str, str]] = None,
+            issue_repo: Optional[str] = None
     ) -> str:
         """
         Creates an issue within a specified project using a series of GraphQL operations.
@@ -1186,9 +1283,9 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                     issue_owner_name, issue_repo_name = self._parse_repo(issue_repo)
                 except ValueError as e:
                     return str(e)
-                
-                issue_repo_result = _graphql_client.get_issue_repo(owner=issue_owner_name, repo_name=issue_repo_name)\
-                
+
+                issue_repo_result = _graphql_client.get_issue_repo(owner=issue_owner_name, repo_name=issue_repo_name)
+
                 repository_id, labels, assignable_users = self._get_repo_extra_info(issue_repo_result)
             else:
                 repository_id, labels, assignable_users = self._get_repo_extra_info(result)
@@ -1244,14 +1341,14 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         return f"{base_message}\n{fields_message}"
 
     def update_issue_on_project(
-        self,
-        board_repo: str,
-        issue_number: str,
-        project_title: str,
-        title: str,
-        body: str,
-        fields: Optional[Dict[str, str]] = None,
-        issue_repo: Optional[str] = None
+            self,
+            board_repo: str,
+            issue_number: str,
+            project_title: str,
+            title: str,
+            body: str,
+            fields: Optional[Dict[str, str]] = None,
+            issue_repo: Optional[str] = None
     ) -> str:
         """
         Updates an existing issue specified by issue number within a project, title, body, and other fields.
@@ -1272,7 +1369,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             Exception: Describes any errors encountered during operation execution.
         """
         _graphql_client = self._get_graphql_client()
-        
+
         try:
             owner_name, repo_name = self._parse_repo(board_repo)
         except Exception as e:
@@ -1288,9 +1385,9 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                     issue_owner_name, issue_repo_name = self._parse_repo(issue_repo)
                 except ValueError as e:
                     return str(e)
-                
-                issue_repo_result = _graphql_client.get_issue_repo(owner=issue_owner_name, repo_name=issue_repo_name)\
-                
+
+                issue_repo_result = _graphql_client.get_issue_repo(owner=issue_owner_name, repo_name=issue_repo_name)
+
                 repository_id, labels, assignable_users = self._get_repo_extra_info(issue_repo_result)
             else:
                 repository_id, labels, assignable_users = self._get_repo_extra_info(result)
@@ -1511,6 +1608,13 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                 "mode": "update_issue_on_project",
                 "description": UPDATE_ISSUE_ON_PROJECT_PROMPT,
                 "args_schema": UpdateIssueOnProject,
+            },
+            {
+                "ref": self.get_commits,
+                "name": "get_commits",
+                "mode": "get_commits",
+                "description": self.get_commits.__doc__,
+                "args_schema": GetCommits,
             }
         ]
 
