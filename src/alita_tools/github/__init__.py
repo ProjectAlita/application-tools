@@ -69,13 +69,13 @@ class AlitaGitHubToolkit(BaseToolkit):
                 }
             ),
             base_url=(Optional[str], Field(description="Base API URL", default="https://api.github.com")),
-            app_id=(Optional[str], Field(description="Github APP ID", default=None)),
-            app_private_key=(Optional[SecretStr], Field(description="Github APP private key", default=None, json_schema_extra={'secret': True})),
+            app_id=(Optional[str], Field(description="Github APP ID", default=None, json_schema_extra={'configuration': True})),
+            app_private_key=(Optional[SecretStr], Field(description="Github APP private key", default=None, json_schema_extra={'secret': True, 'configuration': True})),
 
-            access_token=(Optional[SecretStr], Field(description="Github Access Token", default=None, json_schema_extra={'secret': True})),
+            access_token=(Optional[SecretStr], Field(description="Github Access Token", default=None, json_schema_extra={'secret': True, 'configuration': True})),
 
-            username=(Optional[str], Field(description="Github Username", default=None)),
-            password=(Optional[SecretStr], Field(description="Github Password", default=None, json_schema_extra={'secret': True})),
+            username=(Optional[str], Field(description="Github Username", default=None, json_schema_extra={'configuration': True})),
+            password=(Optional[SecretStr], Field(description="Github Password", default=None, json_schema_extra={'secret': True, 'configuration': True})),
 
             repository=(str, Field(description="Github repository", json_schema_extra={'toolkit_name': True, 'max_toolkit_length': AlitaGitHubToolkit.toolkit_max_length})),
             active_branch=(Optional[str], Field(description="Active branch", default="main")),

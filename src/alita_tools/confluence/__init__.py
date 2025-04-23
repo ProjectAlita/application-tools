@@ -37,13 +37,13 @@ class ConfluenceToolkit(BaseToolkit):
         ConfluenceToolkit.toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name,
-            base_url=(str, Field(description="Confluence URL")),
-            token=(SecretStr, Field(description="Token", default=None, json_schema_extra={'secret': True})),
-            api_key=(SecretStr, Field(description="API key", default=None, json_schema_extra={'secret': True})),
-            username=(str, Field(description="Username", default=None)),
+            base_url=(str, Field(description="Confluence URL", json_schema_extra={'configuration': True})),
+            token=(SecretStr, Field(description="Token", default=None, json_schema_extra={'secret': True, 'configuration': True})),
+            api_key=(SecretStr, Field(description="API key", default=None, json_schema_extra={'secret': True, 'configuration': True})),
+            username=(str, Field(description="Username", default=None, json_schema_extra={'configuration': True})),
             space=(str, Field(description="Space", default=None, json_schema_extra={'toolkit_name': True,
                                                                                     'max_toolkit_length': ConfluenceToolkit.toolkit_max_length})),
-            cloud=(bool, Field(description="Hosting Option")),
+            cloud=(bool, Field(description="Hosting Option", json_schema_extra={'configuration': True})),
             limit=(int, Field(description="Pages limit per request", default=5)),
             labels=(Optional[str], Field(
                 description="List of comma separated labels used for labeling of agent's created or updated entities",
