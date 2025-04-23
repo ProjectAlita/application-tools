@@ -29,9 +29,19 @@ class TestrailToolkit(BaseToolkit):
         TestrailToolkit.toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name,
-            url=(str, Field(description="Testrail URL", json_schema_extra={'toolkit_name': True, "max_length": TestrailToolkit.toolkit_max_length})),
-            email=(str, Field(description="User's email")),
-            password=(SecretStr, Field(description="User's password", json_schema_extra={'secret': True})),
+            url=(
+                str,
+                Field(
+                    description="Testrail URL",
+                    json_schema_extra={
+                        'toolkit_name': True,
+                        "max_length": TestrailToolkit.toolkit_max_length,
+                        "configuration": True
+                    }
+                )
+            ),
+            email=(str, Field(description="User's email", json_schema_extra={'configuration': True})),
+            password=(SecretStr, Field(description="User's password", json_schema_extra={'secret': True, 'configuration': True})),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Testrail", "icon_url": "testrail-icon.svg"}})
         )

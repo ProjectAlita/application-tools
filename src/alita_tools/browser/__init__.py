@@ -1,7 +1,7 @@
 from typing import List, Optional, Literal
 from langchain_core.tools import BaseTool, BaseToolkit
 
-from pydantic import create_model, BaseModel, ConfigDict, Field, SecretStr
+from pydantic import create_model, BaseModel, ConfigDict, Field, SecretStr, model_validator
 
 from langchain_community.utilities.google_search import GoogleSearchAPIWrapper
 from langchain_community.utilities.wikipedia import WikipediaAPIWrapper
@@ -22,7 +22,6 @@ def get_tools(tool):
         google_cse_id=tool['settings'].get("google_cse_id"),
         toolkit_name=tool.get('toolkit_name', '')
     ).get_tools()
-                
 
 class BrowserToolkit(BaseToolkit):
     tools: List[BaseTool] = []
@@ -39,12 +38,23 @@ class BrowserToolkit(BaseToolkit):
         }
         BrowserToolkit.toolkit_max_length = get_max_toolkit_length(selected_tools)
 
+        def validate_google_fields(cls, values):
+            if 'google' in values.get('selected_tools', []):
+                google_cse_id = values.get('google_cse_id') is not None
+                google_api_key = values.get('google_api_key') is not None
+                if not (google_cse_id and google_api_key):
+                    raise ValueError("google_cse_id and google_api_key are required when 'google' is in selected_tools")
+            return values
+
         return create_model(
             name,
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Browser", "icon_url": None}}),
             google_cse_id=(Optional[str], Field(description="Google CSE id", default=None)),
             google_api_key=(Optional[SecretStr], Field(description="Google API key", default=None, json_schema_extra={'secret': True})),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
+            __validators__={
+                "validate_google_fields": model_validator(mode='before')(validate_google_fields)
+            }
         )
 
     @classmethod

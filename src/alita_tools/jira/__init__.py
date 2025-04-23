@@ -32,11 +32,21 @@ class JiraToolkit(BaseToolkit):
         JiraToolkit.toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name,
-            base_url=(str, Field(description="Jira URL", json_schema_extra={'toolkit_name': True, 'max_toolkit_length': JiraToolkit.toolkit_max_length})),
-            cloud=(bool, Field(description="Hosting Option")),
-            api_key=(Optional[SecretStr], Field(description="API key", default=None, json_schema_extra={'secret': True})),
-            username=(Optional[str], Field(description="Jira Username", default=None)),
-            token=(Optional[SecretStr], Field(description="Jira token", default=None, json_schema_extra={'secret': True})),
+            base_url=(
+                str,
+                Field(
+                    description="Jira URL",
+                    json_schema_extra={
+                        'toolkit_name': True,
+                        'max_toolkit_length': JiraToolkit.toolkit_max_length,
+                        'configuration': True
+                    }
+                )
+            ),
+            cloud=(bool, Field(description="Hosting Option", json_schema_extra={'configuration': True})),
+            api_key=(Optional[SecretStr], Field(description="API key", default=None, json_schema_extra={'secret': True, 'configuration': True})),
+            username=(Optional[str], Field(description="Jira Username", default=None, json_schema_extra={'configuration': True})),
+            token=(Optional[SecretStr], Field(description="Jira token", default=None, json_schema_extra={'secret': True, 'configuration': True})),
             limit=(int, Field(description="Limit issues", default=5)),
             labels=(Optional[str], Field(
                 description="List of comma separated labels used for labeling of agent's created or updated entities",
