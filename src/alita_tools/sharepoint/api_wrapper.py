@@ -34,7 +34,8 @@ GetFiles = create_model(
 ReadDocument = create_model(
     "ReadDocument",
     path=(str, Field(description="Contains the server-relative path of a document for reading.")),
-    is_capture_image=(Optional[bool], Field(description="Determines is pictures in the document should be recognized.", default=False))
+    is_capture_image=(Optional[bool], Field(description="Determines is pictures in the document should be recognized.", default=False)),
+    page_number=(Optional[int], Field(description="Specifies which page to read. If it is None, then full document will be read.", default=None))
 )
 
 
@@ -124,7 +125,7 @@ class SharepointApiWrapper(BaseToolApiWrapper):
             logging.error(f"Failed to load files from sharepoint: {e}")
             return ToolException("Can not get files. Please, double check folder name and read permissions.")
 
-    def read_file(self, path, is_capture_image: bool = False):
+    def read_file(self, path, is_capture_image: bool = False, page_number: int = None):
         """ Reads file located at the specified server-relative path. """
         try:
             file = self._client.web.get_file_by_server_relative_path(path)
@@ -146,32 +147,50 @@ class SharepointApiWrapper(BaseToolApiWrapper):
         elif file.name.endswith('.pdf'):
             with pymupdf.open(stream=file_content, filetype="pdf") as report:
                 text_content = ''
-                for page in report:
-                    text_content += page.get_text()
-                    images = page.get_images(full=True)
-                    for i, img in enumerate(images):
-                        xref = img[0]
-                        base_image = report.extract_image(xref)
-                        img_bytes = base_image["image"]
-                        text_content += self.describe_image(Image.open(io.BytesIO(img_bytes)).convert("RGB"))
+                if page_number is not None:
+                    page = report.load_page(page_number - 1)
+                    text_content += self.read_pdf_page(report, page, page_number, is_capture_image)
+                else:
+                    for index, page in enumerate(report, start=1):
+                        text_content += self.read_pdf_page(report, page, index, is_capture_image)
                 file_content_str = text_content
         elif file.name.endswith('.pptx'):
             prs = Presentation(io.BytesIO(file_content))
             text_content = ''
-            for slide in prs.slides:
-                for shape in slide.shapes:
-                    if hasattr(shape, "text"):
-                        text_content += shape.text + "\n"
-                    elif is_capture_image and shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
-                        try:
-                            caption = self.describe_image(Image.open(io.BytesIO(shape.image.blob)).convert("RGB"))
-                        except:
-                            caption = "\n[Picture: unknown]\n"
-                        text_content += caption
+            if page_number is not None:
+                text_content += self.read_pptx_slide(prs.slides[page_number - 1], page_number, is_capture_image)
+            else:
+                for index, slide in enumerate(prs.slides, start=1):
+                    text_content += self.read_pptx_slide(slide, index, is_capture_image)
             file_content_str = text_content
         else:
             return ToolException("Not supported type of files entered. Supported types are TXT and DOCX only.")
         return file_content_str
+
+    def read_pdf_page(self, report, page, index, is_capture_images):
+        text_content = f'Page: {index}\n'
+        text_content += page.get_text()
+        if is_capture_images:
+            images = page.get_images(full=True)
+            for i, img in enumerate(images):
+                xref = img[0]
+                base_image = report.extract_image(xref)
+                img_bytes = base_image["image"]
+                text_content += self.describe_image(Image.open(io.BytesIO(img_bytes)).convert("RGB"))
+        return text_content
+
+    def read_pptx_slide(self, slide, index, is_capture_image):
+        text_content = f'Slide: {index}\n'
+        for shape in slide.shapes:
+            if hasattr(shape, "text"):
+                text_content += shape.text + "\n"
+            elif is_capture_image and shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
+                try:
+                    caption = self.describe_image(Image.open(io.BytesIO(shape.image.blob)).convert("RGB"))
+                except:
+                    caption = "\n[Picture: unknown]\n"
+                text_content += caption
+        return text_content
 
     def describe_image(self, image):
         processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
