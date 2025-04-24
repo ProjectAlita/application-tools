@@ -723,7 +723,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                 "author": author if isinstance(author, str) else None,
             }
             # Remove None values from the parameters
-            params = {key: value for key, value in params.items() if value is not None}
+            params = {key: value for key, value in params.items() if value}
 
             # Call the GitHub API to get commits
             commits = self.github_repo_instance.get_commits(**params)
