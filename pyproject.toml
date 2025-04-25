@@ -53,6 +53,7 @@ markers = [
     "azureai: marks Azure AI tests",
     "browser: marks Browser tests",
     "figma: marks Figma tests",
+    "qtest: marks QTest tests",
 ]
 
 [tool.coverage.run]
