@@ -54,6 +54,7 @@ markers = [
     "browser: marks Browser tests",
     "figma: marks Figma tests",
     "qtest: marks QTest tests",
+    "report_portal: marks Report Portal tests",
 ]
 
 [tool.coverage.run]
