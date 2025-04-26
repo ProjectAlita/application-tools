@@ -68,7 +68,7 @@ class AlitaGitHubToolkit(BaseToolkit):
                     },
                 }
             ),
-            base_url=(Optional[str], Field(description="Base API URL", default="https://api.github.com")),
+            base_url=(Optional[str], Field(description="Base API URL", default="https://api.github.com", json_schema_extra={'configuration': True, 'configuration_title': True})),
             app_id=(Optional[str], Field(description="Github APP ID", default=None, json_schema_extra={'configuration': True})),
             app_private_key=(Optional[SecretStr], Field(description="Github APP private key", default=None, json_schema_extra={'secret': True, 'configuration': True})),
 

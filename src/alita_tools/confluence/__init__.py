@@ -37,7 +37,7 @@ class ConfluenceToolkit(BaseToolkit):
         ConfluenceToolkit.toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name,
-            base_url=(str, Field(description="Confluence URL", json_schema_extra={'configuration': True})),
+            base_url=(str, Field(description="Confluence URL", json_schema_extra={'configuration': True, 'configuration_title': True})),
             token=(SecretStr, Field(description="Token", default=None, json_schema_extra={'secret': True, 'configuration': True})),
             api_key=(SecretStr, Field(description="API key", default=None, json_schema_extra={'secret': True, 'configuration': True})),
             username=(str, Field(description="Username", default=None, json_schema_extra={'configuration': True})),

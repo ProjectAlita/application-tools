@@ -36,7 +36,8 @@ class TestrailToolkit(BaseToolkit):
                     json_schema_extra={
                         'toolkit_name': True,
                         "max_length": TestrailToolkit.toolkit_max_length,
-                        "configuration": True
+                        "configuration": True,
+                        "configuration_title": True
                     }
                 )
             ),
