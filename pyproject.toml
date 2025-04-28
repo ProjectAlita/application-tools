@@ -59,6 +59,7 @@ markers = [
     "sharepoint: marks Sharepoint tests",
     "elastic: marks Elastic Search tests",
     "testio: marks TestIO tests",
+    "yagmail: marks YagMail tests",
 ]
 
 [tool.coverage.run]
