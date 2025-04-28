@@ -57,6 +57,7 @@ markers = [
     "report_portal: marks Report Portal tests",
     "salesforce: marks Salesforce tests",
     "sharepoint: marks Sharepoint tests",
+    "elastic: marks Elastic Search tests",
 ]
 
 [tool.coverage.run]
