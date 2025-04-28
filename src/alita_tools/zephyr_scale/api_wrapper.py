@@ -25,7 +25,7 @@ ZephyrGetTestCases = create_model(
 
 ZephyrGetTestCase = create_model(
     "ZephyrGetTestCase",
-    test_case_id=(str, Field(description="Test case ID")),
+    test_case_key=(str, Field(description="Test case key")),
 )
 
 ZephyrCreateTestCase = create_model(
