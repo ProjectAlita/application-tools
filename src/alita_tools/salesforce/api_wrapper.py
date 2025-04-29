@@ -32,7 +32,7 @@ class SalesforceApiWrapper(BaseToolApiWrapper):
         payload = {
             "grant_type": "client_credentials",
             "client_id": self.client_id,
-            "client_secret": self.client_secret
+            "client_secret": self.client_secret.get_secret_value()
         }
 
         response = requests.post(auth_url, data=payload)
