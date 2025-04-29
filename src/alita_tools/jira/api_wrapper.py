@@ -13,6 +13,7 @@ import requests
 
 from ..elitea_base import BaseToolApiWrapper
 from ..utils import is_cookie_token, parse_cookie_string
+from ..llm.llm_utils import get_model, summarize
 
 logger = logging.getLogger(__name__)
 
@@ -104,6 +105,21 @@ GetSpecificFieldInfo = create_model(
     "GetSpecificFieldInfoModel",
     jira_issue_key=(str, Field(description="Jira issue key specific information will be exctracted from in following format, TEST-1234")),
     field_name=(str, Field(description="Field name data from which will be taken. It should be either 'description', 'summary', 'priority' etc or custom field name in following format 'customfield_10300'"))
+)
+
+GetFieldWithImageDescriptions = create_model(
+    "GetFieldWithImageDescriptionsModel",
+    jira_issue_key=(str, Field(description="Jira issue key from which field with images will be extracted, e.g. TEST-1234")),
+    field_name=(str, Field(description="Field name containing images to be processed. Common values are 'description', 'comment', or custom fields like 'customfield_10300'")),
+    prompt=(Optional[str], Field(description="Custom prompt to use for image description generation. If not provided, a default prompt will be used", default=None)),
+    context_radius=(Optional[int], Field(description="Number of characters to include before and after each image for context. Default is 500", default=500))
+)
+
+GetCommentsWithImageDescriptions = create_model(
+    "GetCommentsWithImageDescriptionsModel",
+    jira_issue_key=(str, Field(description="Jira issue key from which comments with images will be extracted, e.g. TEST-1234")),
+    prompt=(Optional[str], Field(description="Custom prompt to use for image description generation. If not provided, a default prompt will be used", default=None)),
+    context_radius=(Optional[int], Field(description="Number of characters to include before and after each image for context. Default is 500", default=500))
 )
 
 GetRemoteLinks = create_model(
@@ -248,7 +264,8 @@ class JiraApiWrapper(BaseToolApiWrapper):
     verify_ssl: Optional[bool] = True
     _client: Jira = PrivateAttr()
     issue_search_pattern: str = r'/rest/api/\d+/search'
-
+    alita: Any = None
+    llm: Any = None
     @model_validator(mode='before')
     @classmethod
     def validate_toolkit(cls, values):
@@ -279,6 +296,8 @@ class JiraApiWrapper(BaseToolApiWrapper):
             cls._client = Jira(url=url, token=token, cloud=cloud, verify_ssl=values['verify_ssl'], api_version=api_version)
         else:
             cls._client = Jira(url=url, username=username, password=api_key, cloud=cloud, verify_ssl=values['verify_ssl'], api_version=api_version)
+        cls.llm=values.get('llm')
+        cls.alita=values.get('alita')
         return values
 
     def _parse_issues(self, issues: Dict) -> List[dict]:
@@ -612,6 +631,449 @@ class JiraApiWrapper(BaseToolApiWrapper):
             content = f"Unable to parse content of '{attachment['filename']}' due to: {str(e)}"
         return f"filename: {attachment['filename']}\ncontent: {content}"
 
+    # Helper functions for image processing
+    def _collect_context_for_image(self, content: str, image_marker: str, context_radius: int = 500) -> str:
+        """
+        Collect text surrounding an image reference to provide context.
+        
+        Args:
+            content: The full content containing image markers
+            image_marker: The specific image marker to find context around
+            context_radius: Number of characters to include before and after the marker
+            
+        Returns:
+            String containing text before and after the image marker
+        """
+        try:
+            # Find the position of the image marker in the content
+            pos = content.find(image_marker)
+            if pos == -1:
+                return ""
+                
+            # Calculate start position (don't go below 0)
+            start = max(0, pos - context_radius)
+            
+            # Calculate end position (don't exceed content length)
+            end = min(len(content), pos + len(image_marker) + context_radius)
+            
+            # Extract context
+            context = content[start:end]
+            
+            # Add ellipsis if we truncated
+            if start > 0:
+                context = "..." + context
+            if end < len(content):
+                context = context + "..."
+                
+            return context
+        except Exception as e:
+            logger.warning(f"Error collecting context for image {image_marker}: {e}")
+            return ""
+    
+    def _get_default_image_analysis_prompt(self) -> str:
+        """
+        Returns the default prompt for image analysis when none is provided.
+        
+        Returns:
+            String containing structured prompt for image analysis
+        """
+        return """
+        ## Image Analysis Task:
+        Analyze this image and describe it in detail, focusing on structural elements and UI components rather than specific content details. 
+        Consider image type and context:
+        ## Image Type: Diagrams (e.g., Sequence Diagram, Context Diagram, Component Diagram)
+        **Prompt**: 
+        "Analyze the given diagram to identify and describe the connections and relationships between components. Provide a detailed flow of interactions, highlighting key elements and their roles within the system architecture. Provide result in functional specification format ready to be used by BA's, Developers and QA's."
+        ## Image Type: Application Screenshots
+        **Prompt**: 
+        "Examine the application screenshot to construct a functional specification. Detail the user experience by identifying and describing all UX components, their functions, and the overall flow of the screen."
+        ## Image Type: Free Form Screenshots (e.g., Text Documents, Excel Sheets)
+        **Prompt**: 
+        "Extract and interpret the text from the screenshot. Establish and describe the relationships between the text and any visible components, providing a comprehensive understanding of the content and context."
+        ## Image Type: Mockup Screenshots
+        **Prompt**: 
+        "Delve into the UX specifics of the mockup screenshot. Offer a detailed description of each component, focusing on design elements, user interactions, and the overall user experience."
+
+        Focus on:
+        1. UI components and their arrangement (buttons, forms, navigation elements, etc.)
+        2. Visual structure and layout patterns
+        3. Functional elements if it's a screenshot or diagram
+        4. General purpose and type of the interface or diagram shown
+        5. Overall context and functionality represented
+
+        ### Instructions and Important guidelines:
+        - Prioritize describing the PURPOSE and FUNCTION of interface elements over their specific content
+        - For media content (like movie/video thumbnails), mention the presence of media elements but DON'T focus on specific titles
+        - For text fields, describe their purpose (e.g., "username field", "search box") rather than the exact text entered
+        - For diagrams, focus on the type of relationship shown rather than specific entity names
+        - Provide a comprehensive description that focuses on HOW the interface works rather than the specific content displayed
+        - Ensure clarity and precision in the analysis for each image type.
+        - Avoid introducing information does not present in the image.
+        - Maintain a structured and logical flow in the output to enhance understanding and usability.
+        - Avoid presenting the entire prompt for user.
+        """
+
+    def _process_image_with_llm(self, image_data, image_name: str = "", context_text: str = "", custom_prompt: str = None):
+        """
+        Process an image with LLM including surrounding context
+        
+        Args:
+            image_data: Binary image data
+            image_name: Name of the image for reference
+            context_text: Surrounding text context
+            custom_prompt: Optional custom prompt for the LLM
+            
+        Returns:
+            Generated description from the LLM
+        """
+        try:
+            from io import BytesIO
+            from PIL import Image
+            from alita_tools.confluence.utils import image_to_byte_array, bytes_to_base64
+            from langchain_core.messages import HumanMessage
+            
+            # Get the LLM instance
+            llm = self.llm
+            if not llm:
+                return "[LLM not available for image processing]"
+            
+            # Load and convert the image
+            image = Image.open(BytesIO(image_data))
+            byte_array = image_to_byte_array(image)
+            base64_string = bytes_to_base64(byte_array)
+            
+            # Use default or custom prompt
+            prompt = custom_prompt if custom_prompt else self._get_default_image_analysis_prompt()
+            
+            # Add context information if available
+            if image_name or context_text:
+                prompt += "\n\n## Additional Context Information:\n"
+                
+                if image_name:
+                    prompt += f"- Image Name/Reference: {image_name}\n"
+                
+                if context_text:
+                    prompt += f"- Surrounding Content: {context_text}\n"
+                    
+                prompt += "\nPlease incorporate this contextual information in your description when relevant."
+            
+            # Perform LLM invocation with image
+            result = llm.invoke([
+                HumanMessage(
+                    content=[
+                        {"type": "text", "text": prompt},
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/png;base64,{base64_string}"},
+                        },
+                    ]
+                )
+            ])
+            
+            return result.content
+        except Exception as e:
+            logger.error(f"Error processing image with LLM: {str(e)}")
+            return f"[Image processing error: {str(e)}]"
+
+    def _download_attachment(self, attachment_url):
+        """
+        Download an attachment from a URL with appropriate authentication
+        
+        Args:
+            attachment_url: URL to the attachment
+            
+        Returns:
+            Binary content of the attachment or None if failed
+        """
+        try:
+            import requests
+            
+            # Handle authentication
+            auth = None
+            headers = None
+            if hasattr(self, 'username') and self.username:
+                if hasattr(self, 'api_key') and self.api_key:
+                    # Using username/API key authentication
+                    auth = (self.username, self.api_key.get_secret_value())
+                elif hasattr(self, 'token') and self.token:
+                    # Using token authentication (for Jira Cloud)
+                    headers = {"Authorization": f"Bearer {self.token.get_secret_value()}"}
+            
+            # Make direct request
+            response = requests.get(
+                attachment_url,
+                auth=auth,
+                headers=headers,
+                verify=self.verify_ssl
+            )
+            
+            if response.status_code == 200:
+                return response.content
+            else:
+                logger.error(f"Failed to download attachment: {response.status_code}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error downloading attachment: {str(e)}")
+            return None
+
+    def get_field_with_image_descriptions(self, jira_issue_key: str, field_name: str, prompt: Optional[str] = None, context_radius: int = 500):
+        """
+        Get a field from Jira issue and augment any images in it with textual descriptions that include
+        image names and contextual information from surrounding text.
+        
+        This method will:
+        1. Extract the specified field content from Jira
+        2. Detect images in the content
+        3. Retrieve and process each image with an LLM, providing surrounding context
+        4. Replace image references with the generated text descriptions
+        
+        Args:
+            jira_issue_key: The Jira issue key to retrieve field from (e.g., 'TEST-1234')
+            field_name: The field containing images (e.g., 'description')
+            prompt: Custom prompt for the LLM when analyzing images. If None, a default prompt will be used.
+            context_radius: Number of characters to include before and after each image for context. Default is 500.
+            
+        Returns:
+            The field content with image references replaced with contextual descriptions
+        """
+        try:
+            # Get the specified field from the Jira issue
+            jira_issue = self._client.issue(jira_issue_key, fields=field_name)
+            field_content = jira_issue.get('fields', {}).get(field_name)
+            
+            if not field_content:
+                existing_fields = [key for key, value in self._client.issue(jira_issue_key).get("fields").items() if value is not None]
+                existing_fields_str = ', '.join(existing_fields)
+                return f"Unable to find field '{field_name}' or it's empty. Available fields are: {existing_fields_str}"
+            
+            # Regular expression to find image references in Jira markup
+            # This pattern looks for both inline images and attachment references
+            image_pattern = r'!([^!|]+)(?:\|[^!]*)?!'
+            
+            # Get all attachments for this issue upfront
+            attachments_list = self._client.issue(jira_issue_key, fields="attachment").get('fields', {}).get('attachment', [])
+            attachments_map = {attachment.get('filename'): attachment for attachment in attachments_list}
+            
+            def process_image_match(match):
+                """Process each image reference and get its contextual description"""
+                image_ref = match.group(1)
+                full_match = match.group(0)  # The complete image reference with markers
+                
+                try:
+                    # Find the attachment info
+                    attachment = None
+                    attachment_id = None
+                    
+                    # Handle various formats of image references
+                    if image_ref.startswith("attachment"):
+                        # !attachment:123456! format
+                        attachment_id = image_ref.split(':')[1].strip()
+                    elif image_ref.isdigit():
+                        # Direct numeric ID format 
+                        attachment_id = image_ref
+                    else:
+                        # Try to find by filename in attachments map
+                        filename = image_ref.split('/')[-1]  # Get just the filename if it's a path
+                        if filename in attachments_map:
+                            attachment = attachments_map[filename]
+                        else:
+                            for attach_filename, attach_data in attachments_map.items():
+                                if image_ref == attach_filename or image_ref.endswith(f"/{attach_filename}"):
+                                    attachment = attach_data
+                                    break
+                    
+                    # If we found attachment by ID, get the attachment data
+                    if attachment_id and not attachment:
+                        attachment = self._client.get_attachment(attachment_id)
+                    
+                    if not attachment:
+                        logger.warning(f"Could not find attachment for reference: {image_ref}")
+                        return f"[Image: {image_ref} - attachment not found]"
+                    
+                    # Get the binary content directly
+                    if hasattr(attachment, 'get') and attachment.get('content'):
+                        content_url = attachment.get('content')
+                        image_name = attachment.get('filename', image_ref)
+                        
+                        # Collect surrounding content
+                        context_text = self._collect_context_for_image(field_content, full_match, context_radius)
+                        
+                        # Download the attachment
+                        image_data = self._download_attachment(content_url)
+                        if not image_data:
+                            return f"[Image: {image_ref} - download failed]"
+                        
+                        # Process the image with LLM, including context
+                        description = self._process_image_with_llm(image_data, image_name, context_text, prompt)
+                        return f"[Image {image_name} Description: {description}]"
+                    else:
+                        logger.error(f"Attachment format not supported: {attachment}")
+                        return f"[Image: {image_ref} - attachment format not supported]"
+                        
+                except Exception as e:
+                    logger.error(f"Error processing image {image_ref}: {str(e)}")
+                    return f"[Image: {image_ref} - Error: {str(e)}]"
+            
+            # Replace each image reference with its description
+            augmented_content = re.sub(image_pattern, process_image_match, field_content)
+            
+            return f"Field '{field_name}' from issue '{jira_issue_key}' with image descriptions:\n\n{augmented_content}"
+            
+        except Exception as e:
+            stacktrace = format_exc()
+            logger.error(f"Error processing field with images: {stacktrace}")
+            return f"Error processing field with images: {str(e)}"
+
+    def get_comments_with_image_descriptions(self, jira_issue_key: str, prompt: Optional[str] = None, context_radius: int = 500):
+        """
+        Get all comments from Jira issue and augment any images in them with textual descriptions.
+        
+        This method will:
+        1. Extract all comments from the specified Jira issue
+        2. Detect images in each comment
+        3. Retrieve and process each image with an LLM, providing surrounding context
+        4. Replace image references with the generated text descriptions
+        
+        Args:
+            jira_issue_key: The Jira issue key to retrieve comments from (e.g., 'TEST-1234')
+            prompt: Custom prompt for the LLM when analyzing images. If None, a default prompt will be used.
+            context_radius: Number of characters to include before and after each image for context. Default is 500.
+            
+        Returns:
+            The comments with image references replaced with contextual descriptions
+        """
+        try:
+            # Retrieve all comments for the issue
+            comments = self._client.issue_get_comments(jira_issue_key)
+            
+            if not comments or not comments.get('comments'):
+                return f"No comments found for issue '{jira_issue_key}'"
+            
+            processed_comments = []
+            
+            # Define a default prompt that emphasizes contextual understanding and includes image name
+            default_prompt = prompt if prompt else """
+            ## Image Analysis Task:
+            Analyze this image in detail, paying special attention to contextual information provided about it. 
+            Focus on:
+            1. Visual elements and their arrangement
+            2. Any text visible in the image
+            3. UI components if it's a screenshot
+            4. Diagrams, charts, or technical illustrations
+            5. The overall context and purpose of the image
+            
+            ## Instructions:
+            - Begin your description by referencing the image name provided
+            - Incorporate the surrounding content in your analysis to provide contextual relevance
+            - Explain how this image relates to the comment being discussed
+            - Provide a comprehensive description that could substitute for the image, ensuring anyone 
+              reading would understand what the image contains without seeing it
+            - Format your response clearly with appropriate paragraph breaks
+            """
+            
+            # Get all attachments for this issue upfront
+            attachments_list = self._client.issue(jira_issue_key, fields="attachment").get('fields', {}).get('attachment', [])
+            attachments_map = {attachment.get('filename'): attachment for attachment in attachments_list}
+            
+            # Regular expression to find image references in Jira markup
+            image_pattern = r'!([^!|]+)(?:\|[^!]*)?!'
+            
+            # Process each comment
+            for comment in comments['comments']:
+                comment_body = comment.get('body', '')
+                if not comment_body:
+                    continue
+                    
+                comment_author = comment.get('author', {}).get('displayName', 'Unknown')
+                comment_created = comment.get('created', 'Unknown date')
+                
+                # Function to process images in comment text
+                def process_image_match(match):
+                    """Process each image reference and get its contextual description"""
+                    image_ref = match.group(1)
+                    full_match = match.group(0)  # The complete image reference with markers
+                    
+                    try:
+                        # Find the attachment info
+                        attachment = None
+                        attachment_id = None
+                        
+                        # Handle various formats of image references
+                        if image_ref.startswith("attachment"):
+                            # !attachment:123456! format
+                            attachment_id = image_ref.split(':')[1].strip()
+                        elif image_ref.isdigit():
+                            # Direct numeric ID format
+                            attachment_id = image_ref
+                        else:
+                            # Try to find by filename in attachments map
+                            filename = image_ref.split('/')[-1]  # Get just the filename if it's a path
+                            if filename in attachments_map:
+                                attachment = attachments_map[filename]
+                            else:
+                                for attach_filename, attach_data in attachments_map.items():
+                                    if image_ref == attach_filename or image_ref.endswith(f"/{attach_filename}"):
+                                        attachment = attach_data
+                                        break
+                        
+                        # If we found attachment by ID, get the attachment data
+                        if attachment_id and not attachment:
+                            attachment = self._client.get_attachment(attachment_id)
+                        
+                        if not attachment:
+                            logger.warning(f"Could not find attachment for reference: {image_ref}")
+                            return f"[Image: {image_ref} - attachment not found]"
+                        
+                        # Get the binary content directly
+                        if hasattr(attachment, 'get') and attachment.get('content'):
+                            content_url = attachment.get('content')
+                            image_name = attachment.get('filename', image_ref)
+                            
+                            # Collect surrounding content
+                            context_text = self._collect_context_for_image(comment_body, full_match, context_radius)
+                            
+                            # Download the attachment
+                            image_data = self._download_attachment(content_url)
+                            if not image_data:
+                                return f"[Image: {image_ref} - download failed]"
+                            
+                            # Process the image with LLM, including context
+                            description = self._process_image_with_llm(image_data, image_name, context_text, prompt)
+                            return f"[Image {image_name} Description: {description}]"
+                        else:
+                            logger.error(f"Attachment format not supported: {attachment}")
+                            return f"[Image: {image_ref} - attachment format not supported]"
+                        
+                    except Exception as e:
+                        logger.error(f"Error retrieving attachment {image_ref}: {str(e)}")
+                        return f"[Image: {image_ref} - Error: {str(e)}]"
+                
+                # Process the comment body by replacing image references with descriptions
+                processed_body = re.sub(image_pattern, process_image_match, comment_body)
+                
+                # Add the processed comment to our results
+                processed_comments.append({
+                    "author": comment_author,
+                    "created": comment_created,
+                    "id": comment.get('id'),
+                    "original_content": comment_body,
+                    "processed_content": processed_body
+                })
+            
+            # Format the output
+            result = f"Comments from issue '{jira_issue_key}' with image descriptions:\n\n"
+            for idx, comment in enumerate(processed_comments, 1):
+                result += f"Comment #{idx} by {comment['author']} on {comment['created']}:\n"
+                result += f"{comment['processed_content']}\n\n"
+                
+            return result
+            
+        except Exception as e:
+            stacktrace = format_exc()
+            logger.error(f"Error processing comments with images: {stacktrace}")
+            return f"Error processing comments with images: {str(e)}"
+
     def get_available_tools(self):
         return [
             {
@@ -667,28 +1129,36 @@ class JiraApiWrapper(BaseToolApiWrapper):
                 "description": self.get_specific_field_info.__doc__,
                 "args_schema": GetSpecificFieldInfo,
                 "ref": self.get_specific_field_info,
-
+            },
+            {
+                "name": "get_field_with_image_descriptions",
+                "description": self.get_field_with_image_descriptions.__doc__,
+                "args_schema": GetFieldWithImageDescriptions,
+                "ref": self.get_field_with_image_descriptions,
+            },
+            {
+                "name": "get_comments_with_image_descriptions",
+                "description": self.get_comments_with_image_descriptions.__doc__,
+                "args_schema": GetCommentsWithImageDescriptions,
+                "ref": self.get_comments_with_image_descriptions,
             },
             {
                 "name": "get_remote_links",
                 "description": self.get_remote_links.__doc__,
                 "args_schema": GetRemoteLinks,
                 "ref": self.get_remote_links,
-
             },
             {
                 "name": "link_issues",
                 "description": self.link_issues.__doc__,
                 "args_schema": LinkIssues,
                 "ref": self.link_issues,
-
             },
             {
                 "name": "get_attachments_content",
                 "description": self.get_attachments_content.__doc__,
                 "args_schema": GetRemoteLinks,
                 "ref": self.get_attachments_content,
-
             },
             {
                 "name": "execute_generic_rq",
