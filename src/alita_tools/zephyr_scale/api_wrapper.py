@@ -257,11 +257,12 @@ class ZephyrScaleApiWrapper(BaseToolApiWrapper):
 
     def create_test_case(self, project_key: str, test_case_name: str, additional_fields: str) -> str:
         """Creates a test case. Fields priorityName and statusName will be set to default values if not informed.
-        
         Args:
             project_key: Jira project key
             test_case_name: Test case name
             additional_fields: JSON string containing additional optional fields
+        
+        NOTE: Please note that if the user specifies a folder name, it is necessary to execute the get_folders() function first to find the correct mapping
         """
 
         try:
@@ -365,6 +366,7 @@ class ZephyrScaleApiWrapper(BaseToolApiWrapper):
         Args:
             test_case_key: The key of the test case
             issue_id: The ID of the Jira issue to link
+        NOTE: The issue ID should be a valid Jira issue ID. If JIRA issue key is provided instead, it's requrid to get issue id first either by asking user or by using JIRA tooking (if avialable).
         """
         
         try:
