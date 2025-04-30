@@ -2,9 +2,11 @@ import json
 import logging
 import re
 import traceback
+import hashlib
 from json import JSONDecodeError
 from traceback import format_exc
 from typing import List, Optional, Any, Dict
+import os
 
 from atlassian import Jira
 from langchain_core.tools import ToolException
@@ -16,7 +18,6 @@ from ..utils import is_cookie_token, parse_cookie_string
 from ..llm.llm_utils import get_model, summarize
 
 logger = logging.getLogger(__name__)
-
 
 NoInput = create_model(
     "NoInput"
@@ -157,6 +158,187 @@ SUPPORTED_ATTACHMENT_MIME_TYPES = (
     "application/json"
     # Add new supported types
 )
+# Helper class for improved attachment lookup
+class AttachmentResolver:
+    """
+    Helper class to efficiently find and resolve attachment references in Jira content.
+    Centralizes attachment lookup logic to avoid code duplication between methods.
+    """
+    
+    def __init__(self, jira_client, issue_key):
+        self.jira_client = jira_client
+        self.issue_key = issue_key
+        self.by_id = {}
+        self.by_filename = {}
+        self.by_normalized_name = {}
+        self.load_attachments()
+        
+    def load_attachments(self):
+        """Load all attachments for the issue and index them by ID and filename"""
+        # Get attachment IDs from the API
+        try:
+            attachment_ids = self.jira_client.get_attachments_ids_from_issue(issue=self.issue_key)
+            logger.info(f"Found {len(attachment_ids)} attachment IDs for issue {self.issue_key}")
+            
+            # Get full metadata for all attachments
+            for attachment_info in attachment_ids:
+                attachment_id = attachment_info.get('attachment_id')
+                if attachment_id:
+                    # Get detailed attachment metadata
+                    try:
+                        attachment = self.jira_client.get_attachment(attachment_id)
+                        if attachment:
+                            self._index_attachment(attachment, attachment_id)
+                    except Exception as e:
+                        logger.warning(f"Error getting attachment {attachment_id}: {e}")
+        except Exception as e:
+            logger.warning(f"Error getting attachments from ID list: {e}")
+        
+        # Also get attachments directly from fields for completeness (useful for Jira Server)
+        try:
+            attachments_list = self.jira_client.issue(self.issue_key, fields="attachment").get('fields', {}).get('attachment', [])
+            logger.info(f"Found {len(attachments_list)} attachments from issue fields for {self.issue_key}")
+            
+            for attachment in attachments_list:
+                if attachment:
+                    attachment_id = attachment.get('id')
+                    if attachment_id:
+                        self._index_attachment(attachment, attachment_id)
+        except Exception as e:
+            logger.warning(f"Error getting attachments from issue fields: {e}")
+            
+        # Log statistics
+        logger.info(f"Indexed {len(self.by_id)} attachments by ID")
+        logger.info(f"Indexed {len(self.by_filename)} attachments by filename")
+    
+    def _index_attachment(self, attachment, attachment_id=None):
+        """Index an attachment by its ID and filename variations"""
+        # Always use the ID from the attachment if available
+        attachment_id = attachment.get('id', attachment_id)
+        
+        if attachment_id:
+            self.by_id[attachment_id] = attachment
+            
+        filename = attachment.get('filename')
+        if filename:
+            # Store by full filename
+            self.by_filename[filename] = attachment
+            self.by_normalized_name[filename.lower()] = attachment
+            
+            # Also store by filename without extension for JIRA Server references
+            name_without_ext = os.path.splitext(filename)[0]
+            self.by_filename[name_without_ext] = attachment
+            self.by_normalized_name[name_without_ext.lower()] = attachment
+            
+            # For thumbnail references, also store with common formats
+            thumbnail_formats = [
+                f"{filename}|thumbnail",
+                f"{name_without_ext}|thumbnail"
+            ]
+            for thumbnail_format in thumbnail_formats:
+                self.by_filename[thumbnail_format] = attachment
+                self.by_normalized_name[thumbnail_format.lower()] = attachment
+    
+    def find_attachment(self, reference):
+        """
+        Find an attachment using multiple strategies based on the reference format.
+        
+        Args:
+            reference: String reference to an attachment (ID, filename, or path)
+            
+        Returns:
+            The attachment object if found, None otherwise
+        """
+        # Try direct ID match first (most efficient)
+        if reference.isdigit() and reference in self.by_id:
+            logger.info(f"Found attachment by direct ID match: {reference}")
+            return self.by_id[reference]
+        
+        # If it's an attachment:ID format, extract the ID
+        if reference.startswith("attachment"):
+            try:
+                attachment_id = reference.split(':')[1].strip()
+                if attachment_id in self.by_id:
+                    logger.info(f"Found attachment by parsed ID: {attachment_id}")
+                    return self.by_id[attachment_id]
+            except (IndexError, ValueError):
+                pass
+        
+        # Clean the reference for filename matching
+        clean_ref = reference
+        
+        # Remove path if present
+        if '/' in clean_ref:
+            clean_ref = clean_ref.split('/')[-1]
+        
+        # Remove formatting parameters
+        if '|' in clean_ref:
+            clean_ref = clean_ref.split('|')[0]
+        
+        # Try exact filename match
+        if clean_ref in self.by_filename:
+            logger.info(f"Found attachment by exact filename match: {clean_ref}")
+            return self.by_filename[clean_ref]
+        
+        # Try case-insensitive match as filenames might have different casing
+        for attach_filename, attach_data in self.by_filename.items():
+            if attach_filename.lower() == clean_ref.lower():
+                logger.info(f"Found case-insensitive attachment match: {attach_filename} for {clean_ref}")
+                return attach_data
+            
+        # If still not found, try partial match with filenames that end with our target
+        for attach_filename, attach_data in self.by_filename.items():
+            if attach_filename.endswith(clean_ref):
+                logger.info(f"Found partial match: {attach_filename} contains {clean_ref}")
+                return attach_data
+        
+        logger.warning(f"Attachment {reference} not found")
+        return None
+
+
+# Simple cache for image descriptions to avoid redundant processing
+class ImageDescriptionCache:
+    """Cache for image descriptions to avoid processing the same image multiple times"""
+    
+    def __init__(self, max_size=50):
+        self.cache = {}  # content_hash -> description
+        self.max_size = max_size
+        
+    def get(self, image_data, image_name=""):
+        """Get a cached description if available"""
+        if not image_data:
+            return None
+            
+        # Generate a content hash for the image
+        content_hash = hashlib.md5(image_data).hexdigest()
+        
+        # Create a composite key that includes the image name when available
+        cache_key = f"{content_hash}_{image_name}" if image_name else content_hash
+        
+        return self.cache.get(cache_key)
+    
+    def set(self, image_data, description, image_name=""):
+        """Cache a description for an image"""
+        if not image_data or not description:
+            return
+            
+        # Generate content hash
+        content_hash = hashlib.md5(image_data).hexdigest()
+        
+        # Create a composite key that includes the image name when available
+        cache_key = f"{content_hash}_{image_name}" if image_name else content_hash
+        
+        # Only cache if we have room or if evicting one entry is enough
+        if len(self.cache) < self.max_size:
+            self.cache[cache_key] = description
+        else:
+            # Simple LRU: just remove a random entry if we're at capacity
+            # In a real implementation, we'd use an OrderedDict or proper LRU
+            if len(self.cache) >= self.max_size:
+                # Remove one entry to make room
+                self.cache.pop(next(iter(self.cache)))
+                self.cache[cache_key] = description
+
 
 def clean_json_string(json_string):
     """
@@ -263,6 +445,7 @@ class JiraApiWrapper(BaseToolApiWrapper):
     additional_fields: list[str] | str | None = []
     verify_ssl: Optional[bool] = True
     _client: Jira = PrivateAttr()
+    _image_cache: ImageDescriptionCache = PrivateAttr(default_factory=lambda: ImageDescriptionCache(max_size=50))
     issue_search_pattern: str = r'/rest/api/\d+/search'
     alita: Any = None
     llm: Any = None
@@ -726,9 +909,15 @@ class JiraApiWrapper(BaseToolApiWrapper):
         Returns:
             Generated description from the LLM
         """
+        # Check cache first to avoid redundant processing
+        cached_description = self._image_cache.get(image_data, image_name)
+        if cached_description:
+            logger.info(f"Using cached description for image: {image_name}")
+            return cached_description
+            
         try:
             from io import BytesIO
-            from PIL import Image
+            from PIL import Image, UnidentifiedImageError
             from alita_tools.confluence.utils import image_to_byte_array, bytes_to_base64
             from langchain_core.messages import HumanMessage
             
@@ -737,10 +926,28 @@ class JiraApiWrapper(BaseToolApiWrapper):
             if not llm:
                 return "[LLM not available for image processing]"
             
-            # Load and convert the image
-            image = Image.open(BytesIO(image_data))
-            byte_array = image_to_byte_array(image)
-            base64_string = bytes_to_base64(byte_array)
+            # Try to load and validate the image with PIL instead of using imghdr
+            try:
+                bio = BytesIO(image_data)
+                bio.seek(0)
+                image = Image.open(bio)
+                # Force load the image to validate it
+                image.load()
+                # Get format directly from PIL
+                image_format = image.format.lower() if image.format else "png"
+            except UnidentifiedImageError:
+                logger.warning(f"PIL cannot identify the image format for {image_name}")
+                return f"[Could not identify image format for {image_name}]"
+            except Exception as img_error:
+                logger.warning(f"Error loading image {image_name}: {str(img_error)}")
+                return f"[Error loading image {image_name}: {str(img_error)}]"
+            
+            try:
+                byte_array = image_to_byte_array(image)
+                base64_string = bytes_to_base64(byte_array)
+            except Exception as conv_error:
+                logger.warning(f"Error converting image {image_name}: {str(conv_error)}")
+                return f"[Error converting image {image_name}: {str(conv_error)}]"
             
             # Use default or custom prompt
             prompt = custom_prompt if custom_prompt else self._get_default_image_analysis_prompt()
@@ -764,13 +971,18 @@ class JiraApiWrapper(BaseToolApiWrapper):
                         {"type": "text", "text": prompt},
                         {
                             "type": "image_url",
-                            "image_url": {"url": f"data:image/png;base64,{base64_string}"},
+                            "image_url": {"url": f"data:image/{image_format};base64,{base64_string}"},
                         },
                     ]
                 )
             ])
             
-            return result.content
+            description = result.content
+            
+            # Cache the result for future use
+            self._image_cache.set(image_data, description, image_name)
+            
+            return description
         except Exception as e:
             logger.error(f"Error processing image with LLM: {str(e)}")
             return f"[Image processing error: {str(e)}]"
@@ -787,30 +999,98 @@ class JiraApiWrapper(BaseToolApiWrapper):
         """
         try:
             import requests
+            import base64
+            from bs4 import BeautifulSoup
             
             # Handle authentication
             auth = None
-            headers = None
+            headers = {}
+            cookies = {}
+            
+            # Use appropriate authentication method based on available credentials
             if hasattr(self, 'username') and self.username:
                 if hasattr(self, 'api_key') and self.api_key:
                     # Using username/API key authentication
                     auth = (self.username, self.api_key.get_secret_value())
-                elif hasattr(self, 'token') and self.token:
-                    # Using token authentication (for Jira Cloud)
-                    headers = {"Authorization": f"Bearer {self.token.get_secret_value()}"}
+                    logger.info(f"Using basic auth with username: {self.username}")
             
-            # Make direct request
-            response = requests.get(
+            if hasattr(self, 'token') and self.token:
+                token_value = self.token.get_secret_value()
+                # Check if it's a cookie-based token
+                if is_cookie_token(token_value):
+                    # Parse cookies and add them to the request
+                    cookies = parse_cookie_string(token_value)
+                    logger.info(f"Using cookie-based authentication with {len(cookies)} cookies")
+                else:
+                    # Using token authentication (for Jira Cloud)
+                    headers["Authorization"] = f"Bearer {token_value}"
+                    logger.info("Using Bearer token authentication")
+            
+            # Make direct request with session to handle cookies and redirects
+            session = requests.Session()
+            session.cookies.update(cookies)
+            
+            # Set user-agent to avoid being blocked
+            headers["User-Agent"] = "Mozilla/5.0 (compatible; JiraAPI/1.0; Python)"
+            
+            # Allow redirects and increase timeout
+            response = session.get(
                 attachment_url,
                 auth=auth,
                 headers=headers,
-                verify=self.verify_ssl
+                verify=self.verify_ssl,
+                allow_redirects=True,
+                timeout=30
             )
             
+            # Check if we got a successful response
             if response.status_code == 200:
-                return response.content
+                content = response.content
+                content_type = response.headers.get('Content-Type', '')
+                logger.info(f"Attachment content type: {content_type}")
+                
+                # Check for HTML content which likely indicates an error or login page
+                if 'text/html' in content_type.lower():
+                    # Try to extract error message from HTML
+                    try:
+                        soup = BeautifulSoup(content, 'html.parser')
+                        title = soup.title.string if soup.title else "Unknown error"
+                        # Check if it's a login page
+                        if 'log' in title.lower() or 'sign' in title.lower() or 'auth' in title.lower():
+                            logger.error(f"Authentication error: Received login page instead of attachment. Title: {title}")
+                            return None
+                        else:
+                            logger.error(f"Received HTML instead of image. Page title: {title}")
+                            # Log a snippet of the HTML for debugging
+                            html_preview = content.decode('utf-8', errors='replace')[:500]
+                            logger.debug(f"HTML preview: {html_preview}")
+                            return None
+                    except Exception as html_err:
+                        logger.error(f"Received HTML instead of attachment and couldn't parse: {html_err}")
+                        return None
+                
+                # Basic validation of image data
+                if len(content) < 100:  # Too small to be a valid image
+                    logger.warning(f"Downloaded data is too small to be a valid image: {len(content)} bytes")
+                    # Show hex of first few bytes to help diagnose
+                    hex_preview = ' '.join([f'{b:02x}' for b in content[:16]])
+                    logger.warning(f"Data preview (hex): {hex_preview}")
+                    if len(content) < 50:
+                        # If it's text data, log it
+                        try:
+                            text_content = content.decode('utf-8', errors='replace')
+                            logger.warning(f"Content appears to be text: {text_content}")
+                        except Exception:
+                            pass
+                    return None
+                
+                return content
             else:
-                logger.error(f"Failed to download attachment: {response.status_code}")
+                logger.error(f"Failed to download attachment: HTTP {response.status_code} - {response.reason}")
+                try:
+                    logger.error(f"Response body: {response.text[:500]}")
+                except Exception:
+                    pass
                 return None
                 
         except Exception as e:
@@ -848,68 +1128,48 @@ class JiraApiWrapper(BaseToolApiWrapper):
                 return f"Unable to find field '{field_name}' or it's empty. Available fields are: {existing_fields_str}"
             
             # Regular expression to find image references in Jira markup
-            # This pattern looks for both inline images and attachment references
             image_pattern = r'!([^!|]+)(?:\|[^!]*)?!'
             
-            # Get all attachments for this issue upfront
-            attachments_list = self._client.issue(jira_issue_key, fields="attachment").get('fields', {}).get('attachment', [])
-            attachments_map = {attachment.get('filename'): attachment for attachment in attachments_list}
+            # Create an AttachmentResolver to efficiently handle attachment lookups
+            attachment_resolver = AttachmentResolver(self._client, jira_issue_key)
             
             def process_image_match(match):
                 """Process each image reference and get its contextual description"""
                 image_ref = match.group(1)
                 full_match = match.group(0)  # The complete image reference with markers
                 
+                logger.info(f"Processing image reference: {image_ref} (full match: {full_match})")
+                
                 try:
-                    # Find the attachment info
-                    attachment = None
-                    attachment_id = None
-                    
-                    # Handle various formats of image references
-                    if image_ref.startswith("attachment"):
-                        # !attachment:123456! format
-                        attachment_id = image_ref.split(':')[1].strip()
-                    elif image_ref.isdigit():
-                        # Direct numeric ID format 
-                        attachment_id = image_ref
-                    else:
-                        # Try to find by filename in attachments map
-                        filename = image_ref.split('/')[-1]  # Get just the filename if it's a path
-                        if filename in attachments_map:
-                            attachment = attachments_map[filename]
-                        else:
-                            for attach_filename, attach_data in attachments_map.items():
-                                if image_ref == attach_filename or image_ref.endswith(f"/{attach_filename}"):
-                                    attachment = attach_data
-                                    break
-                    
-                    # If we found attachment by ID, get the attachment data
-                    if attachment_id and not attachment:
-                        attachment = self._client.get_attachment(attachment_id)
+                    # Use the AttachmentResolver to find the attachment
+                    attachment = attachment_resolver.find_attachment(image_ref)
                     
                     if not attachment:
                         logger.warning(f"Could not find attachment for reference: {image_ref}")
                         return f"[Image: {image_ref} - attachment not found]"
                     
-                    # Get the binary content directly
-                    if hasattr(attachment, 'get') and attachment.get('content'):
-                        content_url = attachment.get('content')
-                        image_name = attachment.get('filename', image_ref)
-                        
-                        # Collect surrounding content
-                        context_text = self._collect_context_for_image(field_content, full_match, context_radius)
-                        
-                        # Download the attachment
-                        image_data = self._download_attachment(content_url)
-                        if not image_data:
-                            return f"[Image: {image_ref} - download failed]"
-                        
-                        # Process the image with LLM, including context
-                        description = self._process_image_with_llm(image_data, image_name, context_text, prompt)
-                        return f"[Image {image_name} Description: {description}]"
-                    else:
-                        logger.error(f"Attachment format not supported: {attachment}")
-                        return f"[Image: {image_ref} - attachment format not supported]"
+                    # Get the content URL and download the image
+                    content_url = attachment.get('content')
+                    if not content_url:
+                        logger.error(f"No content URL found in attachment: {attachment}")
+                        return f"[Image: {image_ref} - no content URL]"
+                    
+                    image_name = attachment.get('filename', image_ref)
+                    
+                    # Collect surrounding content
+                    context_text = self._collect_context_for_image(field_content, full_match, context_radius)
+                    
+                    # Download the image data
+                    logger.info(f"Downloading image from URL: {content_url}")
+                    image_data = self._download_attachment(content_url)
+                    
+                    if not image_data:
+                        logger.error(f"Failed to download image from URL: {content_url}")
+                        return f"[Image: {image_ref} - download failed]"
+                    
+                    # Process with LLM (will use cache if available)
+                    description = self._process_image_with_llm(image_data, image_name, context_text, prompt)
+                    return f"[Image {image_name} Description: {description}]"
                         
                 except Exception as e:
                     logger.error(f"Error processing image {image_ref}: {str(e)}")
@@ -972,9 +1232,8 @@ class JiraApiWrapper(BaseToolApiWrapper):
             - Format your response clearly with appropriate paragraph breaks
             """
             
-            # Get all attachments for this issue upfront
-            attachments_list = self._client.issue(jira_issue_key, fields="attachment").get('fields', {}).get('attachment', [])
-            attachments_map = {attachment.get('filename'): attachment for attachment in attachments_list}
+            # Create an AttachmentResolver to efficiently handle attachment lookups
+            attachment_resolver = AttachmentResolver(self._client, jira_issue_key)
             
             # Regular expression to find image references in Jira markup
             image_pattern = r'!([^!|]+)(?:\|[^!]*)?!'
@@ -994,56 +1253,38 @@ class JiraApiWrapper(BaseToolApiWrapper):
                     image_ref = match.group(1)
                     full_match = match.group(0)  # The complete image reference with markers
                     
+                    logger.info(f"Processing image reference: {image_ref} (full match: {full_match})")
+                    
                     try:
-                        # Find the attachment info
-                        attachment = None
-                        attachment_id = None
-                        
-                        # Handle various formats of image references
-                        if image_ref.startswith("attachment"):
-                            # !attachment:123456! format
-                            attachment_id = image_ref.split(':')[1].strip()
-                        elif image_ref.isdigit():
-                            # Direct numeric ID format
-                            attachment_id = image_ref
-                        else:
-                            # Try to find by filename in attachments map
-                            filename = image_ref.split('/')[-1]  # Get just the filename if it's a path
-                            if filename in attachments_map:
-                                attachment = attachments_map[filename]
-                            else:
-                                for attach_filename, attach_data in attachments_map.items():
-                                    if image_ref == attach_filename or image_ref.endswith(f"/{attach_filename}"):
-                                        attachment = attach_data
-                                        break
-                        
-                        # If we found attachment by ID, get the attachment data
-                        if attachment_id and not attachment:
-                            attachment = self._client.get_attachment(attachment_id)
+                        # Use the AttachmentResolver to find the attachment
+                        attachment = attachment_resolver.find_attachment(image_ref)
                         
                         if not attachment:
                             logger.warning(f"Could not find attachment for reference: {image_ref}")
                             return f"[Image: {image_ref} - attachment not found]"
                         
-                        # Get the binary content directly
-                        if hasattr(attachment, 'get') and attachment.get('content'):
-                            content_url = attachment.get('content')
-                            image_name = attachment.get('filename', image_ref)
-                            
-                            # Collect surrounding content
-                            context_text = self._collect_context_for_image(comment_body, full_match, context_radius)
-                            
-                            # Download the attachment
-                            image_data = self._download_attachment(content_url)
-                            if not image_data:
-                                return f"[Image: {image_ref} - download failed]"
-                            
-                            # Process the image with LLM, including context
-                            description = self._process_image_with_llm(image_data, image_name, context_text, prompt)
-                            return f"[Image {image_name} Description: {description}]"
-                        else:
-                            logger.error(f"Attachment format not supported: {attachment}")
-                            return f"[Image: {image_ref} - attachment format not supported]"
+                        # Get the content URL and download the image
+                        content_url = attachment.get('content')
+                        if not content_url:
+                            logger.error(f"No content URL found in attachment: {attachment}")
+                            return f"[Image: {image_ref} - no content URL]"
+                        
+                        image_name = attachment.get('filename', image_ref)
+                        
+                        # Collect surrounding content
+                        context_text = self._collect_context_for_image(comment_body, full_match, context_radius)
+                        
+                        # Download the image data
+                        logger.info(f"Downloading image from URL: {content_url}")
+                        image_data = self._download_attachment(content_url)
+                        
+                        if not image_data:
+                            logger.error(f"Failed to download image from URL: {content_url}")
+                            return f"[Image: {image_ref} - download failed]"
+                        
+                        # Process with LLM (will use cache if available)
+                        description = self._process_image_with_llm(image_data, image_name, context_text, prompt)
+                        return f"[Image {image_name} Description: {description}]"
                         
                     except Exception as e:
                         logger.error(f"Error retrieving attachment {image_ref}: {str(e)}")
