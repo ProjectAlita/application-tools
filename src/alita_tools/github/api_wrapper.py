@@ -452,6 +452,56 @@ UpdateIssueOnProject = create_model(
     ),
 )
 
+ListProjectIssues = create_model(
+    "ListProjectIssues",
+    board_repo=(
+        str,
+        Field(
+            description="The organization and repository for the board (project).",
+            examples=["OrganizationName/repository-name"]
+        ),
+    ),
+    project_number=(
+        int,
+        Field(description="The number of the project to list issues from (visible in project URL).")
+    ),
+    items_count=(
+        Optional[int],
+        Field(
+            default=30,
+            description="Maximum number of items to retrieve. Default is 30."
+        ),
+    ),
+)
+
+SearchProjectIssues = create_model(
+    "SearchProjectIssues",
+    board_repo=(
+        str,
+        Field(
+            description="The organization and repository for the board (project).",
+            examples=["OrganizationName/repository-name"]
+        ),
+    ),
+    project_number=(
+        int,
+        Field(description="The number of the project to search issues in (visible in project URL).")
+    ),
+    search_query=(
+        str,
+        Field(
+            description="Search query for filtering issues. Examples: \"status:In Progress\", \"release:v1.0\", etc."
+        ),
+    ),
+    items_count=(
+        Optional[int],
+        Field(
+            default=100,
+            description="Maximum number of items to retrieve. Default is 30."
+        ),
+    ),
+)
+
 LoaderSchema = create_model(
     "LoaderSchema",
     branch=(Optional[str], Field(
@@ -1672,6 +1722,198 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         except Exception as e:
             return f"An error occurred while getting workflow logs: {str(e)}"
 
+    def list_project_issues(
+            self,
+            board_repo: str,
+            project_number: int,
+            items_count: int = 100
+    ) -> str:
+        """
+        Lists all issues in a GitHub project with their details including status, assignees, and custom fields.
+        
+        This method retrieves a comprehensive view of all issues within a specified project,
+        making it useful for project management and tracking.
+        
+        Args:
+            board_repo (str): The organization and repository for the board (project). 
+                             Example: 'org-name/repo-name'
+            project_number (int): The project number as shown in the project URL.
+            items_count (int, optional): Maximum number of items to retrieve. Defaults to 100.
+            
+        Returns:
+            str: JSON string with project issues data including custom fields and status values.
+            
+        Example:
+            To list all issues in project #1 of the 'octocat/hello-world' repository:
+            ```
+            result = github_api.list_project_issues('octocat/hello-world', 1)
+            ```
+        """
+        try:
+            _graphql_client = self._get_graphql_client()
+            owner_name, repo_name = self._parse_repo(board_repo)
+            
+            result = _graphql_client.list_project_issues(
+                owner=owner_name,
+                repo_name=repo_name,
+                project_number=project_number,
+                items_count=items_count
+            )
+            
+            if isinstance(result, str):  # Error message
+                return result
+                
+            return dumps(result, default=str)
+            
+        except Exception as e:
+            return f"An error occurred while listing project issues: {str(e)}"
+
+    def search_project_issues(
+            self,
+            board_repo: str,
+            project_number: int,
+            search_query: str,
+            items_count: int = 100
+    ) -> str:
+        """
+        Searches for issues in a GitHub project matching specific criteria.
+        
+        This method allows filtering project issues based on any criteria including status values,
+        column position, custom field values, or content.
+        
+        Args:
+            board_repo (str): The organization and repository for the board (project).
+                             Example: 'org-name/repo-name'
+            project_number (int): The project number as shown in the project URL.
+            search_query (str): Search query for filtering issues. Examples:
+                               - "status:In Progress" to find issues in that status
+                               - "release:v1.0" to find issues for a specific release
+                               - "column:Done" to find issues in a specific column
+                               - "assignee:username" to find issues assigned to a specific user
+                               - "label:bug" to find issues with bug label
+                               - "title:Fix" to find issues with "Fix" in the title
+                               - Multiple criteria can be combined: "status:In Progress release:v2.0"
+            items_count (int, optional): Maximum number of items to retrieve. Defaults to 100.
+            
+        Returns:
+            str: JSON string with matching project issues including their metadata.
+            
+        Example:
+            To find all "In Progress" issues for release v1.0:
+            ```
+            result = github_api.search_project_issues('octocat/hello-world', 1, 'status:"In Progress" release:v1.0')
+            ```
+        """
+        try:
+            if not search_query or not isinstance(search_query, str):
+                return "Invalid search query. Please provide a valid search string."
+
+            if not self.validate_search_query(search_query):
+                return "Invalid search query. Please ensure it doesn't contain potentially harmful content."
+                
+            _graphql_client = self._get_graphql_client()
+            owner_name, repo_name = self._parse_repo(board_repo)
+            
+            # First, get all project issues - we'll filter them client-side
+            result = _graphql_client.list_project_issues(
+                owner=owner_name,
+                repo_name=repo_name,
+                project_number=project_number,
+                items_count=items_count
+            )
+            
+            if isinstance(result, str):  # Error message
+                return result
+            
+            # Parse the search query into key-value pairs
+            search_criteria = {}
+            current_query_parts = search_query.split()
+            for part in current_query_parts:
+                if ":" in part:
+                    key, value = part.split(":", 1)
+                    search_criteria[key.lower()] = value.strip('"\'')
+            
+            # Filter the items based on search criteria
+            filtered_items = []
+            for item in result.get('items', []):
+                # Skip non-issue items and draft issues
+                if item.get('contentType') != 'Issue':
+                    continue
+                    
+                match = True
+                
+                # Check title
+                if "title" in search_criteria and search_criteria["title"].lower() not in item.get("title", "").lower():
+                    match = False
+                    
+                # Check status/state
+                if "status" in search_criteria:
+                    status_matched = False
+                    for field_value in item.get('fieldValues', []):
+                        if field_value.get('type') == 'singleSelect' and field_value.get('value', '').lower() == search_criteria["status"].lower():
+                            status_matched = True
+                            break
+                    if not status_matched:
+                        match = False
+                
+                # Check release field
+                if "release" in search_criteria:
+                    release_matched = False
+                    for field_value in item.get('fieldValues', []):
+                        if field_value.get('fieldName', '').lower() == 'release' and field_value.get('value', '').lower() == search_criteria["release"].lower():
+                            release_matched = True
+                            break
+                    if not release_matched:
+                        match = False
+                
+                # Check labels
+                if "label" in search_criteria and "labels" in item:
+                    label_matched = False
+                    for label in item.get('labels', []):
+                        if label.get('name', '').lower() == search_criteria["label"].lower():
+                            label_matched = True
+                            break
+                    if not label_matched:
+                        match = False
+                        
+                # Check assignee
+                if "assignee" in search_criteria and "assignees" in item:
+                    assignee_matched = False
+                    for assignee in item.get('assignees', []):
+                        if assignee.get('login', '').lower() == search_criteria["assignee"].lower():
+                            assignee_matched = True
+                            break
+                    if not assignee_matched:
+                        match = False
+                
+                # Check custom fields
+                for key, value in search_criteria.items():
+                    if key not in ["title", "status", "label", "assignee", "release"]:
+                        field_matched = False
+                        for field_value in item.get('fieldValues', []):
+                            if field_value.get('fieldName', '').lower() == key.lower() and field_value.get('value', '').lower() == value.lower():
+                                field_matched = True
+                                break
+                        if not field_matched:
+                            match = False
+                
+                if match:
+                    filtered_items.append(item)
+            
+            # Create filtered result
+            filtered_result = {
+                "id": result.get('id'),
+                "title": result.get('title'),
+                "url": result.get('url'),
+                "fields": result.get('fields', []),
+                "items": filtered_items
+            }
+                
+            return dumps(filtered_result, default=str)
+            
+        except Exception as e:
+            return f"An error occurred while searching project issues: {str(e)}"
+
     def get_available_tools(self):
         return [
             {
@@ -1855,6 +2097,20 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                 "mode": "get_workflow_logs",
                 "description": self.get_workflow_logs.__doc__,
                 "args_schema": GetWorkflowLogs,
+            },
+            {
+                "ref": self.list_project_issues,
+                "name": "list_project_issues",
+                "mode": "list_project_issues",
+                "description": self.list_project_issues.__doc__,
+                "args_schema": ListProjectIssues,
+            },
+            {
+                "ref": self.search_project_issues,
+                "name": "search_project_issues",
+                "mode": "search_project_issues",
+                "description": self.search_project_issues.__doc__,
+                "args_schema": SearchProjectIssues,
             }
         ]
 
