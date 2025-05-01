@@ -149,7 +149,8 @@ def parse_payload_params(params: Optional[str]) -> Dict[str, Any]:
     return {}
 
 class ConfluenceAPIWrapper(BaseToolApiWrapper):
-    _client: Any = PrivateAttr()
+    # Changed from PrivateAttr to Optional field with exclude=True
+    _client: Optional[Any] = Field(default=None, exclude=True)
     base_url: str
     api_key: Optional[SecretStr] = None,
     username: Optional[str] = None

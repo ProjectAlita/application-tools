@@ -1,5 +1,6 @@
 from typing import Optional, Dict, Any
-from pydantic import BaseModel, model_validator, create_model, Field, PrivateAttr
+from pydantic import BaseModel, model_validator, create_model, Field
+
 import requests
 import json
 
@@ -11,7 +12,8 @@ class KeycloakApiWrapper(BaseToolApiWrapper):
     realm: str
     client_id: str
     client_secret: str
-    _client: Optional[requests.Session] = PrivateAttr()
+    # Changed from PrivateAttr to Optional field with exclude=True
+    _client: Optional[requests.Session] = Field(default=None, exclude=True)
 
     @model_validator(mode='before')
     @classmethod
