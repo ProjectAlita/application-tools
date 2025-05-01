@@ -1861,6 +1861,6 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
     def run(self, name: str, *args: Any, **kwargs: Any):
         for tool in self.get_available_tools():
             if tool["name"] == name:
-                return tool["ref"](*args, kwargs)
+                return tool["ref"](*args, **kwargs)
         else:
             raise ValueError(f"Unknown mode: {name}")
