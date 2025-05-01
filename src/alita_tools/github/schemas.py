@@ -35,46 +35,54 @@ DirectoryPath = create_model(
 
 ReadFile = create_model(
     "ReadFile",
-    file_path=(str, Field(description="The path to the file to read, e.g. `src/main.py`"))
+    file_path=(str, Field(description="The path to the file to read, e.g. `src/main.py`")),
+    repo_name=(Optional[str], Field(default=None, description="Name of the repository (e.g., 'owner/repo'). If None, uses the default repository."))
 )
 
 UpdateFile = create_model(
     "UpdateFile",
-    file_query=(str, Field(description="File path and content to update with OLD and NEW markers"))
+    file_query=(str, Field(description="File path and content to update with OLD and NEW markers")),
+    repo_name=(Optional[str], Field(default=None, description="Name of the repository (e.g., 'owner/repo'). If None, uses the default repository."))
 )
 
 CreateFile = create_model(
     "CreateFile",
     file_path=(str, Field(description="The path of the file to create, e.g. `src/new_file.py`")),
-    file_contents=(str, Field(description="The contents to write to the file"))
+    file_contents=(str, Field(description="The contents to write to the file")),
+    repo_name=(Optional[str], Field(default=None, description="Name of the repository (e.g., 'owner/repo'). If None, uses the default repository."))
 )
 
 DeleteFile = create_model(
     "DeleteFile",
-    file_path=(str, Field(description="The path of the file to delete, e.g. `src/old_file.py`"))
+    file_path=(str, Field(description="The path of the file to delete, e.g. `src/old_file.py`")),
+    repo_name=(Optional[str], Field(default=None, description="Name of the repository (e.g., 'owner/repo'). If None, uses the default repository."))
 )
 
 GetIssue = create_model(
     "GetIssue",
-    issue_number=(int, Field(description="The issue number as a int, e.g. `42`"))
+    issue_number=(int, Field(description="The issue number as a int, e.g. `42`")),
+    repo_name=(Optional[str], Field(default=None, description="Name of the repository (e.g., 'owner/repo'). If None, uses the default repository."))
 )
 
 GetPR = create_model(
     "GetPR",
-    pr_number=(int, Field(description="The PR number as a int, e.g. `42`"))
+    pr_number=(int, Field(description="The PR number as a int, e.g. `42`")),
+    repo_name=(Optional[str], Field(default=None, description="Name of the repository (e.g., 'owner/repo'). If None, uses the default repository."))
 )
 
 CreatePR = create_model(
     "CreatePR",
     pr_title=(str, Field(description="Title of the pull request")),
     pr_body=(str, Field(description="Body of the pull request")),
-    branch_name=(str, Field(description="The name of the branch, e.g. `feature-branch`"))
+    branch_name=(str, Field(description="The name of the branch, e.g. `feature-branch`")),
+    repo_name=(Optional[str], Field(default=None, description="Name of the repository (e.g., 'owner/repo'). If None, uses the default repository."))
 )
 
 CommentOnIssue = create_model(
     "CommentOnIssue",
     issue_number=(str, Field(description="The issue or PR number as a string, e.g. `42`")),
-    comment_body=(str, Field(description="The comment text to add to the issue or PR"))
+    comment_body=(str, Field(description="The comment text to add to the issue or PR")),
+    repo_name=(Optional[str], Field(default=None, description="Name of the repository (e.g., 'owner/repo'). If None, uses the default repository."))
 )
 
 SearchIssues = create_model(
@@ -134,7 +142,8 @@ UpdateIssueOnProject = create_model(
 
 GetCommits = create_model(
     "GetCommits",
-    sha=(Optional[str], Field(description="The commit SHA to start listing commits from", default=None)),
+    repo_name=(Optional[str], Field(default=None, description="Name of the repository (e.g., 'owner/repo'). If None, uses the default repository.")),
+    sha=(Optional[str], Field(description="The commit SHA or branch name to start listing commits from", default=None)),
     path=(Optional[str], Field(description="The file path to filter commits by", default=None)),
     since=(Optional[str], Field(description="Only commits after this date will be returned (ISO format)", default=None)),
     until=(Optional[str], Field(description="Only commits before this date will be returned (ISO format)", default=None)),
@@ -145,7 +154,8 @@ TriggerWorkflow = create_model(
     "TriggerWorkflow",
     workflow_id=(str, Field(description="The ID or file name of the workflow to trigger (e.g., 'build.yml', '1234567')")),
     ref=(str, Field(description="The branch or tag reference to trigger the workflow on (e.g., 'main', 'v1.0.0')")),
-    inputs=(Optional[Dict[str, Any]], Field(description="Optional inputs for the workflow, as defined in the workflow file", default=None))
+    inputs=(Optional[Dict[str, Any]], Field(description="Optional inputs for the workflow, as defined in the workflow file", default=None)),
+    repo_name=(Optional[str], Field(default=None, description="Name of the repository (e.g., 'owner/repo'). If None, uses the default repository."))
 )
 
 GetWorkflowStatus = create_model(
@@ -191,4 +201,10 @@ GetProjectItemsByView = create_model(
     first=(Optional[int], Field(description="Number of items to fetch", default=100)),
     after=(Optional[str], Field(description="Cursor for pagination", default=None)),
     filter_by=(Optional[Dict[str, Dict[str, str]]], Field(description="Dictionary containing filter parameters. Format: {'field_name': {'value': 'value'}}", default=None))
+)
+
+# Schema for the process_github_query tool
+ProcessGitHubQueryModel = create_model(
+    "ProcessGitHubQueryModel",
+    query=(str, Field(description="Natural language query describing the GitHub task to perform."))
 )
