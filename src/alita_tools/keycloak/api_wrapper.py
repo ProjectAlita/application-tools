@@ -15,6 +15,9 @@ class KeycloakApiWrapper(BaseToolApiWrapper):
     # Changed from PrivateAttr to Optional field with exclude=True
     client: Optional[requests.Session] = Field(default=None, exclude=True)
 
+    class Config:
+        arbitrary_types_allowed = True
+
     @model_validator(mode='before')
     @classmethod
     def validate_toolkit(cls, values):
