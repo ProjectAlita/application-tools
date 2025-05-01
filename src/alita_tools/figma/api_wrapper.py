@@ -263,8 +263,8 @@ class FigmaApiWrapper(BaseToolApiWrapper):
     @model_validator(mode="after")
     @classmethod
     def validate_toolkit(cls, values):
-        token = values.token
-        oauth2 = values.oauth2
+        token = values.token.get_secret_value() if values.token else None
+        oauth2 = values.oauth2.get_secret_value() if values.oauth2 else None
         global_regexp = values.global_regexp
 
         if global_regexp is None:
