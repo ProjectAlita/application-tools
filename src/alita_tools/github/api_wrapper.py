@@ -1814,18 +1814,102 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             _graphql_client = self._get_graphql_client()
             owner_name, repo_name = self._parse_repo(board_repo)
             
-            result = _graphql_client.search_project_issues(
+            # First, get all project issues - we'll filter them client-side
+            result = _graphql_client.list_project_issues(
                 owner=owner_name,
                 repo_name=repo_name,
                 project_number=project_number,
-                search_query=search_query,
                 items_count=items_count
             )
             
             if isinstance(result, str):  # Error message
                 return result
+            
+            # Parse the search query into key-value pairs
+            search_criteria = {}
+            current_query_parts = search_query.split()
+            for part in current_query_parts:
+                if ":" in part:
+                    key, value = part.split(":", 1)
+                    search_criteria[key.lower()] = value.strip('"\'')
+            
+            # Filter the items based on search criteria
+            filtered_items = []
+            for item in result.get('items', []):
+                # Skip non-issue items and draft issues
+                if item.get('contentType') != 'Issue':
+                    continue
+                    
+                match = True
                 
-            return dumps(result, default=str)
+                # Check title
+                if "title" in search_criteria and search_criteria["title"].lower() not in item.get("title", "").lower():
+                    match = False
+                    
+                # Check status/state
+                if "status" in search_criteria:
+                    status_matched = False
+                    for field_value in item.get('fieldValues', []):
+                        if field_value.get('type') == 'singleSelect' and field_value.get('value', '').lower() == search_criteria["status"].lower():
+                            status_matched = True
+                            break
+                    if not status_matched:
+                        match = False
+                
+                # Check release field
+                if "release" in search_criteria:
+                    release_matched = False
+                    for field_value in item.get('fieldValues', []):
+                        if field_value.get('fieldName', '').lower() == 'release' and field_value.get('value', '').lower() == search_criteria["release"].lower():
+                            release_matched = True
+                            break
+                    if not release_matched:
+                        match = False
+                
+                # Check labels
+                if "label" in search_criteria and "labels" in item:
+                    label_matched = False
+                    for label in item.get('labels', []):
+                        if label.get('name', '').lower() == search_criteria["label"].lower():
+                            label_matched = True
+                            break
+                    if not label_matched:
+                        match = False
+                        
+                # Check assignee
+                if "assignee" in search_criteria and "assignees" in item:
+                    assignee_matched = False
+                    for assignee in item.get('assignees', []):
+                        if assignee.get('login', '').lower() == search_criteria["assignee"].lower():
+                            assignee_matched = True
+                            break
+                    if not assignee_matched:
+                        match = False
+                
+                # Check custom fields
+                for key, value in search_criteria.items():
+                    if key not in ["title", "status", "label", "assignee", "release"]:
+                        field_matched = False
+                        for field_value in item.get('fieldValues', []):
+                            if field_value.get('fieldName', '').lower() == key.lower() and field_value.get('value', '').lower() == value.lower():
+                                field_matched = True
+                                break
+                        if not field_matched:
+                            match = False
+                
+                if match:
+                    filtered_items.append(item)
+            
+            # Create filtered result
+            filtered_result = {
+                "id": result.get('id'),
+                "title": result.get('title'),
+                "url": result.get('url'),
+                "fields": result.get('fields', []),
+                "items": filtered_items
+            }
+                
+            return dumps(filtered_result, default=str)
             
         except Exception as e:
             return f"An error occurred while searching project issues: {str(e)}"

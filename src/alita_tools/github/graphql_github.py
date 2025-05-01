@@ -191,13 +191,30 @@ class GraphQLTemplates(Enum):
     """)
 
     QUERY_SEARCH_PROJECT_ISSUES = Template("""
-    query SearchProjectIssues($owner: String!, $repo_name: String!, $project_number: Int!, $search_query: String!, $items_count: Int = 100) {
+    query SearchProjectIssues($owner: String!, $repo_name: String!, $project_number: Int!, $items_count: Int = 100) {
         repository(owner: $owner, name: $repo_name) {
             projectV2(number: $project_number) {
                 id
                 title
                 url
-                items(first: $items_count, query: $search_query) {
+                fields(first: 30) {
+                    nodes {
+                        ... on ProjectV2SingleSelectField {
+                            id
+                            name
+                            options {
+                                id
+                                name
+                            }
+                        }
+                        ... on ProjectV2FieldCommon {
+                            id
+                            name
+                            dataType
+                        }
+                    }
+                }
+                items(first: $items_count) {
                     nodes {
                         id
                         fieldValues(first: 30) {
@@ -1059,6 +1076,7 @@ class GraphQLClient:
             "id": project.get('id'),
             "title": project.get('title'),
             "url": project.get('url'),
+            "fields": self._process_project_fields(project.get('fields', {}).get('nodes', [])),
             "items": self._process_project_items(project.get('items', {}).get('nodes', []))
         }
         
