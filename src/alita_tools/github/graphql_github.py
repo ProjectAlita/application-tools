@@ -16,6 +16,10 @@ class GraphQLTemplates(Enum):
 
         QUERY_GET_REPO_INFO_TEMPLATE (Template): Template for a query to get information about repository such as repository ID, labels, assignable users.
         
+        QUERY_LIST_PROJECT_ISSUES (Template): Template for a query to list all issues in a project with their details.
+        
+        QUERY_SEARCH_PROJECT_ISSUES (Template): Template for a query to search for issues in a project by title, status, or any field value.
+        
         MUTATION_CREATE_DRAFT_ISSUE (Template): Template for a mutation to create a draft issue in a specific project.
         
         MUTATION_CONVERT_DRAFT_INTO_ISSUE (Template): Template for a mutation to convert a draft issue to a regular issue in a repository.
@@ -89,6 +93,175 @@ class GraphQLTemplates(Enum):
             id
             labels (first: 100) { nodes { id name } }
             assignableUsers (first: 100) { nodes { id name login } }
+        }
+    }
+    """)
+    
+    QUERY_LIST_PROJECT_ISSUES = Template("""
+    query ProjectIssues($owner: String!, $repo_name: String!, $project_number: Int!, $items_count: Int = 100) {
+        repository(owner: $owner, name: $repo_name) {
+            projectV2(number: $project_number) {
+                id
+                title
+                url
+                fields(first: 30) {
+                    nodes {
+                        ... on ProjectV2SingleSelectField {
+                            id
+                            name
+                            options {
+                                id
+                                name
+                            }
+                        }
+                        ... on ProjectV2FieldCommon {
+                            id
+                            name
+                            dataType
+                        }
+                    }
+                }
+                items(first: $items_count) {
+                    nodes {
+                        id
+                        fieldValues(first: 30) {
+                            nodes {
+                                ... on ProjectV2ItemFieldTextValue {
+                                    field { ... on ProjectV2FieldCommon { name } }
+                                    text
+                                }
+                                ... on ProjectV2ItemFieldDateValue {
+                                    field { ... on ProjectV2FieldCommon { name } }
+                                    date
+                                }
+                                ... on ProjectV2ItemFieldSingleSelectValue {
+                                    field { ... on ProjectV2FieldCommon { name } }
+                                    name
+                                    optionId
+                                }
+                            }
+                        }
+                        content {
+                            ... on Issue {
+                                id
+                                number
+                                title
+                                state
+                                body
+                                url
+                                createdAt
+                                updatedAt
+                                labels(first: 10) {
+                                    nodes {
+                                        id
+                                        name
+                                        color
+                                    }
+                                }
+                                assignees(first: 5) {
+                                    nodes {
+                                        id
+                                        login
+                                        name
+                                    }
+                                }
+                            }
+                            ... on PullRequest {
+                                id
+                                number
+                                title
+                                state
+                                body
+                                url
+                                createdAt
+                                updatedAt
+                            }
+                            ... on DraftIssue {
+                                id
+                                title
+                                body
+                                createdAt
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    """)
+
+    QUERY_SEARCH_PROJECT_ISSUES = Template("""
+    query SearchProjectIssues($owner: String!, $repo_name: String!, $project_number: Int!, $search_query: String!, $items_count: Int = 100) {
+        repository(owner: $owner, name: $repo_name) {
+            projectV2(number: $project_number) {
+                id
+                title
+                url
+                items(first: $items_count, query: $search_query) {
+                    nodes {
+                        id
+                        fieldValues(first: 30) {
+                            nodes {
+                                ... on ProjectV2ItemFieldTextValue {
+                                    field { ... on ProjectV2FieldCommon { name } }
+                                    text
+                                }
+                                ... on ProjectV2ItemFieldDateValue {
+                                    field { ... on ProjectV2FieldCommon { name } }
+                                    date
+                                }
+                                ... on ProjectV2ItemFieldSingleSelectValue {
+                                    field { ... on ProjectV2FieldCommon { name } }
+                                    name
+                                    optionId
+                                }
+                            }
+                        }
+                        content {
+                            ... on Issue {
+                                id
+                                number
+                                title
+                                state
+                                body
+                                url
+                                createdAt
+                                updatedAt
+                                labels(first: 10) {
+                                    nodes {
+                                        id
+                                        name
+                                        color
+                                    }
+                                }
+                                assignees(first: 5) {
+                                    nodes {
+                                        id
+                                        login
+                                        name
+                                    }
+                                }
+                            }
+                            ... on PullRequest {
+                                id
+                                number
+                                title
+                                state
+                                body
+                                url
+                                createdAt
+                                updatedAt
+                            }
+                            ... on DraftIssue {
+                                id
+                                title
+                                body
+                                createdAt
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
     """)
@@ -777,3 +950,232 @@ class GraphQLClient:
         date_iso8601 = date_parsed.replace(tzinfo=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
         return date_iso8601
+
+    def list_project_issues(self, owner: str, repo_name: str, project_number: int, items_count: int = 100) -> Union[Dict[str, Any], str]:
+        """
+        Lists all issues in a GitHub project with their details including custom fields.
+        
+        This method retrieves all issues in a project including their status, assignees,
+        custom fields, and other metadata.
+        
+        Args:
+            owner (str): Repository owner (organization or username).
+            repo_name (str): Repository name.
+            project_number (int): Project number (visible in project URL).
+            items_count (int, optional): Maximum number of items to retrieve. Defaults to 100.
+            
+        Returns:
+            Union[Dict[str, Any], str]: Dictionary with project issues or error message.
+            
+        Example:
+            project_issues = client.list_project_issues(
+                owner="octocat",
+                repo_name="Hello-World",
+                project_number=1
+            )
+        """
+        result = self._run_graphql_query(
+            query=GraphQLTemplates.QUERY_LIST_PROJECT_ISSUES.value.template,
+            variables={
+                "owner": owner,
+                "repo_name": repo_name,
+                "project_number": project_number,
+                "items_count": items_count
+            }
+        )
+        
+        if result['error']:
+            return f"Error occurred while listing project issues: {result['details']}"
+        
+        repository = result.get('data', {}).get('repository')
+        if not repository:
+            return "No repository data found."
+        
+        project = repository.get('projectV2')
+        if not project:
+            return f"No project with number {project_number} found."
+            
+        # Process and format the project data
+        formatted_result = {
+            "id": project.get('id'),
+            "title": project.get('title'),
+            "url": project.get('url'),
+            "fields": self._process_project_fields(project.get('fields', {}).get('nodes', [])),
+            "items": self._process_project_items(project.get('items', {}).get('nodes', []))
+        }
+        
+        return formatted_result
+        
+    def search_project_issues(self, owner: str, repo_name: str, project_number: int, 
+                             search_query: str, items_count: int = 100) -> Union[Dict[str, Any], str]:
+        """
+        Searches for issues in a GitHub project that match the provided query.
+        
+        This method allows searching issues in a project by title, description,
+        status, or any field value. The query uses GitHub's search syntax.
+        
+        Args:
+            owner (str): Repository owner (organization or username).
+            repo_name (str): Repository name.
+            project_number (int): Project number (visible in project URL).
+            search_query (str): Search query string (e.g., "status:todo", "label:bug").
+            items_count (int, optional): Maximum number of items to retrieve. Defaults to 100.
+            
+        Returns:
+            Union[Dict[str, Any], str]: Dictionary with matching issues or error message.
+            
+        Example:
+            matching_issues = client.search_project_issues(
+                owner="octocat",
+                repo_name="Hello-World",
+                project_number=1,
+                search_query="status:todo label:bug"
+            )
+        """
+        result = self._run_graphql_query(
+            query=GraphQLTemplates.QUERY_SEARCH_PROJECT_ISSUES.value.template,
+            variables={
+                "owner": owner,
+                "repo_name": repo_name,
+                "project_number": project_number,
+                "search_query": search_query,
+                "items_count": items_count
+            }
+        )
+        
+        if result['error']:
+            return f"Error occurred while searching project issues: {result['details']}"
+        
+        repository = result.get('data', {}).get('repository')
+        if not repository:
+            return "No repository data found."
+        
+        project = repository.get('projectV2')
+        if not project:
+            return f"No project with number {project_number} found."
+            
+        # Process and format the project data
+        formatted_result = {
+            "id": project.get('id'),
+            "title": project.get('title'),
+            "url": project.get('url'),
+            "items": self._process_project_items(project.get('items', {}).get('nodes', []))
+        }
+        
+        return formatted_result
+    
+    def _process_project_fields(self, fields: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Process and format project field definitions"""
+        formatted_fields = []
+        
+        for field in fields:
+            field_data = {
+                "id": field.get('id'),
+                "name": field.get('name'),
+                "dataType": field.get('dataType')
+            }
+            
+            # Add options for single select fields
+            if field.get('options'):
+                field_data["options"] = [
+                    {"id": option.get('id'), "name": option.get('name')}
+                    for option in field.get('options')
+                ]
+                
+            formatted_fields.append(field_data)
+            
+        return formatted_fields
+    
+    def _process_project_items(self, items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Process and format project items (issues, PRs, draft issues)"""
+        formatted_items = []
+        
+        for item in items:
+            if not item.get('content'):
+                continue
+                
+            content = item.get('content')
+            content_type = 'DraftIssue'
+            
+            # Determine content type based on fields
+            if 'state' in content and 'url' in content:
+                if 'pullRequestUrl' in content:
+                    content_type = 'PullRequest'
+                else:
+                    content_type = 'Issue'
+            
+            item_data = {
+                "id": item.get('id'),
+                "contentId": content.get('id'),
+                "contentType": content_type,
+                "title": content.get('title'),
+                "body": content.get('body'),
+                "createdAt": content.get('createdAt'),
+                "updatedAt": content.get('updatedAt')
+            }
+            
+            # Add issue/PR specific fields
+            if content_type in ['Issue', 'PullRequest']:
+                item_data.update({
+                    "number": content.get('number'),
+                    "state": content.get('state'),
+                    "url": content.get('url')
+                })
+                
+                # Add labels for issues
+                if content_type == 'Issue' and content.get('labels'):
+                    item_data["labels"] = [
+                        {
+                            "id": label.get('id'),
+                            "name": label.get('name'),
+                            "color": label.get('color')
+                        }
+                        for label in content.get('labels', {}).get('nodes', [])
+                    ]
+                    
+                # Add assignees for issues
+                if content_type == 'Issue' and content.get('assignees'):
+                    item_data["assignees"] = [
+                        {
+                            "id": assignee.get('id'),
+                            "login": assignee.get('login'),
+                            "name": assignee.get('name')
+                        }
+                        for assignee in content.get('assignees', {}).get('nodes', [])
+                    ]
+            
+            # Process custom field values
+            field_values = []
+            for field_value in item.get('fieldValues', {}).get('nodes', []):
+                if 'field' not in field_value:
+                    continue
+                    
+                field_name = field_value.get('field', {}).get('name')
+                
+                # Get value based on field value type
+                if 'text' in field_value:
+                    field_values.append({
+                        "fieldName": field_name,
+                        "type": "text",
+                        "value": field_value.get('text')
+                    })
+                elif 'date' in field_value:
+                    field_values.append({
+                        "fieldName": field_name,
+                        "type": "date",
+                        "value": field_value.get('date')
+                    })
+                elif 'name' in field_value and 'optionId' in field_value:
+                    field_values.append({
+                        "fieldName": field_name,
+                        "type": "singleSelect",
+                        "value": field_value.get('name'),
+                        "optionId": field_value.get('optionId')
+                    })
+                    
+            if field_values:
+                item_data["fieldValues"] = field_values
+                
+            formatted_items.append(item_data)
+            
+        return formatted_items
