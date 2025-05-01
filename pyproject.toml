@@ -60,6 +60,7 @@ markers = [
     "elastic: marks Elastic Search tests",
     "testio: marks TestIO tests",
     "yagmail: marks YagMail tests",
+    "carrier: marks Carrier tests",
 ]
 
 [tool.coverage.run]
