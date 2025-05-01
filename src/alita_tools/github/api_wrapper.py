@@ -1084,6 +1084,16 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             str: JSON string containing a list of issues and PRs with their details (id, title, description, status, URL, type)
         """
         try:
+            # Handle case when parameters are passed as a dictionary (from kwargs)
+            if isinstance(search_query, dict):
+                kwargs = search_query
+                search_query = kwargs.get('search_query', '')
+                repo_name = kwargs.get('repo_name', repo_name)
+                max_count = kwargs.get('max_count', max_count)
+
+            if not isinstance(search_query, str):
+                return "Invalid search query. Search query must be a string."
+
             if not self.validate_search_query(search_query):
                 return "Invalid search query. Please ensure it matches expected GitHub search syntax."
 
@@ -1111,7 +1121,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
 
             return dumps(matching_issues)
         except Exception as e:
-            return "An error occurred while searching issues:\n" + str(e)
+            return f"An error occurred while searching issues:\n{str(e)}"
 
     def create_issue(self, title: str, body: Optional[str] = None, repo_name: Optional[str] = None,
                      labels: Optional[List[str]] = None, assignees: Optional[List[str]] = None) -> str:
