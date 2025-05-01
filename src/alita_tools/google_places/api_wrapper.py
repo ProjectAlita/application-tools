@@ -19,7 +19,7 @@ class GooglePlacesAPIWrapper(BaseToolApiWrapper):
     @classmethod
     def validate_toolkit(cls, api_key: Optional[str]) -> Optional[str]:
         if api_key:
-            cls._client = googlemaps.Client(key=api_key)
+            cls._client = googlemaps.Client(key=api_key.get_secret_value())
         return api_key
 
     def places(self, query: str) -> str:

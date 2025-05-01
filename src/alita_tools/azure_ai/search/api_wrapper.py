@@ -43,7 +43,7 @@ class AzureSearchApiWrapper(BaseToolApiWrapper):
     api_version: Optional[str] = None
     openai_api_key: Optional[SecretStr] = None
     model_name: Optional[str] = None
-    
+
 
     @model_validator(mode='before')
     @classmethod
@@ -54,18 +54,18 @@ class AzureSearchApiWrapper(BaseToolApiWrapper):
             raise ValueError("Endpoint is required.")
         if not values.get('index_name'):
             raise ValueError("Index name is required.")
-        
+
         cls._client = SearchClient(
             endpoint=values['endpoint'],
             index_name=values['index_name'],
-            credential=AzureKeyCredential(values['api_key'])
+            credential=AzureKeyCredential(values['api_key'].get_secret_value())
         )
         if values.get('openai_api_key') and values.get('model_name'):
             cls._AzureOpenAIClient = AzureOpenAIEmbeddings(
                 model=values['model_name'],
                 api_version=values['api_version'],
                 azure_endpoint=values['api_base'],
-                api_key=values['openai_api_key'],
+                api_key=values['openai_api_key'].get_secret_value(),
             )
         return values
 

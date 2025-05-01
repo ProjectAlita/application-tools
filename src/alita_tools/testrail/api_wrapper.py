@@ -144,7 +144,8 @@ class TestrailAPIWrapper(BaseToolApiWrapper):
             )
 
         url = values['url']
-        password = values.get('password')
+        # TODO: add handling for empty field password as it is optional
+        password = values.get('password').get_secret_value() if values.get('password') else None
         email = values.get('email')
         cls._client = TestRailAPI(url, email, password)
         return values

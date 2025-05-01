@@ -17,7 +17,7 @@ class GCPApiWrapper(BaseToolApiWrapper):
     @model_validator(mode='before')
     @classmethod
     def validate_toolkit(cls, values):
-        api_key = values.get('api_key')
+        api_key = values.get('api_key').get_secret_value() if values.get('api_key') else None
         if not api_key:
             raise ValueError("API key is required.")
 

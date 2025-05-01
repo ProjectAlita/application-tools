@@ -23,7 +23,7 @@ class AzureApiWrapper(BaseToolApiWrapper):
         subscription_id = values.get('subscription_id')
         tenant_id = values.get('tenant_id')
         client_id = values.get('client_id')
-        client_secret = values.get('client_secret')
+        client_secret = values.get('client_secret').get_secret_value()
         cls._credentials = ClientSecretCredential(tenant_id=tenant_id, client_id=client_id, client_secret=client_secret)
         cls._client = ResourceManagementClient(cls._credentials, subscription_id)
         return values

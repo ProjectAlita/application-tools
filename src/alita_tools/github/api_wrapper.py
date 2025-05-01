@@ -72,12 +72,12 @@ Tool allows to create a new issue in a GitHub repository.
 Optionally you can specify:
 - a detailed description or body of the issue
 - labels for the issue, each separated by a comma. For labels, write `labels:` followed by a comma-separated list of labels.
-- assignees for the issue, each separated by a comma. For assignees, write `assignees:` followed by a comma-separated 
+- assignees for the issue, each separated by a comma. For assignees, write `assignees:` followed by a comma-separated
 list of GitHub usernames.
 
 Ensure that each command (`labels:` and `assignees:`) starts in a new line, if used.
 
-For example, if you would like to create an issue titled "Fix login bug" with a body explaining the problem and tagged with `bug` 
+For example, if you would like to create an issue titled "Fix login bug" with a body explaining the problem and tagged with `bug`
 and `urgent` labels, plus assigned to `user123`, you would pass in the following string:
 
 Fix login bug
@@ -89,7 +89,7 @@ assignees: user123
 """
 
 UPDATE_ISSUE_PROMPT = """
-Tool allows you to update an existing issue in a GitHub repository. **IMPORTANT**: Input MUST follow 
+Tool allows you to update an existing issue in a GitHub repository. **IMPORTANT**: Input MUST follow
 these rules:
 - You must specify the repository name where the issue exists.
 - You must specify the issue ID that you wish to update.
@@ -558,7 +558,7 @@ TriggerWorkflow = create_model(
     workflow_id=(str, Field(description="The ID or file name of the workflow to trigger (e.g., 'build.yml', '1234567')")),
     ref=(str, Field(description="The branch or tag reference to trigger the workflow on (e.g., 'main', 'v1.0.0')")),
     inputs=(Optional[Dict[str, Any]], Field(
-        default=None, 
+        default=None,
         description="Optional inputs for the workflow, as defined in the workflow file",
         example={"environment": "production", "debug": "true"}
     ))
@@ -648,7 +648,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
             with open(github_app_private_key, "r") as f:
                 private_key = f.read()
         else:
-            private_key = github_app_private_key
+            private_key = github_app_private_key.get_secret_value()
 
         try:
             from github import Auth, GithubIntegration, Github
@@ -662,9 +662,9 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         github_base_url = get_from_dict_or_env(
             values, "github_base_url", "GITHUB_BASE_URL", default=DEFAULT_BASE_URL)
         if github_access_token:
-            auth = Auth.Token(github_access_token)
+            auth = Auth.Token(github_access_token.get_secret_value())
         elif github_username and github_password:
-            auth = Auth.Login(github_username, github_password)
+            auth = Auth.Login(github_username, github_password.get_secret_value())
         elif github_app_id and private_key:
             header = "-----BEGIN RSA PRIVATE KEY-----"
             footer = "-----END RSA PRIVATE KEY-----"
@@ -1112,7 +1112,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         # We're mainly checking that the query isn't empty and doesn't contain dangerous characters
         if not query or not query.strip():
             return False
-        
+
         # Check for potentially dangerous inputs (basic validation)
         dangerous_patterns = [
             r'<script', r'javascript:', r'onerror=', r'onclick=',
@@ -1567,7 +1567,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         """
         try:
             repo = self.github_repo_instance
-            
+
             # First try to get the workflow by its filename
             try:
                 workflow = repo.get_workflow(workflow_id)
@@ -1581,7 +1581,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
 
             # Create a workflow dispatch event
             workflow_run = workflow.create_dispatch(ref, inputs or {})
-            
+
             # Return run details
             result = {
                 "success": True,
@@ -1592,32 +1592,32 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                 "ref": ref,
                 "inputs": inputs or {}
             }
-            
+
             return dumps(result)
         except Exception as e:
             return f"An error occurred while triggering workflow: {str(e)}"
-    
+
     def get_workflow_status(self, run_id: str, repo_name: Optional[str] = None) -> str:
         """
         Gets the status and details of a specific GitHub Actions workflow run.
-        
+
         Parameters:
             run_id (str): The ID of the workflow run to get status for
             repo_name (Optional[str]): Name of the repository to get workflow status from
-        
+
         Returns:
             str: A JSON string containing details about the workflow run status
         """
         try:
             repo = self._github.get_repo(repo_name) if repo_name else self.github_repo_instance
-            
+
             # Get the workflow run
             run = repo.get_workflow_run(int(run_id))
-            
+
             # Get additional details about the run jobs
             jobs = list(run.get_jobs())
             job_details = []
-            
+
             for job in jobs:
                 job_details.append({
                     "id": job.id,
@@ -1628,7 +1628,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                     "completed_at": job.completed_at.isoformat() if job.completed_at else None,
                     "url": job.html_url
                 })
-            
+
             # Compile the results
             result = {
                 "id": run.id,
@@ -1644,43 +1644,43 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                 "jobs": job_details,
                 "url": run.html_url
             }
-            
+
             return dumps(result)
         except Exception as e:
             return f"An error occurred while getting workflow status: {str(e)}"
-    
+
     def get_workflow_logs(self, run_id: str, repo_name: Optional[str] = None) -> str:
         """
         Gets the logs from a GitHub Actions workflow run.
-        
+
         Parameters:
             run_id (str): The ID of the workflow run to get logs for
             repo_name (Optional[str]): Name of the repository to get workflow logs from
-        
+
         Returns:
             str: A JSON string containing logs from the workflow run's jobs
         """
         try:
             repo = self._github.get_repo(repo_name) if repo_name else self.github_repo_instance
-            
+
             # Get the workflow run
             run = repo.get_workflow_run(int(run_id))
-            
+
             # Get the run's logs
             try:
                 # First approach: Try to get logs from the API directly if possible
                 log_url = run.logs_url
                 logs_zip = run.get_logs()  # This will give us a bytes object with the ZIP content
-                
+
                 from io import BytesIO
                 import zipfile
-                
+
                 log_contents = {}
                 with zipfile.ZipFile(BytesIO(logs_zip)) as zip_file:
                     for file_name in zip_file.namelist():
                         with zip_file.open(file_name) as log_file:
                             log_contents[file_name] = log_file.read().decode('utf-8', errors='replace')
-                
+
                 # Return the extracted logs
                 return dumps({
                     "run_id": run.id,
@@ -1692,7 +1692,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                 # Fallback approach: Get logs from individual jobs
                 jobs = list(run.get_jobs())
                 job_logs = []
-                
+
                 for job in jobs:
                     job_logs.append({
                         "job_id": job.id,
@@ -1711,7 +1711,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                         ],
                         "logs_url": job.logs_url if hasattr(job, 'logs_url') else "No direct logs URL available"
                     })
-                
+
                 return dumps({
                     "run_id": run.id,
                     "status": run.status,
@@ -1730,19 +1730,19 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
     ) -> str:
         """
         Lists all issues in a GitHub project with their details including status, assignees, and custom fields.
-        
+
         This method retrieves a comprehensive view of all issues within a specified project,
         making it useful for project management and tracking.
-        
+
         Args:
-            board_repo (str): The organization and repository for the board (project). 
+            board_repo (str): The organization and repository for the board (project).
                              Example: 'org-name/repo-name'
             project_number (int): The project number as shown in the project URL.
             items_count (int, optional): Maximum number of items to retrieve. Defaults to 100.
-            
+
         Returns:
             str: JSON string with project issues data including custom fields and status values.
-            
+
         Example:
             To list all issues in project #1 of the 'octocat/hello-world' repository:
             ```
@@ -1752,19 +1752,19 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         try:
             _graphql_client = self._get_graphql_client()
             owner_name, repo_name = self._parse_repo(board_repo)
-            
+
             result = _graphql_client.list_project_issues(
                 owner=owner_name,
                 repo_name=repo_name,
                 project_number=project_number,
                 items_count=items_count
             )
-            
+
             if isinstance(result, str):  # Error message
                 return result
-                
+
             return dumps(result, default=str)
-            
+
         except Exception as e:
             return f"An error occurred while listing project issues: {str(e)}"
 
@@ -1777,10 +1777,10 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
     ) -> str:
         """
         Searches for issues in a GitHub project matching specific criteria.
-        
+
         This method allows filtering project issues based on any criteria including status values,
         column position, custom field values, or content.
-        
+
         Args:
             board_repo (str): The organization and repository for the board (project).
                              Example: 'org-name/repo-name'
@@ -1794,10 +1794,10 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                                - "title:Fix" to find issues with "Fix" in the title
                                - Multiple criteria can be combined: "status:In Progress release:v2.0"
             items_count (int, optional): Maximum number of items to retrieve. Defaults to 100.
-            
+
         Returns:
             str: JSON string with matching project issues including their metadata.
-            
+
         Example:
             To find all "In Progress" issues for release v1.0:
             ```
@@ -1810,10 +1810,10 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
 
             if not self.validate_search_query(search_query):
                 return "Invalid search query. Please ensure it doesn't contain potentially harmful content."
-                
+
             _graphql_client = self._get_graphql_client()
             owner_name, repo_name = self._parse_repo(board_repo)
-            
+
             # First, get all project issues - we'll filter them client-side
             result = _graphql_client.list_project_issues(
                 owner=owner_name,
@@ -1821,10 +1821,10 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                 project_number=project_number,
                 items_count=items_count
             )
-            
+
             if isinstance(result, str):  # Error message
                 return result
-            
+
             # Parse the search query into key-value pairs
             search_criteria = {}
             current_query_parts = search_query.split()
@@ -1832,20 +1832,20 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                 if ":" in part:
                     key, value = part.split(":", 1)
                     search_criteria[key.lower()] = value.strip('"\'')
-            
+
             # Filter the items based on search criteria
             filtered_items = []
             for item in result.get('items', []):
                 # Skip non-issue items and draft issues
                 if item.get('contentType') != 'Issue':
                     continue
-                    
+
                 match = True
-                
+
                 # Check title
                 if "title" in search_criteria and search_criteria["title"].lower() not in item.get("title", "").lower():
                     match = False
-                    
+
                 # Check status/state
                 if "status" in search_criteria:
                     status_matched = False
@@ -1855,7 +1855,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                             break
                     if not status_matched:
                         match = False
-                
+
                 # Check release field
                 if "release" in search_criteria:
                     release_matched = False
@@ -1865,7 +1865,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                             break
                     if not release_matched:
                         match = False
-                
+
                 # Check labels
                 if "label" in search_criteria and "labels" in item:
                     label_matched = False
@@ -1875,7 +1875,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                             break
                     if not label_matched:
                         match = False
-                        
+
                 # Check assignee
                 if "assignee" in search_criteria and "assignees" in item:
                     assignee_matched = False
@@ -1885,7 +1885,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                             break
                     if not assignee_matched:
                         match = False
-                
+
                 # Check custom fields
                 for key, value in search_criteria.items():
                     if key not in ["title", "status", "label", "assignee", "release"]:
@@ -1896,10 +1896,10 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                                 break
                         if not field_matched:
                             match = False
-                
+
                 if match:
                     filtered_items.append(item)
-            
+
             # Create filtered result
             filtered_result = {
                 "id": result.get('id'),
@@ -1908,9 +1908,9 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                 "fields": result.get('fields', []),
                 "items": filtered_items
             }
-                
+
             return dumps(filtered_result, default=str)
-            
+
         except Exception as e:
             return f"An error occurred while searching project issues: {str(e)}"
 

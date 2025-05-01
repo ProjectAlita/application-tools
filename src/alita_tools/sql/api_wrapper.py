@@ -39,7 +39,7 @@ class SQLApiWrapper(BaseToolApiWrapper):
         dialect = values['dialect']
         host = values['host']
         username = values['username']
-        password = values['password']
+        password = values['password'].get_secret_value()
         database_name = values['database_name']
         port = values['port']
 

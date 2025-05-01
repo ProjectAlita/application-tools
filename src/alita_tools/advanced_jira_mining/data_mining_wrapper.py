@@ -143,9 +143,9 @@ class AdvancedJiraMiningWrapper(BaseModel):
             )
         url = values['jira_base_url']
         model_type = values['model_type']
-        api_key = values.get('jira_api_key')
+        api_key = values.get('jira_api_key').get_secret_value()
         username = values.get('jira_username')
-        token = values.get('jira_token')
+        token = values.get('jira_token').get_secret_value()
         is_cloud = values.get('is_jira_cloud')
         if token:
             cls._client = Jira(url=url, token=token, cloud=is_cloud, verify_ssl=values['verify_ssl'])

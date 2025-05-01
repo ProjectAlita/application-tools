@@ -217,7 +217,7 @@ class ReposApiWrapper(BaseCodeToolApiWrapper):
         repository_id = values["repository_id"]
         base_branch = values["base_branch"]
         active_branch = values["active_branch"]
-        credentials = BasicAuthentication("", values["token"])
+        credentials = BasicAuthentication("", values["token"].get_secret_value())
 
         if not organization_url or not project or not repository_id:
             raise ToolException(

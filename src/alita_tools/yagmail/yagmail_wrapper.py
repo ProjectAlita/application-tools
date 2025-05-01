@@ -31,7 +31,7 @@ class YagmailWrapper(BaseModel):
     @classmethod
     def validate_toolkit(cls, values):
         username = values['username']
-        password = values['password']
+        password = values['password'].get_secret_value()
         host = values.get("host")
         values['client'] = yagmail.SMTP(user=username, password=password, host=host)
         return values

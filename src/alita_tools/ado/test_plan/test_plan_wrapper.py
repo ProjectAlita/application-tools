@@ -91,7 +91,7 @@ class TestPlanApiWrapper(BaseToolApiWrapper):
     @model_validator(mode='before')
     def validate_toolkit(cls, values):
         try:
-            credentials = BasicAuthentication('', values['token'])
+            credentials = BasicAuthentication('', values['token'].get_secret_value())
             connection = Connection(base_url=values['organization_url'], creds=credentials)
             cls._client = connection.clients.get_test_plan_client()
         except Exception as e:

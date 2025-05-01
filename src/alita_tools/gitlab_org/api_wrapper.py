@@ -145,7 +145,7 @@ class GitLabWorkspaceAPIWrapper(BaseToolApiWrapper):
             import gitlab
             g = gitlab.Gitlab(
                 url=values['url'],
-                private_token=values['private_token'],
+                private_token=values['private_token'].get_secret_value(),
                 keep_base_url=True,
             )
             g.auth()

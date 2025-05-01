@@ -17,7 +17,7 @@ class KubernetesApiWrapper(BaseToolApiWrapper):
     @classmethod
     def validate_toolkit(cls, values):
         url = values.get('url')
-        token = values.get('token')
+        token = values.get('token').get_secret_value() if values.get('token') else None
         if url and token:
             configuration = client.Configuration()
             configuration.host = url

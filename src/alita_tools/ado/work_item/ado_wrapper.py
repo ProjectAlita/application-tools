@@ -109,7 +109,7 @@ class AzureDevOpsApiWrapper(BaseToolApiWrapper):
         """Validate and set up the Azure DevOps client."""
         try:
             # Set up connection to Azure DevOps using Personal Access Token (PAT)
-            credentials = BasicAuthentication('', values['token'])
+            credentials = BasicAuthentication('', values['token'].get_secret_value())
             connection = Connection(base_url=values['organization_url'], creds=credentials)
 
             # Retrieve the work item tracking client and assign it to the private _client attribute

@@ -23,7 +23,7 @@ class BitbucketAPIWrapper(BaseCodeToolApiWrapper):
     """Wrapper for Bitbucket API."""
 
     _bitbucket: Any = PrivateAttr()
-    _active_branch: Any = PrivateAttr() 
+    _active_branch: Any = PrivateAttr()
     url: str = ''
     project: str = ''
     """The key of the project this repo belongs to"""
@@ -34,7 +34,7 @@ class BitbucketAPIWrapper(BaseCodeToolApiWrapper):
     password: SecretStr = None
     # """User's password or OAuth token required for authentication."""
     branch: Optional[str] = 'main'
-    """The specific branch in the Bitbucket repository where the bot will make 
+    """The specific branch in the Bitbucket repository where the bot will make
         its commits. Defaults to 'main'.
     """
     cloud: Optional[bool] = False
@@ -56,13 +56,13 @@ class BitbucketAPIWrapper(BaseCodeToolApiWrapper):
         cls._bitbucket = BitbucketCloudApi(
             url=values['url'],
             username=values['username'],
-            password=values['password'],
+            password=values['password'].get_secret_value(),
             workspace=values['project'],
             repository=values['repository']
         ) if values['cloud'] else BitbucketServerApi(
             url=values['url'],
             username=values['username'],
-            password=values['password'],
+            password=values['password'].get_secret_value(),
             project=values['project'],
             repository=values['repository']
         )

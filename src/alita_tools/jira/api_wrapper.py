@@ -29,15 +29,15 @@ JiraInput = create_model(
          Required parameter: The relative URI for JIRA REST API V2.
          URI must start with a forward slash and '/rest/api/2/...'.
          Do not include query parameters in the URL, they must be provided separately in 'params'.
-         For search/read operations, you MUST always get "key", "summary", "status", "assignee", "issuetype" and 
+         For search/read operations, you MUST always get "key", "summary", "status", "assignee", "issuetype" and
          set maxResult, until users ask explicitly for more fields.
          """
     )),
     params=(Optional[str], Field(
         default="",
         description="""
-         Optional JSON of parameters to be sent in request body or query params. MUST be string with valid JSON. 
-         For search/read operations, you MUST always get "key", "summary", "status", "assignee", "issuetype" and 
+         Optional JSON of parameters to be sent in request body or query params. MUST be string with valid JSON.
+         For search/read operations, you MUST always get "key", "summary", "status", "assignee", "issuetype" and
          set maxResult, until users ask explicitly for more fields.
          """
     )))
@@ -118,18 +118,18 @@ ListCommentsInput = create_model(
 LinkIssues = create_model(
     "LinkIssuesModel",
     inward_issue_key=(str, Field(description="""The JIRA issue id  of inward issue.
-                                    Example: 
-                                    To link test to another issue ( test 'test' story, story 'is tested by test'). 
+                                    Example:
+                                    To link test to another issue ( test 'test' story, story 'is tested by test').
                                     Use the appropriate issue link type (e.g., "Test", "Relates", "Blocks").
                                     If we use "Test" linktype, the test is inward issue, the story/other issue is outward issue.""")),
-    outward_issue_key=(str, Field(description="""The JIRA issue id  of outward issue. 
-                                    Example: 
-                                    To link test to another issue ( test 'test' story, story 'is tested by test'). 
+    outward_issue_key=(str, Field(description="""The JIRA issue id  of outward issue.
+                                    Example:
+                                    To link test to another issue ( test 'test' story, story 'is tested by test').
                                     Use the appropriate issue link type (e.g., "Test", "Relates", "Blocks").
                                     If we use "Test" linktype, the test is inward issue, the story/other issue is outward issue.""")),
     linktype=(str, Field(description="""Use the appropriate issue link type (e.g., "Test", "Relates", "Blocks").
-                                    Example: 
-                                    To link test to another issue ( test 'test' story, story 'is tested by test'). 
+                                    Example:
+                                    To link test to another issue ( test 'test' story, story 'is tested by test').
                                     Use the appropriate issue link type (e.g., "Test", "Relates", "Blocks").
                                     If we use "Test" linktype, the test is inward issue, the story/other issue is outward issue."""))
 )
@@ -261,9 +261,9 @@ class JiraApiWrapper(BaseToolApiWrapper):
             )
 
         url = values['base_url']
-        api_key = values.get('api_key')
+        api_key = values.get('api_key').get_secret_value() if values.get('api_key') else None
         username = values.get('username')
-        token = values.get('token')
+        token = values.get('token').get_secret_value() if values.get('token') else None
         cloud = values.get('cloud')
         api_version = values.get('api_version', '2')
         additional_fields = values.get('additional_fields')
@@ -371,7 +371,7 @@ class JiraApiWrapper(BaseToolApiWrapper):
         if params.get("fields") is None and params.get("update") is None:
             raise ToolException("""
         Jira fields are provided in a wrong way. It should have at least any of nodes `fields` or `update`
-        For example, to update a task with key XXX-123 with new summary, description and custom field, you would pass in the following STRING dictionary: 
+        For example, to update a task with key XXX-123 with new summary, description and custom field, you would pass in the following STRING dictionary:
         {"key": "issue key", "fields": {"summary": "updated issue", "description": "updated description", "customfield_xxx": "updated custom field"}}
         """)
 

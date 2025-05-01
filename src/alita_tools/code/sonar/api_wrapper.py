@@ -20,7 +20,7 @@ class SonarApiWrapper(BaseToolApiWrapper):
     @classmethod
     def validate_toolkit(cls, values):
         url = values.get('url')
-        sonar_token = values.get('sonar_token')
+        sonar_token = values.get('sonar_token').get_secret_value() if values.get('sonar_token') else None
         sonar_project_name = values.get('sonar_project_name')
         if not url or not sonar_token or not sonar_project_name:
             raise ValueError("SonarQube credentials are not provided properly.")

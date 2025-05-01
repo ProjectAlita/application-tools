@@ -117,7 +117,7 @@ class XrayApiWrapper(BaseToolApiWrapper):
                 "`pip install python_graphql_client`"
             )
         client_id = values['client_id']
-        client_secret = values['client_secret']
+        client_secret = values['client_secret'].get_secret_value()
         # Authenticate to get the token
         values['base_url'] = values.get('base_url', '') or cls._default_base_url
         auth_url = f"{values['base_url']}/api/v1/authenticate"

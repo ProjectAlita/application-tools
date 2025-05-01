@@ -184,9 +184,9 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
             )
 
         url = values['base_url']
-        api_key = values.get('api_key')
+        api_key = values.get('api_key').get_secret_value() if values.get('api_key') else None
         username = values.get('username')
-        token = values.get('token')
+        token = values.get('token').get_secret_value() if values.get('token') else None
         cloud = values.get('cloud')
         if token and is_cookie_token(token):
             session = requests.Session()
@@ -194,8 +194,10 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
             cls._client = Confluence(url=url, session=session, cloud=cloud)
         elif token:
             cls._client = Confluence(url=url, token=token, cloud=cloud)
-        else:
+        elif api_key:
             cls._client = Confluence(url=url,username=username, password=api_key, cloud=cloud)
+        else:
+            raise ToolException("Credentials (api_key/token) are not set or invalid")
         return values
 
     def __unquote_confluence_space(self) -> str | None:
@@ -687,8 +689,8 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
             body = markdownify(response.text, heading_style="ATX")
             return body
         return response.text
-    
-    
+
+
     def paginate_request(self, retrieval_method: Callable, **kwargs: Any) -> List:
         """Paginate the various methods to retrieve groups of pages.
 
@@ -737,7 +739,7 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
                     break
             docs.extend(batch)
         return docs[:max_pages]
-    
+
     def loader(self,
             content_format: str,
             page_ids: Optional[List[str]] = None,
@@ -761,7 +763,7 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
             Generator: A generator that yields content of pages that match specified criteria
         """
         from .loader import AlitaConfluenceLoader
-        
+
         content_formant = content_format.lower() if content_format else 'view'
         mapping = {
             'view': ContentFormat.VIEW,
@@ -771,7 +773,7 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
             'anonymous': ContentFormat.ANONYMOUS_EXPORT_VIEW
         }
         content_format = mapping.get(content_formant, ContentFormat.VIEW)
-        
+
         confluence_loader_params = {
             'url': self.base_url,
             'space_key': self.space,
@@ -792,16 +794,16 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
             'min_retry_seconds': self.min_retry_seconds,
             'max_retry_seconds': self.max_retry_seconds,
             'number_of_retries': self.number_of_retries
-            
+
         }
-        
+
         loader = AlitaConfluenceLoader(self._client, self.llm, bins_with_llm, **confluence_loader_params)
-        
+
         for document in loader._lazy_load(kwargs={}):
             yield document
 
 
-        
+
 
     def get_available_tools(self):
         return [

@@ -23,7 +23,7 @@ class GitLabAPIWrapper(BaseModel):
     private_token: SecretStr = None
     """Personal access token for the GitLab service, used for authentication."""
     branch: Optional[str] = 'main'
-    """The specific branch in the GitLab repository where the bot will make 
+    """The specific branch in the GitLab repository where the bot will make
         its commits. Defaults to 'main'.
     """
 
@@ -41,11 +41,13 @@ class GitLabAPIWrapper(BaseModel):
                 "Please install it with `pip install python-gitlab`"
             )
 
+
+        # TODO: private_token is declared as None, need to add exception handling if it is None
         g = gitlab.Gitlab(
-            url=values['url'],
-            private_token=values['private_token'],
-            keep_base_url=True,
-        )
+                url=values['url'],
+                private_token=values['private_token'].get_secret_value(),
+                keep_base_url=True,
+            )
 
         g.auth()
         cls._repo_instance = g.projects.get(values.get('repository'))
@@ -177,7 +179,7 @@ class GitLabAPIWrapper(BaseModel):
             str: A success or failure message
         """
         if self.branch == branch:
-            return f"""Cannot make a pull request because 
+            return f"""Cannot make a pull request because
             commits are already in the {self.branch} branch"""
         else:
             try:

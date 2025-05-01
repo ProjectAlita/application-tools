@@ -60,8 +60,8 @@ class SharepointApiWrapper(BaseToolApiWrapper):
 
         site_url = values['site_url']
         client_id = values.get('client_id')
-        client_secret = values.get('client_secret')
-        token = values.get('token')
+        client_secret = values.get('client_secret').get_secret_value()
+        token = values.get('token').get_secret_value()
 
         try:
             if client_id and client_secret:

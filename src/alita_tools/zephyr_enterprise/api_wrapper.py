@@ -18,7 +18,7 @@ class ZephyrApiWrapper(BaseToolApiWrapper):
     @classmethod
     def validate_toolkit(cls, values):
         base_url = values.get('base_url')
-        token = values.get('token')
+        token = values.get('token').get_secret_value()
         cls._client = ZephyrClient(base_url=base_url, token=token)
         return values
 
@@ -144,7 +144,7 @@ class ZephyrApiWrapper(BaseToolApiWrapper):
                                          _entityType_ - The values for the entitytype are testcase, requirement, or execution.
                                          _word_ - If you want to search a testcase by the name ‘untitled’, enter the query as: "name ~ \"untitled\""
                                          Constraints: always escape name if provided with double quotes.
-                                         
+
                                          By *ID*:
                                          _entityType_
                                          _word_ - If you want to search a testcase by the id 2, then you must enter the query as: "testcaseId = 2"
@@ -164,7 +164,7 @@ class ZephyrApiWrapper(BaseToolApiWrapper):
                     create_testcase_json=(str, Field(description=
                                          """
                                          JSON body of create test case query, i.e.
-                                         `{ "tcrCatalogTreeId": 137973, "testcase": { "name": "TestToolkit", 
+                                         `{ "tcrCatalogTreeId": 137973, "testcase": { "name": "TestToolkit",
                                          "description": "some description", "projectId": 75 } }`
                                          """))
                 ),
@@ -189,12 +189,12 @@ class ZephyrApiWrapper(BaseToolApiWrapper):
                 "args_schema": create_model(
                     "TestCaseByZqlModel",
                     zql=(str, Field(description="""
-                    ZQL query to search for test cases. 
+                    ZQL query to search for test cases.
                     Supported: estimatedTime, testcaseId, creator, release,
                     project, priority, altId, version,
                     versionId, automated, folder, contents,
                     name, comment, tag
-                    
+
                     It has to follow the syntax in examples:
                     "folder=\"TestToolkit\"", "name~\"TestToolkit5\"
                     """, examples=["folder=\"TestToolkit\"", "name~\"TestToolkit5\""]))

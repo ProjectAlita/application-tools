@@ -18,7 +18,7 @@ class AWSToolConfig(BaseToolApiWrapper):
     def validate_toolkit(cls, values):
         region = values.get('region')
         access_key_id = values.get('access_key_id')
-        secret_access_key = values.get('secret_access_key')
+        secret_access_key = values.get('secret_access_key').get_secret_value()
         client_config = Config(region_name=region)
         cls._client = boto3.client(
             'service',

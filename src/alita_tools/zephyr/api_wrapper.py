@@ -43,7 +43,7 @@ class ZephyrV1ApiWrapper(BaseToolApiWrapper):
     def validate_toolkit(cls, values):
         base_url = values['base_url']
         username = values['username']
-        password = values['password']
+        password = values['password'].get_secret_value()
         cls._client = Zephyr(base_url=base_url,
                                   username=username,
                                   password=password)

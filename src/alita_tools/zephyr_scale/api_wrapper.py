@@ -16,7 +16,7 @@ ZephyrGetTestCases = create_model(
     project_key=(str, Field(description="Jira project key filter")),
     folder_id=(Optional[str], Field(description="Folder ID filter", default=None)),
     maxResults=(Optional[int], Field(
-        description="A hint as to the maximum number of results to return in each call. Must be an integer >= 1.", 
+        description="A hint as to the maximum number of results to return in each call. Must be an integer >= 1.",
         default=10)),
     startAt=(Optional[int], Field(
         description="Zero-indexed starting position. Should be a multiple of maxResults.",
@@ -126,7 +126,7 @@ ZephyrGetVersions = create_model(
     "ZephyrGetVersions",
     test_case_key=(str, Field(description="The key of the test case")),
     maxResults=(Optional[int], Field(
-        description="A hint as to the maximum number of results to return in each call", 
+        description="A hint as to the maximum number of results to return in each call",
         default=10)),
     startAt=(Optional[int], Field(
         description="Zero-indexed starting position. Should be a multiple of maxResults.",
@@ -198,12 +198,12 @@ class ZephyrScaleApiWrapper(BaseToolApiWrapper):
         #     cls._api = ZephyrScale.server_api(base_url=values['base_url'], **auth).api
         # else:
         # Cloud version is enabled for now
-        cls._api = ZephyrScale(token=values['token']).api
+        cls._api = ZephyrScale(token=values['token'].get_secret_value()).api
         return values
 
     def get_tests(self, project_key: str = None, folder_id: str = None, maxResults: Optional[int] = 10, startAt: Optional[int] = 0):
         """Retrieves all test cases. Query parameters can be used to filter the results.
-        
+
         Args:
             project_key: Jira project key filter
             folder_id: Folder ID filter
@@ -228,7 +228,7 @@ class ZephyrScaleApiWrapper(BaseToolApiWrapper):
 
     def get_test(self, test_case_key: str):
         """Returns a test case for the given key
-        
+
         Args:
             test_case_key: The key of the test case
         """
@@ -241,7 +241,7 @@ class ZephyrScaleApiWrapper(BaseToolApiWrapper):
 
     def get_test_steps(self, test_case_key: str, **kwargs):
         """Returns the test steps for the given test case. Provides a paged response.
-        
+
         Args:
             test_case_key: The key of the test case
             **kwargs: Additional parameters like maxResults and startAt
@@ -261,7 +261,7 @@ class ZephyrScaleApiWrapper(BaseToolApiWrapper):
             project_key: Jira project key
             test_case_name: Test case name
             additional_fields: JSON string containing additional optional fields
-        
+
         NOTE: Please note that if the user specifies a folder name, it is necessary to execute the get_folders() function first to find the correct mapping
         """
 
@@ -277,7 +277,7 @@ class ZephyrScaleApiWrapper(BaseToolApiWrapper):
 
     def add_test_steps(self, test_case_key: str, tc_mode: str, items: str) -> str:
         """Assigns a series of test steps to a test case.
-        
+
         Args:
             test_case_key: The key of the test case
             tc_mode: Valid values: 'APPEND', 'OVERWRITE'
@@ -310,7 +310,7 @@ class ZephyrScaleApiWrapper(BaseToolApiWrapper):
 
     def update_test_case(self, test_case_key: str, test_case_id: int, name: str, project_id: int, priority_id: int, status_id: int, **kwargs) -> str:
         """Updates an existing test case.
-        
+
         Args:
             test_case_key: The key of the test case
             test_case_id: Integer id of the test
@@ -320,7 +320,7 @@ class ZephyrScaleApiWrapper(BaseToolApiWrapper):
             status_id: Status id
             **kwargs: Additional parameters to update
         """
-        
+
         try:
             json_data = {
                 "id": test_case_id,
@@ -330,10 +330,10 @@ class ZephyrScaleApiWrapper(BaseToolApiWrapper):
                 "priority": {"id": priority_id},
                 "status": {"id": status_id}
             }
-            
+
             if kwargs:
                 json_data.update(kwargs)
-                
+
             update_response = self._api.test_cases.update_test_case(
                 test_case_key,
                 test_case_id,
@@ -346,60 +346,60 @@ class ZephyrScaleApiWrapper(BaseToolApiWrapper):
             return f"Test case `{test_case_key}` was updated: {str(update_response)}"
         except Exception as e:
             return ToolException(f"Unable to update test case with key: {test_case_key}:\n{str(e)}")
-            
+
     def get_links(self, test_case_key: str) -> str:
         """Returns links for a test case with specified key
-        
+
         Args:
             test_case_key: The key of the test case
         """
-        
+
         try:
             links = self._api.test_cases.get_links(test_case_key)
             return f"Links for test case `{test_case_key}`: {str(links)}"
         except Exception as e:
             return ToolException(f"Unable to get links for test case with key: {test_case_key}:\n{str(e)}")
-            
+
     def create_issue_links(self, test_case_key: str, issue_id: int) -> str:
         """Creates a link between a test case and a Jira issue
-        
+
         Args:
             test_case_key: The key of the test case
             issue_id: The ID of the Jira issue to link
         NOTE: The issue ID should be a valid Jira issue ID. If JIRA issue key is provided instead, it's requrid to get issue id first either by asking user or by using JIRA tooking (if avialable).
         """
-        
+
         try:
             link_response = self._api.test_cases.create_issue_links(test_case_key, issue_id)
             return f"Issue link created for test case `{test_case_key}` with issue ID `{issue_id}`: {str(link_response)}"
         except Exception as e:
             return ToolException(f"Unable to create issue link for test case with key: {test_case_key}:\n{str(e)}")
-    
+
     def create_web_links(self, test_case_key: str, url: str, additional_fields: str) -> str:
         """Creates a link between a test case and a generic URL
-        
+
         Args:
             test_case_key: The key of the test case
             url: The URL to link
             additional_fields: JSON string containing any additional fields for the web link
         """
-        
+
         try:
             additional_params = json.loads(additional_fields) if additional_fields else {}
             web_link_response = self._api.test_cases.create_web_links(test_case_key, url, **additional_params)
             return f"Web link created for test case `{test_case_key}` with URL `{url}`: {str(web_link_response)}"
         except Exception as e:
             return ToolException(f"Unable to create web link for test case with key: {test_case_key}:\n{str(e)}")
-    
+
     def get_versions(self, test_case_key: str, maxResults: Optional[int] = 10, startAt: Optional[int] = 0) -> str:
         """Returns all test case versions for a test case with specified key. Response is ordered by most recent first.
-        
+
         Args:
             test_case_key: The key of the test case
             maxResults: A hint as to the maximum number of results to return in each call
             startAt: Zero-indexed starting position. Should be a multiple of maxResults
         """
-        
+
         try:
             versions = self._api.test_cases.get_versions(test_case_key, maxResults=maxResults, startAt=startAt)
             versions_list = [str(version) for version in versions]
@@ -407,28 +407,28 @@ class ZephyrScaleApiWrapper(BaseToolApiWrapper):
             return f"Versions for test case `{test_case_key}`: {all_versions}"
         except Exception as e:
             return ToolException(f"Unable to get versions for test case with key: {test_case_key}:\n{str(e)}")
-    
+
     def get_version(self, test_case_key: str, version: str) -> str:
         """Retrieves a specific version of a test case"""
-        
+
         try:
             version_data = self._api.test_cases.get_version(test_case_key, version)
             return f"Version {version} of test case `{test_case_key}`: {str(version_data)}"
         except Exception as e:
             return ToolException(f"Unable to get version {version} for test case with key: {test_case_key}:\n{str(e)}")
-    
+
     def get_test_script(self, test_case_key: str) -> str:
         """Returns the test script for the given test case"""
-        
+
         try:
             test_script = self._api.test_cases.get_test_script(test_case_key)
             return f"Test script for test case `{test_case_key}`: {str(test_script)}"
         except Exception as e:
             return ToolException(f"Unable to get test script for test case with key: {test_case_key}:\n{str(e)}")
-    
+
     def create_test_script(self, test_case_key: str, script_type: str, text: str) -> str:
         """Creates or updates the test script for a test case"""
-        
+
         try:
             script_response = self._api.test_cases.create_test_script(test_case_key, script_type, text)
             return f"Test script created/updated for test case `{test_case_key}`: {str(script_response)}"

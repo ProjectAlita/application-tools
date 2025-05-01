@@ -16,7 +16,7 @@ class TestIOApiWrapper(BaseToolApiWrapper):
     @classmethod
     def validate_toolkit(cls, values):
         endpoint = values.get('endpoint')
-        api_key = values.get('api_key')
+        api_key = values.get('api_key').get_secret_value()
         cls._client = TestIOClient(endpoint=endpoint, api_key=api_key)
         return values
 
