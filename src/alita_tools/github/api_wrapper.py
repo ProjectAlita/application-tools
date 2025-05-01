@@ -274,7 +274,7 @@ SearchIssues = create_model(
         ),
     ),
     max_count=(
-        Optional[str],
+        Optional[int],
         Field(
             description="Default is 30. This determines max size of returned list with issues",
             default=30
@@ -500,6 +500,36 @@ GetCommits = create_model(
             )
         ),
     ),
+)
+
+# New GitHub Actions workflow models
+TriggerWorkflow = create_model(
+    "TriggerWorkflow",
+    workflow_id=(str, Field(description="The ID or file name of the workflow to trigger (e.g., 'build.yml', '1234567')")),
+    ref=(str, Field(description="The branch or tag reference to trigger the workflow on (e.g., 'main', 'v1.0.0')")),
+    inputs=(Optional[Dict[str, Any]], Field(
+        default=None, 
+        description="Optional inputs for the workflow, as defined in the workflow file",
+        example={"environment": "production", "debug": "true"}
+    ))
+)
+
+GetWorkflowStatus = create_model(
+    "GetWorkflowStatus",
+    run_id=(str, Field(description="The ID of the workflow run to get status for")),
+    repo_name=(Optional[str], Field(
+        default=None,
+        description="Name of the repository to get workflow status from. If None, use the initialized repository.",
+    ))
+)
+
+GetWorkflowLogs = create_model(
+    "GetWorkflowLogs",
+    run_id=(str, Field(description="The ID of the workflow run to get logs for")),
+    repo_name=(Optional[str], Field(
+        default=None,
+        description="Name of the repository to get workflow logs from. If None, use the initialized repository.",
+    ))
 )
 
 
@@ -1030,7 +1060,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         pattern = r"^(\w+:)?[\w\s]+$"
         return bool(re.match(pattern, query))
 
-    def search_issues(self, search_query: str, repo_name: Optional[str] = None, max_count: int = 30) -> str:
+    def search_issues(self, search_query: str, repo_name: Optional[str] = None, max_count: Union[int] = 30) -> str:
         """
         Searches for issues in a specific repository or a default initialized repository
         based on a search query using GitHub's search feature.
@@ -1038,7 +1068,7 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         Parameters:
             search_query (str): Keywords or query for searching issues and PRs in Github (supports GitHub search syntax).
             repo_name (Optional[str]): Name of the repository to search issues in. If None, use the initialized repository.
-            max_count (int): Default is 30. This determines max size of returned list with issues
+            max_count (Union[int]): Default is 30. This determines max size of returned list with issues
 
         Returns:
             str: JSON string containing a list of issues and PRs with their details (id, title, description, status, URL, type)
@@ -1453,6 +1483,175 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
 
         return f"{base_message}\n{fields_message}"
 
+    def trigger_workflow(self, workflow_id: str, ref: str, inputs: Optional[Dict[str, Any]] = None) -> str:
+        """
+        Triggers a GitHub Actions workflow run manually.
+
+        Parameters:
+            workflow_id (str): The ID or file name of the workflow to trigger (e.g., 'build.yml', '1234567')
+            ref (str): The branch or tag reference to trigger the workflow on (e.g., 'main', 'v1.0.0')
+            inputs (Optional[Dict[str, Any]]): Optional inputs for the workflow, as defined in the workflow file
+
+        Returns:
+            str: A JSON string containing the workflow run details, including the run ID
+        """
+        try:
+            repo = self.github_repo_instance
+            
+            # First try to get the workflow by its filename
+            try:
+                workflow = repo.get_workflow(workflow_id)
+            except Exception:
+                # If that fails, try by ID
+                try:
+                    workflows = repo.get_workflows()
+                    workflow = next(wf for wf in workflows if str(wf.id) == workflow_id)
+                except StopIteration:
+                    return f"Workflow with ID or filename '{workflow_id}' not found in repository {repo.full_name}"
+
+            # Create a workflow dispatch event
+            workflow_run = workflow.create_dispatch(ref, inputs or {})
+            
+            # Return run details
+            result = {
+                "success": True,
+                "message": f"Workflow '{workflow.name}' triggered successfully on ref '{ref}'",
+                "workflow_id": workflow.id,
+                "workflow_name": workflow.name,
+                "workflow_url": workflow.html_url,
+                "ref": ref,
+                "inputs": inputs or {}
+            }
+            
+            return dumps(result)
+        except Exception as e:
+            return f"An error occurred while triggering workflow: {str(e)}"
+    
+    def get_workflow_status(self, run_id: str, repo_name: Optional[str] = None) -> str:
+        """
+        Gets the status and details of a specific GitHub Actions workflow run.
+        
+        Parameters:
+            run_id (str): The ID of the workflow run to get status for
+            repo_name (Optional[str]): Name of the repository to get workflow status from
+        
+        Returns:
+            str: A JSON string containing details about the workflow run status
+        """
+        try:
+            repo = self._github.get_repo(repo_name) if repo_name else self.github_repo_instance
+            
+            # Get the workflow run
+            run = repo.get_workflow_run(int(run_id))
+            
+            # Get additional details about the run jobs
+            jobs = list(run.get_jobs())
+            job_details = []
+            
+            for job in jobs:
+                job_details.append({
+                    "id": job.id,
+                    "name": job.name,
+                    "status": job.status,
+                    "conclusion": job.conclusion,
+                    "started_at": job.started_at.isoformat() if job.started_at else None,
+                    "completed_at": job.completed_at.isoformat() if job.completed_at else None,
+                    "url": job.html_url
+                })
+            
+            # Compile the results
+            result = {
+                "id": run.id,
+                "name": run.name,
+                "workflow_id": run.workflow_id,
+                "event": run.event,
+                "status": run.status,
+                "conclusion": run.conclusion,
+                "created_at": run.created_at.isoformat() if run.created_at else None,
+                "updated_at": run.updated_at.isoformat() if run.updated_at else None,
+                "head_branch": run.head_branch,
+                "head_sha": run.head_sha,
+                "jobs": job_details,
+                "url": run.html_url
+            }
+            
+            return dumps(result)
+        except Exception as e:
+            return f"An error occurred while getting workflow status: {str(e)}"
+    
+    def get_workflow_logs(self, run_id: str, repo_name: Optional[str] = None) -> str:
+        """
+        Gets the logs from a GitHub Actions workflow run.
+        
+        Parameters:
+            run_id (str): The ID of the workflow run to get logs for
+            repo_name (Optional[str]): Name of the repository to get workflow logs from
+        
+        Returns:
+            str: A JSON string containing logs from the workflow run's jobs
+        """
+        try:
+            repo = self._github.get_repo(repo_name) if repo_name else self.github_repo_instance
+            
+            # Get the workflow run
+            run = repo.get_workflow_run(int(run_id))
+            
+            # Get the run's logs
+            try:
+                # First approach: Try to get logs from the API directly if possible
+                log_url = run.logs_url
+                logs_zip = run.get_logs()  # This will give us a bytes object with the ZIP content
+                
+                from io import BytesIO
+                import zipfile
+                
+                log_contents = {}
+                with zipfile.ZipFile(BytesIO(logs_zip)) as zip_file:
+                    for file_name in zip_file.namelist():
+                        with zip_file.open(file_name) as log_file:
+                            log_contents[file_name] = log_file.read().decode('utf-8', errors='replace')
+                
+                # Return the extracted logs
+                return dumps({
+                    "run_id": run.id,
+                    "status": run.status,
+                    "conclusion": run.conclusion,
+                    "logs": log_contents
+                })
+            except Exception as e:
+                # Fallback approach: Get logs from individual jobs
+                jobs = list(run.get_jobs())
+                job_logs = []
+                
+                for job in jobs:
+                    job_logs.append({
+                        "job_id": job.id,
+                        "job_name": job.name,
+                        "status": job.status,
+                        "conclusion": job.conclusion,
+                        "steps": [
+                            {
+                                "name": step.name,
+                                "status": step.status,
+                                "conclusion": step.conclusion,
+                                "number": step.number,
+                                "started_at": step.started_at.isoformat() if step.started_at else None,
+                                "completed_at": step.completed_at.isoformat() if step.completed_at else None
+                            } for step in job.steps
+                        ],
+                        "logs_url": job.logs_url if hasattr(job, 'logs_url') else "No direct logs URL available"
+                    })
+                
+                return dumps({
+                    "run_id": run.id,
+                    "status": run.status,
+                    "conclusion": run.conclusion,
+                    "job_details": job_logs,
+                    "note": "Full logs couldn't be retrieved directly. Only job details are available."
+                })
+        except Exception as e:
+            return f"An error occurred while getting workflow logs: {str(e)}"
+
     def get_available_tools(self):
         return [
             {
@@ -1615,6 +1814,27 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
                 "mode": "get_commits",
                 "description": self.get_commits.__doc__,
                 "args_schema": GetCommits,
+            },
+            {
+                "ref": self.trigger_workflow,
+                "name": "trigger_workflow",
+                "mode": "trigger_workflow",
+                "description": self.trigger_workflow.__doc__,
+                "args_schema": TriggerWorkflow,
+            },
+            {
+                "ref": self.get_workflow_status,
+                "name": "get_workflow_status",
+                "mode": "get_workflow_status",
+                "description": self.get_workflow_status.__doc__,
+                "args_schema": GetWorkflowStatus,
+            },
+            {
+                "ref": self.get_workflow_logs,
+                "name": "get_workflow_logs",
+                "mode": "get_workflow_logs",
+                "description": self.get_workflow_logs.__doc__,
+                "args_schema": GetWorkflowLogs,
             }
         ]
 
