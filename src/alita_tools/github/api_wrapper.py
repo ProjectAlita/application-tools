@@ -1057,8 +1057,18 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
         Returns:
             bool: True if valid, False otherwise.
         """
-        pattern = r"^(\w+:)?[\w\s]+$"
-        return bool(re.match(pattern, query))
+        # GitHub search supports complex queries with multiple filters, so we need a more permissive check
+        # This pattern allows for common GitHub search syntax including filters, values with dots, etc.
+        # We're mainly checking that the query isn't empty and doesn't contain dangerous characters
+        if not query or not query.strip():
+            return False
+        
+        # Check for potentially dangerous inputs (basic validation)
+        dangerous_patterns = [
+            r'<script', r'javascript:', r'onerror=', r'onclick=',
+            r'data:text/html', r'alert\(', r'eval\('
+        ]
+        return not any(re.search(pattern, query, re.IGNORECASE) for pattern in dangerous_patterns)
 
     def search_issues(self, search_query: str, repo_name: Optional[str] = None, max_count: Union[int] = 30) -> str:
         """
@@ -1841,6 +1851,6 @@ class AlitaGitHubAPIWrapper(GitHubAPIWrapper):
     def run(self, name: str, *args: Any, **kwargs: Any):
         for tool in self.get_available_tools():
             if tool["name"] == name:
-                return tool["ref"](*args, **kwargs)
+                return tool["ref"](*args, kwargs)
         else:
             raise ValueError(f"Unknown mode: {name}")
