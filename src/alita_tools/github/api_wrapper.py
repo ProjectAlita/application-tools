@@ -3,7 +3,7 @@ import logging
 import traceback
 import json
 import re
-from pydantic import BaseModel, PrivateAttr, model_validator, Field
+from pydantic import BaseModel, model_validator, Field
 
 from .github_client import GitHubClient
 from .graphql_client_wrapper import GraphQLClientWrapper
@@ -48,9 +48,9 @@ class AlitaGitHubAPIWrapper(BaseModel):
     # Add LLM instance
     llm: Optional[Any] = None
     
-    # Private attributes for client instances
-    _github_client: GitHubClient = PrivateAttr(None)
-    _graphql_client: GraphQLClientWrapper = PrivateAttr(None)
+    # Client instances - changed from PrivateAttr to Optional fields with exclude=True
+    _github_client: Optional[GitHubClient] = Field(default=None, exclude=True)
+    _graphql_client: Optional[GraphQLClientWrapper] = Field(default=None, exclude=True)
     
     class Config:
         arbitrary_types_allowed = True
@@ -102,11 +102,11 @@ class AlitaGitHubAPIWrapper(BaseModel):
             github_base_branch=get_from_dict_or_env(values, "github_base_branch", "GITHUB_BASE_BRANCH", default="main")
         )
         
-        # Initialize GitHub client
-        github_client = GitHubClient(auth_config, repo_config)
+        # Initialize GitHub client with keyword arguments
+        github_client = GitHubClient(auth_config=auth_config, repo_config=repo_config)
         
-        # Initialize GraphQL client
-        graphql_client = GraphQLClientWrapper(github_client.github_api._Github__requester)
+        # Initialize GraphQL client with keyword argument
+        graphql_client = GraphQLClientWrapper(github_graphql_instance=github_client.github_api._Github__requester)
         
         # Set client attributes as private attributes on the class
         cls._github_client = github_client
