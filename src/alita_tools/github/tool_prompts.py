@@ -133,3 +133,70 @@ JSON:
   "Assignees": ["ui_team"]
 }
 """
+
+LIST_PROJECTS_ISSUES = """
+Lists all issues in a GitHub project with their details including custom fields.
+
+This method retrieves all issues in a project including their status, assignees,
+custom fields, and other metadata.
+
+Args:
+    owner (str): Repository owner (organization or username).
+    repo_name (str): Repository name.
+    project_number (int): Project number (visible in project URL).
+    items_count (int, optional): Maximum number of items to retrieve. Defaults to 100.
+    
+Returns:
+    Union[Dict[str, Any], str]: Dictionary with project issues or error message.
+    
+Example:
+    project_issues = client.list_project_issues(
+        owner="octocat",
+        repo_name="Hello-World",
+        project_number=1
+    )
+"""
+
+SEARCH_PROJECT_ISSUES = """
+Searches for issues in a GitHub project matching specific criteria.
+
+Args:
+    board_repo: The organization and repository for the board (project).
+    search_query: Search query for filtering issues. Can be a string or a dictionary of filter parameters.
+    project_number: The project number as shown in the project URL.
+    items_count: Maximum number of items to retrieve.
+    repo_name: Optional repository name to override default.
+    
+Returns:
+    str: JSON string with matching project issues including their metadata.
+"""
+
+LIST_PROJECT_VIEWS =  """
+List views for a GitHub Project.
+
+Args:
+    board_repo: The organization and repository for the board (project).
+    project_number: The project number (visible in the project URL).
+    first: Number of views to fetch.
+    after: Cursor for pagination.
+    repo_name: Optional repository name to override default.
+    
+Returns:
+    str: JSON string containing project views.
+"""
+
+GET_PROJECT_ITEMS_BY_VIEW = """
+Get project items filtered by a specific project view.
+
+Args:
+    board_repo: The organization and repository for the board (project).
+    project_number: The project number (visible in the project URL).
+    view_number: The view number to filter by.
+    first: Number of items to fetch.
+    after: Cursor for pagination.
+    filter_by: Dictionary containing filter parameters.
+    repo_name: Optional repository name to override default.
+    
+Returns:
+    str: JSON string containing project items.
+"""

@@ -1,22 +1,56 @@
 from typing import Any, Dict, List, Optional, Tuple, Union
 from json import dumps
 
+from pydantic import BaseModel, Field, model_validator
+
 from .graphql_github import GraphQLClient
 
+from .schemas import (
+    CreateIssueOnProject,
+    UpdateIssueOnProject,
+    ListProjectIssues,
+    SearchProjectIssues,
+    ListProjectViews,
+    GetProjectItemsByView,
+)
 
-class GraphQLClientWrapper:
+
+# Import prompts for tools
+from .tool_prompts import (
+    CREATE_ISSUE_ON_PROJECT_PROMPT,
+    UPDATE_ISSUE_ON_PROJECT_PROMPT,
+    LIST_PROJECTS_ISSUES,
+    SEARCH_PROJECT_ISSUES,
+    LIST_PROJECT_VIEWS,
+    GET_PROJECT_ITEMS_BY_VIEW
+)
+
+
+class GraphQLClientWrapper(BaseModel):
     """
     Wrapper for interacting with GitHub's GraphQL API.
     """
+    # Config for Pydantic model
+    class Config:
+        arbitrary_types_allowed = True
     
-    def __init__(self, github_graphql_instance: Any):
+    # Input attributes
+    github_graphql_instance: Any = Field(default=None, exclude=True)
+    
+    # Client object
+    graphql_client: Optional[GraphQLClient] = Field(default=None, exclude=True)
+    
+    @model_validator(mode='after')
+    def initialize_graphql_client(self) -> 'GraphQLClientWrapper':
         """
-        Initialize the GraphQL client wrapper.
+        Initialize the GraphQL client after the model is created.
         
-        Args:
-            github_graphql_instance: The GraphQL requester instance from the GitHub API.
+        Returns:
+            The initialized GraphQLClientWrapper instance
         """
-        self._graphql_client = GraphQLClient(github_graphql_instance)
+        if self.github_graphql_instance:
+            self.graphql_client = GraphQLClient(self.github_graphql_instance)
+        return self
     
     def get_project(self, owner: str, repo_name: str, project_title: str) -> str:
         """
@@ -30,7 +64,7 @@ class GraphQLClientWrapper:
         Returns:
             str: JSON string with project details or an error message.
         """
-        result = self._graphql_client.get_project(owner, repo_name, project_title)
+        result = self.graphql_client.get_project(owner, repo_name, project_title)
         return dumps(result)
     
     def get_issue_repo(self, owner: str, repo_name: str) -> str:
@@ -44,7 +78,7 @@ class GraphQLClientWrapper:
         Returns:
             str: JSON string with repository details or an error message.
         """
-        result = self._graphql_client.get_issue_repo(owner, repo_name)
+        result = self.graphql_client.get_issue_repo(owner, repo_name)
         return dumps(result)
     
     def get_project_fields(self, project: Dict[str, Any], fields: Optional[Dict[str, List[str]]] = None,
@@ -62,7 +96,7 @@ class GraphQLClientWrapper:
         Returns:
             Tuple with lists of updatable fields and missing fields.
         """
-        return self._graphql_client.get_project_fields(
+        return self.graphql_client.get_project_fields(
             project, 
             fields=fields,
             available_labels=available_labels,
@@ -82,7 +116,7 @@ class GraphQLClientWrapper:
         Returns:
             str: The draft issue ID or an error message.
         """
-        result = self._graphql_client.create_draft_issue(project_id, title, body)
+        result = self.graphql_client.create_draft_issue(project_id, title, body)
         return result
     
     def convert_draft_issue(self, repository_id: str, draft_issue_id: str, repo_name: Optional[str] = None) -> Union[Tuple[int, str, str], str]:
@@ -97,7 +131,7 @@ class GraphQLClientWrapper:
         Returns:
             Union[Tuple[int, str, str], str]: Issue details on success or an error message if failed.
         """
-        return self._graphql_client.convert_draft_issue(repository_id, draft_issue_id)
+        return self.graphql_client.convert_draft_issue(repository_id, draft_issue_id)
     
     def update_issue(self, issue_id: str, title: str, body: str, repo_name: Optional[str] = None) -> str:
         """
@@ -112,7 +146,7 @@ class GraphQLClientWrapper:
         Returns:
             str: JSON string containing the update response or an error message.
         """
-        result = self._graphql_client.update_issue(issue_id, title, body)
+        result = self.graphql_client.update_issue(issue_id, title, body)
         return dumps(result)
     
     def update_issue_fields(self, project_id: str, item_id: str, issue_item_id: str,
@@ -133,7 +167,7 @@ class GraphQLClientWrapper:
         Returns:
             List[str]: Titles of fields successfully updated.
         """
-        return self._graphql_client.update_issue_fields(
+        return self.graphql_client.update_issue_fields(
             project_id,
             item_id,
             issue_item_id,
@@ -166,7 +200,7 @@ class GraphQLClientWrapper:
             return str(e)
 
         try:
-            result = self._graphql_client.get_project(owner=owner_name, repo_name=repo_name, project_title=project_title)
+            result = self.graphql_client.get_project(owner=owner_name, repo_name=repo_name, project_title=project_title)
             project = result.get("project")
             project_id = result.get("projectId")
             if issue_repo:
@@ -175,7 +209,7 @@ class GraphQLClientWrapper:
                 except ValueError as e:
                     return str(e)
 
-                issue_repo_result = self._graphql_client.get_issue_repo(owner=issue_owner_name, repo_name=issue_repo_name)
+                issue_repo_result = self.graphql_client.get_issue_repo(owner=issue_owner_name, repo_name=issue_repo_name)
                 repository_id, labels, assignable_users = self._get_repo_extra_info(issue_repo_result)
             else:
                 repository_id, labels, assignable_users = self._get_repo_extra_info(result)
@@ -187,14 +221,14 @@ class GraphQLClientWrapper:
 
         if fields:
             try:
-                fields_to_update, missing_fields = self._graphql_client.get_project_fields(
+                fields_to_update, missing_fields = self.graphql_client.get_project_fields(
                     project, fields, labels, assignable_users
                 )
             except Exception as e:
                 return f"Project fields are not returned. Error: {str(e)}"
 
         try:
-            draft_issue_item_id = self._graphql_client.create_draft_issue(
+            draft_issue_item_id = self.graphql_client.create_draft_issue(
                 project_id=project_id,
                 title=title,
                 body=body,
@@ -203,7 +237,7 @@ class GraphQLClientWrapper:
             return f"Draft Issue Not Created. Error: {str(e)}"
 
         try:
-            issue_number, item_id, issue_item_id = self._graphql_client.convert_draft_issue(
+            issue_number, item_id, issue_item_id = self.graphql_client.convert_draft_issue(
                 repository_id=repository_id,
                 draft_issue_id=draft_issue_item_id,
             )
@@ -212,7 +246,7 @@ class GraphQLClientWrapper:
 
         if fields:
             try:
-                updated_fields = self._graphql_client.update_issue_fields(
+                updated_fields = self.graphql_client.update_issue_fields(
                     project_id=project_id,
                     item_id=item_id,
                     issue_item_id=issue_item_id,
@@ -255,7 +289,7 @@ class GraphQLClientWrapper:
             return str(e)
 
         try:
-            result = self._graphql_client.get_project(owner=owner_name, repo_name=repo_name, project_title=project_title)
+            result = self.graphql_client.get_project(owner=owner_name, repo_name=repo_name, project_title=project_title)
             project = result.get("project")
             project_id = result.get("projectId")
 
@@ -265,7 +299,7 @@ class GraphQLClientWrapper:
                 except ValueError as e:
                     return str(e)
 
-                issue_repo_result = self._graphql_client.get_issue_repo(owner=issue_owner_name, repo_name=issue_repo_name)
+                issue_repo_result = self.graphql_client.get_issue_repo(owner=issue_owner_name, repo_name=issue_repo_name)
                 repository_id, labels, assignable_users = self._get_repo_extra_info(issue_repo_result)
             else:
                 repository_id, labels, assignable_users = self._get_repo_extra_info(result)
@@ -277,7 +311,7 @@ class GraphQLClientWrapper:
 
         if fields:
             try:
-                fields_to_update, missing_fields = self._graphql_client.get_project_fields(
+                fields_to_update, missing_fields = self.graphql_client.get_project_fields(
                     project, fields, labels, assignable_users
                 )
             except Exception as e:
@@ -298,7 +332,7 @@ class GraphQLClientWrapper:
             return f"Issue number {issue_number} not found in project."
 
         try:
-            updated_issue = self._graphql_client.update_issue(
+            updated_issue = self.graphql_client.update_issue(
                 issue_id=issue_item_id,
                 title=title,
                 body=body
@@ -311,7 +345,7 @@ class GraphQLClientWrapper:
                 item_label_ids = [label["id"] for label in item_labels]
                 item_assignee_ids = [assignee["id"] for assignee in item_assignees]
 
-                updated_fields = self._graphql_client.update_issue_fields(
+                updated_fields = self.graphql_client.update_issue_fields(
                     project_id=project_id,
                     item_id=item_id,
                     issue_item_id=issue_item_id,
@@ -347,7 +381,7 @@ class GraphQLClientWrapper:
         try:
             owner_name, repo_name = self._parse_repo(board_repo)
             
-            result = self._graphql_client.list_project_issues(
+            result = self.graphql_client.list_project_issues(
                 owner=owner_name,
                 repo_name=repo_name,
                 project_number=project_number,
@@ -363,19 +397,7 @@ class GraphQLClientWrapper:
             return f"An error occurred while listing project issues: {str(e)}"
     
     def search_project_issues(self, board_repo: str, search_query: Union[str, Dict], project_number: int = 1, items_count: int = 100, repo_name: Optional[str] = None) -> str:
-        """
-        Searches for issues in a GitHub project matching specific criteria.
         
-        Args:
-            board_repo: The organization and repository for the board (project).
-            search_query: Search query for filtering issues. Can be a string or a dictionary of filter parameters.
-            project_number: The project number as shown in the project URL.
-            items_count: Maximum number of items to retrieve.
-            repo_name: Optional repository name to override default.
-            
-        Returns:
-            str: JSON string with matching project issues including their metadata.
-        """
         try:
             # Handle dictionary input for search_query (from tests)
             if isinstance(search_query, dict):
@@ -413,7 +435,7 @@ class GraphQLClientWrapper:
             owner_name, repo_name = self._parse_repo(board_repo)
             
             # Use server-side filtering via GraphQL API
-            result = self._graphql_client.search_project_issues(
+            result = self.graphql_client.search_project_issues(
                 owner=owner_name,
                 repo_name=repo_name,
                 project_number=project_number,
@@ -435,26 +457,13 @@ class GraphQLClientWrapper:
     def list_project_views(self, board_repo: str, project_number: int, 
                           first: int = 100, after: Optional[str] = None, 
                           repo_name: Optional[str] = None) -> str:
-        """
-        List views for a GitHub Project.
-        
-        Args:
-            board_repo: The organization and repository for the board (project).
-            project_number: The project number (visible in the project URL).
-            first: Number of views to fetch.
-            after: Cursor for pagination.
-            repo_name: Optional repository name to override default.
-            
-        Returns:
-            str: JSON string containing project views.
-        """
         try:
             owner_name, repo_name = self._parse_repo(board_repo)
         except Exception as e:
             return f"Invalid repository format: {str(e)}"
         
         try:
-            result = self._graphql_client.get_project_views(
+            result = self.graphql_client.get_project_views(
                 owner=owner_name,
                 repo_name=repo_name,
                 project_number=project_number,
@@ -471,28 +480,13 @@ class GraphQLClientWrapper:
                                  first: int = 100, after: Optional[str] = None, 
                                  filter_by: Optional[Dict[str, Dict[str, str]]] = None,
                                  repo_name: Optional[str] = None) -> str:
-        """
-        Get project items filtered by a specific project view.
-        
-        Args:
-            board_repo: The organization and repository for the board (project).
-            project_number: The project number (visible in the project URL).
-            view_number: The view number to filter by.
-            first: Number of items to fetch.
-            after: Cursor for pagination.
-            filter_by: Dictionary containing filter parameters.
-            repo_name: Optional repository name to override default.
-            
-        Returns:
-            str: JSON string containing project items.
-        """
         try:
             owner_name, repo_name = self._parse_repo(board_repo)
         except Exception as e:
             return f"Invalid repository format: {str(e)}"
         
         try:
-            result = self._graphql_client.get_project_items_by_view(
+            result = self.graphql_client.get_project_items_by_view(
                 owner=owner_name,
                 repo_name=repo_name,
                 project_number=project_number,
@@ -522,3 +516,49 @@ class GraphQLClientWrapper:
         assignable_users = repository.get("assignableUsers")
 
         return repository_id, labels, assignable_users
+    
+    def get_available_tools(self):
+        return [
+            {
+                "ref": self.create_issue_on_project,
+                "name": "create_issue_on_project",
+                "mode": "create_issue_on_project",
+                "description": CREATE_ISSUE_ON_PROJECT_PROMPT,
+                "args_schema": CreateIssueOnProject,
+            },
+            {
+                "ref": self.update_issue_on_project,
+                "name": "update_issue_on_project",
+                "mode": "update_issue_on_project",
+                "description": UPDATE_ISSUE_ON_PROJECT_PROMPT,
+                "args_schema": UpdateIssueOnProject,
+            },
+            {
+                "ref": self.list_project_issues,
+                "name": "list_project_issues",
+                "mode": "list_project_issues",
+                "description": LIST_PROJECTS_ISSUES,
+                "args_schema": ListProjectIssues,
+            },
+            {
+                "ref": self.search_project_issues,
+                "name": "search_project_issues",
+                "mode": "search_project_issues",
+                "description": SEARCH_PROJECT_ISSUES,
+                "args_schema": SearchProjectIssues,
+            },
+            {
+                "ref": self.list_project_views,
+                "name": "list_project_views",
+                "mode": "list_project_views",
+                "description": LIST_PROJECT_VIEWS,
+                "args_schema": ListProjectViews,
+            },
+            {
+                "ref": self.get_project_items_by_view,
+                "name": "get_project_items_by_view",
+                "mode": "get_project_items_by_view",
+                "description": GET_PROJECT_ITEMS_BY_VIEW,
+                "args_schema": GetProjectItemsByView,
+            }
+        ]

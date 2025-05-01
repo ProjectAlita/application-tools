@@ -7,6 +7,8 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple, Union
 from json import dumps
 
+from pydantic import BaseModel, Field, model_validator
+
 from github import Auth, Github, GithubIntegration, Repository
 from github.GitCommit import GitCommit
 from github.Consts import DEFAULT_BASE_URL
@@ -17,57 +19,135 @@ from .schemas import (
     GitHubRepoConfig,
 )
 
+from .schemas import (
+    GitHubAuthConfig, 
+    GitHubRepoConfig,
+    NoInput,
+    BranchName,
+    CreateBranchName,
+    DirectoryPath,
+    ReadFile,
+    UpdateFile,
+    CreateFile,
+    DeleteFile,
+    GetIssue,
+    GetPR,
+    CreatePR,
+    CommentOnIssue,
+    SearchIssues,
+    CreateIssue,
+    UpdateIssue,
+    LoaderSchema,
+    GetCommits,
+    TriggerWorkflow,
+    GetWorkflowStatus,
+    GetWorkflowLogs,
+)
 
-class GitHubClient:
+# Import prompts for tools
+from .tool_prompts import (
+    CREATE_FILE_PROMPT,
+    UPDATE_FILE_PROMPT,
+    CREATE_ISSUE_PROMPT,
+    UPDATE_ISSUE_PROMPT,
+)
+
+from langchain_community.tools.github.prompt import (
+    DELETE_FILE_PROMPT,
+    OVERVIEW_EXISTING_FILES_IN_MAIN,
+    LIST_BRANCHES_IN_REPO_PROMPT,
+    SET_ACTIVE_BRANCH_PROMPT,
+    CREATE_BRANCH_PROMPT,
+    GET_FILES_FROM_DIRECTORY_PROMPT,
+    SEARCH_ISSUES_AND_PRS_PROMPT,
+    READ_FILE_PROMPT,
+    GET_ISSUES_PROMPT,
+    GET_ISSUE_PROMPT,
+    COMMENT_ON_ISSUE_PROMPT,
+    LIST_PRS_PROMPT,
+    GET_PR_PROMPT,
+    LIST_PULL_REQUEST_FILES,
+    CREATE_PULL_REQUEST_PROMPT
+)
+
+
+class GitHubClient(BaseModel):
     """Client for interacting with the GitHub REST API."""
     
-    def __init__(self, auth_config: GitHubAuthConfig, repo_config: GitHubRepoConfig):
+    # Config for Pydantic model
+    class Config:
+        arbitrary_types_allowed = True
+    
+    # Public attributes that can be serialized/deserialized
+    github_repository: str = Field(default="")
+    active_branch: str = Field(default="")
+    github_base_branch: str = Field(default="main")
+    github_base_url: str = Field(default=DEFAULT_BASE_URL)
+    
+    # Using optional variables with None defaults instead of PrivateAttr
+    github_api: Optional[Github] = Field(default=None, exclude=True)
+    github_repo_instance: Optional[Repository.Repository] = Field(default=None, exclude=True)
+    
+    # Adding auth config and repo config as optional fields for initialization
+    auth_config: Optional[GitHubAuthConfig] = Field(default=None, exclude=True)
+    repo_config: Optional[GitHubRepoConfig] = Field(default=None, exclude=True)
+    
+    @model_validator(mode='after')
+    def initialize_github_client(self) -> 'GitHubClient':
         """
-        Initialize the GitHub client with authentication and repository configuration.
+        Initialize the GitHub client after the model is created.
+        This replaces the need for a custom __init__ method.
         
-        Args:
-            auth_config: Authentication configuration for GitHub
-            repo_config: Repository configuration for GitHub
+        Returns:
+            The initialized GitHubClient instance
         """
-        self.github_api = None
-        self.github_repo_instance = None
-        self.github_repository = repo_config.github_repository
-        self.active_branch = repo_config.active_branch
-        self.github_base_branch = repo_config.github_base_branch
-        self.github_base_url = auth_config.github_base_url or DEFAULT_BASE_URL
         
-        # Set up authentication
-        auth = None
-        if auth_config.github_access_token:
-            auth = Auth.Token(auth_config.github_access_token.get_secret_value())
-        elif auth_config.github_username and auth_config.github_password:
-            auth = Auth.Login(auth_config.github_username, auth_config.github_password.get_secret_value())
-        elif auth_config.github_app_id and auth_config.github_app_private_key:
-            # Format the private key correctly
-            private_key = auth_config.github_app_private_key.get_secret_value()
-            header = "-----BEGIN RSA PRIVATE KEY-----"
-            footer = "-----END RSA PRIVATE KEY-----"
+        if self.repo_config:
+            self.github_repository = self.repo_config.github_repository
+            self.active_branch = self.repo_config.active_branch
+            self.github_base_branch = self.repo_config.github_base_branch
+        
+        # If auth_config is provided, update base URL and set up authentication
+        if self.auth_config:
+            self.github_base_url = self.auth_config.github_base_url or DEFAULT_BASE_URL
             
-            if header not in private_key:
-                key_body = private_key
-                body = key_body.replace(" ", "\n")
-                private_key = f"{header}\n{body}\n{footer}"
+            # Set up authentication
+            auth = None
+            if self.auth_config.github_access_token:
+                auth = Auth.Token(self.auth_config.github_access_token.get_secret_value())
+            elif self.auth_config.github_username and self.auth_config.github_password:
+                auth = Auth.Login(self.auth_config.github_username, self.auth_config.github_password.get_secret_value())
+            elif self.auth_config.github_app_id and self.auth_config.github_app_private_key:
+                # Format the private key correctly
+                private_key = self.auth_config.github_app_private_key.get_secret_value()
+                header = "-----BEGIN RSA PRIVATE KEY-----"
+                footer = "-----END RSA PRIVATE KEY-----"
                 
-            auth = Auth.AppAuth(auth_config.github_app_id, private_key)
-        
-        # Initialize GitHub client
-        if auth is None:
-            self.github_api = Github(base_url=self.github_base_url)
-        elif auth_config.github_app_id and auth_config.github_app_private_key:
-            gi = GithubIntegration(base_url=self.github_base_url, auth=auth)
-            installation = gi.get_installations()[0]
-            self.github_api = installation.get_github_for_installation()
+                if header not in private_key:
+                    key_body = private_key
+                    body = key_body.replace(" ", "\n")
+                    private_key = f"{header}\n{body}\n{footer}"
+                    
+                auth = Auth.AppAuth(self.auth_config.github_app_id, private_key)
+            
+            # Initialize GitHub client
+            if auth is None:
+                self.github_api = Github(base_url=self.github_base_url)
+            elif self.auth_config.github_app_id and self.auth_config.github_app_private_key:
+                gi = GithubIntegration(base_url=self.github_base_url, auth=auth)
+                installation = gi.get_installations()[0]
+                self.github_api = installation.get_github_for_installation()
+            else:
+                self.github_api = Github(base_url=self.github_base_url, auth=auth)
+            
+            # Get repository instance
+            if self.github_repository:
+                self.github_repo_instance = self.github_api.get_repo(self.github_repository)
         else:
-            self.github_api = Github(base_url=self.github_base_url, auth=auth)
-        
-        # Get repository instance
-        if self.github_repository:
-            self.github_repo_instance = self.github_api.get_repo(self.github_repository)
+            # Initialize with default authentication if no auth_config provided
+            self.github_api = Github(base_url=self.github_base_url)
+            if self.github_repository:
+                self.github_repo_instance = self.github_api.get_repo(self.github_repository)
     
     @staticmethod
     def clean_repository_name(repo_link: str) -> str:
@@ -1173,3 +1253,189 @@ class GitHubClient:
             return dumps(pr_list)
         except Exception as e:
             return f"Failed to list open pull requests: {str(e)}"
+    
+    def get_available_tools(self) -> List[Dict[str, Any]]:
+        return [
+             {
+                "ref": self.get_issues,
+                "name": "get_issues",
+                "mode": "get_issues",
+                "description": GET_ISSUES_PROMPT,
+                "args_schema": NoInput,
+            },
+            {
+                "ref": self.get_issue,
+                "name": "get_issue",
+                "mode": "get_issue",
+                "description": GET_ISSUE_PROMPT,
+                "args_schema": GetIssue,
+            },
+            {
+                "ref": self.comment_on_issue,
+                "name": "comment_on_issue",
+                "mode": "comment_on_issue",
+                "description": COMMENT_ON_ISSUE_PROMPT,
+                "args_schema": CommentOnIssue,
+            },
+            {
+                "ref": self.list_open_pull_requests,
+                "name": "list_open_pull_requests",
+                "mode": "list_open_pull_requests",
+                "description": LIST_PRS_PROMPT,
+                "args_schema": NoInput,
+            },
+            {
+                "ref": self.get_pull_request,
+                "name": "get_pull_request",
+                "mode": "get_pull_request",
+                "description": GET_PR_PROMPT,
+                "args_schema": GetPR,
+            },
+            {
+                "ref": self.list_pull_request_diffs,
+                "name": "list_pull_request_diffs",
+                "mode": "list_pull_request_diffs",
+                "description": LIST_PULL_REQUEST_FILES,
+                "args_schema": GetPR, # Uses repo_name, pr_number
+            },
+            {
+                "ref": self.create_pull_request,
+                "name": "create_pull_request",
+                "mode": "create_pull_request",
+                "description": CREATE_PULL_REQUEST_PROMPT,
+                "args_schema": CreatePR,
+            },
+            {
+                "ref": self.create_file,
+                "name": "create_file",
+                "mode": "create_file",
+                "description": CREATE_FILE_PROMPT,
+                "args_schema": CreateFile,
+            },
+            {
+                "ref": self.read_file,
+                "name": "read_file",
+                "mode": "read_file",
+                "description": READ_FILE_PROMPT,
+                "args_schema": ReadFile,
+            },
+            {
+                "ref": self.update_file,
+                "name": "update_file",
+                "mode": "update_file",
+                "description": UPDATE_FILE_PROMPT,
+                "args_schema": UpdateFile,
+            },
+            {
+                "ref": self.delete_file,
+                "name": "delete_file",
+                "mode": "delete_file",
+                "description": DELETE_FILE_PROMPT,
+                "args_schema": DeleteFile,
+            },
+            {
+                "ref": self.list_files_in_main_branch,
+                "name": "list_files_in_main_branch",
+                "mode": "list_files_in_main_branch",
+                "description": OVERVIEW_EXISTING_FILES_IN_MAIN,
+                "args_schema": NoInput,
+            },
+            {
+                "ref": self.list_files_in_bot_branch,
+                "name": "list_files_in_bot_branch",
+                "mode": "list_files_in_bot_branch",
+                "description": "Lists files in the bot's currently active working branch.",
+                "args_schema": NoInput,
+            },
+            {
+                "ref": self.list_branches_in_repo,
+                "name": "list_branches_in_repo",
+                "mode": "list_branches_in_repo",
+                "description": LIST_BRANCHES_IN_REPO_PROMPT,
+                "args_schema": NoInput,
+            },
+            {
+                "ref": self.set_active_branch,
+                "name": "set_active_branch",
+                "mode": "set_active_branch",
+                "description": SET_ACTIVE_BRANCH_PROMPT,
+                "args_schema": BranchName,
+            },
+            {
+                "ref": self.create_branch,
+                "name": "create_branch",
+                "mode": "create_branch",
+                "description": CREATE_BRANCH_PROMPT,
+                "args_schema": CreateBranchName,
+            },
+            {
+                "ref": self.get_files_from_directory,
+                "name": "get_files_from_directory",
+                "mode": "get_files_from_directory",
+                "description": GET_FILES_FROM_DIRECTORY_PROMPT,
+                "args_schema": DirectoryPath,
+            },
+            {
+                "ref": self.validate_search_query,
+                "name": "validate_search_query",
+                "mode": "validate_search_query",
+                "description": "Validates a search query against expected GitHub search syntax.",
+                "args_schema": SearchIssues, # Assuming SearchIssues has 'query' field
+            },
+            {
+                "ref": self.search_issues,
+                "name": "search_issues",
+                "mode": "search_issues",
+                "description": SEARCH_ISSUES_AND_PRS_PROMPT,
+                "args_schema": SearchIssues,
+            },
+            {
+                "ref": self.create_issue,
+                "name": "create_issue",
+                "mode": "create_issue",
+                "description": CREATE_ISSUE_PROMPT,
+                "args_schema": CreateIssue,
+            },
+            {
+                "ref": self.update_issue,
+                "name": "update_issue",
+                "mode": "update_issue",
+                "description": UPDATE_ISSUE_PROMPT,
+                "args_schema": UpdateIssue,
+            },
+            {
+                "ref": self.loader,
+                "name": "loader",
+                "mode": "loader",
+                "description": self.loader.__doc__,
+                "args_schema": LoaderSchema,
+            },
+            {
+                "ref": self.get_commits,
+                "name": "get_commits",
+                "mode": "get_commits",
+                "description": self.get_commits.__doc__,
+                "args_schema": GetCommits,
+            },
+            {
+                "ref": self.trigger_workflow,
+                "name": "trigger_workflow",
+                "mode": "trigger_workflow",
+                "description": self.trigger_workflow.__doc__,
+                "args_schema": TriggerWorkflow,
+            },
+            {
+                "ref": self.get_workflow_status,
+                "name": "get_workflow_status",
+                "mode": "get_workflow_status",
+                "description": self.get_workflow_status.__doc__,
+                "args_schema": GetWorkflowStatus,
+            },
+            {
+                "ref": self.get_workflow_logs,
+                "name": "get_workflow_logs",
+                "mode": "get_workflow_logs",
+                "description": self.get_workflow_logs.__doc__,
+                "args_schema": GetWorkflowLogs,
+            }
+        ]

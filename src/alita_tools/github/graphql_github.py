@@ -6,6 +6,7 @@ from typing import Any, List, Tuple, Union, Optional, Dict
 from dateutil import parser
 
 
+
 class GraphQLTemplates(Enum):
     """
     Enum class to maintain consistent GraphQL query and mutation templates for GitHub operations.
@@ -1116,28 +1117,6 @@ class GraphQLClient:
         return date_iso8601
 
     def list_project_issues(self, owner: str, repo_name: str, project_number: int, items_count: int = 100) -> Union[Dict[str, Any], str]:
-        """
-        Lists all issues in a GitHub project with their details including custom fields.
-        
-        This method retrieves all issues in a project including their status, assignees,
-        custom fields, and other metadata.
-        
-        Args:
-            owner (str): Repository owner (organization or username).
-            repo_name (str): Repository name.
-            project_number (int): Project number (visible in project URL).
-            items_count (int, optional): Maximum number of items to retrieve. Defaults to 100.
-            
-        Returns:
-            Union[Dict[str, Any], str]: Dictionary with project issues or error message.
-            
-        Example:
-            project_issues = client.list_project_issues(
-                owner="octocat",
-                repo_name="Hello-World",
-                project_number=1
-            )
-        """
         result = self._run_graphql_query(
             query=GraphQLTemplates.QUERY_LIST_PROJECT_ISSUES.value.template,
             variables={
