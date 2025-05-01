@@ -13,7 +13,7 @@ class KeycloakApiWrapper(BaseToolApiWrapper):
     client_id: str
     client_secret: str
     # Changed from PrivateAttr to Optional field with exclude=True
-    _client: Optional[requests.Session] = Field(default=None, exclude=True)
+    client: Optional[requests.Session] = Field(default=None, exclude=True)
 
     @model_validator(mode='before')
     @classmethod
@@ -22,9 +22,9 @@ class KeycloakApiWrapper(BaseToolApiWrapper):
         realm = values.get('realm')
         client_id = values.get('client_id')
         client_secret = values.get('client_secret')
-        cls._client = requests.Session()
-        cls._client.headers.update({'Content-Type': 'application/json'})
-        cls._client.auth = (client_id, client_secret)
+        values['client'] = requests.Session()
+        values['client'].headers.update({'Content-Type': 'application/json'})
+        values['client'].auth = (client_id, client_secret)
         return values
 
     def get_keycloak_admin_token(self):
@@ -34,7 +34,7 @@ class KeycloakApiWrapper(BaseToolApiWrapper):
             'client_secret': self.client_secret,
             'grant_type': 'client_credentials'
         }
-        response = self._client.post(url, data=payload)
+        response = self.client.post(url, data=payload)
         response.raise_for_status()
         return response.json()['access_token']
 
@@ -48,9 +48,9 @@ class KeycloakApiWrapper(BaseToolApiWrapper):
         headers = {
             'Authorization': f'Bearer {access_token}'
         }
-        self._client.headers.update(headers)
+        self.client.headers.update(headers)
         payload_params = self.parse_payload_params(params)
-        response = self._client.request(method, full_url, json=payload_params)
+        response = self.client.request(method, full_url, json=payload_params)
         response.raise_for_status()
         return response.text
 

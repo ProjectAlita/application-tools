@@ -48,9 +48,9 @@ class AlitaGitHubAPIWrapper(BaseModel):
     # Add LLM instance
     llm: Optional[Any] = None
     
-    # Client instances - changed from PrivateAttr to Optional fields with exclude=True
-    _github_client: Optional[GitHubClient] = Field(default=None, exclude=True)
-    _graphql_client: Optional[GraphQLClientWrapper] = Field(default=None, exclude=True)
+    # Client instances - renamed without leading underscores and marked as exclude=True
+    github_client_instance: Optional[GitHubClient] = Field(default=None, exclude=True)
+    graphql_client_instance: Optional[GraphQLClientWrapper] = Field(default=None, exclude=True)
     
     class Config:
         arbitrary_types_allowed = True
@@ -108,9 +108,9 @@ class AlitaGitHubAPIWrapper(BaseModel):
         # Initialize GraphQL client with keyword argument
         graphql_client = GraphQLClientWrapper(github_graphql_instance=github_client.github_api._Github__requester)
         
-        # Set client attributes as private attributes on the class
-        cls._github_client = github_client
-        cls._graphql_client = graphql_client
+        # Set client attributes on the class (renamed from _github_client to github_client_instance)
+        cls.github_client_instance = github_client
+        cls.graphql_client_instance = graphql_client
         
         # Update values
         values["github_repository"] = github_repository
@@ -127,13 +127,13 @@ class AlitaGitHubAPIWrapper(BaseModel):
     @property
     def github_client(self) -> GitHubClient:
         """Access to GitHub REST client methods"""
-        return self._github_client
+        return self.github_client_instance
         
     # Expose GraphQL client methods directly via property  
     @property
     def graphql_client(self) -> GraphQLClientWrapper:
         """Access to GitHub GraphQL client methods"""
-        return self._graphql_client
+        return self.graphql_client_instance
 
 
     def process_github_query(self, query: str) -> Any:
@@ -235,14 +235,14 @@ class AlitaGitHubAPIWrapper(BaseModel):
 
     def get_available_tools(self):
         # this is horrible, I need to think on something better
-        if not self._github_client:
+        if not self.github_client_instance:
             github_tools = GitHubClient.model_construct().get_available_tools()
         else:
-            github_tools = self._github_client.get_available_tools()
-        if not self._graphql_client:
+            github_tools = self.github_client_instance.get_available_tools()
+        if not self.graphql_client_instance:
             graphql_tools = GraphQLClientWrapper.model_construct().get_available_tools()
         else:
-            graphql_tools = self._graphql_client.get_available_tools()
+            graphql_tools = self.graphql_client_instance.get_available_tools()
         tools = github_tools + graphql_tools + [
             {
                 "ref": self.process_github_query,
