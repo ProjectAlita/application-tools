@@ -24,7 +24,8 @@ from .tool_prompts import (
     CREATE_ISSUE_PROMPT,
     UPDATE_ISSUE_PROMPT,
     CREATE_ISSUE_ON_PROJECT_PROMPT,
-    UPDATE_ISSUE_ON_PROJECT_PROMPT
+    UPDATE_ISSUE_ON_PROJECT_PROMPT,
+    CODE_AND_RUN
 )
 
 
@@ -104,13 +105,11 @@ class AlitaGitHubAPIWrapper(BaseModel):
         
         # Initialize GitHub client with keyword arguments
         github_client = GitHubClient(auth_config=auth_config, repo_config=repo_config)
-        
         # Initialize GraphQL client with keyword argument
         graphql_client = GraphQLClientWrapper(github_graphql_instance=github_client.github_api._Github__requester)
-        
         # Set client attributes on the class (renamed from _github_client to github_client_instance)
-        cls.github_client_instance = github_client
-        cls.graphql_client_instance = graphql_client
+        values["github_client_instance"] = github_client
+        values["graphql_client_instance"] = graphql_client
         
         # Update values
         values["github_repository"] = github_repository
@@ -137,12 +136,7 @@ class AlitaGitHubAPIWrapper(BaseModel):
 
 
     def process_github_query(self, query: str) -> Any:
-        """
-        EXPERIMENTAL: Takes a natural language query describing a task involving multiple GitHub operations,
-        generates Python code using available GitHub tools, executes it, and returns the result.
-        The generated code should aim to store the final result in a variable named 'result'.
-        Example Query: "Create a new branch named 'feature/new-thing', create a file 'docs/new_feature.md' in it with content '# New Feature', and then create a pull request for it."
-        """
+        
         try:
             code = self.generate_code_with_retries(query)
             print("Generated code:\n", code)  # <-- For debugging
@@ -248,7 +242,7 @@ class AlitaGitHubAPIWrapper(BaseModel):
                 "ref": self.process_github_query,
                 "name": "process_github_query",
                 "mode": "process_github_query",
-                "description": self.process_github_query.__doc__,
+                "description": CODE_AND_RUN,
                 "args_schema": ProcessGitHubQueryModel
             }
         ]

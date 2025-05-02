@@ -62,3 +62,10 @@ def create_pydantic_model(model_name: str, variables: dict[str, dict]):
     for var_name, var_data in variables.items():
         fields[var_name] = (parse_type(var_data['type']), Field(description=var_data.get('description', None)))
     return create_model(model_name, **fields)
+
+from pydantic import BaseModel
+from pydantic_core import SchemaValidator
+
+def check_schema(model: BaseModel) -> None:
+    schema_validator = SchemaValidator(schema=model.__pydantic_core_schema__)
+    schema_validator.validate_python(model.__dict__)
