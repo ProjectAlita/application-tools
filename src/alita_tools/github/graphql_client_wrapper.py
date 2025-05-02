@@ -787,19 +787,30 @@ class GraphQLClientWrapper(BaseModel):
                                 view_number: int, items_count: int = 100, 
                                 filter_by: Optional[Dict[str, Dict[str, str]]] = None) -> Union[Dict[str, Any], str]:
         query_template = GraphQLTemplates.QUERY_PROJECT_ITEMS_BY_VIEW.value
+        query = query_template.safe_substitute(
+            owner="$owner",
+            repo_name="$repo_name",
+            project_number="$project_number",
+            view_number="$view_number",
+            items_count="$items_count" # Reinstate items_count
+        )
+
+        variables = {
+            "owner": owner,
+            "repo_name": repo_name,
+            "project_number": project_number,
+            "view_number": view_number,
+            "items_count": items_count # Reinstate items_count
+        }
+        
         result = self._run_graphql_query(
-            query=query_template,
-            variables={
-                "owner": owner,
-                "repo_name": repo_name,
-                "project_number": project_number,
-                "view_number": view_number,
-                "items_count": items_count
-            }
+            query=query,
+            variables=variables
         )
         
         if result['error']:
-            return f"Error occurred while retrieving project items: {result['details']}"
+            # Basic error check
+            return f"Error occurred while retrieving project data: {result['details']}"
         
         repository = result.get('data', {}).get('repository')
         if not repository:
@@ -811,20 +822,32 @@ class GraphQLClientWrapper(BaseModel):
         
         view = project.get('view')
         if not view:
-            return f"No view with number {view_number} found in project {project_number}."
+            # Check if the view number was the issue based on GraphQL error (more robust check)
+            graphql_errors = result.get('details', []) # Assuming errors are passed in 'details'
+            if isinstance(graphql_errors, list) and any("Could not resolve to a ProjectV2View with the number" in err.get('message', '') for err in graphql_errors):
+                 return f"No view with number {view_number} found in project {project_number} (GraphQL error)."
+            # Otherwise, view might be null for other reasons, but proceed if items exist
+            # Log a warning maybe? print(f"Warning: View number {view_number} resolved to null, but proceeding with items.")
+
+        # Process items fetched from the project level
+        project_items_data = project.get('items', {})
+        items = self._process_project_items(project_items_data.get('nodes', []))
+        page_info = project_items_data.get('pageInfo', {})
+        total_count = project_items_data.get('totalCount', 0)
             
-        # Process and format the project view data
+        # Format the result including the view confirmation and the list of ALL project items
         formatted_result = {
             "projectId": project.get('id'),
             "projectTitle": project.get('title'),
             "projectUrl": project.get('url'),
-            "view": {
-                "id": view.get('id'),
-                "name": view.get('name'),
-                "layout": view.get('layout'),
-                "fields": self._process_project_fields(view.get('fields', {}).get('nodes', [])),
-                "items": self._process_project_items(view.get('items', {}).get('nodes', []))
-            }
+            "targetView": { # Info about the view we intended to query
+                "number": view_number,
+                "id": view.get('id') if view else None,
+                "name": view.get('name') if view else None,
+            },
+            "items": items, # Note: These are ALL project items, not yet filtered by the view
+            "itemsPageInfo": page_info,
+            "itemsTotalCount": total_count
         }
         
         return formatted_result

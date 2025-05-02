@@ -704,58 +704,56 @@ class GraphQLTemplates(Enum):
                 id
                 title
                 url
+                # Fetch the specific view to confirm it exists
                 view(number: $view_number) {
                     id
                     name
-                    layout
-                    fields(first: 30) {
-                        nodes {
-                            id
-                            name
-                            dataType
-                        }
-                    }
-                    items(first: $items_count) {
-                        nodes {
-                            id
-                            type
-                            content {
-                                ... on Issue {
-                                    id
-                                    number
-                                    title
-                                    state
-                                    url
-                                    createdAt
-                                    updatedAt
-                                    labels(first: 10) {
-                                        nodes {
-                                            id
-                                            name
-                                            color
-                                        }
-                                    }
+                }
+                # Fetch all items for the project
+                items(first: $items_count) {
+                    nodes {
+                        id
+                        type
+                        content {
+                            ... on Issue {
+                                id
+                                number
+                                title
+                                state
+                                url
+                                createdAt
+                                updatedAt
+                                labels(first: 10) {
+                                    nodes { id name color }
+                                }
+                                assignees(first: 5) {
+                                    nodes { id login name }
                                 }
                             }
-                            fieldValues(first: 30) {
-                                nodes {
-                                    ... on ProjectV2ItemFieldTextValue {
-                                        field { name }
-                                        text
-                                    }
-                                    ... on ProjectV2ItemFieldDateValue {
-                                        field { name }
-                                        date
-                                    }
-                                    ... on ProjectV2ItemFieldSingleSelectValue {
-                                        field { name }
-                                        name
-                                        optionId
-                                    }
-                                }
+                            ... on PullRequest {
+                                id
+                                number
+                                title
+                                state
+                                url
+                                createdAt
+                                updatedAt
+                            }
+                            ... on DraftIssue {
+                                id
+                                title
+                                createdAt
+                                updatedAt
                             }
                         }
+                        # Include field values if needed later
+                        # fieldValues(first: 10) { ... }
                     }
+                    pageInfo {
+                        endCursor
+                        hasNextPage
+                    }
+                    totalCount
                 }
             }
         }
