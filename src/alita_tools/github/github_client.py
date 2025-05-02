@@ -1271,13 +1271,16 @@ class GitHubClient(BaseModel):
             JSON string with the response from the API call
         """
         try:
-            try:
-                api_method = getattr(self.github_api, method)
-                response = api_method(**method_kwargs)
-                return response.raw_data
-            except AttributeError:
-                response = getattr(self.github_repo_instance, method)(**method_kwargs)
-                return response.raw_data
+            # First check if method exists on github_api
+            if hasattr(self.github_api, method):
+                _method = getattr(self.github_api, method)
+            # Then check if it exists on github_repo_instance
+            elif self.github_repo_instance and hasattr(self.github_repo_instance, method):
+                _method = getattr(self.github_repo_instance, method)
+            else:
+                return f"API method '{method}' not found on GitHub API or repository instance (neither Github API client not Repo API instance)"
+            response = _method(**method_kwargs)
+            return response.raw_data
         except Exception as e:
             import traceback
             return f"API call failed: {traceback.format_exc()}"

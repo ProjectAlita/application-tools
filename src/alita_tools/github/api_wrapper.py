@@ -153,7 +153,7 @@ class AlitaGitHubAPIWrapper(BaseModel):
             dispatch_custom_event(
                 name="thinking_step",
                 data={
-                    "message": f"Execution Results... \n\n```bash\n{result}\n```",
+                    "message": f"Execution Results... \n\n```\n{result}\n```",
                     "tool_name": "process_github_query",
                     "toolkit": "github"
                 }
