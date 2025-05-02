@@ -174,30 +174,39 @@ class AlitaGitHubAPIWrapper(BaseModel):
             raise ValueError("LLM instance is required for code generation.")
 
         # Prepare tool descriptions for the generator
+        from .schemas import GenericGithubAPICall
+        approved_tools = [
+            {
+                "name": "generic_github_api_call",
+                "args_schema": GenericGithubAPICall,    
+            }
+        ]
+        
         tool_info = [
             {
                 "name": tool["name"],
                 "args_schema": json.dumps(tool["args_schema"].schema()),
             }
-            for tool in self.get_available_tools() if tool["name"] != "process_github_query" # Exclude self
+            for tool in approved_tools + self.graphql_client_instance.get_available_tools()
         ]
         
-        prompt_addon = f""" There are very specific rules for some tools, such as:
-        ** update_file TOOL**
-        {UPDATE_FILE_PROMPT}
+        # prompt_addon = f""" There are very specific rules for some tools, such as:
+        # ** update_file TOOL**
+        # {UPDATE_FILE_PROMPT}
         
-        ** create_issue TOOL **
-        {CREATE_ISSUE_PROMPT}
+        # ** create_issue TOOL **
+        # {CREATE_ISSUE_PROMPT}
         
-        ** update_issue TOOL **
-        {UPDATE_ISSUE_PROMPT}
+        # ** update_issue TOOL **
+        # {UPDATE_ISSUE_PROMPT}
         
-        ** create_issue_on_project TOOL **
-        {CREATE_ISSUE_ON_PROJECT_PROMPT}
+        # ** create_issue_on_project TOOL **
+        # {CREATE_ISSUE_ON_PROJECT_PROMPT}
         
-        ** update_issue_on_project TOOL **
-        {UPDATE_ISSUE_ON_PROJECT_PROMPT}
+        # ** update_issue_on_project TOOL **
+        # {UPDATE_ISSUE_ON_PROJECT_PROMPT}
         
+        prompt_addon = f"""
         
         ** Default github repository **
         {self.github_repository}

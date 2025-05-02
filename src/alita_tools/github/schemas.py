@@ -170,6 +170,12 @@ GetWorkflowLogs = create_model(
     repo_name=(Optional[str], Field(description="Name of the repository to get workflow logs from", default=None))
 )
 
+GenericGithubAPICall = create_model(
+    "GenericGithubAPICall",
+    method=(str, Field(description="The GitHub API method to call (e.g., 'get_repo', 'get_user')")),
+    method_kwargs=(Dict[str, Any], Field(description="Keyword arguments for the API method as a dictionary"))
+)
+
 ListProjectIssues = create_model(
     "ListProjectIssues",
     board_repo=(str, Field(description="The organization and repository for the board (project). Example: 'org-name/repo-name'")),

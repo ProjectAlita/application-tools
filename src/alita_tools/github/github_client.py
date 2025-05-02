@@ -42,6 +42,7 @@ from .schemas import (
     TriggerWorkflow,
     GetWorkflowStatus,
     GetWorkflowLogs,
+    GenericGithubAPICall
 )
 
 # Import prompts for tools
@@ -745,7 +746,7 @@ class GitHubClient(BaseModel):
                 }
                 matching_issues.append(issue_details)
 
-            return dumps(matching_issues)
+            return matching_issues
         except Exception as e:
             return f"An error occurred while searching issues:\n{str(e)}"
 
@@ -1256,6 +1257,26 @@ class GitHubClient(BaseModel):
         except Exception as e:
             return f"Failed to list open pull requests: {str(e)}"
     
+    def generic_github_api_call(self, method: str, method_kwargs: dict) -> str:
+        """
+        Generic method to make API calls to GitHub.
+        method will be the name of the method to call on the GitHub API (python library)
+        method_kwargs will be the parameters to pass to that method.
+
+        Parameters:
+            method (str): The API method to call (e.g., 'get_repo', 'get_user', etc.)
+            method_kwargs: Keyword arguments for the API method
+
+        Returns:
+            JSON string with the response from the API call
+        """
+        try:
+            api_method = getattr(self.github_api, method)
+            response = api_method(**method_kwargs)
+            return response.raw_data
+        except Exception as e:
+            return f"API call failed: {str(e)}"
+    
     def get_available_tools(self) -> List[Dict[str, Any]]:
         return [
              {
@@ -1432,5 +1453,12 @@ class GitHubClient(BaseModel):
                 "mode": "get_workflow_logs",
                 "description": self.get_workflow_logs.__doc__,
                 "args_schema": GetWorkflowLogs,
+            },
+            {
+                "ref": self.generic_github_api_call,
+                "name": "generic_github_api_call",
+                "mode": "generic_github_api_call",
+                "description": self.generic_github_api_call.__doc__,
+                "args_schema": GenericGithubAPICall,
             }
         ]
