@@ -1271,11 +1271,16 @@ class GitHubClient(BaseModel):
             JSON string with the response from the API call
         """
         try:
-            api_method = getattr(self.github_api, method)
-            response = api_method(**method_kwargs)
-            return response.raw_data
+            try:
+                api_method = getattr(self.github_api, method)
+                response = api_method(**method_kwargs)
+                return response.raw_data
+            except AttributeError:
+                response = getattr(self.github_repo_instance, method)(**method_kwargs)
+                return response.raw_data
         except Exception as e:
-            return f"API call failed: {str(e)}"
+            import traceback
+            return f"API call failed: {traceback.format_exc()}"
     
     def get_available_tools(self) -> List[Dict[str, Any]]:
         return [
@@ -1460,5 +1465,6 @@ class GitHubClient(BaseModel):
                 "mode": "generic_github_api_call",
                 "description": self.generic_github_api_call.__doc__,
                 "args_schema": GenericGithubAPICall,
-            }
+            },
+            
         ]
