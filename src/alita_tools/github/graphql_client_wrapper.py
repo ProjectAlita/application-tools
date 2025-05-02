@@ -706,19 +706,33 @@ class GraphQLClientWrapper(BaseModel):
                                  first: int = 100, after: Optional[str] = None, 
                                  filter_by: Optional[Dict[str, Dict[str, str]]] = None,
                                  repo_name: Optional[str] = None) -> str:
+        """
+        Retrieves items from a specific view in a GitHub project board.
+        
+        Args:
+            board_repo: The organization and repository for the board (project) in format 'org/repo'.
+            project_number: The project number as shown in the project URL.
+            view_number: The view number within the project.
+            first: Maximum number of items to retrieve.
+            after: Cursor for pagination.
+            filter_by: Optional filtering criteria.
+            repo_name: Optional repository name to override default.
+            
+        Returns:
+            str: JSON string with project items data filtered by the specified view.
+        """
         try:
             owner_name, repo_name = self._parse_repo(board_repo)
         except Exception as e:
             return f"Invalid repository format: {str(e)}"
         
         try:
-            
             return self._get_project_items_by_view_internal(
                 owner=owner_name,
                 repo_name=repo_name,
                 project_number=project_number,
                 view_number=view_number,
-                items_count=first,  # Use items_count instead of first
+                items_count=first,
                 filter_by=filter_by
             )
             
@@ -1126,7 +1140,22 @@ class GraphQLClientWrapper(BaseModel):
         
         return formatted_result
     
-    # Rest of the existing methods from GraphQLClientWrapper
+    def _parse_repo(self, repo: str) -> Tuple[str, str]:
+        """Helper to extract owner and repository name from provided value."""
+        try:
+            owner_name, repo_name = repo.split("/")
+            return owner_name, repo_name
+        except Exception as e:
+            raise ValueError(f"'{repo}' repo format is invalid. It should be like 'org-name/repo-name'. Error: {str(e)}")
+
+    def _get_repo_extra_info(self, repository: Dict[str, Any]) -> Tuple[str, List[Dict[str, Any]], List[Dict[str, Any]]]:
+        """Helper to extract repository ID, labels and assignable users of the repository."""
+        repository_id = repository.get("repositoryId")
+        labels = repository.get("labels")
+        assignable_users = repository.get("assignableUsers")
+
+        return repository_id, labels, assignable_users
+    
     def create_issue_on_project(self, board_repo: str, project_title: str, title: str, 
                                body: str, fields: Optional[Dict[str, str]] = None,
                                issue_repo: Optional[str] = None, repo_name: Optional[str] = None) -> str:
@@ -1315,22 +1344,6 @@ class GraphQLClientWrapper(BaseModel):
             fields_message = f"Response on update fields: {str(updated_fields)}."
 
         return f"{base_message}\n{fields_message}"
-    
-    def _parse_repo(self, repo: str) -> Tuple[str, str]:
-        """Helper to extract owner and repository name from provided value."""
-        try:
-            owner_name, repo_name = repo.split("/")
-            return owner_name, repo_name
-        except Exception as e:
-            raise ValueError(f"'{repo}' repo format is invalid. It should be like 'org-name/repo-name'. Error: {str(e)}")
-
-    def _get_repo_extra_info(self, repository: Dict[str, Any]) -> Tuple[str, List[Dict[str, Any]], List[Dict[str, Any]]]:
-        """Helper to extract repository ID, labels and assignable users of the repository."""
-        repository_id = repository.get("repositoryId")
-        labels = repository.get("labels")
-        assignable_users = repository.get("assignableUsers")
-
-        return repository_id, labels, assignable_users
     
     def get_available_tools(self):
         return [
