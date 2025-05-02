@@ -667,8 +667,8 @@ class GraphQLClientWrapper(BaseModel):
 
             owner_name, repo_name = self._parse_repo(board_repo)
           
-                
-            return self.search_project_issues(
+            # Fix recursion by calling the internal implementation instead
+            return self._search_project_issues_internal(
                 owner=owner_name,
                 repo_name=repo_name,
                 project_number=project_number,
@@ -681,6 +681,55 @@ class GraphQLClientWrapper(BaseModel):
             raise e
         except Exception as e:
             return f"An error occurred while searching project issues: {str(e)}"
+    
+    # Rename the duplicate method to an internal implementation method
+    def _search_project_issues_internal(self, owner: str, repo_name: str, project_number: int, 
+                             search_query: str, items_count: int = 100) -> Union[Dict[str, Any], str]:
+        """
+        Internal implementation for searching issues in a GitHub project that match the provided query.
+        
+        Args:
+            owner (str): Repository owner (organization or username).
+            repo_name (str): Repository name.
+            project_number (int): Project number (visible in project URL).
+            search_query (str): Search query string (e.g., "status:todo", "label:bug").
+            items_count (int, optional): Maximum number of items to retrieve. Defaults to 100.
+            
+        Returns:
+            Union[Dict[str, Any], str]: Dictionary with matching issues or error message.
+        """
+        result = self._run_graphql_query(
+            query=GraphQLTemplates.QUERY_SEARCH_PROJECT_ISSUES.value.template,
+            variables={
+                "owner": owner,
+                "repo_name": repo_name,
+                "project_number": project_number,
+                "search_query": search_query,
+                "items_count": items_count
+            }
+        )
+        
+        if result['error']:
+            return f"Error occurred while searching project issues: {result['details']}"
+        
+        repository = result.get('data', {}).get('repository')
+        if not repository:
+            return "No repository data found."
+        
+        project = repository.get('projectV2')
+        if not project:
+            return f"No project with number {project_number} found."
+            
+        # Process and format the project data
+        formatted_result = {
+            "id": project.get('id'),
+            "title": project.get('title'),
+            "url": project.get('url'),
+            "fields": self._process_project_fields(project.get('fields', {}).get('nodes', [])),
+            "items": self._process_project_items(project.get('items', {}).get('nodes', []))
+        }
+        
+        return formatted_result
     
     def list_project_views(self, board_repo: str, project_number: int, 
                           first: int = 100, after: Optional[str] = None, 
@@ -784,45 +833,45 @@ class GraphQLClientWrapper(BaseModel):
         
         return formatted_result
     
-    def search_project_issues(self, owner: str, repo_name: str, project_number: int, 
-                             search_query: str, items_count: int = 100) -> Union[Dict[str, Any], str]:
+    def get_project_views(self, owner: str, repo_name: str, project_number: int, 
+                         first: int = 100, after: Optional[str] = None) -> Union[Dict[str, Any], str]:
         """
-        Searches for issues in a GitHub project that match the provided query.
+        Retrieves all views available in a GitHub project.
         
-        This method allows searching issues in a project by title, description,
-        status, or any field value. The query uses GitHub's search syntax.
+        This method fetches views from a specific GitHub project, including their layout type,
+        fields, sorting criteria, and grouping options. Views are useful for filtering and 
+        organizing project items in different ways.
         
         Args:
             owner (str): Repository owner (organization or username).
             repo_name (str): Repository name.
             project_number (int): Project number (visible in project URL).
-            search_query (str): Search query string (e.g., "status:todo", "label:bug").
-            items_count (int, optional): Maximum number of items to retrieve. Defaults to 100.
+            first (int, optional): Number of views to return. Defaults to 100.
+            after (str, optional): Cursor for pagination. Defaults to None.
             
         Returns:
-            Union[Dict[str, Any], str]: Dictionary with matching issues or error message.
+            Union[Dict[str, Any], str]: Dictionary with project views or error message.
             
         Example:
-            matching_issues = client.search_project_issues(
+            project_views = client.get_project_views(
                 owner="octocat",
                 repo_name="Hello-World",
-                project_number=1,
-                search_query="status:todo label:bug"
+                project_number=1
             )
         """
+        query_variables = {
+            "owner": owner,
+            "repo_name": repo_name,
+            "project_number": project_number
+        }
+        
         result = self._run_graphql_query(
-            query=GraphQLTemplates.QUERY_SEARCH_PROJECT_ISSUES.value.template,
-            variables={
-                "owner": owner,
-                "repo_name": repo_name,
-                "project_number": project_number,
-                "search_query": search_query,
-                "items_count": items_count
-            }
+            query=GraphQLTemplates.QUERY_LIST_PROJECT_VIEWS.value.template,
+            variables=query_variables
         )
         
         if result['error']:
-            return f"Error occurred while searching project issues: {result['details']}"
+            return f"Error occurred while retrieving project views: {result['details']}"
         
         repository = result.get('data', {}).get('repository')
         if not repository:
@@ -832,13 +881,135 @@ class GraphQLClientWrapper(BaseModel):
         if not project:
             return f"No project with number {project_number} found."
             
-        # Process and format the project data
+        # Process and format the project views
         formatted_result = {
-            "id": project.get('id'),
-            "title": project.get('title'),
-            "url": project.get('url'),
-            "fields": self._process_project_fields(project.get('fields', {}).get('nodes', [])),
-            "items": self._process_project_items(project.get('items', {}).get('nodes', []))
+            "projectId": project.get('id'),
+            "projectTitle": project.get('title'),
+            "views": self._process_project_views(project.get('views', {}).get('nodes', []))
+        }
+        
+        return formatted_result
+        
+    def _process_project_views(self, views: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Process and format project views"""
+        formatted_views = []
+        
+        for view in views:
+            view_data = {
+                "id": view.get('id'),
+                "name": view.get('name'),
+                "number": view.get('number'),
+                "layout": view.get('layout')
+            }
+            
+            # Process fields
+            if 'fields' in view and 'nodes' in view['fields']:
+                view_data["fields"] = [
+                    {
+                        "id": field.get('id'),
+                        "name": field.get('name'),
+                        "dataType": field.get('dataType')
+                    }
+                    for field in view['fields']['nodes'] if field
+                ]
+            
+            # Process group-by fields
+            if 'groupByFields' in view and 'nodes' in view['groupByFields']:
+                view_data["groupByFields"] = [
+                    {
+                        "id": field.get('id'),
+                        "name": field.get('name'),
+                        "dataType": field.get('dataType')
+                    }
+                    for field in view['groupByFields']['nodes'] if field
+                ]
+            
+            # Process sort-by settings
+            if 'sortBy' in view and 'nodes' in view['sortBy']:
+                view_data["sortBy"] = [
+                    {
+                        "direction": sort_config.get('direction'),
+                        "field": {
+                            "id": sort_config.get('field', {}).get('id'),
+                            "name": sort_config.get('field', {}).get('name'),
+                            "dataType": sort_config.get('field', {}).get('dataType')
+                        }
+                    }
+                    for sort_config in view['sortBy']['nodes'] if sort_config and 'field' in sort_config
+                ]
+            
+            formatted_views.append(view_data)
+            
+        return formatted_views
+    
+    def get_project_items_by_view(self, owner: str, repo_name: str, project_number: int, 
+                                view_number: int, items_count: int = 100, 
+                                filter_by: Optional[Dict[str, Dict[str, str]]] = None) -> Union[Dict[str, Any], str]:
+        """
+        Retrieves project items (issues, PRs, etc.) filtered by a specific view.
+        
+        This method allows you to use GitHub Project views to filter items based on any criteria
+        defined in the view (status, labels, custom fields, etc.). Views provide a powerful
+        way to organize and filter project items without relying on specific fields.
+        
+        Args:
+            owner (str): Repository owner (organization or username).
+            repo_name (str): Repository name.
+            project_number (int): Project number (visible in project URL).
+            view_number (int): View number within the project.
+            items_count (int, optional): Maximum number of items to retrieve. Defaults to 100.
+            filter_by (Optional[Dict[str, Dict[str, str]]]): Additional filtering criteria.
+            
+        Returns:
+            Union[Dict[str, Any], str]: Dictionary with filtered project items or error message.
+            
+        Example:
+            # Get all issues from the "In Progress" view of project 1
+            in_progress_items = client.get_project_items_by_view(
+                owner="octocat",
+                repo_name="Hello-World",
+                project_number=1,
+                view_number=2  # Assuming view number 2 is the "In Progress" view
+            )
+        """
+        result = self._run_graphql_query(
+            query=GraphQLTemplates.QUERY_PROJECT_ITEMS_BY_VIEW.value.template,
+            variables={
+                "owner": owner,
+                "repo_name": repo_name,
+                "project_number": project_number,
+                "view_number": view_number,
+                "items_count": items_count
+            }
+        )
+        
+        if result['error']:
+            return f"Error occurred while retrieving project items: {result['details']}"
+        
+        repository = result.get('data', {}).get('repository')
+        if not repository:
+            return "No repository data found."
+        
+        project = repository.get('projectV2')
+        if not project:
+            return f"No project with number {project_number} found."
+        
+        view = project.get('view')
+        if not view:
+            return f"No view with number {view_number} found in project {project_number}."
+            
+        # Process and format the project view data
+        formatted_result = {
+            "projectId": project.get('id'),
+            "projectTitle": project.get('title'),
+            "projectUrl": project.get('url'),
+            "view": {
+                "id": view.get('id'),
+                "name": view.get('name'),
+                "layout": view.get('layout'),
+                "fields": self._process_project_fields(view.get('fields', {}).get('nodes', [])),
+                "items": self._process_project_items(view.get('items', {}).get('nodes', []))
+            }
         }
         
         return formatted_result
@@ -1067,78 +1238,6 @@ class GraphQLClientWrapper(BaseModel):
             formatted_views.append(view_data)
             
         return formatted_views
-    
-    def get_project_items_by_view(self, owner: str, repo_name: str, project_number: int, 
-                                view_number: int, items_count: int = 100, 
-                                filter_by: Optional[Dict[str, Dict[str, str]]] = None) -> Union[Dict[str, Any], str]:
-        """
-        Retrieves project items (issues, PRs, etc.) filtered by a specific view.
-        
-        This method allows you to use GitHub Project views to filter items based on any criteria
-        defined in the view (status, labels, custom fields, etc.). Views provide a powerful
-        way to organize and filter project items without relying on specific fields.
-        
-        Args:
-            owner (str): Repository owner (organization or username).
-            repo_name (str): Repository name.
-            project_number (int): Project number (visible in project URL).
-            view_number (int): View number within the project.
-            items_count (int, optional): Maximum number of items to retrieve. Defaults to 100.
-            filter_by (Optional[Dict[str, Dict[str, str]]]): Additional filtering criteria.
-            
-        Returns:
-            Union[Dict[str, Any], str]: Dictionary with filtered project items or error message.
-            
-        Example:
-            # Get all issues from the "In Progress" view of project 1
-            in_progress_items = client.get_project_items_by_view(
-                owner="octocat",
-                repo_name="Hello-World",
-                project_number=1,
-                view_number=2  # Assuming view number 2 is the "In Progress" view
-            )
-        """
-        result = self._run_graphql_query(
-            query=GraphQLTemplates.QUERY_PROJECT_ITEMS_BY_VIEW.value.template,
-            variables={
-                "owner": owner,
-                "repo_name": repo_name,
-                "project_number": project_number,
-                "view_number": view_number,
-                "items_count": items_count
-            }
-        )
-        
-        if result['error']:
-            return f"Error occurred while retrieving project items: {result['details']}"
-        
-        repository = result.get('data', {}).get('repository')
-        if not repository:
-            return "No repository data found."
-        
-        project = repository.get('projectV2')
-        if not project:
-            return f"No project with number {project_number} found."
-        
-        view = project.get('view')
-        if not view:
-            return f"No view with number {view_number} found in project {project_number}."
-            
-        # Process and format the project view data
-        formatted_result = {
-            "projectId": project.get('id'),
-            "projectTitle": project.get('title'),
-            "projectUrl": project.get('url'),
-            "view": {
-                "id": view.get('id'),
-                "name": view.get('name'),
-                "layout": view.get('layout'),
-                "fields": self._process_project_fields(view.get('fields', {}).get('nodes', [])),
-                "items": self._process_project_items(view.get('items', {}).get('nodes', []))
-            }
-        }
-        
-        return formatted_result
     
     def _parse_repo(self, repo: str) -> Tuple[str, str]:
         """Helper to extract owner and repository name from provided value."""
