@@ -207,3 +207,590 @@ generates Python code using available GitHub tools, executes it, and returns the
 The generated code should aim to store the final result in a variable named 'result'.
 Example Query: "Create a new branch named 'feature/new-thing', create a file 'docs/new_feature.md' in it with content '# New Feature', and then create a pull request for it."
 """
+
+# GraphQL templates moved from graphql_github.py
+from enum import Enum
+from string import Template
+
+class GraphQLTemplates(Enum):
+    """
+    Enum class to maintain consistent GraphQL query and mutation templates for GitHub operations.
+
+    Attributes:
+        QUERY_GET_PROJECT_INFO_TEMPLATE (Template): Template for a query to gather detailed info about projects and their contents
+        in a specific repository including labels, assignable users, and project items.
+
+        QUERY_GET_REPO_INFO_TEMPLATE (Template): Template for a query to get information about repository such as repository ID, labels, assignable users.
+        
+        QUERY_LIST_PROJECT_ISSUES (Template): Template for a query to list all issues in a project with their details.
+        
+        QUERY_SEARCH_PROJECT_ISSUES (Template): Template for a query to search for issues in a project by title, status, or any field value.
+        
+        MUTATION_CREATE_DRAFT_ISSUE (Template): Template for a mutation to create a draft issue in a specific project.
+        
+        MUTATION_CONVERT_DRAFT_INTO_ISSUE (Template): Template for a mutation to convert a draft issue to a regular issue in a repository.
+        
+        MUTATION_UPDATE_ISSUE (Template): Template for a mutation to update the title and body of a specific issue.
+        
+        MUTATION_UPDATE_ISSUE_FIELDS (Template): Template for a mutation to update the field values of a project item.
+
+        MUTATION_CLEAR_ISSUE_FIELDS (Template): Template for a mutation to clear the field values of a project item.
+        
+        MUTATION_SET_ISSUE_LABELS (Template): Template for a mutation to set labels to an issue.
+        
+        MUTATION_SET_ISSUE_ASSIGNEES (Template): Template for a mutation to add assignees to an issue.
+        
+        MUTATION_REMOVE_ISSUE_LABELS (Template): Template for a mutation to remove labels from an issue.
+        
+        MUTATION_REMOVE_ISSUE_ASSIGNEES (Template): Template for a mutation to remove assignees from an issue.
+    """
+    # bad design, it needs to be refactored to get information about project/repository separately 
+    QUERY_GET_PROJECT_INFO_TEMPLATE = Template("""
+    query {
+        repository(owner: "$owner", name: "$repo_name") {
+            id
+            labels (first: 100) { nodes { id name } }
+            assignableUsers (first: 100) { nodes { id name login } }
+            projectsV2(first: 10) {
+                nodes
+                {
+                    id
+                    title
+                    fields(first: 30) { 
+                        nodes {
+                            ... on ProjectV2SingleSelectField { 
+                                id
+                                dataType
+                                name
+                                options {
+                                    id
+                                    name
+                                }
+                            }
+                            ... on ProjectV2FieldCommon { 
+                                id
+                                dataType
+                                name
+                            }
+                        }
+                    }
+                    items(first: 100) {
+                        nodes {
+                            id
+                            content {
+                                ... on Issue {
+                                    id
+                                    number
+                                    labels (first: 20) { nodes { id name } }
+                                    assignees (first: 20) { nodes { id name } }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    """)
+
+    QUERY_GET_REPO_INFO_TEMPLATE = Template("""
+    query {
+        repository(owner: "$owner", name: "$repo_name") {
+            id
+            labels (first: 100) { nodes { id name } }
+            assignableUsers (first: 100) { nodes { id name login } }
+        }
+    }
+    """)
+    
+    QUERY_LIST_PROJECT_ISSUES = Template("""
+    query ProjectIssues($owner: String!, $repo_name: String!, $project_number: Int!, $items_count: Int = 100) {
+        repository(owner: $owner, name: $repo_name) {
+            projectV2(number: $project_number) {
+                id
+                title
+                url
+                fields(first: 30) {
+                    nodes {
+                        ... on ProjectV2SingleSelectField {
+                            id
+                            name
+                            options {
+                                id
+                                name
+                            }
+                        }
+                        ... on ProjectV2FieldCommon {
+                            id
+                            name
+                            dataType
+                        }
+                    }
+                }
+                items(first: $items_count) {
+                    nodes {
+                        id
+                        fieldValues(first: 30) {
+                            nodes {
+                                ... on ProjectV2ItemFieldTextValue {
+                                    field { ... on ProjectV2FieldCommon { name } }
+                                    text
+                                }
+                                ... on ProjectV2ItemFieldDateValue {
+                                    field { ... on ProjectV2FieldCommon { name } }
+                                    date
+                                }
+                                ... on ProjectV2ItemFieldSingleSelectValue {
+                                    field { ... on ProjectV2FieldCommon { name } }
+                                    name
+                                    optionId
+                                }
+                            }
+                        }
+                        content {
+                            ... on Issue {
+                                id
+                                number
+                                title
+                                state
+                                body
+                                url
+                                createdAt
+                                updatedAt
+                                labels(first: 10) {
+                                    nodes {
+                                        id
+                                        name
+                                        color
+                                    }
+                                }
+                                assignees(first: 5) {
+                                    nodes {
+                                        id
+                                        login
+                                        name
+                                    }
+                                }
+                            }
+                            ... on PullRequest {
+                                id
+                                number
+                                title
+                                state
+                                body
+                                url
+                                createdAt
+                                updatedAt
+                            }
+                            ... on DraftIssue {
+                                id
+                                title
+                                body
+                                createdAt
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    """)
+
+    QUERY_SEARCH_PROJECT_ISSUES = Template("""
+    query SearchProjectIssues($owner: String!, $repo_name: String!, $project_number: Int!, $items_count: Int = 100) {
+        repository(owner: $owner, name: $repo_name) {
+            projectV2(number: $project_number) {
+                id
+                title
+                url
+                fields(first: 30) {
+                    nodes {
+                        ... on ProjectV2SingleSelectField {
+                            id
+                            name
+                            options {
+                                id
+                                name
+                            }
+                        }
+                        ... on ProjectV2FieldCommon {
+                            id
+                            name
+                            dataType
+                        }
+                    }
+                }
+                items(first: $items_count) {
+                    nodes {
+                        id
+                        fieldValues(first: 30) {
+                            nodes {
+                                ... on ProjectV2ItemFieldTextValue {
+                                    field { ... on ProjectV2FieldCommon { name } }
+                                    text
+                                }
+                                ... on ProjectV2ItemFieldDateValue {
+                                    field { ... on ProjectV2FieldCommon { name } }
+                                    date
+                                }
+                                ... on ProjectV2ItemFieldSingleSelectValue {
+                                    field { ... on ProjectV2FieldCommon { name } }
+                                    name
+                                    optionId
+                                }
+                            }
+                        }
+                        content {
+                            ... on Issue {
+                                id
+                                number
+                                title
+                                state
+                                body
+                                url
+                                createdAt
+                                updatedAt
+                                labels(first: 10) {
+                                    nodes {
+                                        id
+                                        name
+                                        color
+                                    }
+                                }
+                                assignees(first: 5) {
+                                    nodes {
+                                        id
+                                        login
+                                        name
+                                    }
+                                }
+                            }
+                            ... on PullRequest {
+                                id
+                                number
+                                title
+                                state
+                                body
+                                url
+                                createdAt
+                                updatedAt
+                            }
+                            ... on DraftIssue {
+                                id
+                                title
+                                body
+                                createdAt
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    """)
+
+    MUTATION_CREATE_DRAFT_ISSUE = Template("""
+    mutation ($projectId: ID!, $title: String!, $body: String!) {
+    addProjectV2DraftIssue(input: {
+        projectId: $projectId,
+        title: $title,
+        body: $body
+    }) {
+        projectItem {
+            id
+        }
+    }
+    }
+    """)
+
+    MUTATION_CONVERT_DRAFT_INTO_ISSUE = Template("""
+    mutation ($draftItemId: ID!, $repositoryId: ID!) {
+        convertProjectV2DraftIssueItemToIssue(input: {
+            itemId: $draftItemId,
+            repositoryId: $repositoryId
+        }) {
+            item {
+                id
+                content {
+                    ... on Issue {
+                        id
+                        number
+                    }
+                }
+            }
+        }
+    }
+    """)
+
+    MUTATION_UPDATE_ISSUE = Template("""
+    mutation UpdateIssue($issueId: ID!, $title: String!, $body: String!) {
+        updateIssue(input: {id: $issueId, title: $title, body: $body}) {
+            issue {
+                id
+                number
+                title
+                body
+            }
+        }
+    }
+    """)
+
+    MUTATION_UPDATE_ISSUE_FIELDS = Template("""
+    mutation {
+        updateProjectV2ItemFieldValue(input: 
+        {
+            projectId: "$project_id"
+            itemId: "$issue_item_id",
+            fieldId: "$field_id",
+            value: {
+                $value_content
+            }
+        }) {
+            projectV2Item {
+                id
+                fieldValues(first: 30) {
+                    nodes {
+                        ... on ProjectV2ItemFieldSingleSelectValue {
+                            id
+                            name
+                        }
+                        ... on ProjectV2ItemFieldDateValue {
+                            id
+                            date
+                        }
+                        ... on ProjectV2ItemFieldLabelValue {
+                            labels (first: 20) {
+                                nodes { id name }
+                            }
+                        }                    
+                    }
+                }
+            }
+        }
+    }
+    """)
+
+    MUTATION_CLEAR_ISSUE_FIELDS = Template("""
+    mutation {
+        clearProjectV2ItemFieldValue(input: 
+        {
+            projectId: "$project_id"
+            itemId: "$issue_item_id",
+            fieldId: "$field_id"
+        }) {
+            projectV2Item {
+                id
+                fieldValues(first: 30) {
+                    nodes {
+                        ... on ProjectV2ItemFieldSingleSelectValue {
+                            id
+                            name
+                        }
+                        ... on ProjectV2ItemFieldDateValue {
+                            id
+                            date
+                        }
+                        ... on ProjectV2ItemFieldLabelValue {
+                            labels (first: 20) {
+                                nodes { id name }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    """)
+
+    MUTATION_SET_ISSUE_LABELS = Template("""
+    mutation ($labelableId: ID!, $labelIds: [ID!]!) {
+        addLabelsToLabelable(input: { labelableId: $labelableId, labelIds: $labelIds }) {
+            labelable {
+                ... on Issue {
+                    labels (first: 100) { nodes { id name } }
+                }
+            }
+        }
+    }
+    """)
+
+    MUTATION_SET_ISSUE_ASSIGNEES = Template("""
+    mutation AddAssigneesToAssignable($assignableId: ID!, $assigneeIds: [ID!]!) {
+        addAssigneesToAssignable(input: { assignableId: $assignableId, assigneeIds: $assigneeIds }) {
+            assignable { 
+                assignees (first: 10) { nodes { name } }     
+            }
+        }
+    }
+    """)
+
+    MUTATION_REMOVE_ISSUE_LABELS = Template("""
+    mutation ($labelableId: ID!, $labelIds: [ID!]!) {
+        removeLabelsFromLabelable(input: { labelableId: $labelableId, labelIds: $labelIds }) {
+            labelable {
+                ... on Issue {
+                    labels (first: 100) { nodes { id name } }
+                }
+            }
+        }
+    }
+    """)
+
+    MUTATION_REMOVE_ISSUE_ASSIGNEES = Template("""
+    mutation ($assignableId: ID!, $assigneeIds: [ID!]!) {
+        removeAssigneesFromAssignable(input: { assignableId: $assignableId, assigneeIds: $assigneeIds }) {
+            assignable {
+                ... on Issue {
+                    assignees (first: 100) { nodes { id name } }
+                }
+            }
+        }
+    }
+    """)
+
+    QUERY_LIST_PROJECT_VIEWS = Template("""
+    query ProjectViews($owner: String!, $repo_name: String!, $project_number: Int!) {
+        repository(owner: $owner, name: $repo_name) {
+            projectV2(number: $project_number) {
+                id
+                title
+                views(first: 20) {
+                    nodes {
+                        id
+                        name
+                        number
+                        layout
+                        fields(first: 20) {
+                            nodes {
+                                ... on ProjectV2FieldCommon {
+                                    id
+                                    name
+                                    dataType
+                                }
+                            }
+                        }
+                        groupByFields(first: 10) {
+                            nodes {
+                                ... on ProjectV2FieldCommon {
+                                    id
+                                    name
+                                    dataType
+                                }
+                            }
+                        }
+                        sortBy(first: 5) {
+                            nodes {
+                                direction
+                                field {
+                                    ... on ProjectV2FieldCommon {
+                                        id
+                                        name
+                                        dataType
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    """)
+
+    QUERY_PROJECT_ITEMS_BY_VIEW = Template("""
+    query ProjectItemsByView($owner: String!, $repo_name: String!, $project_number: Int!, $view_number: Int!, $items_count: Int = 100) {
+        repository(owner: $owner, name: $repo_name) {
+            projectV2(number: $project_number) {
+                id
+                title
+                url
+                view(number: $view_number) {
+                    id
+                    name
+                    layout
+                    fields(first: 30) {
+                        nodes {
+                            ... on ProjectV2SingleSelectField {
+                                id
+                                name
+                                options {
+                                    id
+                                    name
+                                }
+                            }
+                            ... on ProjectV2FieldCommon {
+                                id
+                                name
+                                dataType
+                            }
+                        }
+                    }
+                    items: items(first: $items_count) {
+                        nodes {
+                            id
+                            fieldValues(first: 30) {
+                                nodes {
+                                    ... on ProjectV2ItemFieldTextValue {
+                                        field { ... on ProjectV2FieldCommon { name } }
+                                        text
+                                    }
+                                    ... on ProjectV2ItemFieldDateValue {
+                                        field { ... on ProjectV2FieldCommon { name } }
+                                        date
+                                    }
+                                    ... on ProjectV2ItemFieldSingleSelectValue {
+                                        field { ... on ProjectV2FieldCommon { name } }
+                                        name
+                                        optionId
+                                    }
+                                }
+                            }
+                            content {
+                                ... on Issue {
+                                    id
+                                    number
+                                    title
+                                    state
+                                    body
+                                    url
+                                    createdAt
+                                    updatedAt
+                                    labels(first: 10) {
+                                        nodes {
+                                            id
+                                            name
+                                            color
+                                        }
+                                    }
+                                    assignees(first: 5) {
+                                        nodes {
+                                            id
+                                            login
+                                            name
+                                        }
+                                    }
+                                }
+                                ... on PullRequest {
+                                    id
+                                    number
+                                    title
+                                    state
+                                    body
+                                    url
+                                    createdAt
+                                    updatedAt
+                                }
+                                ... on DraftIssue {
+                                    id
+                                    title
+                                    body
+                                    createdAt
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    """)
