@@ -1378,13 +1378,6 @@ class GitHubClient(BaseModel):
                 "args_schema": DirectoryPath,
             },
             {
-                "ref": self.validate_search_query,
-                "name": "validate_search_query",
-                "mode": "validate_search_query",
-                "description": "Validates a search query against expected GitHub search syntax.",
-                "args_schema": SearchIssues, # Assuming SearchIssues has 'query' field
-            },
-            {
                 "ref": self.search_issues,
                 "name": "search_issues",
                 "mode": "search_issues",

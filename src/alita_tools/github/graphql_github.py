@@ -1324,7 +1324,8 @@ class GraphQLClient:
             
         return formatted_items
 
-    def get_project_views(self, owner: str, repo_name: str, project_number: int) -> Union[Dict[str, Any], str]:
+    def get_project_views(self, owner: str, repo_name: str, project_number: int, 
+                         first: int = 100, after: Optional[str] = None) -> Union[Dict[str, Any], str]:
         """
         Retrieves all views available in a GitHub project.
         
@@ -1336,6 +1337,8 @@ class GraphQLClient:
             owner (str): Repository owner (organization or username).
             repo_name (str): Repository name.
             project_number (int): Project number (visible in project URL).
+            first (int, optional): Number of views to return. Defaults to 100.
+            after (str, optional): Cursor for pagination. Defaults to None.
             
         Returns:
             Union[Dict[str, Any], str]: Dictionary with project views or error message.
@@ -1347,13 +1350,15 @@ class GraphQLClient:
                 project_number=1
             )
         """
+        query_variables = {
+            "owner": owner,
+            "repo_name": repo_name,
+            "project_number": project_number
+        }
+        
         result = self._run_graphql_query(
             query=GraphQLTemplates.QUERY_LIST_PROJECT_VIEWS.value.template,
-            variables={
-                "owner": owner,
-                "repo_name": repo_name,
-                "project_number": project_number
-            }
+            variables=query_variables
         )
         
         if result['error']:

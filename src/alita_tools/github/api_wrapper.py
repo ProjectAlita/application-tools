@@ -16,6 +16,8 @@ from .schemas import (
     ProcessGitHubQueryModel
 )
 
+from langchain_core.callbacks import dispatch_custom_event
+
 logger = logging.getLogger(__name__)
 
 # Import prompts for tools
@@ -136,11 +138,26 @@ class AlitaGitHubAPIWrapper(BaseModel):
 
 
     def process_github_query(self, query: str) -> Any:
-        
         try:
             code = self.generate_code_with_retries(query)
-            print("Generated code:\n", code)  # <-- For debugging
+            dispatch_custom_event(
+                name="thinking_step",
+                data={
+                    "message": f"Executing generated code... \n\n```python\n{code}\n```",
+                    "tool_name": "process_github_query",
+                    "toolkit": "github"
+                }
+            )
+            
             result = self.execute_github_code(code)
+            dispatch_custom_event(
+                name="thinking_step",
+                data={
+                    "message": f"Execution Results... \n\n```bash\n{result}\n```",
+                    "tool_name": "process_github_query",
+                    "toolkit": "github"
+                }
+            )
             if isinstance(result, (dict, list)):
                 import json
                 return json.dumps(result, indent=2)
@@ -180,6 +197,10 @@ class AlitaGitHubAPIWrapper(BaseModel):
         
         ** update_issue_on_project TOOL **
         {UPDATE_ISSUE_ON_PROJECT_PROMPT}
+        
+        
+        ** Default github repository **
+        {self.github_repository}
         
         """
         code = GitHubCodeGenerator(
