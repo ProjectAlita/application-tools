@@ -491,8 +491,8 @@ class GraphQLClientWrapper(BaseModel):
                 repo_name=repo_name,
                 project_number=project_number,
                 view_number=view_number,
-                first=first,
-                after=after,
+                items_count=first,  # Use items_count instead of first
+                cursor=after,       # Use cursor instead of after
                 filter_by=filter_by
             )
             
