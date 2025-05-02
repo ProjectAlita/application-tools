@@ -569,7 +569,7 @@ class GraphQLClientWrapper(BaseModel):
 
         return date_iso8601
     
-    def list_project_issues(self, board_repo: str, project_number: int = 1, items_count: int = 100, repo_name: Optional[str] = None) -> str:
+    def list_project_issues(self, board_repo: str, project_number: int = 1, items_count: int = 100) -> str:
         """
         Lists all issues in a GitHub project with their details including status, assignees, and custom fields.
         
@@ -577,7 +577,6 @@ class GraphQLClientWrapper(BaseModel):
             board_repo: The organization and repository for the board (project).
             project_number: The project number as shown in the project URL.
             items_count: Maximum number of items to retrieve.
-            repo_name: Optional repository name to override default.
             
         Returns:
             str: JSON string with project issues data including custom fields and status values.
@@ -628,7 +627,7 @@ class GraphQLClientWrapper(BaseModel):
         
         return formatted_result
     
-    def search_project_issues(self, board_repo: str, search_query: Union[str, Dict], project_number: int = 1, items_count: int = 100, repo_name: Optional[str] = None) -> str:
+    def search_project_issues(self, board_repo: str, search_query: str, project_number: int = 1, items_count: int = 100) -> str:
         
         try:
             # Handle dictionary input for search_query (from tests)
@@ -731,8 +730,7 @@ class GraphQLClientWrapper(BaseModel):
         return formatted_result
     
     def list_project_views(self, board_repo: str, project_number: int, 
-                          first: int = 100, after: Optional[str] = None, 
-                          repo_name: Optional[str] = None) -> str:
+                          first: int = 100, after: Optional[str] = None) -> str:
         try:
             owner_name, repo_name = self._parse_repo(board_repo)
         except Exception as e:
@@ -752,8 +750,7 @@ class GraphQLClientWrapper(BaseModel):
     
     def get_project_items_by_view(self, board_repo: str, project_number: int, view_number: int,
                                  first: int = 100, after: Optional[str] = None, 
-                                 filter_by: Optional[Dict[str, Dict[str, str]]] = None,
-                                 repo_name: Optional[str] = None) -> str:
+                                 filter_by: Optional[Dict[str, Dict[str, str]]] = None) -> str:
         """
         Retrieves items from a specific view in a GitHub project board.
         
@@ -764,7 +761,6 @@ class GraphQLClientWrapper(BaseModel):
             first: Maximum number of items to retrieve.
             after: Cursor for pagination.
             filter_by: Optional filtering criteria.
-            repo_name: Optional repository name to override default.
             
         Returns:
             str: JSON string with project items data filtered by the specified view.
@@ -952,7 +948,7 @@ class GraphQLClientWrapper(BaseModel):
     
     def create_issue_on_project(self, board_repo: str, project_title: str, title: str, 
                                body: str, fields: Optional[Dict[str, str]] = None,
-                               issue_repo: Optional[str] = None, repo_name: Optional[str] = None) -> str:
+                               issue_repo: Optional[str] = None) -> str:
         """
         Creates an issue within a specified project.
 
@@ -963,7 +959,6 @@ class GraphQLClientWrapper(BaseModel):
             body: Body text for the newly created issue.
             fields: Additional key value pairs for issue field configurations.
             issue_repo: The issue's organization and repository to link issue on the board.
-            repo_name: Optional repository name to override default.
 
         Returns:
             str: A message indicating the outcome of the operation.
@@ -1040,7 +1035,7 @@ class GraphQLClientWrapper(BaseModel):
     
     def update_issue_on_project(self, board_repo: str, issue_number: str, project_title: str, 
                                title: str, body: str, fields: Optional[Dict[str, str]] = None,
-                               issue_repo: Optional[str] = None, repo_name: Optional[str] = None) -> str:
+                               issue_repo: Optional[str] = None) -> str:
         """
         Updates an existing issue within a project.
 
@@ -1052,7 +1047,6 @@ class GraphQLClientWrapper(BaseModel):
             body: New body content to set for the issue.
             fields: A dictionary of additional field values by field names to update.
             issue_repo: The issue's organization and repository to link issue on the board.
-            repo_name: Optional repository name to override default.
 
         Returns:
             str: Summary of the update operation and any changes applied or errors encountered.
@@ -1184,3 +1178,106 @@ class GraphQLClientWrapper(BaseModel):
                 "args_schema": GetProjectItemsByView,
             }
         ]
+    
+    def _process_project_fields(self, fields: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Process and format project fields into a structured list
+        
+        Args:
+            fields: List of field objects from GraphQL response
+            
+        Returns:
+            List of formatted field dictionaries
+        """
+        formatted_fields = []
+        
+        for field in fields:
+            if not field:
+                continue
+                
+            field_data = {
+                "id": field.get("id"),
+                "name": field.get("name"),
+                "dataType": field.get("dataType")
+            }
+            
+            # Handle single select fields with options
+            if field.get("dataType") == "SINGLE_SELECT" and "options" in field:
+                field_data["options"] = [
+                    {"id": option.get("id"), "name": option.get("name"), "color": option.get("color")}
+                    for option in field.get("options", [])
+                ]
+            
+            formatted_fields.append(field_data)
+            
+        return formatted_fields
+    
+    def _process_project_items(self, items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Process and format project items into a structured list
+        
+        Args:
+            items: List of item objects from GraphQL response
+            
+        Returns:
+            List of formatted item dictionaries
+        """
+        formatted_items = []
+        
+        for item in items:
+            if not item:
+                continue
+                
+            item_data = {
+                "id": item.get("id"),
+                "type": item.get("type")
+            }
+            
+            # Process content (could be Issue, PullRequest or DraftIssue)
+            content = item.get("content")
+            if content:
+                item_data["content"] = {
+                    "id": content.get("id"),
+                    "number": content.get("number"),
+                    "title": content.get("title"),
+                    "url": content.get("url"),
+                    "state": content.get("state")
+                }
+                
+                # Add labels if present
+                if "labels" in content and "nodes" in content["labels"]:
+                    item_data["content"]["labels"] = [
+                        {"id": label.get("id"), "name": label.get("name"), "color": label.get("color")}
+                        for label in content["labels"]["nodes"] if label
+                    ]
+                
+                # Add assignees if present
+                if "assignees" in content and "nodes" in content["assignees"]:
+                    item_data["content"]["assignees"] = [
+                        {"id": user.get("id"), "login": user.get("login"), "name": user.get("name")}
+                        for user in content["assignees"]["nodes"] if user
+                    ]
+            
+            # Process field values
+            if "fieldValues" in item and "nodes" in item["fieldValues"]:
+                item_data["fieldValues"] = []
+                
+                for value in item["fieldValues"]["nodes"]:
+                    if not value:
+                        continue
+                        
+                    field_value = {
+                        "field": {"id": value.get("field", {}).get("id"), "name": value.get("field", {}).get("name")}
+                    }
+                    
+                    # Handle different value types
+                    if "text" in value:
+                        field_value["text"] = value["text"]
+                    if "date" in value:
+                        field_value["date"] = value["date"]
+                    if "singleSelectOptionId" in value and value["singleSelectOptionId"]:
+                        field_value["singleSelectOptionId"] = value["singleSelectOptionId"]
+                    
+                    item_data["fieldValues"].append(field_value)
+            
+            formatted_items.append(item_data)
+            
+        return formatted_items
