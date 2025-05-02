@@ -92,34 +92,34 @@ class GitHubClient(BaseModel):
     auth_config: Optional[GitHubAuthConfig] = Field(default=None, exclude=True)
     repo_config: Optional[GitHubRepoConfig] = Field(default=None, exclude=True)
     
-    @model_validator(mode='after')
-    def initialize_github_client(self) -> 'GitHubClient':
+    @model_validator(mode='before')
+    def initialize_github_client(cls, values):
         """
         Initialize the GitHub client after the model is created.
         This replaces the need for a custom __init__ method.
         
         Returns:
-            The initialized GitHubClient instance
+            The initialized values dictionary
         """
         
-        if self.repo_config:
-            self.github_repository = self.repo_config.github_repository
-            self.active_branch = self.repo_config.active_branch
-            self.github_base_branch = self.repo_config.github_base_branch
+        if values.get("repo_config"):
+            values["github_repository"] = values["repo_config"].github_repository
+            values["active_branch"] = values["repo_config"].active_branch
+            values["github_base_branch"] = values["repo_config"].github_base_branch
         
         # If auth_config is provided, update base URL and set up authentication
-        if self.auth_config:
-            self.github_base_url = self.auth_config.github_base_url or DEFAULT_BASE_URL
+        if values.get("auth_config"):
+            values["github_base_url"] = values["auth_config"].github_base_url or DEFAULT_BASE_URL
             
             # Set up authentication
             auth = None
-            if self.auth_config.github_access_token:
-                auth = Auth.Token(self.auth_config.github_access_token.get_secret_value())
-            elif self.auth_config.github_username and self.auth_config.github_password:
-                auth = Auth.Login(self.auth_config.github_username, self.auth_config.github_password.get_secret_value())
-            elif self.auth_config.github_app_id and self.auth_config.github_app_private_key:
+            if values["auth_config"].github_access_token:
+                auth = Auth.Token(values["auth_config"].github_access_token.get_secret_value())
+            elif values["auth_config"].github_username and values["auth_config"].github_password:
+                auth = Auth.Login(values["auth_config"].github_username, values["auth_config"].github_password.get_secret_value())
+            elif values["auth_config"].github_app_id and values["auth_config"].github_app_private_key:
                 # Format the private key correctly
-                private_key = self.auth_config.github_app_private_key.get_secret_value()
+                private_key = values["auth_config"].github_app_private_key.get_secret_value()
                 header = "-----BEGIN RSA PRIVATE KEY-----"
                 footer = "-----END RSA PRIVATE KEY-----"
                 
@@ -128,27 +128,29 @@ class GitHubClient(BaseModel):
                     body = key_body.replace(" ", "\n")
                     private_key = f"{header}\n{body}\n{footer}"
                     
-                auth = Auth.AppAuth(self.auth_config.github_app_id, private_key)
+                auth = Auth.AppAuth(values["auth_config"].github_app_id, private_key)
             
             # Initialize GitHub client
             if auth is None:
-                self.github_api = Github(base_url=self.github_base_url)
-            elif self.auth_config.github_app_id and self.auth_config.github_app_private_key:
-                gi = GithubIntegration(base_url=self.github_base_url, auth=auth)
+                values["github_api"] = Github(base_url=values["github_base_url"])
+            elif values["auth_config"].github_app_id and values["auth_config"].github_app_private_key:
+                gi = GithubIntegration(base_url=values["github_base_url"], auth=auth)
                 installation = gi.get_installations()[0]
-                self.github_api = installation.get_github_for_installation()
+                values["github_api"] = installation.get_github_for_installation()
             else:
-                self.github_api = Github(base_url=self.github_base_url, auth=auth)
+                values["github_api"] = Github(base_url=values["github_base_url"], auth=auth)
             
             # Get repository instance
-            if self.github_repository:
-                self.github_repo_instance = self.github_api.get_repo(self.github_repository)
+            if values.get("github_repository"):
+                values["github_repo_instance"] = values["github_api"].get_repo(values["github_repository"])
         else:
             # Initialize with default authentication if no auth_config provided
-            self.github_api = Github(base_url=self.github_base_url)
-            if self.github_repository:
-                self.github_repo_instance = self.github_api.get_repo(self.github_repository)
-    
+            values["github_api"] = Github(base_url=values.get("github_base_url", DEFAULT_BASE_URL))
+            if values.get("github_repository"):
+                values["github_repo_instance"] = values["github_api"].get_repo(values["github_repository"])
+                
+        return values
+
     @staticmethod
     def clean_repository_name(repo_link: str) -> str:
         """

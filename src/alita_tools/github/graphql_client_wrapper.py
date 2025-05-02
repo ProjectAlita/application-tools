@@ -40,17 +40,17 @@ class GraphQLClientWrapper(BaseModel):
     # Client object
     graphql_client: Optional[GraphQLClient] = Field(default=None, exclude=True)
     
-    @model_validator(mode='after')
-    def initialize_graphql_client(self) -> 'GraphQLClientWrapper':
+    @model_validator(mode='before')
+    def initialize_graphql_client(cls, values):
         """
         Initialize the GraphQL client after the model is created.
         
         Returns:
-            The initialized GraphQLClientWrapper instance
+            The initialized values dictionary
         """
-        if self.github_graphql_instance:
-            self.graphql_client = GraphQLClient(self.github_graphql_instance)
-        return self
+        if values.get("github_graphql_instance"):
+            values["graphql_client"] = GraphQLClient(values["github_graphql_instance"])
+        return values
     
     def get_project(self, owner: str, repo_name: str, project_title: str) -> str:
         """
