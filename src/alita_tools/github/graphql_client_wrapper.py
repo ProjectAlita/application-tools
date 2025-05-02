@@ -786,8 +786,9 @@ class GraphQLClientWrapper(BaseModel):
     def _get_project_items_by_view_internal(self, owner: str, repo_name: str, project_number: int, 
                                 view_number: int, items_count: int = 100, 
                                 filter_by: Optional[Dict[str, Dict[str, str]]] = None) -> Union[Dict[str, Any], str]:
+        query_template = GraphQLTemplates.QUERY_PROJECT_ITEMS_BY_VIEW.value
         result = self._run_graphql_query(
-            query=GraphQLTemplates.QUERY_PROJECT_ITEMS_BY_VIEW.value.template,
+            query=query_template,
             variables={
                 "owner": owner,
                 "repo_name": repo_name,

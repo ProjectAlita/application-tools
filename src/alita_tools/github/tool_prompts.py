@@ -710,48 +710,21 @@ class GraphQLTemplates(Enum):
                     layout
                     fields(first: 30) {
                         nodes {
-                            ... on ProjectV2SingleSelectField {
-                                id
-                                name
-                                options {
-                                    id
-                                    name
-                                }
-                            }
-                            ... on ProjectV2FieldCommon {
-                                id
-                                name
-                                dataType
-                            }
+                            id
+                            name
+                            dataType
                         }
                     }
-                    items: items(first: $items_count) {
+                    items(first: $items_count) {
                         nodes {
                             id
-                            fieldValues(first: 30) {
-                                nodes {
-                                    ... on ProjectV2ItemFieldTextValue {
-                                        field { ... on ProjectV2FieldCommon { name } }
-                                        text
-                                    }
-                                    ... on ProjectV2ItemFieldDateValue {
-                                        field { ... on ProjectV2FieldCommon { name } }
-                                        date
-                                    }
-                                    ... on ProjectV2ItemFieldSingleSelectValue {
-                                        field { ... on ProjectV2FieldCommon { name } }
-                                        name
-                                        optionId
-                                    }
-                                }
-                            }
+                            type
                             content {
                                 ... on Issue {
                                     id
                                     number
                                     title
                                     state
-                                    body
                                     url
                                     createdAt
                                     updatedAt
@@ -762,29 +735,23 @@ class GraphQLTemplates(Enum):
                                             color
                                         }
                                     }
-                                    assignees(first: 5) {
-                                        nodes {
-                                            id
-                                            login
-                                            name
-                                        }
+                                }
+                            }
+                            fieldValues(first: 30) {
+                                nodes {
+                                    ... on ProjectV2ItemFieldTextValue {
+                                        field { name }
+                                        text
                                     }
-                                }
-                                ... on PullRequest {
-                                    id
-                                    number
-                                    title
-                                    state
-                                    body
-                                    url
-                                    createdAt
-                                    updatedAt
-                                }
-                                ... on DraftIssue {
-                                    id
-                                    title
-                                    body
-                                    createdAt
+                                    ... on ProjectV2ItemFieldDateValue {
+                                        field { name }
+                                        date
+                                    }
+                                    ... on ProjectV2ItemFieldSingleSelectValue {
+                                        field { name }
+                                        name
+                                        optionId
+                                    }
                                 }
                             }
                         }
