@@ -5,7 +5,6 @@ import fnmatch
 import tiktoken
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple, Union
-from json import dumps
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -216,7 +215,7 @@ class GitHubClient(BaseModel):
         Returns:
             str: List of file paths, or an error message.
         """
-        return dumps(self._get_files(directory_path, self.active_branch, repo_name))
+        return self._get_files(directory_path, self.active_branch, repo_name)
 
     def get_issue(self, issue_number: int, repo_name: Optional[str] = None) -> str:
         """
@@ -244,7 +243,7 @@ class GitHubClient(BaseModel):
                 "labels": [label.name for label in issue.labels],
                 "assignees": [assignee.login for assignee in issue.assignees]
             }
-            return dumps(issue_data)
+            return issue_data
         except Exception as e:
             return f"Failed to get issue: {str(e)}"
 
@@ -258,7 +257,7 @@ class GitHubClient(BaseModel):
         Returns:
             str: A plaintext report containing the paths and names of the files.
         """
-        return dumps(self._get_files("", self.github_base_branch, repo_name))
+        return self._get_files("", self.github_base_branch, repo_name)
 
     def list_files_in_bot_branch(self, repo_name: Optional[str] = None) -> str:
         """
@@ -270,7 +269,7 @@ class GitHubClient(BaseModel):
         Returns:
             str: A plaintext report containing the paths and names of the files.
         """
-        return dumps(self._get_files("", self.active_branch, repo_name))
+        return self._get_files("", self.active_branch, repo_name)
 
     def get_commits(
             self,
@@ -323,11 +322,11 @@ class GitHubClient(BaseModel):
                 for commit in commits
             ]
 
-            return dumps(commit_list)
+            return commit_list
 
         except Exception as e:
             # Return error as JSON instead of plain text
-            return dumps({"error": str(e), "message": f"Unable to retrieve commits due to error: {str(e)}"})
+            return {"error": str(e), "message": f"Unable to retrieve commits due to error: {str(e)}"}
 
     def get_pull_request(self, pr_number: str, repo_name: Optional[str] = None) -> str:
         """
@@ -393,7 +392,7 @@ class GitHubClient(BaseModel):
                     total_tokens += get_tokens(commit_str)
                 page += 1
             add_to_dict(response_dict, "commits", str(commits))
-            return dumps(response_dict)
+            return response_dict
         except Exception as e:
             return f"Failed to get pull request: {str(e)}"
 
@@ -428,10 +427,10 @@ class GitHubClient(BaseModel):
                         "changes": file.changes
                     }
                 )
-            return dumps(data)
+            return data
         except Exception as e:
             # Return error as JSON instead of plain string
-            return dumps({"error": str(e), "message": f"Failed to get pull request diffs: {str(e)}"})
+            return {"error": str(e), "message": f"Failed to get pull request diffs: {str(e)}"}
 
     def create_branch(self, proposed_branch_name: str, repo_name: Optional[str] = None) -> str:
         """
@@ -931,7 +930,7 @@ class GitHubClient(BaseModel):
             repo = self.github_api.get_repo(repo_name) if repo_name else self.github_repo_instance
             branches = repo.get_branches()
             branch_list = [{"name": branch.name, "protected": branch.protected} for branch in branches]
-            return dumps(branch_list)
+            return branch_list
         except Exception as e:
             return f"Failed to list branches: {str(e)}"
             
@@ -1006,7 +1005,7 @@ class GitHubClient(BaseModel):
                 "inputs": inputs or {}
             }
             
-            return dumps(result)
+            return result
         except Exception as e:
             return f"An error occurred while triggering workflow: {str(e)}"
     
@@ -1058,13 +1057,13 @@ class GitHubClient(BaseModel):
                 "url": run.html_url
             }
             
-            return dumps(result)
+            return result
         except Exception as e:
             # Return error as JSON instead of plain text
-            return dumps({
+            return {
                 "error": True,
                 "message": f"An error occurred while getting workflow status: {str(e)}"
-            })
+            }
     
     def get_workflow_logs(self, run_id: str, repo_name: Optional[str] = None) -> str:
         """
@@ -1099,12 +1098,12 @@ class GitHubClient(BaseModel):
                             log_contents[file_name] = log_file.read().decode('utf-8', errors='replace')
                 
                 # Return the extracted logs
-                return dumps({
+                return {
                     "run_id": run.id,
                     "status": run.status,
                     "conclusion": run.conclusion,
                     "logs": log_contents
-                })
+                }
             except Exception as e:
                 # Fallback approach: Get logs from individual jobs
                 jobs = list(run.get_jobs())
@@ -1129,13 +1128,13 @@ class GitHubClient(BaseModel):
                         "logs_url": job.logs_url if hasattr(job, 'logs_url') else "No direct logs URL available"
                     })
                 
-                return dumps({
+                return {
                     "run_id": run.id,
                     "status": run.status,
                     "conclusion": run.conclusion,
                     "job_details": job_logs,
                     "note": "Full logs couldn't be retrieved directly. Only job details are available."
-                })
+                }
         except Exception as e:
             return f"An error occurred while getting workflow logs: {str(e)}"
             
@@ -1220,7 +1219,7 @@ class GitHubClient(BaseModel):
                 for issue in issues
             ]
             
-            return dumps(issue_list)
+            return issue_list
         except Exception as e:
             return f"Failed to get issues: {str(e)}"
             
@@ -1253,7 +1252,7 @@ class GitHubClient(BaseModel):
                 }
                 pr_list.append(pr_data)
                 
-            return dumps(pr_list)
+            return pr_list
         except Exception as e:
             return f"Failed to list open pull requests: {str(e)}"
     

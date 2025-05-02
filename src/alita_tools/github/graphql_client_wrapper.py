@@ -1,5 +1,4 @@
 from typing import Any, Dict, List, Optional, Tuple, Union
-from json import dumps
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -64,8 +63,7 @@ class GraphQLClientWrapper(BaseModel):
         Returns:
             str: JSON string with project details or an error message.
         """
-        result = self.graphql_client.get_project(owner, repo_name, project_title)
-        return dumps(result)
+        return self.graphql_client.get_project(owner, repo_name, project_title)
     
     def get_issue_repo(self, owner: str, repo_name: str) -> str:
         """
@@ -78,8 +76,7 @@ class GraphQLClientWrapper(BaseModel):
         Returns:
             str: JSON string with repository details or an error message.
         """
-        result = self.graphql_client.get_issue_repo(owner, repo_name)
-        return dumps(result)
+        return self.graphql_client.get_issue_repo(owner, repo_name)
     
     def get_project_fields(self, project: Dict[str, Any], fields: Optional[Dict[str, List[str]]] = None,
                           available_labels: Optional[List[Dict[str, Any]]] = None,
@@ -146,8 +143,7 @@ class GraphQLClientWrapper(BaseModel):
         Returns:
             str: JSON string containing the update response or an error message.
         """
-        result = self.graphql_client.update_issue(issue_id, title, body)
-        return dumps(result)
+        return self.graphql_client.update_issue(issue_id, title, body)
     
     def update_issue_fields(self, project_id: str, item_id: str, issue_item_id: str,
                            fields: List[Dict[str, Any]], item_label_ids: List[str] = None,
@@ -380,18 +376,13 @@ class GraphQLClientWrapper(BaseModel):
         """
         try:
             owner_name, repo_name = self._parse_repo(board_repo)
-            
-            result = self.graphql_client.list_project_issues(
+               
+            return self.graphql_client.list_project_issues(
                 owner=owner_name,
                 repo_name=repo_name,
                 project_number=project_number,
                 items_count=items_count
             )
-            
-            if isinstance(result, str):  # Error message
-                return result
-                
-            return dumps(result, default=str)
             
         except Exception as e:
             return f"An error occurred while listing project issues: {str(e)}"
@@ -433,20 +424,15 @@ class GraphQLClientWrapper(BaseModel):
                 return "Invalid search query. Please provide a valid search string."
 
             owner_name, repo_name = self._parse_repo(board_repo)
-            
-            # Use server-side filtering via GraphQL API
-            result = self.graphql_client.search_project_issues(
+          
+                
+            return self.graphql_client.search_project_issues(
                 owner=owner_name,
                 repo_name=repo_name,
                 project_number=project_number,
                 search_query=search_query,
                 items_count=items_count
             )
-            
-            if isinstance(result, str):  # Error message
-                return result
-                
-            return dumps(result, default=str)
             
         except ValueError as e:
             # Re-raise ValueError for the invalid parameter tests to catch
@@ -463,15 +449,13 @@ class GraphQLClientWrapper(BaseModel):
             return f"Invalid repository format: {str(e)}"
         
         try:
-            result = self.graphql_client.get_project_views(
+            return self.graphql_client.get_project_views(
                 owner=owner_name,
                 repo_name=repo_name,
                 project_number=project_number,
                 first=first,
                 after=after
             )
-            
-            return dumps(result, default=str)
             
         except Exception as e:
             return f"Failed to list project views: {str(e)}"
@@ -486,7 +470,8 @@ class GraphQLClientWrapper(BaseModel):
             return f"Invalid repository format: {str(e)}"
         
         try:
-            result = self.graphql_client.get_project_items_by_view(
+            
+            return self.graphql_client.get_project_items_by_view(
                 owner=owner_name,
                 repo_name=repo_name,
                 project_number=project_number,
@@ -495,8 +480,6 @@ class GraphQLClientWrapper(BaseModel):
                 cursor=after,       # Use cursor instead of after
                 filter_by=filter_by
             )
-            
-            return dumps(result, default=str)
             
         except Exception as e:
             return f"Failed to get project items by view: {str(e)}"
