@@ -1,23 +1,25 @@
-import json
-import logging
+import hashlib
 import re
-import traceback
-from json import JSONDecodeError
-from typing import List, Optional, Any, Dict, Callable, Generator
-
+import os
+import logging
+import hashlib
 import requests
-from langchain_community.document_loaders.confluence import ContentFormat
+import json
+import base64
+import io
+import traceback
+from typing import Optional, List, Any, Dict, Callable, Generator
+from json import JSONDecodeError
+
+from pydantic import Field, PrivateAttr, model_validator, create_model, SecretStr
+from enum import Enum
+from tenacity import retry, stop_after_attempt, wait_exponential, before_sleep_log
+
 from langchain_core.documents import Document
 from langchain_core.tools import ToolException
+from langchain_core.messages import HumanMessage
 from markdownify import markdownify
-from pydantic import create_model, Field, model_validator, SecretStr
-from pydantic.fields import PrivateAttr
-from tenacity import (
-    before_sleep_log,
-    retry,
-    stop_after_attempt,
-    wait_exponential,
-)
+from langchain_community.document_loaders.confluence import ContentFormat
 
 from ..elitea_base import BaseToolApiWrapper
 from ..utils import is_cookie_token, parse_cookie_string
@@ -138,6 +140,12 @@ loaderParams = create_model(
     bins_with_llm=(Optional[bool], Field(description="Use LLM for processing binary files.", default=False)),
 )
 
+GetPageWithImageDescriptions = create_model(
+    "GetPageWithImageDescriptionsModel",
+    page_id=(str, Field(description="Confluence page ID from which content with images will be extracted")),
+    prompt=(Optional[str], Field(description="Custom prompt to use for image description generation. If not provided, a default prompt will be used", default=None)),
+    context_radius=(Optional[int], Field(description="Number of characters to include before and after each image for context. Default is 500", default=500))
+)
 
 def parse_payload_params(params: Optional[str]) -> Dict[str, Any]:
     if params:
@@ -147,6 +155,47 @@ def parse_payload_params(params: Optional[str]) -> Dict[str, Any]:
             stacktrace = traceback.format_exc()
             return ToolException(f"Confluence tool exception. Passed params are not valid JSON. {stacktrace}")
     return {}
+
+class ImageDescriptionCache:
+    """Cache for image descriptions to avoid processing the same image multiple times"""
+    
+    def __init__(self, max_size=50):
+        self.cache = {}  # content_hash -> description
+        self.max_size = max_size
+        
+    def get(self, image_data, image_name=""):
+        """Get a cached description if available"""
+        if not image_data:
+            return None
+            
+        # Generate a content hash for the image
+        content_hash = hashlib.md5(image_data).hexdigest()
+        
+        # Create a composite key that includes the image name when available
+        cache_key = f"{content_hash}_{image_name}" if image_name else content_hash
+        
+        return self.cache.get(cache_key)
+    
+    def set(self, image_data, description, image_name=""):
+        """Cache a description for an image"""
+        if not image_data or not description:
+            return
+            
+        # Generate content hash
+        content_hash = hashlib.md5(image_data).hexdigest()
+        
+        # Create a composite key that includes the image name when available
+        cache_key = f"{content_hash}_{image_name}" if image_name else content_hash
+        
+        # Only cache if we have room or if evicting one entry is enough
+        if len(self.cache) < self.max_size:
+            self.cache[cache_key] = description
+        else:
+            # Simple LRU: just remove a random entry if we're at capacity
+            if len(self.cache) >= self.max_size:
+                # Remove one entry to make room
+                self.cache.pop(next(iter(self.cache)))
+                self.cache[cache_key] = description
 
 class ConfluenceAPIWrapper(BaseToolApiWrapper):
     _client: Any = PrivateAttr()
@@ -171,6 +220,7 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
     keep_newlines: Optional[bool] = True
     alita: Any = None
     llm: Any = None
+    _image_cache: ImageDescriptionCache = PrivateAttr(default_factory=ImageDescriptionCache)
 
     @model_validator(mode='before')
     @classmethod
@@ -800,8 +850,456 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
         for document in loader._lazy_load(kwargs={}):
             yield document
 
-
+    def _download_image(self, image_url):
+        """
+        Download an image from a URL using the already authenticated Confluence client
         
+        Args:
+            image_url: URL to download the image from
+            
+        Returns:
+            Binary image data or None if download fails
+        """
+        try:
+            # Handle blob URLs by extracting the content ID and attachment name
+            if 'blob:' in image_url or 'media-blob-url=true' in image_url:
+                logger.info(f"Detected blob URL: {image_url}")
+                # Extract content ID from the URL if possible
+                content_id_match = re.search(r'contentId-(\d+)', image_url)
+                attachment_name_match = re.search(r'name=([^&]+)', image_url)
+                
+                if content_id_match and attachment_name_match:
+                    content_id = content_id_match.group(1)
+                    attachment_name = attachment_name_match.group(1)
+                    # URL decode the attachment name if needed
+                    import urllib.parse
+                    attachment_name = urllib.parse.unquote(attachment_name)
+                    
+                    logger.info(f"Extracted content ID: {content_id}, attachment name: {attachment_name}")
+                    
+                    # Find the attachment in the page
+                    try:
+                        attachments = self._client.get_attachments_from_content(content_id)['results']
+                        attachment = None
+                        
+                        # Find the attachment that matches the filename
+                        for att in attachments:
+                            if att['title'] == attachment_name:
+                                attachment = att
+                                break
+                        
+                        if attachment:
+                            # Get the download URL and retry with that
+                            download_url = self.base_url.rstrip('/') + attachment['_links']['download']
+                            logger.info(f"Found attachment, using download URL: {download_url}")
+                            # Recursive call with the direct download URL
+                            return self._download_image(download_url)
+                    except Exception as e:
+                        logger.warning(f"Error resolving blob URL attachment: {str(e)}")
+            
+            # Clean up the URL by removing query parameters if causing issues
+            parsed_url = image_url
+            if '?' in image_url and ('version=' in image_url or 'modificationDate=' in image_url):
+                # Keep only the path part for Confluence server URLs
+                parsed_url = image_url.split('?')[0]
+                logger.info(f"Removed query parameters from URL: {parsed_url}")
+            
+            # Extract the path from the URL - the client is already configured with base URL
+            # and authentication, so we just need the path part
+            relative_path = None
+            if parsed_url.startswith(self.base_url):
+                relative_path = parsed_url[len(self.base_url):]
+            else:
+                # Handle case where URL uses different base URL format
+                # Try common Confluence URL patterns
+                for pattern in ['/download/attachments/', '/download/thumbnails/']:
+                    if pattern in parsed_url:
+                        path_idx = parsed_url.find(pattern)
+                        if path_idx != -1:
+                            relative_path = parsed_url[path_idx:]
+                            break
+                
+                # If still no match, try to use the URL as is
+                if not relative_path:
+                    if parsed_url.startswith('http'):
+                        # For fully qualified URLs that don't match our base URL,
+                        # try a direct request as fallback
+                        logger.info(f"Using direct request for external URL: {parsed_url}")
+                        response = requests.get(
+                            parsed_url,
+                            headers={"User-Agent": "Mozilla/5.0 (compatible; ConfluenceAPI/1.0; Python)"},
+                            cookies=self._client.session.cookies.get_dict(),
+                            verify=True,
+                            allow_redirects=True,
+                            timeout=30
+                        )
+                        
+                        if response.status_code == 200:
+                            content_type = response.headers.get('Content-Type', '')
+                            if 'text/html' in content_type.lower():
+                                logger.warning(f"Received HTML content instead of image from direct request")
+                                return None
+                            return response.content
+                        else:
+                            logger.error(f"Direct request failed: {response.status_code}")
+                            return None
+                    else:
+                        relative_path = parsed_url
+            
+            # Remove leading slash if present
+            if relative_path and relative_path.startswith('/'):
+                relative_path = relative_path[1:]
+            
+            logger.info(f"Downloading image using relative path: {relative_path}")
+            
+            # Use the existing authenticated client to get the image
+            response = self._client.request(
+                method="GET",
+                path=relative_path,
+                advanced_mode=True,
+                headers={"User-Agent": "Mozilla/5.0 (compatible; ConfluenceAPI/1.0; Python)"}
+            )
+            
+            # Check if we got a successful response
+            if response.status_code == 200:
+                content = response.content
+                content_type = response.headers.get('Content-Type', '')
+                logger.info(f"Downloaded image successfully. Content type: {content_type}")
+                
+                # Check for HTML content which likely indicates an error or login page
+                if 'text/html' in content_type.lower():
+                    logger.warning(f"Received HTML content instead of image. Authentication issue likely.")
+                    return None
+                
+                # Basic validation of image data - ensure we actually got image data
+                if len(content) < 100:
+                    logger.warning(f"Downloaded content suspiciously small ({len(content)} bytes), might not be a valid image")
+                    return None
+                
+                return content
+            else:
+                logger.error(f"Failed to download image: HTTP {response.status_code} - {response.reason}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error downloading image from {image_url}: {str(e)}")
+            return None
+            
+    def _get_default_image_analysis_prompt(self) -> str:
+        """
+        Get a default prompt for image analysis
+        
+        Returns:
+            Default prompt string
+        """
+        return """
+        ## Image Analysis Task:
+        Analyze this image in detail, paying special attention to contextual information provided about it. 
+        Focus on:
+        1. Visual elements and their arrangement
+        2. Any text visible in the image
+        3. UI components if it's a screenshot
+        4. Diagrams, charts, or technical illustrations
+        5. The overall context and purpose of the image
+        
+        ## Instructions:
+        - Begin your description by referencing the image name provided
+        - Provide a comprehensive description that could substitute for the image
+        - Incorporate the surrounding content in your analysis to provide contextual relevance
+        - Explain how this image relates to the content being discussed
+        - Format your response clearly with appropriate paragraph breaks
+        - Make it short
+        """
+        
+    def _collect_context_for_image(self, content: str, image_marker: str, context_radius: int = 500) -> str:
+        """
+        Collect text context around an image reference
+        
+        Args:
+            content: The full content text
+            image_marker: The image reference marker
+            context_radius: Number of characters to include before and after each image for context
+            
+        Returns:
+            Context text
+        """
+        try:
+            start_idx = max(0, content.find(image_marker) - context_radius)
+            end_idx = min(len(content), content.find(image_marker) + len(image_marker) + context_radius)
+            
+            # Extract the surrounding text
+            context = content[start_idx:end_idx]
+            
+            # Clean up the context by removing excessive whitespace
+            context = re.sub(r'\s+', ' ', context).strip()
+            
+            return context
+        except Exception as e:
+            logger.error(f"Error collecting context for image: {str(e)}")
+            return ""
+            
+    def _process_image_with_llm(self, image_data, image_name: str = "", context_text: str = "", custom_prompt: str = None):
+        """
+        Process an image with LLM including surrounding context
+        
+        Args:
+            image_data: Binary image data
+            image_name: Name of the image for reference
+            context_text: Surrounding text context
+            custom_prompt: Optional custom prompt for the LLM
+            
+        Returns:
+            Generated description from the LLM
+        """
+        # Check cache first to avoid redundant processing
+        cached_description = self._image_cache.get(image_data, image_name)
+        if cached_description:
+            logger.info(f"Using cached description for image: {image_name}")
+            return cached_description
+            
+        try:
+            from io import BytesIO
+            from PIL import Image, UnidentifiedImageError
+            
+            # Get the LLM instance
+            llm = self.llm
+            if not llm:
+                return "[LLM not available for image processing]"
+            
+            # Try to load and validate the image with PIL
+            try:
+                bio = BytesIO(image_data)
+                bio.seek(0)
+                image = Image.open(bio)
+                # Force load the image to validate it
+                image.load()
+                # Get format directly from PIL
+                image_format = image.format.lower() if image.format else "png"
+            except UnidentifiedImageError:
+                logger.warning(f"PIL cannot identify the image format for {image_name}")
+                return f"[Could not identify image format for {image_name}]"
+            except Exception as img_error:
+                logger.warning(f"Error loading image {image_name}: {str(img_error)}")
+                return f"[Error loading image {image_name}: {str(img_error)}]"
+            
+            try:
+                # Convert image to base64
+                buffer = BytesIO()
+                image.save(buffer, format=image_format.upper())
+                buffer.seek(0)
+                base64_string = base64.b64encode(buffer.read()).decode('utf-8')
+            except Exception as conv_error:
+                logger.warning(f"Error converting image {image_name}: {str(conv_error)}")
+                return f"[Error converting image {image_name}: {str(conv_error)}]"
+            
+            # Use default or custom prompt
+            prompt = custom_prompt if custom_prompt else self._get_default_image_analysis_prompt()
+            
+            # Add context information if available
+            if image_name or context_text:
+                prompt += "\n\n## Additional Context Information:\n"
+                
+                if image_name:
+                    prompt += f"- Image Name/Reference: {image_name}\n"
+                
+                if context_text:
+                    prompt += f"- Surrounding Content: {context_text}\n"
+                    
+                prompt += "\nPlease incorporate this contextual information in your description when relevant."
+            
+            # Perform LLM invocation with image
+            result = llm.invoke([
+                HumanMessage(
+                    content=[
+                        {"type": "text", "text": prompt},
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/{image_format};base64,{base64_string}"},
+                        },
+                    ]
+                )
+            ])
+            
+            description = result.content
+            
+            # Cache the result for future use
+            self._image_cache.set(image_data, description, image_name)
+            
+            return description
+        except Exception as e:
+            logger.error(f"Error processing image with LLM: {str(e)}")
+            return f"[Image processing error: {str(e)}]"
+
+    def get_page_with_image_descriptions(self, page_id: str, prompt: Optional[str] = None, context_radius: int = 500):
+        """
+        Get a Confluence page and augment any images in it with textual descriptions that include
+        image names and contextual information from surrounding text.
+        
+        This method will:
+        1. Extract the specified page content from Confluence
+        2. Detect images in the content (both attachments and embedded/linked images)
+        3. Retrieve and process each image with an LLM, providing surrounding context
+        4. Replace image references with the generated text descriptions
+        
+        Args:
+            page_id: The Confluence page ID to retrieve
+            prompt: Custom prompt for the LLM when analyzing images. If None, a default prompt will be used.
+            context_radius: Number of characters to include before and after each image for context. Default is 500.
+            
+        Returns:
+            The page content with image references replaced with contextual descriptions
+        """
+        try:
+            # Get the page content
+            page = self._client.get_page_by_id(page_id, expand="body.storage")
+            if not page:
+                return f"Page with ID {page_id} not found."
+                
+            page_title = page['title']
+            page_content = page['body']['storage']['value']
+            
+            # Regular expressions to find different types of image references in Confluence markup:
+            
+            # 1. Attachment-based images - <ac:image><ri:attachment ri:filename="image.png" /></ac:image>
+            attachment_image_pattern = r'<ac:image[^>]*>(?:.*?)<ri:attachment ri:filename="([^"]+)"[^>]*/>(?:.*?)</ac:image>'
+            
+            # 2. URL-based images - <ac:image><ri:url ri:value="http://example.com/image.png" /></ac:image>
+            url_image_pattern = r'<ac:image[^>]*>(?:.*?)<ri:url ri:value="([^"]+)"[^>]*/>(?:.*?)</ac:image>'
+            
+            # 3. Base64 embedded images - <ac:image><ac:resource>...<ac:media-type>image/png</ac:media-type><ac:data>(base64 data)</ac:data></ac:resource></ac:image>
+            base64_image_pattern = r'<ac:image[^>]*>(?:.*?)<ac:resource>(?:.*?)<ac:media-type>([^<]+)</ac:media-type>(?:.*?)<ac:data>([^<]+)</ac:data>(?:.*?)</ac:resource>(?:.*?)</ac:image>'
+            
+            # Process attachment-based images
+            def process_attachment_image(match):
+                """Process attachment-based image references and get contextual descriptions"""
+                image_filename = match.group(1)
+                full_match = match.group(0)  # The complete image reference
+                
+                logger.info(f"Processing attachment image reference: {image_filename}")
+                
+                try:
+                    # Get the image attachment from the page
+                    attachments = self._client.get_attachments_from_content(page_id)['results']
+                    attachment = None
+                    
+                    # Find the attachment that matches the filename
+                    for att in attachments:
+                        if att['title'] == image_filename:
+                            attachment = att
+                            break
+                    
+                    if not attachment:
+                        logger.warning(f"Could not find attachment for image: {image_filename}")
+                        return f"[Image: {image_filename} - attachment not found]"
+                    
+                    # Get the download URL and download the image
+                    download_url = self.base_url.rstrip('/') + attachment['_links']['download']
+                    logger.info(f"Downloading image from URL: {download_url}")
+                    image_data = self._download_image(download_url)
+                    
+                    if not image_data:
+                        logger.error(f"Failed to download image from URL: {download_url}")
+                        return f"[Image: {image_filename} - download failed]"
+                    
+                    # Collect surrounding context
+                    context_text = self._collect_context_for_image(page_content, full_match, context_radius)
+                    
+                    # Process with LLM (will use cache if available)
+                    description = self._process_image_with_llm(image_data, image_filename, context_text, prompt)
+                    return f"[Image {image_filename} Description: {description}]"
+                    
+                except Exception as e:
+                    logger.error(f"Error processing attachment image {image_filename}: {str(e)}")
+                    return f"[Image: {image_filename} - Error: {str(e)}]"
+            
+            # Process URL-based images
+            def process_url_image(match):
+                """Process URL-based image references and get contextual descriptions"""
+                image_url = match.group(1)
+                full_match = match.group(0)  # The complete image reference
+                
+                logger.info(f"Processing URL image reference: {image_url}")
+                
+                try:
+                    # Extract image name from URL for better reference
+                    image_name = image_url.split('/')[-1]
+                    
+                    # Download the image
+                    logger.info(f"Downloading image from URL: {image_url}")
+                    image_data = self._download_image(image_url)
+                    
+                    if not image_data:
+                        logger.error(f"Failed to download image from URL: {image_url}")
+                        return f"[Image: {image_name} - download failed]"
+                    
+                    # Collect surrounding context
+                    context_text = self._collect_context_for_image(page_content, full_match, context_radius)
+                    
+                    # Process with LLM (will use cache if available)
+                    description = self._process_image_with_llm(image_data, image_name, context_text, prompt)
+                    return f"[Image {image_name} Description: {description}]"
+                    
+                except Exception as e:
+                    logger.error(f"Error processing URL image {image_url}: {str(e)}")
+                    return f"[Image: {image_url} - Error: {str(e)}]"
+            
+            # Process base64 embedded images
+            def process_base64_image(match):
+                """Process base64 embedded image references and get contextual descriptions"""
+                media_type = match.group(1)
+                base64_data = match.group(2)
+                full_match = match.group(0)  # The complete image reference
+                
+                logger.info(f"Processing base64 embedded image of type: {media_type}")
+                
+                try:
+                    # Generate a name for the image based on media type
+                    image_format = media_type.split('/')[-1]
+                    image_name = f"embedded-image.{image_format}"
+                    
+                    # Decode base64 data
+                    try:
+                        image_data = base64.b64decode(base64_data)
+                    except Exception as e:
+                        logger.error(f"Failed to decode base64 image data: {str(e)}")
+                        return f"[Image: embedded {media_type} - decode failed]"
+                    
+                    # Collect surrounding context
+                    context_text = self._collect_context_for_image(page_content, full_match, context_radius)
+                    
+                    # Process with LLM (will use cache if available)
+                    description = self._process_image_with_llm(image_data, image_name, context_text, prompt)
+                    return f"[Image {image_name} Description: {description}]"
+                    
+                except Exception as e:
+                    logger.error(f"Error processing base64 image: {str(e)}")
+                    return f"[Image: embedded {media_type} - Error: {str(e)}]"
+            
+            # Replace each type of image reference with its description
+            processed_content = page_content
+            
+            # 1. Process attachment-based images
+            processed_content = re.sub(attachment_image_pattern, process_attachment_image, processed_content)
+            
+            # 2. Process URL-based images
+            processed_content = re.sub(url_image_pattern, process_url_image, processed_content)
+            
+            # 3. Process base64 embedded images
+            processed_content = re.sub(base64_image_pattern, process_base64_image, processed_content)
+            
+            # Convert HTML to markdown for easier readability
+            try:
+                augmented_markdown = markdownify(processed_content, heading_style="ATX")
+                return f"Page '{page_title}' (ID: {page_id}) with image descriptions:\n\n{augmented_markdown}"
+            except Exception as e:
+                logger.warning(f"Failed to convert to markdown: {str(e)}. Returning HTML content.")
+                # If markdownify fails, return the processed HTML
+                return f"Page '{page_title}' (ID: {page_id}) with image descriptions:\n\n{processed_content}"
+            
+        except Exception as e:
+            stacktrace = traceback.format_exc()
+            logger.error(f"Error processing page with images: {stacktrace}")
+            return f"Error processing page with images: {str(e)}"
 
     def get_available_tools(self):
         return [
@@ -894,6 +1392,12 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
                 "ref": self.site_search,
                 "description": self.site_search.__doc__,
                 "args_schema": siteSearch,
+            },
+            {
+                "name": "get_page_with_image_descriptions",
+                "ref": self.get_page_with_image_descriptions,
+                "description": self.get_page_with_image_descriptions.__doc__,
+                "args_schema": GetPageWithImageDescriptions,
             },
             {
                 "name": "execute_generic_confluence",

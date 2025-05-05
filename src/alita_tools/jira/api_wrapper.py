@@ -989,7 +989,7 @@ class JiraApiWrapper(BaseToolApiWrapper):
 
     def _download_attachment(self, attachment_url):
         """
-        Download an attachment from a URL with appropriate authentication
+        Download an attachment from a URL using the already authenticated Jira client
         
         Args:
             attachment_url: URL to the attachment
@@ -998,49 +998,25 @@ class JiraApiWrapper(BaseToolApiWrapper):
             Binary content of the attachment or None if failed
         """
         try:
-            import requests
-            import base64
-            from bs4 import BeautifulSoup
+            # Extract the path from the URL - the client is already configured with base URL
+            # and authentication, so we just need the path part
+            if attachment_url.startswith(self.base_url):
+                relative_path = attachment_url[len(self.base_url):]
+            else:
+                relative_path = attachment_url
             
-            # Handle authentication
-            auth = None
-            headers = {}
-            cookies = {}
+            # Remove leading slash if present
+            if relative_path.startswith('/'):
+                relative_path = relative_path[1:]
             
-            # Use appropriate authentication method based on available credentials
-            if hasattr(self, 'username') and self.username:
-                if hasattr(self, 'api_key') and self.api_key:
-                    # Using username/API key authentication
-                    auth = (self.username, self.api_key.get_secret_value())
-                    logger.info(f"Using basic auth with username: {self.username}")
+            logger.info(f"Downloading attachment using relative path: {relative_path}")
             
-            if hasattr(self, 'token') and self.token:
-                token_value = self.token.get_secret_value()
-                # Check if it's a cookie-based token
-                if is_cookie_token(token_value):
-                    # Parse cookies and add them to the request
-                    cookies = parse_cookie_string(token_value)
-                    logger.info(f"Using cookie-based authentication with {len(cookies)} cookies")
-                else:
-                    # Using token authentication (for Jira Cloud)
-                    headers["Authorization"] = f"Bearer {token_value}"
-                    logger.info("Using Bearer token authentication")
-            
-            # Make direct request with session to handle cookies and redirects
-            session = requests.Session()
-            session.cookies.update(cookies)
-            
-            # Set user-agent to avoid being blocked
-            headers["User-Agent"] = "Mozilla/5.0 (compatible; JiraAPI/1.0; Python)"
-            
-            # Allow redirects and increase timeout
-            response = session.get(
-                attachment_url,
-                auth=auth,
-                headers=headers,
-                verify=self.verify_ssl,
-                allow_redirects=True,
-                timeout=30
+            # Use the existing authenticated client to get the attachment
+            response = self._client.request(
+                method="GET",
+                path=relative_path,
+                advanced_mode=True,
+                headers={"User-Agent": "Mozilla/5.0 (compatible; JiraAPI/1.0; Python)"}
             )
             
             # Check if we got a successful response
@@ -1051,46 +1027,17 @@ class JiraApiWrapper(BaseToolApiWrapper):
                 
                 # Check for HTML content which likely indicates an error or login page
                 if 'text/html' in content_type.lower():
-                    # Try to extract error message from HTML
-                    try:
-                        soup = BeautifulSoup(content, 'html.parser')
-                        title = soup.title.string if soup.title else "Unknown error"
-                        # Check if it's a login page
-                        if 'log' in title.lower() or 'sign' in title.lower() or 'auth' in title.lower():
-                            logger.error(f"Authentication error: Received login page instead of attachment. Title: {title}")
-                            return None
-                        else:
-                            logger.error(f"Received HTML instead of image. Page title: {title}")
-                            # Log a snippet of the HTML for debugging
-                            html_preview = content.decode('utf-8', errors='replace')[:500]
-                            logger.debug(f"HTML preview: {html_preview}")
-                            return None
-                    except Exception as html_err:
-                        logger.error(f"Received HTML instead of attachment and couldn't parse: {html_err}")
-                        return None
+                    logger.warning(f"Received HTML instead of attachment data. Authentication issue likely.")
+                    return None
                 
                 # Basic validation of image data
-                if len(content) < 100:  # Too small to be a valid image
-                    logger.warning(f"Downloaded data is too small to be a valid image: {len(content)} bytes")
-                    # Show hex of first few bytes to help diagnose
-                    hex_preview = ' '.join([f'{b:02x}' for b in content[:16]])
-                    logger.warning(f"Data preview (hex): {hex_preview}")
-                    if len(content) < 50:
-                        # If it's text data, log it
-                        try:
-                            text_content = content.decode('utf-8', errors='replace')
-                            logger.warning(f"Content appears to be text: {text_content}")
-                        except Exception:
-                            pass
+                if len(content) < 100:
+                    logger.warning(f"Downloaded content suspiciously small ({len(content)} bytes)")
                     return None
                 
                 return content
             else:
                 logger.error(f"Failed to download attachment: HTTP {response.status_code} - {response.reason}")
-                try:
-                    logger.error(f"Response body: {response.text[:500]}")
-                except Exception:
-                    pass
                 return None
                 
         except Exception as e:
