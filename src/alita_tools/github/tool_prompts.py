@@ -224,6 +224,8 @@ class GraphQLTemplates(Enum):
         
         QUERY_LIST_PROJECT_ISSUES (Template): Template for a query to list all issues in a project with their details.
         
+        QUERY_LIST_PROJECT_ISSUES_PAGINATED (Template): Template for a query to list project issues with pagination support.
+        
         QUERY_SEARCH_PROJECT_ISSUES (Template): Template for a query to search for issues in a project by title, status, or any field value.
         
         MUTATION_CREATE_DRAFT_ISSUE (Template): Template for a mutation to create a draft issue in a specific project.
@@ -390,6 +392,79 @@ class GraphQLTemplates(Enum):
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+    """)
+
+    QUERY_LIST_PROJECT_ISSUES_PAGINATED = Template("""
+    query ProjectIssuesPaginated($owner: String!, $repo_name: String!, $project_number: Int!, $items_count: Int!, $after_cursor: String) {
+        repository(owner: $owner, name: $repo_name) {
+            projectV2(number: $project_number) {
+                # No need to fetch fields again, assuming they were fetched initially
+                items(first: $items_count, after: $after_cursor) {
+                    nodes {
+                        id
+                        type # Added type
+                        fieldValues(first: 30) {
+                            nodes {
+                                ... on ProjectV2ItemFieldTextValue {
+                                    field { ... on ProjectV2FieldCommon { id name } } # Added ID
+                                    text
+                                }
+                                ... on ProjectV2ItemFieldDateValue {
+                                    field { ... on ProjectV2FieldCommon { id name } } # Added ID
+                                    date
+                                }
+                                ... on ProjectV2ItemFieldSingleSelectValue {
+                                    field { ... on ProjectV2FieldCommon { id name } } # Added ID
+                                    name
+                                    optionId # Keep optionId
+                                    # Include option details if needed, e.g., for color
+                                    # option { id name color } 
+                                }
+                                # Add other field value types as needed (Iteration, Number, etc.)
+                            }
+                        }
+                        content {
+                            ... on Issue {
+                                id
+                                number
+                                title
+                                state
+                                url
+                                createdAt
+                                updatedAt
+                                labels(first: 10) {
+                                    nodes { id name color }
+                                }
+                                assignees(first: 5) {
+                                    nodes { id login name }
+                                }
+                            }
+                            ... on PullRequest {
+                                id
+                                number
+                                title
+                                state
+                                url
+                                createdAt
+                                updatedAt
+                            }
+                            ... on DraftIssue {
+                                id
+                                title
+                                createdAt
+                                updatedAt
+                            }
+                        }
+                    }
+                    pageInfo {
+                        endCursor
+                        hasNextPage
+                    }
+                    totalCount # Keep totalCount if useful
                 }
             }
         }
@@ -660,6 +735,7 @@ class GraphQLTemplates(Enum):
                         name
                         number
                         layout
+                        filter
                         fields(first: 20) {
                             nodes {
                                 ... on ProjectV2FieldCommon {
@@ -697,65 +773,79 @@ class GraphQLTemplates(Enum):
     }
     """)
 
+    # GraphQL query template for fetching project items filtered by view
     QUERY_PROJECT_ITEMS_BY_VIEW = Template("""
-    query ProjectItemsByView($owner: String!, $repo_name: String!, $project_number: Int!, $view_number: Int!, $items_count: Int = 100) {
-        repository(owner: $owner, name: $repo_name) {
-            projectV2(number: $project_number) {
-                id
-                title
-                url
-                # Fetch the specific view to confirm it exists
-                view(number: $view_number) {
-                    id
+    query GetProjectItemsWithViewFilter($project_id: ID!, $view_number: Int!, $items_count: Int!, $after_cursor: String) {
+      node(id: $project_id) {
+        ... on ProjectV2 {
+          title
+          url
+          view(number: $view_number) {
+            id
+            name
+            number
+            filter
+          }
+          items(first: $items_count, after: $after_cursor) {
+            nodes {
+              id
+              type
+              fieldValues(first: 30) {
+                nodes {
+                  ... on ProjectV2ItemFieldTextValue {
+                    field { ... on ProjectV2FieldCommon { id name } }
+                    text
+                  }
+                  ... on ProjectV2ItemFieldDateValue {
+                    field { ... on ProjectV2FieldCommon { id name } }
+                    date
+                  }
+                  ... on ProjectV2ItemFieldSingleSelectValue {
+                    field { ... on ProjectV2FieldCommon { id name } }
                     name
+                    optionId
+                  }
                 }
-                # Fetch all items for the project
-                items(first: $items_count) {
-                    nodes {
-                        id
-                        type
-                        content {
-                            ... on Issue {
-                                id
-                                number
-                                title
-                                state
-                                url
-                                createdAt
-                                updatedAt
-                                labels(first: 10) {
-                                    nodes { id name color }
-                                }
-                                assignees(first: 5) {
-                                    nodes { id login name }
-                                }
-                            }
-                            ... on PullRequest {
-                                id
-                                number
-                                title
-                                state
-                                url
-                                createdAt
-                                updatedAt
-                            }
-                            ... on DraftIssue {
-                                id
-                                title
-                                createdAt
-                                updatedAt
-                            }
-                        }
-                        # Include field values if needed later
-                        # fieldValues(first: 10) { ... }
-                    }
-                    pageInfo {
-                        endCursor
-                        hasNextPage
-                    }
-                    totalCount
+              }
+              content {
+                ... on Issue {
+                  id
+                  number
+                  title
+                  state
+                  url
+                  createdAt
+                  updatedAt
+                  labels(first: 10) {
+                    nodes { id name color }
+                  }
+                  assignees(first: 5) {
+                    nodes { id login name }
+                  }
                 }
+                ... on PullRequest {
+                  id
+                  number
+                  title
+                  state
+                  url
+                  createdAt
+                  updatedAt
+                }
+                ... on DraftIssue {
+                  id
+                  title
+                  createdAt
+                }
+              }
             }
+            pageInfo {
+              hasNextPage
+              endCursor
+            }
+            totalCount
+          }
         }
+      }
     }
     """)

@@ -595,35 +595,88 @@ class GraphQLClientWrapper(BaseModel):
             return f"An error occurred while listing project issues: {str(e)}"
     
     def _list_project_issues_internal(self, owner: str, repo_name: str, project_number: int, items_count: int = 100) -> Union[Dict[str, Any], str]:
-        result = self._run_graphql_query(
+        all_items = []
+        has_next_page = True
+        after_cursor = None
+        total_fetched = 0
+        max_per_page = 100 # GitHub's limit
+
+        # Fetch project details once (fields, etc.) - assuming these don't change between pages
+        initial_result = self._run_graphql_query(
             query=GraphQLTemplates.QUERY_LIST_PROJECT_ISSUES.value.template,
             variables={
                 "owner": owner,
                 "repo_name": repo_name,
                 "project_number": project_number,
-                "items_count": items_count
+                "items_count": 0 # Fetch 0 items initially just to get project structure/fields
             }
         )
+
+        if initial_result['error']:
+            return f"Error occurred while fetching initial project data: {initial_result['details']}"
         
-        if result['error']:
-            return f"Error occurred while listing project issues: {result['details']}"
-        
-        repository = result.get('data', {}).get('repository')
+        repository = initial_result.get('data', {}).get('repository')
         if not repository:
             return "No repository data found."
         
         project = repository.get('projectV2')
         if not project:
             return f"No project with number {project_number} found."
-            
-        # Process and format the project data
+
+        # Prepare the base structure for the final result
         formatted_result = {
             "id": project.get('id'),
             "title": project.get('title'),
             "url": project.get('url'),
             "fields": self._process_project_fields(project.get('fields', {}).get('nodes', [])),
-            "items": self._process_project_items(project.get('items', {}).get('nodes', []))
+            "items": [] # Will be populated with paginated items
         }
+
+        # Now paginate through items
+        while has_next_page and total_fetched < items_count:
+            fetch_count = min(max_per_page, items_count - total_fetched)
+            if fetch_count <= 0:
+                break # Reached the desired items_count
+
+            page_result = self._run_graphql_query(
+                query=GraphQLTemplates.QUERY_LIST_PROJECT_ISSUES_PAGINATED.value.template, # Use a paginated query
+                variables={
+                    "owner": owner,
+                    "repo_name": repo_name,
+                    "project_number": project_number,
+                    "items_count": fetch_count,
+                    "after_cursor": after_cursor
+                }
+            )
+
+            if page_result['error']:
+                # If an error occurs during pagination, return what we have so far with an error message
+                formatted_result['error_details'] = f"Error during pagination: {page_result['details']}"
+                formatted_result['items'] = self._process_project_items(all_items) # Process items gathered so far
+                return formatted_result # Return partial data + error
+
+            page_repository = page_result.get('data', {}).get('repository')
+            if not page_repository: continue # Should not happen if initial check passed, but safety first
+
+            page_project = page_repository.get('projectV2')
+            if not page_project: continue # Ditto
+
+            items_connection = page_project.get('items', {})
+            new_items = items_connection.get('nodes', [])
+            all_items.extend(new_items)
+            total_fetched += len(new_items)
+
+            page_info = items_connection.get('pageInfo', {})
+            has_next_page = page_info.get('hasNextPage', False)
+            after_cursor = page_info.get('endCursor')
+
+            # Break if GitHub returns fewer items than requested (means we reached the end)
+            if len(new_items) < fetch_count:
+                has_next_page = False
+
+
+        # Process all collected items
+        formatted_result['items'] = self._process_project_items(all_items)
         
         return formatted_result
     
@@ -749,108 +802,415 @@ class GraphQLClientWrapper(BaseModel):
             return f"Failed to list project views: {str(e)}"
     
     def get_project_items_by_view(self, board_repo: str, project_number: int, view_number: int,
-                                 first: int = 100, after: Optional[str] = None, 
-                                 filter_by: Optional[Dict[str, Dict[str, str]]] = None) -> str:
+                                  first: int = 100, after: Optional[str] = None,
+                                  filter_by: Optional[Dict[str, Dict[str, str]]] = None) -> Union[Dict[str, Any], str]:
         """
-        Retrieves items from a specific view in a GitHub project board.
+        Retrieves items in a GitHub project view by using GitHub's native view filtering.
         
         Args:
-            board_repo: The organization and repository for the board (project) in format 'org/repo'.
-            project_number: The project number as shown in the project URL.
-            view_number: The view number within the project.
-            first: Maximum number of items to retrieve.
-            after: Cursor for pagination.
-            filter_by: Optional filtering criteria.
-            
+            board_repo: The organization and repository for the board (project)
+            project_number: The project number (visible in project URL)
+            view_number: The view number to filter by
+            first: Maximum number of items to return
+            after: Cursor for pagination
+            filter_by: Optional additional custom filters to apply after GitHub's native filtering
+        
         Returns:
-            str: JSON string with project items data filtered by the specified view.
+            Union[Dict[str, Any], str]: Dictionary with project items filtered by the view or error message
         """
         try:
             owner_name, repo_name = self._parse_repo(board_repo)
-        except Exception as e:
+        except ValueError as e:
             return f"Invalid repository format: {str(e)}"
-        
+            
         try:
-            return self._get_project_items_by_view_internal(
+            # Get project ID first
+            views_result = self._get_project_views_internal(
                 owner=owner_name,
                 repo_name=repo_name,
-                project_number=project_number,
-                view_number=view_number,
-                items_count=first,
-                filter_by=filter_by
+                project_number=project_number
             )
+            
+            if isinstance(views_result, str):
+                return f"Error retrieving views: {views_result}"
+                
+            # Extract project ID from views result
+            project_id = views_result.get('projectId')
+            if not project_id:
+                return "Could not determine project ID from views"
+                
+            # Find the target view details
+            target_view = next(
+                (v for v in views_result.get('views', []) if v.get('number') == view_number), 
+                None
+            )
+            
+            if not target_view:
+                return f"View number {view_number} not found in project."
+                
+            # Query GitHub directly using the view number - this will use GitHub's native filtering
+            variables = {
+                "project_id": project_id,
+                "view_number": view_number,
+                "items_count": first,
+                "after_cursor": after
+            }
+            
+            # Use the GraphQL query that includes view filtering
+            result = self._run_graphql_query(
+                query=GraphQLTemplates.QUERY_PROJECT_ITEMS_BY_VIEW.value.template,
+                variables=variables
+            )
+            
+            if result['error']:
+                return f"Error occurred while fetching view items: {result['details']}"
+                
+            # Get the project data
+            project_data = result.get('data', {}).get('node')
+            if not project_data:
+                return f"Project with ID {project_id} not found."
+                
+            # Format the results
+            formatted_result = {
+                "projectId": project_id,
+                "projectTitle": project_data.get('title'),
+                "projectUrl": project_data.get('url'),
+                "currentView": {
+                    "id": project_data.get('view', {}).get('id'),
+                    "name": project_data.get('view', {}).get('name'),
+                    "number": project_data.get('view', {}).get('number'),
+                    "filterQuery": project_data.get('view', {}).get('filter')
+                },
+                "items": [],
+                "itemsPageInfo": {},
+                "itemsTotalCount": 0
+            }
+            
+            # Process items data
+            items_data = project_data.get('items', {})
+            formatted_result['items'] = self._process_project_items(items_data.get('nodes', []))
+            formatted_result['itemsTotalCount'] = items_data.get('totalCount', len(formatted_result['items']))
+            formatted_result['itemsPageInfo'] = items_data.get('pageInfo', {})
+            
+            # Apply additional client-side filtering if requested and necessary
+            if filter_by and 'custom' in filter_by:
+                formatted_result['items'] = self._apply_custom_filters(formatted_result['items'], filter_by['custom'])
+                formatted_result['itemsTotalCount'] = len(formatted_result['items'])
+                
+            return formatted_result
             
         except Exception as e:
             return f"Failed to get project items by view: {str(e)}"
     
-    def _get_project_items_by_view_internal(self, owner: str, repo_name: str, project_number: int, 
-                                view_number: int, items_count: int = 100, 
+    def _get_project_items_by_view_internal(self, view_id: str, items_count: int = 100, 
+                                after_cursor: Optional[str] = None,
                                 filter_by: Optional[Dict[str, Dict[str, str]]] = None) -> Union[Dict[str, Any], str]:
-        query_template = GraphQLTemplates.QUERY_PROJECT_ITEMS_BY_VIEW.value
-        query = query_template.safe_substitute(
-            owner="$owner",
-            repo_name="$repo_name",
-            project_number="$project_number",
-            view_number="$view_number",
-            items_count="$items_count" # Reinstate items_count
-        )
-
-        variables = {
-            "owner": owner,
-            "repo_name": repo_name,
-            "project_number": project_number,
-            "view_number": view_number,
-            "items_count": items_count # Reinstate items_count
-        }
+        """
+        Gets project items filtered by a specific view.
         
-        result = self._run_graphql_query(
-            query=query,
-            variables=variables
-        )
+        This method takes a view_id and view_number, fetches the project items directly,
+        and filters them client-side based on the view's filter criteria.
         
-        if result['error']:
-            # Basic error check
-            return f"Error occurred while retrieving project data: {result['details']}"
-        
-        repository = result.get('data', {}).get('repository')
-        if not repository:
-            return "No repository data found."
-        
-        project = repository.get('projectV2')
-        if not project:
-            return f"No project with number {project_number} found."
-        
-        view = project.get('view')
-        if not view:
-            # Check if the view number was the issue based on GraphQL error (more robust check)
-            graphql_errors = result.get('details', []) # Assuming errors are passed in 'details'
-            if isinstance(graphql_errors, list) and any("Could not resolve to a ProjectV2View with the number" in err.get('message', '') for err in graphql_errors):
-                 return f"No view with number {view_number} found in project {project_number} (GraphQL error)."
-            # Otherwise, view might be null for other reasons, but proceed if items exist
-            # Log a warning maybe? print(f"Warning: View number {view_number} resolved to null, but proceeding with items.")
-
-        # Process items fetched from the project level
-        project_items_data = project.get('items', {})
-        items = self._process_project_items(project_items_data.get('nodes', []))
-        page_info = project_items_data.get('pageInfo', {})
-        total_count = project_items_data.get('totalCount', 0)
+        Args:
+            view_id: Project ID, not view ID (confusing parameter name, maintained for backward compatibility)
+            items_count: Maximum number of items to retrieve
+            after_cursor: Cursor for pagination
+            filter_by: Additional client-side filter criteria
             
-        # Format the result including the view confirmation and the list of ALL project items
+        Returns:
+            Dict with filtered project items or error message
+        """
+        all_items = []
+        has_next_page = True
+        current_after_cursor = after_cursor
+        total_fetched = 0
+        max_per_page = 100 # GitHub's limit
+        
+        # Get view details from supplied view_id (if available)
+        # Note: view_id parameter was misleading in previous version - it's actually the project ID
+        project_id = view_id
+        
+        # Extract view number from the filter_by parameter if available
+        view_number = None
+        if filter_by and 'view' in filter_by and 'number' in filter_by['view']:
+            try:
+                view_number = int(filter_by['view']['number'])
+            except (ValueError, TypeError):
+                return "Invalid view number provided in filter_by parameter."
+        
+        # Prepare the base structure for the final result
         formatted_result = {
-            "projectId": project.get('id'),
-            "projectTitle": project.get('title'),
-            "projectUrl": project.get('url'),
-            "targetView": { # Info about the view we intended to query
+            "projectId": project_id,
+            "projectTitle": None,
+            "projectUrl": None,
+            "targetView": {
+                "id": None,
                 "number": view_number,
-                "id": view.get('id') if view else None,
-                "name": view.get('name') if view else None,
+                "name": None,
+                "filter": None
             },
-            "items": items, # Note: These are ALL project items, not yet filtered by the view
-            "itemsPageInfo": page_info,
-            "itemsTotalCount": total_count
+            "items": [],
+            "itemsPageInfo": {},
+            "itemsTotalCount": 0
         }
         
+        # If we don't have a view number, we can't filter by view
+        if not view_number:
+            return "View number is required for filtering by view. Provide it in the filter_by parameter."
+        
+        while has_next_page and total_fetched < items_count:
+            fetch_count = min(max_per_page, items_count - total_fetched)
+            if fetch_count <= 0:
+                break
+                
+            variables = {
+                "project_id": project_id,
+                "items_count": fetch_count,
+                "after_cursor": current_after_cursor,
+                "view_number": view_number
+            }
+            
+            result = self._run_graphql_query(
+                query=GraphQLTemplates.QUERY_PROJECT_ITEMS_BY_VIEW.value.template,
+                variables=variables
+            )
+            
+            if result['error']:
+                graphql_errors = result.get('details', [])
+                formatted_result['error_details'] = f"Error during query: {graphql_errors}"
+                return formatted_result
+                
+            # Get the project data
+            project_data = result.get('data', {}).get('node')
+            if not project_data:
+                return f"Project with ID {project_id} not found."
+                
+            # On first page, populate project and view details
+            if total_fetched == 0:
+                formatted_result["projectTitle"] = project_data.get('title')
+                formatted_result["projectUrl"] = project_data.get('url')
+                
+                # Get view details
+                view_data = project_data.get('view')
+                if view_data:
+                    formatted_result["targetView"]["id"] = view_data.get('id')
+                    formatted_result["targetView"]["name"] = view_data.get('name')
+                    formatted_result["targetView"]["number"] = view_data.get('number')
+                    formatted_result["targetView"]["filter"] = view_data.get('filter')
+                else:
+                    return f"View with number {view_number} not found in project."
+            
+            # Get items
+            items_data = project_data.get('items', {})
+            new_items = items_data.get('nodes', [])
+            page_info = items_data.get('pageInfo', {})
+            
+            # Apply client-side filtering based on view filter criteria
+            if formatted_result["targetView"]["filter"]:
+                view_filter = formatted_result["targetView"]["filter"]  # This is a string like "field:value"
+                filtered_items = self._filter_items_by_view_criteria(new_items, view_filter)
+                all_items.extend(filtered_items)
+                # We might need to fetch more items if many were filtered out
+                if len(filtered_items) < len(new_items) and page_info.get('hasNextPage', False):
+                    # Continue pagination to get more items since some were filtered out
+                    current_after_cursor = page_info.get('endCursor')
+                    continue
+            else:
+                # If no view filter, include all items
+                all_items.extend(new_items)
+            
+            total_fetched += len(new_items)
+            has_next_page = page_info.get('hasNextPage', False)
+            current_after_cursor = page_info.get('endCursor')
+            
+            # Break if GitHub returns fewer items than requested
+            if len(new_items) < fetch_count:
+                has_next_page = False
+                
+        # Process and format the collected items
+        formatted_result['items'] = self._process_project_items(all_items)
+        formatted_result['itemsTotalCount'] = items_data.get('totalCount', len(all_items))
+        formatted_result['itemsPageInfo'] = page_info
+        
+        # Apply additional client-side filtering if requested
+        if filter_by and 'custom' in filter_by:
+            # Example of applying custom filters beyond view filters
+            formatted_result['items'] = self._apply_custom_filters(formatted_result['items'], filter_by['custom'])
+            formatted_result['itemsTotalCount'] = len(formatted_result['items'])
+            
         return formatted_result
+        
+    def _filter_items_by_view_criteria(self, items: List[Dict[str, Any]], view_filter: str) -> List[Dict[str, Any]]:
+        """
+        Filter items based on view filter criteria.
+        
+        Handles various filter formats from GitHub views, including:
+        - field_name: value
+        - field_name:"value with spaces"
+        - field_name:value
+        
+        Args:
+            items: List of items to filter
+            view_filter: Filter string from view (e.g., "Status: In Progress", "release:\"R 1.6.0\"")
+            
+        Returns:
+            Filtered list of items
+        """
+        if not view_filter or not items:
+            return items
+            
+        import re
+        import logging
+        logger = logging.getLogger("github_view_filter")
+        
+        filtered_items = []
+        
+        try:
+            # More sophisticated parsing for different filter formats
+            # Handle quoted values like: release:"R 1.6.0"
+            quoted_pattern = r'(\w+):[\s]*"([^"]+)"'
+            # Handle simple key:value pairs like: is:open
+            simple_pattern = r'(\w+):[\s]*(\S+)'
+            # Handle colon-separated pairs like: "Status: In Progress"
+            colon_pattern = r'(.+?):\s+(.+)'
+            
+            # Try to match quoted pattern first
+            quoted_match = re.search(quoted_pattern, view_filter)
+            if quoted_match:
+                field_name, value = quoted_match.groups()
+                logger.info(f"Filtering by {field_name}=\"{value}\"")
+                return self._filter_by_field_value(items, field_name, value)
+                
+            # Next try simple key:value pattern
+            simple_match = re.search(simple_pattern, view_filter)
+            if simple_match:
+                field_name, value = simple_match.groups()
+                logger.info(f"Filtering by {field_name}:{value}")
+                return self._filter_by_field_value(items, field_name, value)
+                
+            # Finally try field: value pattern with spaces
+            colon_match = re.search(colon_pattern, view_filter)
+            if colon_match:
+                field_name, value = colon_match.groups()
+                field_name = field_name.strip()
+                value = value.strip()
+                logger.info(f"Filtering by {field_name}: {value}")
+                return self._filter_by_field_value(items, field_name, value)
+                
+            # If no patterns match, return all items
+            logger.warning(f"Could not parse filter criteria: {view_filter}")
+            return items
+                
+        except Exception as e:
+            # If filter parsing fails, log the error and return all items
+            logger.error(f"Error parsing filter criteria: {str(e)}")
+            return items
+            
+    def _filter_by_field_value(self, items: List[Dict[str, Any]], field_name: str, value: str) -> List[Dict[str, Any]]:
+        """
+        Helper method to filter items by field name and value.
+        
+        Args:
+            items: List of items to filter
+            field_name: Field name to filter by
+            value: Value to filter for
+            
+        Returns:
+            Filtered list of items
+        """
+        filtered_items = []
+        
+        # Special case for built-in GitHub filters
+        if field_name.lower() == "release":
+            for item in items:
+                # Look in all field values for anything related to releases or versions
+                field_values = item.get('fieldValues', [])
+                for field_value in field_values:
+                    # Check text fields for the release value
+                    if 'text' in field_value and value.lower() in field_value['text'].lower():
+                        filtered_items.append(item)
+                        break
+                    # Check option names for the release value
+                    elif 'optionName' in field_value and value.lower() in field_value['optionName'].lower():
+                        filtered_items.append(item)
+                        break
+            return filtered_items
+        
+        # Filter by standard field name and value
+        for item in items:
+            field_values = item.get('fieldValues', {}).get('nodes', [])
+            
+            # Check if any field value matches the filter criteria
+            item_matched = False
+            for field_value in field_values:
+                field_name_from_item = field_value.get('field', {}).get('name', '')
+                
+                # Skip if field names don't match
+                if field_name_from_item.lower() != field_name.lower():
+                    continue
+                    
+                # Check different field types
+                # Text fields
+                if 'text' in field_value and field_value['text'].lower() == value.lower():
+                    filtered_items.append(item)
+                    item_matched = True
+                    break
+                # Single select fields
+                elif 'optionName' in field_value and field_value['optionName'].lower() == value.lower():
+                    filtered_items.append(item)
+                    item_matched = True
+                    break
+                    
+            # If we didn't find a match in field values, also check the content
+            if not item_matched and 'content' in item:
+                content = item['content']
+                # For built-in GitHub fields like state, labels, etc.
+                if field_name.lower() == 'state' and content.get('state', '').lower() == value.lower():
+                    filtered_items.append(item)
+                elif field_name.lower() == 'label' or field_name.lower() == 'labels':
+                    labels = content.get('labels', [])
+                    if any(label.get('name', '').lower() == value.lower() for label in labels):
+                        filtered_items.append(item)
+        
+        return filtered_items
+    
+    def _apply_custom_filters(self, items: List[Dict[str, Any]], custom_filters: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        Apply custom filters beyond view filters.
+        
+        Args:
+            items: List of items to filter
+            custom_filters: Dictionary of custom filters
+            
+        Returns:
+            Filtered list of items
+        """
+        if not custom_filters or not items:
+            return items
+            
+        # Example implementation - extend as needed
+        filtered_items = []
+        
+        for item in items:
+            include_item = True
+            content = item.get('content', {})
+            
+            # Filter by issue state
+            if 'state' in custom_filters and content.get('state') != custom_filters['state']:
+                include_item = False
+                
+            # Filter by label
+            if 'label' in custom_filters:
+                labels = content.get('labels', {}).get('nodes', [])
+                if not any(label.get('name') == custom_filters['label'] for label in labels):
+                    include_item = False
+                    
+            # Add more custom filters as needed
+            
+            if include_item:
+                filtered_items.append(item)
+                
+        return filtered_items
     
     def _get_project_views_internal(self, owner: str, repo_name: str, project_number: int, 
                          first: int = 100, after: Optional[str] = None) -> Union[Dict[str, Any], str]:
@@ -913,6 +1273,10 @@ class GraphQLClientWrapper(BaseModel):
                 "number": view.get('number'),
                 "layout": view.get('layout')
             }
+            
+            # Extract filter query if available (now as a direct string)
+            if 'filter' in view and view['filter']:
+                view_data["filterQuery"] = view['filter']
             
             # Process fields
             if 'fields' in view and 'nodes' in view['fields']:
@@ -1157,52 +1521,6 @@ class GraphQLClientWrapper(BaseModel):
 
         return f"{base_message}\n{fields_message}"
     
-    def get_available_tools(self):
-        return [
-            {
-                "ref": self.create_issue_on_project,
-                "name": "create_issue_on_project",
-                "mode": "create_issue_on_project",
-                "description": CREATE_ISSUE_ON_PROJECT_PROMPT,
-                "args_schema": CreateIssueOnProject,
-            },
-            {
-                "ref": self.update_issue_on_project,
-                "name": "update_issue_on_project",
-                "mode": "update_issue_on_project",
-                "description": UPDATE_ISSUE_ON_PROJECT_PROMPT,
-                "args_schema": UpdateIssueOnProject,
-            },
-            {
-                "ref": self.list_project_issues,
-                "name": "list_project_issues",
-                "mode": "list_project_issues",
-                "description": LIST_PROJECTS_ISSUES,
-                "args_schema": ListProjectIssues,
-            },
-            {
-                "ref": self.search_project_issues,
-                "name": "search_project_issues",
-                "mode": "search_project_issues",
-                "description": SEARCH_PROJECT_ISSUES,
-                "args_schema": SearchProjectIssues,
-            },
-            {
-                "ref": self.list_project_views,
-                "name": "list_project_views",
-                "mode": "list_project_views",
-                "description": LIST_PROJECT_VIEWS,
-                "args_schema": ListProjectViews,
-            },
-            {
-                "ref": self.get_project_items_by_view,
-                "name": "get_project_items_by_view",
-                "mode": "get_project_items_by_view",
-                "description": GET_PROJECT_ITEMS_BY_VIEW,
-                "args_schema": GetProjectItemsByView,
-            }
-        ]
-    
     def _process_project_fields(self, fields: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Process and format project fields into a structured list
         
@@ -1297,11 +1615,62 @@ class GraphQLClientWrapper(BaseModel):
                         field_value["text"] = value["text"]
                     if "date" in value:
                         field_value["date"] = value["date"]
-                    if "singleSelectOptionId" in value and value["singleSelectOptionId"]:
-                        field_value["singleSelectOptionId"] = value["singleSelectOptionId"]
+                    # single-select option
+                    if "optionId" in value:
+                        field_value["optionId"] = value["optionId"]
+                    if "name" in value and "text" not in value and "date" not in value:
+                        field_value["optionName"] = value["name"]
                     
                     item_data["fieldValues"].append(field_value)
             
             formatted_items.append(item_data)
-            
+        
         return formatted_items
+    
+    def get_available_tools(self):
+        return [
+            {
+                "ref": self.create_issue_on_project,
+                "name": "create_issue_on_project",
+                "mode": "create_issue_on_project",
+                "description": CREATE_ISSUE_ON_PROJECT_PROMPT,
+                "args_schema": CreateIssueOnProject,
+            },
+            {
+                "ref": self.update_issue_on_project,
+                "name": "update_issue_on_project",
+                "mode": "update_issue_on_project",
+                "description": UPDATE_ISSUE_ON_PROJECT_PROMPT,
+                "args_schema": UpdateIssueOnProject,
+            },
+            {
+                "ref": self.list_project_issues,
+                "name": "list_project_issues",
+                "mode": "list_project_issues",
+                "description": LIST_PROJECTS_ISSUES,
+                "args_schema": ListProjectIssues,
+            },
+            {
+                "ref": self.search_project_issues,
+                "name": "search_project_issues",
+                "mode": "search_project_issues",
+                "description": SEARCH_PROJECT_ISSUES,
+                "args_schema": SearchProjectIssues,
+            },
+            # {
+            #     "ref": self.list_project_views,
+            #     "name": "list_project_views",
+            #     "mode": "list_project_views",
+            #     "description": LIST_PROJECT_VIEWS,
+            #     "args_schema": ListProjectViews,
+            # },
+            # {
+            #     "ref": self.get_project_items_by_view,
+            #     "name": "get_project_items_by_view",
+            #     "mode": "get_project_items_by_view",
+            #     "description": GET_PROJECT_ITEMS_BY_VIEW,
+            #     "args_schema": GetProjectItemsByView,
+            # }
+        ]
+    
+    

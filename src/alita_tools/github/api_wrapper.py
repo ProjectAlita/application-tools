@@ -190,22 +190,6 @@ class AlitaGitHubAPIWrapper(BaseModel):
             for tool in approved_tools + self.graphql_client_instance.get_available_tools()
         ]
         
-        # prompt_addon = f""" There are very specific rules for some tools, such as:
-        # ** update_file TOOL**
-        # {UPDATE_FILE_PROMPT}
-        
-        # ** create_issue TOOL **
-        # {CREATE_ISSUE_PROMPT}
-        
-        # ** update_issue TOOL **
-        # {UPDATE_ISSUE_PROMPT}
-        
-        # ** create_issue_on_project TOOL **
-        # {CREATE_ISSUE_ON_PROJECT_PROMPT}
-        
-        # ** update_issue_on_project TOOL **
-        # {UPDATE_ISSUE_ON_PROJECT_PROMPT}
-        
         prompt_addon = f"""
         
         ** Default github repository **
@@ -267,15 +251,16 @@ class AlitaGitHubAPIWrapper(BaseModel):
             graphql_tools = GraphQLClientWrapper.model_construct().get_available_tools()
         else:
             graphql_tools = self.graphql_client_instance.get_available_tools()
-        tools = github_tools + graphql_tools + [
-            {
-                "ref": self.process_github_query,
-                "name": "process_github_query",
-                "mode": "process_github_query",
-                "description": CODE_AND_RUN,
-                "args_schema": ProcessGitHubQueryModel
-            }
+        code_gen = [
+            # {
+            #     "ref": self.process_github_query,
+            #     "name": "process_github_query",
+            #     "mode": "process_github_query",
+            #     "description": CODE_AND_RUN,
+            #     "args_schema": ProcessGitHubQueryModel
+            # }
         ]
+        tools = github_tools + graphql_tools + code_gen
         return tools
 
     def run(self, name: str, *args: Any, **kwargs: Any):
@@ -285,7 +270,6 @@ class AlitaGitHubAPIWrapper(BaseModel):
                 if len(args) == 1 and isinstance(args[0], dict) and not kwargs:
                      kwargs = args[0]
                      args = () # Clear args
-
                 try:
                     return tool["ref"](*args, **kwargs)
                 except TypeError as e:
