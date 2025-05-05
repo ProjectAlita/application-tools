@@ -1,6 +1,7 @@
 import logging
 from typing import Optional
 
+import pandas as pd
 from PIL import Image
 from pptx import Presentation
 from pptx.enum.shapes import MSO_SHAPE_TYPE
@@ -144,6 +145,14 @@ class SharepointApiWrapper(BaseToolApiWrapper):
                 logging.error(f"Error decoding file content: {e}")
         elif file.name.endswith('.docx'):
             file_content_str = read_docx_from_bytes(file_content)
+        elif file.name.endswith('.xlsx') or file.name.endswith('.xls'):
+            try:
+                excel_file = io.BytesIO(file_content)
+                df = pd.read_excel(excel_file)
+                df.fillna('', inplace=True)
+                file_content_str = df.to_string()
+            except Exception as e:
+                return ToolException(f"Error reading Excel file: {e}")
         elif file.name.endswith('.pdf'):
             with pymupdf.open(stream=file_content, filetype="pdf") as report:
                 text_content = ''
@@ -164,7 +173,7 @@ class SharepointApiWrapper(BaseToolApiWrapper):
                     text_content += self.read_pptx_slide(slide, index, is_capture_image)
             file_content_str = text_content
         else:
-            return ToolException("Not supported type of files entered. Supported types are TXT and DOCX only.")
+            return ToolException("Not supported type of files entered. Supported types are TXT, DOCX, PDF, PPTX, XLSX and XLS only.")
         return file_content_str
 
     def read_pdf_page(self, report, page, index, is_capture_images):
