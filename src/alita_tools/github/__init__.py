@@ -22,6 +22,7 @@ def _get_toolkit(tool) -> BaseToolkit:
         github_password=tool['settings'].get('password', ''),
         github_app_id=tool['settings'].get('app_id', None),
         github_app_private_key=tool['settings'].get('app_private_key', None),
+        llm=tool['settings'].get('llm', None),
         toolkit_name=tool.get('toolkit_name')
     )
 
