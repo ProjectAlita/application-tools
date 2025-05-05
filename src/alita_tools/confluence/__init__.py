@@ -22,6 +22,7 @@ def get_tools(tool):
         additional_fields=tool['settings'].get('additional_fields', []),
         verify_ssl=tool['settings'].get('verify_ssl', True),
         alita=tool['settings'].get('alita'),
+        llm=tool['settings'].get('llm', None),
         toolkit_name=tool.get('toolkit_name')
     ).get_tools()
 
