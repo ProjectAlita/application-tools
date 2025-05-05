@@ -20,7 +20,11 @@ def get_tools(tool):
             labels=parse_list(tool['settings'].get('labels', [])),
             additional_fields=tool['settings'].get('additional_fields', []),
             toolkit_name=tool.get('toolkit_name'),
-            verify_ssl=tool['settings'].get('verify_ssl', True)).get_tools()
+            verify_ssl=tool['settings'].get('verify_ssl', True),
+            alita=tool['settings'].get('alita'),
+            llm=tool['settings'].get('llm', None)
+            ).get_tools()
+            
 
 class JiraToolkit(BaseToolkit):
     tools: List[BaseTool] = []
