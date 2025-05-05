@@ -2,7 +2,6 @@ import json
 import logging
 import re
 import traceback
-import hashlib
 from json import JSONDecodeError
 from traceback import format_exc
 from typing import List, Optional, Any, Dict
@@ -14,8 +13,8 @@ from pydantic import Field, PrivateAttr, model_validator, create_model, SecretSt
 import requests
 
 from ..elitea_base import BaseToolApiWrapper
+from ..llm.img_utils import ImageDescriptionCache
 from ..utils import is_cookie_token, parse_cookie_string
-from ..llm.llm_utils import get_model, summarize
 
 logger = logging.getLogger(__name__)
 
@@ -295,51 +294,6 @@ class AttachmentResolver:
         logger.warning(f"Attachment {reference} not found")
         return None
 
-
-# Simple cache for image descriptions to avoid redundant processing
-class ImageDescriptionCache:
-    """Cache for image descriptions to avoid processing the same image multiple times"""
-    
-    def __init__(self, max_size=50):
-        self.cache = {}  # content_hash -> description
-        self.max_size = max_size
-        
-    def get(self, image_data, image_name=""):
-        """Get a cached description if available"""
-        if not image_data:
-            return None
-            
-        # Generate a content hash for the image
-        content_hash = hashlib.md5(image_data).hexdigest()
-        
-        # Create a composite key that includes the image name when available
-        cache_key = f"{content_hash}_{image_name}" if image_name else content_hash
-        
-        return self.cache.get(cache_key)
-    
-    def set(self, image_data, description, image_name=""):
-        """Cache a description for an image"""
-        if not image_data or not description:
-            return
-            
-        # Generate content hash
-        content_hash = hashlib.md5(image_data).hexdigest()
-        
-        # Create a composite key that includes the image name when available
-        cache_key = f"{content_hash}_{image_name}" if image_name else content_hash
-        
-        # Only cache if we have room or if evicting one entry is enough
-        if len(self.cache) < self.max_size:
-            self.cache[cache_key] = description
-        else:
-            # Simple LRU: just remove a random entry if we're at capacity
-            # In a real implementation, we'd use an OrderedDict or proper LRU
-            if len(self.cache) >= self.max_size:
-                # Remove one entry to make room
-                self.cache.pop(next(iter(self.cache)))
-                self.cache[cache_key] = description
-
-
 def clean_json_string(json_string):
     """
     Extract JSON object from a string, removing extra characters before '{' and after '}'.
@@ -447,8 +401,8 @@ class JiraApiWrapper(BaseToolApiWrapper):
     _client: Jira = PrivateAttr()
     _image_cache: ImageDescriptionCache = PrivateAttr(default_factory=lambda: ImageDescriptionCache(max_size=50))
     issue_search_pattern: str = r'/rest/api/\d+/search'
-    alita: Any = None
     llm: Any = None
+
     @model_validator(mode='before')
     @classmethod
     def validate_toolkit(cls, values):
@@ -480,7 +434,6 @@ class JiraApiWrapper(BaseToolApiWrapper):
         else:
             cls._client = Jira(url=url, username=username, password=api_key, cloud=cloud, verify_ssl=values['verify_ssl'], api_version=api_version)
         cls.llm=values.get('llm')
-        cls.alita=values.get('alita')
         return values
 
     def _parse_issues(self, issues: Dict) -> List[dict]:
@@ -498,7 +451,7 @@ class JiraApiWrapper(BaseToolApiWrapper):
             duedate = issue_fields["duedate"]
             priority = issue_fields["priority"]["name"]
             status = issue_fields["status"]["name"]
-            projectId = issue_fields["project"]["id"]
+            project_id = issue_fields["project"]["id"]
             issue_url = f"{self._client.url}browse/{key}"
             try:
                 assignee = issue_fields["assignee"]["displayName"]
@@ -519,7 +472,7 @@ class JiraApiWrapper(BaseToolApiWrapper):
             parsed_issue = {
                 "key": key,
                 "id": id,
-                "projectId": projectId,
+                "projectId": project_id,
                 "summary": summary,
                 "description": description,
                 "created": created,
@@ -537,7 +490,8 @@ class JiraApiWrapper(BaseToolApiWrapper):
             parsed.append(parsed_issue)
         return parsed
 
-    def _parse_projects(self, projects: List[dict]) -> List[dict]:
+    @staticmethod
+    def _parse_projects(projects: List[dict]) -> List[dict]:
         parsed = []
         for project in projects:
             id_ = project["id"]
@@ -551,7 +505,8 @@ class JiraApiWrapper(BaseToolApiWrapper):
         return parsed
 
 
-    def create_issue_validate(self, params: Dict[str, Any]):
+    @staticmethod
+    def create_issue_validate(params: Dict[str, Any]):
         if params.get("fields") is None:
             raise ToolException("""
             Jira fields are provided in a wrong way.
@@ -561,13 +516,15 @@ class JiraApiWrapper(BaseToolApiWrapper):
         if params["fields"].get("project") is None:
             raise ToolException("Jira project key is required to create an issue. Ask user to provide it.")
 
-    def set_issue_status_validate(self, issue_key: str, status_name: str):
+    @staticmethod
+    def set_issue_status_validate(issue_key: str, status_name: str):
         if issue_key is None:
             raise ToolException("Jira project key is required to create an issue. Ask user to provide it.")
         if status_name is None:
             raise ToolException(f"Target status name is missing for {issue_key}")
 
-    def update_issue_validate(self, params: Dict[str, Any]):
+    @staticmethod
+    def update_issue_validate(params: Dict[str, Any]):
         if params.get("key") is None:
             raise ToolException("Jira issue key is required to update an issue. Ask user to provide it.")
         if params.get("fields") is None and params.get("update") is None:
@@ -725,7 +682,7 @@ class JiraApiWrapper(BaseToolApiWrapper):
             output = f"Done. Comments were found for issue '{issue_key}': {comments_list}"
             logger.info(output)
             return output
-        except Exception as e:
+        except Exception:
             stacktrace = format_exc()
             logger.error(f"Unable to extract any comments from the issue: {stacktrace}")
             return f"Error during the attempt to extract available comments: {stacktrace}"
@@ -739,7 +696,7 @@ class JiraApiWrapper(BaseToolApiWrapper):
             logger.info(output)
             self._add_default_labels(issue_key=issue_key)
             return output
-        except Exception as e:
+        except Exception:
             stacktrace = format_exc()
             logger.error(f"Error adding comment to Jira issue: {stacktrace}")
             return ToolException(f"Error adding comment to Jira issue: {stacktrace}")
@@ -815,15 +772,16 @@ class JiraApiWrapper(BaseToolApiWrapper):
         return f"filename: {attachment['filename']}\ncontent: {content}"
 
     # Helper functions for image processing
-    def _collect_context_for_image(self, content: str, image_marker: str, context_radius: int = 500) -> str:
+    @staticmethod
+    def _collect_context_for_image(content: str, image_marker: str, context_radius: int = 500) -> str:
         """
         Collect text surrounding an image reference to provide context.
-        
+
         Args:
             content: The full content containing image markers
             image_marker: The specific image marker to find context around
             context_radius: Number of characters to include before and after the marker
-            
+
         Returns:
             String containing text before and after the image marker
         """
@@ -832,28 +790,29 @@ class JiraApiWrapper(BaseToolApiWrapper):
             pos = content.find(image_marker)
             if pos == -1:
                 return ""
-                
+
             # Calculate start position (don't go below 0)
             start = max(0, pos - context_radius)
-            
+
             # Calculate end position (don't exceed content length)
             end = min(len(content), pos + len(image_marker) + context_radius)
-            
+
             # Extract context
             context = content[start:end]
-            
+
             # Add ellipsis if we truncated
             if start > 0:
                 context = "..." + context
             if end < len(content):
                 context = context + "..."
-                
+
             return context
         except Exception as e:
             logger.warning(f"Error collecting context for image {image_marker}: {e}")
             return ""
-    
-    def _get_default_image_analysis_prompt(self) -> str:
+
+    @staticmethod
+    def _get_default_image_analysis_prompt() -> str:
         """
         Returns the default prompt for image analysis when none is provided.
         
@@ -918,7 +877,7 @@ class JiraApiWrapper(BaseToolApiWrapper):
         try:
             from io import BytesIO
             from PIL import Image, UnidentifiedImageError
-            from alita_tools.confluence.utils import image_to_byte_array, bytes_to_base64
+            from ..confluence.utils import image_to_byte_array, bytes_to_base64
             from langchain_core.messages import HumanMessage
             
             # Get the LLM instance
@@ -1118,9 +1077,9 @@ class JiraApiWrapper(BaseToolApiWrapper):
                     description = self._process_image_with_llm(image_data, image_name, context_text, prompt)
                     return f"[Image {image_name} Description: {description}]"
                         
-                except Exception as e:
-                    logger.error(f"Error processing image {image_ref}: {str(e)}")
-                    return f"[Image: {image_ref} - Error: {str(e)}]"
+                except Exception as img_e:
+                    logger.error(f"Error processing image {image_ref}: {str(img_e)}")
+                    return f"[Image: {image_ref} - Error: {str(img_e)}]"
             
             # Replace each image reference with its description
             augmented_content = re.sub(image_pattern, process_image_match, field_content)
@@ -1158,26 +1117,6 @@ class JiraApiWrapper(BaseToolApiWrapper):
                 return f"No comments found for issue '{jira_issue_key}'"
             
             processed_comments = []
-            
-            # Define a default prompt that emphasizes contextual understanding and includes image name
-            default_prompt = prompt if prompt else """
-            ## Image Analysis Task:
-            Analyze this image in detail, paying special attention to contextual information provided about it. 
-            Focus on:
-            1. Visual elements and their arrangement
-            2. Any text visible in the image
-            3. UI components if it's a screenshot
-            4. Diagrams, charts, or technical illustrations
-            5. The overall context and purpose of the image
-            
-            ## Instructions:
-            - Begin your description by referencing the image name provided
-            - Incorporate the surrounding content in your analysis to provide contextual relevance
-            - Explain how this image relates to the comment being discussed
-            - Provide a comprehensive description that could substitute for the image, ensuring anyone 
-              reading would understand what the image contains without seeing it
-            - Format your response clearly with appropriate paragraph breaks
-            """
             
             # Create an AttachmentResolver to efficiently handle attachment lookups
             attachment_resolver = AttachmentResolver(self._client, jira_issue_key)
