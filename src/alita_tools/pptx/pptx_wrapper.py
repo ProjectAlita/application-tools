@@ -1,4 +1,5 @@
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
+from copy import copy
 import os
 import tempfile
 import chardet
@@ -8,6 +9,16 @@ from logging import getLogger
 import traceback
 from langchain_core.messages import HumanMessage
 logger = getLogger(__name__)
+
+
+INTRO_PROMPT = """I need content for PowerPoint slide {slide_idx}.
+Based on the image of the slide and the data available for use 
+Please provide replacements for ALL these placeholders in the slide
+
+<Data Available for use>
+{content_description}
+</Data Available for use>"""
+
 
 class PPTXWrapper(BaseToolApiWrapper):
     """
@@ -93,7 +104,34 @@ class PPTXWrapper(BaseToolApiWrapper):
             logger.error(f"Error uploading PPTX file {file_name}: {str(e)}")
             raise e
 
-    def fill_template(self, file_name: str, output_file_name: str, content_description: str) -> Dict[str, Any]:
+    def _get_structured_output_llm(self, stuct_model):
+        """
+        Returns the structured output LLM if available, otherwise returns the regular LLM
+        """
+        shalow_llm = copy(self.llm)
+        return shalow_llm.with_structured_output(stuct_model)
+
+    def _create_slide_model(self, placeholders: List[str]) -> type:
+        """
+        Dynamically creates a Pydantic model for a slide based on its placeholders
+        
+        Args:
+            placeholders: List of placeholder texts found in the slide
+            
+        Returns:
+            A Pydantic model class for the slide
+        """
+        field_dict = {}
+        for i, placeholder in enumerate(placeholders):
+            # Clean placeholder text for field name
+            field_name = f"placeholder_{i}"
+            # Add a field for each placeholder
+            field_dict[field_name] = (str, Field(description=f"Content for: {placeholder}"))
+            
+        # Create and return the model
+        return create_model(f"SlideModel", **field_dict)
+
+    def fill_template(self, file_name: str, output_file_name: str, content_description: str, pdf_file_name: str = None) -> Dict[str, Any]:
         """
         Fill a PPTX template with content based on the provided description.
         
@@ -101,11 +139,14 @@ class PPTXWrapper(BaseToolApiWrapper):
             file_name: PPTX file name in the bucket
             output_file_name: Output PPTX file name to save in the bucket
             content_description: Detailed description of what content to put where in the template
+            pdf_file_name: Optional PDF file name in the bucket that matches the PPTX template 1:1
             
         Returns:
             Dictionary with result information
         """
         import pptx
+        import base64
+        from io import BytesIO
         
         try:
             # Download the PPTX file
@@ -114,33 +155,100 @@ class PPTXWrapper(BaseToolApiWrapper):
             # Load the presentation
             presentation = pptx.Presentation(local_path)
             
+            # If PDF file is provided, download and extract images from it
+            pdf_pages = {}
+            if pdf_file_name:
+                try:
+                    import fitz  # PyMuPDF
+                    from PIL import Image
+                    
+                    # Download PDF file
+                    pdf_data = self.alita.download_artifact(self.bucket_name, pdf_file_name)
+                    if isinstance(pdf_data, dict) and pdf_data.get('error'):
+                        raise ValueError(f"Error downloading PDF: {pdf_data.get('error')}")
+                    
+                    # Create a temporary memory buffer for PDF
+                    pdf_buffer = BytesIO(pdf_data)
+                    
+                    # Open the PDF
+                    pdf_doc = fitz.open(stream=pdf_buffer, filetype="pdf")
+                    
+                    # Extract images from each page
+                    for page_idx in range(len(pdf_doc)):
+                        page = pdf_doc.load_page(page_idx)
+                        pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))  # 2x scale for better readability
+                        
+                        # Convert to PIL Image
+                        img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                        
+                        # Convert to base64 for LLM
+                        buffered = BytesIO()
+                        img.save(buffered, format="PNG")
+                        img_str = base64.b64encode(buffered.getvalue()).decode()
+                        
+                        # Store image for later use
+                        pdf_pages[page_idx] = img_str
+                    
+                    logger.info(f"Successfully extracted {len(pdf_pages)} pages from PDF {pdf_file_name}")
+                except ImportError:
+                    logger.warning("PyMuPDF (fitz) or PIL not installed. PDF processing skipped. Install with 'pip install PyMuPDF Pillow'")
+                except Exception as e:
+                    logger.warning(f"Failed to process PDF {pdf_file_name}: {str(e)}")
+            
             # Process each slide based on the content description
             for slide_idx, slide in enumerate(presentation.slides):
+                # Collect all placeholders in this slide
+                placeholders = []
+                placeholder_shapes = []
+                
                 # Get all shapes that contain text
                 for shape in slide.shapes:
                     if hasattr(shape, "text_frame") and shape.text_frame:
                         # Check if this is a placeholder that needs to be filled
                         text = shape.text_frame.text
                         if text and ("{{" in text or "[PLACEHOLDER]" in text):
-                            # Use LLM to generate content for this placeholder
-                            prompt = f"""
-                            I need content for a PowerPoint slide {slide_idx + 1}.
-                            The current placeholder text is: "{text}"
-                            
-                            Based on this description of what's needed: "{content_description}"
-                            
-                            Please provide appropriate content to replace this placeholder.
-                            Placeholder may be replaced with the same text in case no action required.
-                            Keep it concise and formatted appropriately for a presentation slide.
-                            """
-                            
-                            result = self.llm.invoke([ HumanMessage(content=[ {"type": "text", "text": prompt} ] ) ])
-                            new_content = result.content
-                            # Clear existing paragraphs and add new content
-                            shape.text_frame.clear()
-                            p = shape.text_frame.paragraphs[0]
-                            p.text = new_content
-            
+                            placeholders.append(text)
+                            placeholder_shapes.append(shape)
+                logger.info(f"Found {len(placeholders)} placeholders in slide {slide_idx + 1}")
+                if placeholders:
+                    # Create a dynamic Pydantic model for this slide
+                    slide_model = self._create_slide_model(placeholders)
+                    # Create a prompt with image and all placeholders on this slide
+                    prompt_parts = [
+                        {
+                            "type": "text", 
+                            "text": INTRO_PROMPT.format(slide_idx=slide_idx + 1,
+                                                        content_description=content_description)
+                        }
+                    ]
+                    
+                    # Add each placeholder text
+                    for i, placeholder in enumerate(placeholders):
+                        prompt_parts.append({
+                            "type": "text",
+                            "text": f"Placeholder {i+1}: {placeholder}"
+                        })
+                    
+                    # Add PDF image if available
+                    if pdf_pages and slide_idx in pdf_pages:
+                        prompt_parts.append({
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/png;base64,{pdf_pages[slide_idx]}"
+                            }
+                        })
+                    
+                    # Get the structured output LLM
+                    structured_llm = self._get_structured_output_llm(slide_model)
+                    result = structured_llm.invoke([HumanMessage(content=prompt_parts)])
+                    # response = result.content
+                    for key, value in result.model_dump().items():
+                        # Replace the placeholder text with the generated content
+                        for i, shape in enumerate(placeholder_shapes):
+                            if key == f"placeholder_{i}":
+                                shape.text_frame.clear()
+                                p = shape.text_frame.paragraphs[0]
+                                p.text = value
             # Save the modified presentation
             temp_output_path = os.path.join(tempfile.gettempdir(), output_file_name)
             presentation.save(temp_output_path)
@@ -262,7 +370,7 @@ class PPTXWrapper(BaseToolApiWrapper):
                 "status": "error",
                 "message": f"Failed to translate presentation: {str(e)}"
             }
-
+    
     
     def get_available_tools(self):
         """
@@ -276,7 +384,8 @@ class PPTXWrapper(BaseToolApiWrapper):
                 "FillTemplateArgs",
                 file_name=(str, Field(description="PPTX file name in the bucket")),
                 output_file_name=(str, Field(description="Output PPTX file name to save in the bucket")),
-                content_description=(str, Field(description="Detailed description of what content to put where in the template"))
+                content_description=(str, Field(description="Detailed description of what content to put where in the template")),
+                pdf_file_name=(str, Field(description="Optional PDF file name in the bucket that matches the PPTX template 1:1", default=None))
             )
         },{
             "name": "translate_presentation",
