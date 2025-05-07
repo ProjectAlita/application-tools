@@ -3,7 +3,7 @@ import fnmatch
 import logging
 from typing import Any, Optional, List
 from pydantic import BaseModel, create_model, Field
-from .utils import TOOLKIT_SPLITTER
+from .utils import TOOLKIT_SPLITTER, get_max_toolkit_length
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +18,11 @@ LoaderSchema = create_model(
 )
 
 class BaseToolApiWrapper(BaseModel):
+
+    def get_max_toolkit_length(self):
+        """Calculates the maximum length of the toolkit name based on the selected tools per toolkit."""
+        return get_max_toolkit_length({x['name']: x['args_schema'].schema() for x in
+                                       self.get_available_tools()})
 
     def get_available_tools(self):
         raise NotImplementedError("Subclasses should implement this method")
