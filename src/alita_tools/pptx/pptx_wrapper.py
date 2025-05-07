@@ -80,7 +80,7 @@ class PPTXWrapper(BaseToolApiWrapper):
             # Upload file to the bucket
             response = None
             with open(local_path, 'rb') as f:
-                response = self.alita.artifact.create_artifact(
+                response = self.alita.create_artifact(
                     bucket_name=self.bucket_name,
                     artifact_name=file_name,
                     artifact_data=f.read()
