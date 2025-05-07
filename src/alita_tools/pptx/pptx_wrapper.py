@@ -203,12 +203,25 @@ class PPTXWrapper(BaseToolApiWrapper):
                 
                 # Get all shapes that contain text
                 for shape in slide.shapes:
+                    # Check text frames for placeholders
                     if hasattr(shape, "text_frame") and shape.text_frame:
                         # Check if this is a placeholder that needs to be filled
                         text = shape.text_frame.text
                         if text and ("{{" in text or "[PLACEHOLDER]" in text):
                             placeholders.append(text)
                             placeholder_shapes.append(shape)
+                    
+                    # Check tables for placeholders in cells
+                    if hasattr(shape, "table") and shape.table:
+                        for row_idx, row in enumerate(shape.table.rows):
+                            for col_idx, cell in enumerate(row.cells):
+                                if cell.text_frame:
+                                    text = cell.text_frame.text
+                                    if text and ("{{" in text or "[PLACEHOLDER]" in text):
+                                        placeholders.append(text)
+                                        # Store tuple with table info: (shape, row_idx, col_idx)
+                                        placeholder_shapes.append((shape, row_idx, col_idx))
+                
                 logger.info(f"Found {len(placeholders)} placeholders in slide {slide_idx + 1}")
                 if placeholders:
                     # Create a dynamic Pydantic model for this slide
@@ -244,11 +257,135 @@ class PPTXWrapper(BaseToolApiWrapper):
                     # response = result.content
                     for key, value in result.model_dump().items():
                         # Replace the placeholder text with the generated content
-                        for i, shape in enumerate(placeholder_shapes):
+                        for i, shape_or_cell_info in enumerate(placeholder_shapes):
                             if key == f"placeholder_{i}":
-                                shape.text_frame.clear()
-                                p = shape.text_frame.paragraphs[0]
-                                p.text = value
+                                # Store the text frame for cleaner code
+                                if isinstance(shape_or_cell_info, tuple):
+                                    table_shape, row_idx, col_idx = shape_or_cell_info
+                                    text_frame = table_shape.table.rows[row_idx].cells[col_idx].text_frame
+                                else:
+                                    text_frame = shape_or_cell_info.text_frame
+                                
+                                # Save paragraph formatting settings before clearing
+                                paragraph_styles = []
+                                for paragraph in text_frame.paragraphs:
+                                    # Save paragraph level properties
+                                    para_style = {
+                                        'alignment': paragraph.alignment,
+                                        'level': paragraph.level,
+                                        'line_spacing': paragraph.line_spacing,
+                                        'space_before': paragraph.space_before,
+                                        'space_after': paragraph.space_after
+                                    }
+                                    
+                                    # Save run level properties for each run in the paragraph
+                                    runs_style = []
+                                    for run in paragraph.runs:
+                                        run_style = {
+                                            'font': run.font,
+                                            'text_len': len(run.text)
+                                        }
+                                        runs_style.append(run_style)
+                                    
+                                    para_style['runs'] = runs_style
+                                    paragraph_styles.append(para_style)
+                                
+                                # Clear the text frame but keep the formatting
+                                text_frame.clear()
+                                
+                                # Get the first paragraph (created automatically when frame is cleared)
+                                p = text_frame.paragraphs[0]
+                                
+                                # Apply the first paragraph's style if available
+                                if paragraph_styles:
+                                    first_para_style = paragraph_styles[0]
+                                    p.alignment = first_para_style['alignment']
+                                    p.level = first_para_style['level']
+                                    p.line_spacing = first_para_style['line_spacing']
+                                    p.space_before = first_para_style['space_before']
+                                    p.space_after = first_para_style['space_after']
+                                    
+                                    # If we have style info for runs, apply it to segments of the new text
+                                    if first_para_style['runs']:
+                                        remaining_text = value
+                                        for run_style in first_para_style['runs']:
+                                            if not remaining_text:
+                                                break
+                                                
+                                            # Calculate text length for this run (use original or remaining, whichever is smaller)
+                                            text_len = min(run_style['text_len'], len(remaining_text))
+                                            run_text = remaining_text[:text_len]
+                                            remaining_text = remaining_text[text_len:]
+                                            
+                                            # Create a run with the style from the original
+                                            run = p.add_run()
+                                            run.text = run_text
+                                            
+                                            # Copy font properties safely
+                                            # Some font attributes in python-pptx are read-only
+                                            # Only copy attributes that can be safely set
+                                            safe_font_attrs = ['bold', 'italic', 'underline']
+                                            for attr in safe_font_attrs:
+                                                if hasattr(run_style['font'], attr):
+                                                    try:
+                                                        setattr(run.font, attr, getattr(run_style['font'], attr))
+                                                    except (AttributeError, TypeError):
+                                                        # Skip if attribute can't be set
+                                                        logger.debug(f"Couldn't set font attribute: {attr}")
+                                            
+                                            # Handle color safely - check if color attribute exists and has rgb
+                                            try:
+                                                if (hasattr(run_style['font'], 'color') and 
+                                                    hasattr(run_style['font'].color, 'rgb') and 
+                                                    run_style['font'].color.rgb is not None):
+                                                    run.font.color.rgb = run_style['font'].color.rgb
+                                            except (AttributeError, TypeError) as e:
+                                                logger.debug(f"Couldn't set font color: {e}")
+                                            
+                                            # Handle size specially
+                                            if hasattr(run_style['font'], 'size') and run_style['font'].size is not None:
+                                                try:
+                                                    run.font.size = run_style['font'].size
+                                                except (AttributeError, TypeError):
+                                                    logger.debug("Couldn't set font size")
+                                        
+                                        # If there's still text left, add it with the last style
+                                        if remaining_text and first_para_style['runs']:
+                                            run = p.add_run()
+                                            run.text = remaining_text
+                                            last_style = first_para_style['runs'][-1]
+                                            
+                                            # Copy font properties safely for the remaining text
+                                            safe_font_attrs = ['bold', 'italic', 'underline']
+                                            for attr in safe_font_attrs:
+                                                if hasattr(last_style['font'], attr):
+                                                    try:
+                                                        setattr(run.font, attr, getattr(last_style['font'], attr))
+                                                    except (AttributeError, TypeError):
+                                                        # Skip if attribute can't be set
+                                                        logger.debug(f"Couldn't set font attribute: {attr}")
+                                            
+                                            # Handle color safely for remaining text
+                                            try:
+                                                if (hasattr(last_style['font'], 'color') and 
+                                                    hasattr(last_style['font'].color, 'rgb') and 
+                                                    last_style['font'].color.rgb is not None):
+                                                    run.font.color.rgb = last_style['font'].color.rgb
+                                            except (AttributeError, TypeError) as e:
+                                                logger.debug(f"Couldn't set font color: {e}")
+                                            
+                                            # Handle size specially
+                                            if hasattr(last_style['font'], 'size') and last_style['font'].size is not None:
+                                                try:
+                                                    run.font.size = last_style['font'].size
+                                                except (AttributeError, TypeError):
+                                                    logger.debug("Couldn't set font size")
+                                    else:
+                                        # No run style information available, just add the text
+                                        p.text = value
+                                else:
+                                    # No style information available, just add the text
+                                    p.text = value
             # Save the modified presentation
             temp_output_path = os.path.join(tempfile.gettempdir(), output_file_name)
             presentation.save(temp_output_path)
@@ -343,6 +480,31 @@ class PPTXWrapper(BaseToolApiWrapper):
                                     
                                     # Replace the text
                                     paragraph.text = translated_text
+                    
+                    # Also translate text in tables
+                    if hasattr(shape, "table") and shape.table:
+                        for row in shape.table.rows:
+                            for cell in row.cells:
+                                if cell.text_frame and cell.text_frame.text:
+                                    # Translate each paragraph in the cell
+                                    for paragraph in cell.text_frame.paragraphs:
+                                        if paragraph.text:
+                                            # Use LLM to translate the text
+                                            prompt = f"""
+                                            Please translate the following text to {target_language_name}:
+                                            
+                                            "{paragraph.text}"
+                                            
+                                            Provide only the translated text without quotes or explanations.
+                                            """
+                                            
+                                            result = self.llm.invoke([ HumanMessage(content=[ {"type": "text", "text": prompt} ] ) ])
+                                            translated_text = result.content
+                                            # Clean up any extra quotes or whitespace
+                                            translated_text = translated_text.strip().strip('"\'')
+                                            
+                                            # Replace the text
+                                            paragraph.text = translated_text
             
             # Save the translated presentation
             temp_output_path = os.path.join(tempfile.gettempdir(), output_file_name)
