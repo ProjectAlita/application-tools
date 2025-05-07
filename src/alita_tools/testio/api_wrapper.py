@@ -331,9 +331,7 @@ class TestIOApiWrapper(BaseToolApiWrapper):
         return data
 
     def get_available_tools(self):
-        tools = super().get_available_tools()
-        # Append all tools with descriptions
-        tools += [
+        return [
             {
                 "name": "list_products",
                 "description": LIST_PRODUCTS,
@@ -504,4 +502,3 @@ class TestIOApiWrapper(BaseToolApiWrapper):
                 "ref": self.list_bugs_for_test_with_filter,
             }
         ]
-        return tools

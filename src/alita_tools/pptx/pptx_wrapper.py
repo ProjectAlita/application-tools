@@ -247,9 +247,7 @@ class PPTXWrapper(BaseToolApiWrapper):
         """
         Return list of available tools.
         """
-        tools = []
-        
-        tools.append({
+        return [{
             "name": "fill_template",
             "description": "Fill a PPTX template with content based on the provided description",
             "ref": self.fill_template,
@@ -259,9 +257,7 @@ class PPTXWrapper(BaseToolApiWrapper):
                 output_file_name=(str, Field(description="Output PPTX file name to save in the bucket")),
                 content_description=(str, Field(description="Detailed description of what content to put where in the template"))
             )
-        })
-        
-        tools.append({
+        },{
             "name": "translate_presentation",
             "description": "Translate text in a PowerPoint presentation to another language",
             "ref": self.translate_presentation,
@@ -271,6 +267,5 @@ class PPTXWrapper(BaseToolApiWrapper):
                 output_file_name=(str, Field(description="Output PPTX file name to save in the bucket")),
                 target_language=(str, Field(description="Target language code (e.g., 'es' for Spanish, 'ua' for Ukrainian)"))
             )
-        })
+        }]
         
-        return tools
