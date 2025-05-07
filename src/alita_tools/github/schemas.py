@@ -81,7 +81,7 @@ CreatePR = create_model(
 CommentOnIssue = create_model(
     "CommentOnIssue",
     issue_number=(str, Field(description="The issue or PR number as a string, e.g. `42`")),
-    comment_body=(str, Field(description="The comment text to add to the issue or PR")),
+    comment=(str, Field(description="The comment text to add to the issue or PR")),
     repo_name=(Optional[str], Field(default=None, description="Name of the repository (e.g., 'owner/repo'). If None, uses the default repository."))
 )
 
