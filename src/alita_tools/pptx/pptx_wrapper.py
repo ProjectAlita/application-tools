@@ -54,7 +54,7 @@ class PPTXWrapper(BaseToolApiWrapper):
             # Create a temporary file
             temp_dir = tempfile.gettempdir()
             local_path = os.path.join(temp_dir, file_name)
-            data = self.alita.download_artifact(self.bucket_name, self.file_name)
+            data = self.alita.download_artifact(self.bucket_name, file_name)
             if isinstance(data, dict) and data['error']:
                 raise NameError(f"{data['error']}. {data['content'] if data['content'] else ''}")
             with open(local_path, 'wb') as f:
