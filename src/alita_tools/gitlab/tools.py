@@ -164,10 +164,10 @@ class GetPullRequesChanges(BaseTool):
     """
     args_schema: Type[BaseModel] = create_model(
         "GetPullRequesChangesInput",
-        pr_number=(str, Field(description="GitLab Merge Request (Pull Request) number")))
+        pr_number=(int, Field(description="GitLab Merge Request (Pull Request) number")))
     handle_tool_error: bool = True
 
-    def _run(self, pr_number: str):
+    def _run(self, pr_number: int):
         try:
             repo = self.api_wrapper._repo_instance
             try:
@@ -192,7 +192,7 @@ class GetPullRequesChanges(BaseTool):
 
 
 class CreatePullRequestChangeCommentInput(BaseModel):
-    pr_number: str = Field(description="""GitLab Merge Request (Pull Request) number""")
+    pr_number: int = Field(description="""GitLab Merge Request (Pull Request) number""")
     file_path: str = Field(description="""File path of the changed file""")
     line_number: int = Field(description="""Line number from the diff for a changed file""")
     comment: str = Field(description="""Comment content""")
@@ -206,7 +206,7 @@ class CreatePullRequestChangeComment(BaseTool):
     args_schema: Type[BaseModel] = CreatePullRequestChangeCommentInput
     handle_tool_error: bool = True
 
-    def _run(self, pr_number: str, file_path: str, line_number: int, comment: str, *args):
+    def _run(self, pr_number: int, file_path: str, line_number: int, comment: str, *args):
         if line_number == 0:
             raise ToolException("Line number for comment must be greater than 0")
         repo = self.api_wrapper._repo_instance
