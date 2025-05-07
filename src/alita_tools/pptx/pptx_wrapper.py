@@ -17,6 +17,28 @@ class PPTXWrapper(BaseToolApiWrapper):
     alita: Any  # AlitaClient
     llm: Any  # LLMLikeObject
 
+    def _bytes_content(self, content: Any) -> bytes:
+        """
+        Returns the content of the file as bytes
+        """
+        if isinstance(content, bytes):
+            return content
+        return content.encode('utf-8')
+
+    def get(self, artifact_name: str, bucket_name: str = None):
+        if not bucket_name:
+            bucket_name = self.bucket_name
+        data = self.client.download_artifact(bucket_name, artifact_name)
+        if len(data) == 0:
+            # empty file might be created
+            return ""
+        if isinstance(data, dict) and data['error']:
+            return f"{data['error']}. {data['content'] if data['content'] else ''}"
+        detected = chardet.detect(data)
+        if detected['encoding'] is not None:
+            return data.decode(detected['encoding'])
+        else:
+            return "Could not detect encoding"
 
     def _download_pptx(self, file_name: str) -> str:
         """
@@ -32,13 +54,11 @@ class PPTXWrapper(BaseToolApiWrapper):
             # Create a temporary file
             temp_dir = tempfile.gettempdir()
             local_path = os.path.join(temp_dir, file_name)
-            
-            bytes_data = self.bytes_content(self.alita.download_artifact(self.bucket_name, self.file_name))
-            encoding = chardet.detect(bytes_data)['encoding']
-            data = bytes_data.decode(encoding)
+            data = self.alita.download_artifact(self.bucket_name, self.file_name)
+            if isinstance(data, dict) and data['error']:
+                raise NameError(f"{data['error']}. {data['content'] if data['content'] else ''}")
             with open(local_path, 'wb') as f:
-                f.write(data.encode(encoding))
-            
+                f.write(data)
             logger.info(f"Downloaded PPTX from bucket {self.bucket_name} to {local_path}")
             return local_path
         except Exception as e:

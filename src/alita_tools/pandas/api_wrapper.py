@@ -34,7 +34,8 @@ class PandasWrapper(BaseToolApiWrapper):
         """
         Returns the content of the file as bytes
         """
-        content = self.alita.download_artifact(self.bucket_name, self.file_name)
+        if not content:
+            content = self.alita.download_artifact(self.bucket_name, self.file_name)
         if isinstance(content, bytes):
             return content
         return content.encode('utf-8')
