@@ -5,7 +5,8 @@ import chardet
 from pydantic import create_model, BaseModel, Field
 from ..elitea_base import BaseToolApiWrapper
 from logging import getLogger
-
+import traceback
+from langchain_core.messages import HumanMessage
 logger = getLogger(__name__)
 
 class PPTXWrapper(BaseToolApiWrapper):
@@ -133,8 +134,8 @@ class PPTXWrapper(BaseToolApiWrapper):
                             Keep it concise and formatted appropriately for a presentation slide.
                             """
                             
-                            new_content = self.llm.invoke(prompt)
-                            
+                            result = self.llm.invoke([ HumanMessage(content=[ {"type": "text", "text": prompt} ] ) ])
+                            new_content = result.content
                             # Clear existing paragraphs and add new content
                             shape.text_frame.clear()
                             p = shape.text_frame.paragraphs[0]
@@ -164,7 +165,7 @@ class PPTXWrapper(BaseToolApiWrapper):
             logger.error(f"Error filling PPTX template: {str(e)}")
             return {
                 "status": "error",
-                "message": f"Failed to fill template: {str(e)}"
+                "message": f"Failed to fill template: {traceback.format_exc()}"
             }
 
     def translate_presentation(self, file_name: str, output_file_name: str, target_language: str) -> Dict[str, Any]:
@@ -227,8 +228,8 @@ class PPTXWrapper(BaseToolApiWrapper):
                                     Provide only the translated text without quotes or explanations.
                                     """
                                     
-                                    translated_text = self.llm.invoke(prompt)
-                                    
+                                    result = self.llm.invoke([ HumanMessage(content=[ {"type": "text", "text": prompt} ] ) ])
+                                    translated_text = result.content
                                     # Clean up any extra quotes or whitespace
                                     translated_text = translated_text.strip().strip('"\'')
                                     
@@ -288,4 +289,3 @@ class PPTXWrapper(BaseToolApiWrapper):
                 target_language=(str, Field(description="Target language code (e.g., 'es' for Spanish, 'ua' for Ukrainian)"))
             )
         }]
-        
