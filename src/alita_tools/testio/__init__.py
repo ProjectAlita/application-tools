@@ -18,17 +18,18 @@ def get_tools(tool):
     ).get_tools()
 
 
+TOOLKIT_MAX_LENGTH = 25
+
 class TestIOToolkit(BaseToolkit):
     tools: list[BaseTool] = []
-    toolkit_max_length: int = 0
-
+    
+    
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
         selected_tools = {x['name']: x['args_schema'].schema() for x in TestIOApiWrapper.model_construct().get_available_tools()}
-        TestIOToolkit.toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name,
-            endpoint=(str, Field(description="TestIO endpoint", json_schema_extra={'toolkit_name': True, 'max_toolkit_length': TestIOToolkit.toolkit_max_length})),
+            endpoint=(str, Field(description="TestIO endpoint", json_schema_extra={'toolkit_name': True, 'max_toolkit_length': TOOLKIT_MAX_LENGTH})),
             api_key=(SecretStr, Field(description="API key", json_schema_extra={'secret': True})),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "TestIO", "icon_url": "testio-icon.svg"}})
@@ -39,7 +40,7 @@ class TestIOToolkit(BaseToolkit):
         if selected_tools is None:
             selected_tools = []
         testio_api_wrapper = TestIOApiWrapper(**kwargs)
-        prefix = clean_string(toolkit_name, cls.toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
+        prefix = clean_string(toolkit_name, TOOLKIT_MAX_LENGTH) + TOOLKIT_SPLITTER if toolkit_name else ''
         available_tools = testio_api_wrapper.get_available_tools()
         tools = []
         for tool in available_tools:

@@ -50,7 +50,6 @@ class TestIOApiWrapper(BaseToolApiWrapper):
     endpoint: str
     api_key: SecretStr
     headers: Optional[Dict[str, str]] = None
-    client: Optional[Any] = None
 
     @model_validator(mode='before')
     @classmethod
@@ -58,7 +57,7 @@ class TestIOApiWrapper(BaseToolApiWrapper):
         values['endpoint'] = values.get('endpoint').rstrip('/')
         values['headers'] = {
             "Accept": "application/json",
-            "Authorization": f"Bearer {values['api_key'].get_secret_value()}"
+            "Authorization": f"Bearer {values['api_key']}",
         }
         return values
 

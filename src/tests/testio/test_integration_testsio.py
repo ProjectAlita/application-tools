@@ -1,7 +1,6 @@
 import os
 import pytest
 from dotenv import load_dotenv
-from pydantic import SecretStr
 
 from ...alita_tools.testio.api_wrapper import TestIOApiWrapper
 from logging import getLogger
@@ -20,7 +19,7 @@ def api_wrapper():
     if not endpoint or not api_key:
         pytest.skip("TestIO API credentials not found in environment variables")
     
-    return TestIOApiWrapper( endpoint=endpoint, api_key=SecretStr(api_key) )
+    return TestIOApiWrapper( endpoint=endpoint, api_key=api_key )
 
 @pytest.fixture(scope="module")
 def product_id():
