@@ -6,6 +6,7 @@ import csv
 from io import StringIO
 from typing import Any, Optional
 import traceback
+import os
 
 import chardet
 import logging
@@ -17,6 +18,7 @@ from .dataframe.serializer import DataFrameSerializer
 from .dataframe.generator.base import CodeGenerator
 from .dataframe.executor.code_executor import CodeExecutor
 from langchain_core.callbacks import dispatch_custom_event
+from traceback import format_exc
 
 logger = logging.getLogger(__name__)
 
@@ -24,19 +26,16 @@ class PandasWrapper(BaseToolApiWrapper):
     alita: Any = None
     llm: Any = None
     bucket_name: str
-    file_name: str = None
-    df_name: Optional[str] = None
     
     _length_to_sniff: int = 1024
-    _df: pd.DataFrame = None
-    _df_info: str = None
 
-    def bytes_content(self, content: Any) -> bytes:
+
+    def bytes_content(self, content: Any, filename: str) -> bytes:
         """
         Returns the content of the file as bytes
         """
         if not content:
-            content = self.alita.download_artifact(self.bucket_name, self.file_name)
+            content = self.alita.download_artifact(self.bucket_name, filename)
         if isinstance(content, bytes):
             return content
         return content.encode('utf-8')
@@ -47,63 +46,116 @@ class PandasWrapper(BaseToolApiWrapper):
         dialect = sniffer.sniff(data[0:self._length_to_sniff])
         return dialect.delimiter
     
-    def _get_dataframe(self) -> pd.DataFrame | None:
-        """ Get the dataframe from the CSV file. """
-        if self._df is not None:
-            return self._df
+    def _get_dataframe(self, filename: str) -> pd.DataFrame | None:
+        """ Get the dataframe from various file formats. """
+            
+        # Generate df_name from filename by removing extension
+        df_name = os.path.splitext(filename)[0]
+        
+        # Check if df_name exists in artifacts
+        artifacts = self.alita.list_artifacts(self.bucket_name)
+        df_exists = False
+        if artifacts and 'rows' in artifacts:
+            df_exists = any(artifact['name'] == df_name for artifact in artifacts['rows'])
+        
+        df = None
+        if df_exists:
+            try:
+                _df = self.alita.download_artifact(self.bucket_name, df_name)
+                if isinstance(_df, bytes):
+                    from io import BytesIO
+                    df = pd.read_pickle(BytesIO(_df))
+                    return df
+            except Exception as e:
+                logger.warning(f"Failed to load dataframe from {df_name}: {e}")
+                df = None
+        
+        # Fall back to reading the original file
         try:
-            _df = self.alita.download_artifact(self.bucket_name, self.df_name)
-        except Exception as e:
-            _df = None
-        if isinstance(_df, bytes):
             from io import BytesIO
-            df = pd.read_pickle(BytesIO(_df))
-        else:
-            df = None
-        if df is None and self.file_name:
-            bytes_data = self.bytes_content(self.alita.download_artifact(self.bucket_name, self.file_name))
-            encoding = chardet.detect(bytes_data)['encoding']
-            data = bytes_data.decode(encoding)
-            df = pd.read_csv(StringIO(data), sep=self._get_csv_delimiter(data), on_bad_lines='skip')
-        if df is not None:
-            self._df_info = DataFrameSerializer.serialize(df)
+            
+            # Download the file directly
+            file_content = self.alita.download_artifact(self.bucket_name, filename)
+            
+            # Get file extension to determine how to load the file
+            _, file_extension = os.path.splitext(filename.lower())
+            file_extension = file_extension.lstrip('.')
+            
+            # Create BytesIO object from file content if it's bytes
+            if isinstance(file_content, bytes):
+                file_obj = BytesIO(file_content)
+            else:
+                # Convert string to bytes if needed
+                file_obj = BytesIO(file_content.encode('utf-8'))
+                
+            # Handle different file formats using pandas' built-in functionality
+            if file_extension in ['csv', 'txt']:
+                df = pd.read_csv(file_obj)
+            elif file_extension in ['xlsx', 'xls']:
+                df = pd.read_excel(file_obj)
+            elif file_extension == 'parquet':
+                df = pd.read_parquet(file_obj)
+            elif file_extension == 'json':
+                df = pd.read_json(file_obj)
+            elif file_extension == 'xml':
+                df = pd.read_xml(file_obj)
+            elif file_extension in ['h5', 'hdf5']:
+                df = pd.read_hdf(file_obj)
+            elif file_extension == 'feather':
+                df = pd.read_feather(file_obj)
+            elif file_extension in ['pickle', 'pkl']:
+                df = pd.read_pickle(file_obj)
+            else:
+                # Default to CSV for unknown formats
+                logging.warning(f"Unknown file format: {file_extension}, attempting to read as CSV")
+                df = pd.read_csv(file_obj)
+                
+        except Exception as e:
+            logger.error(f"Failed to read file {filename}: {format_exc()}")
+            raise
+                
         return df
     
-    def _save_dataframe(self, df: pd.DataFrame) -> None:
+    def _save_dataframe(self, df: pd.DataFrame, filename: str) -> None:
         """ Save the dataframe to the artifact repo. """
+        # Generate df_name from filename by removing extension
+        df_name = os.path.splitext(filename)[0]
+        
         from io import BytesIO
         bytes_io = BytesIO()
         df.to_pickle(bytes_io)
-        respone = self.alita.create_artifact(self.bucket_name, self.df_name, bytes_io.getvalue())
+        respone = self.alita.create_artifact(self.bucket_name, df_name, bytes_io.getvalue())
         return respone    
     
     
-    def generate_code(self, task_to_solve: str, error_trace: str=None) -> str:
+    def generate_code(self, df: Any, task_to_solve: str, filename: str, error_trace: str=None) -> str:
         """Generate pandas code using LLM based on the task to solve."""
         code = CodeGenerator(
-            df=self._get_dataframe(),
-            df_description=self._df_info,
+            df=df,
+            df_description=DataFrameSerializer.serialize(df),
             llm=self.llm
         ).generate_code(task_to_solve, error_trace)
         return code 
     
-    def execute_code(self, code: str) -> str:
+    def execute_code(self, df: Any, code: str, filename: str) -> str:
         """Execute the generated code and return the result."""
         executor = CodeExecutor()
-        executor.add_to_env("get_dataframe", self._get_dataframe)
+        def get_dataframe():
+            return df
+        executor.add_to_env("get_dataframe", get_dataframe)
         return executor.execute_and_return_result(code)
     
-    def generate_code_with_retries(self, query: str) -> Any:
+    def generate_code_with_retries(self, df: Any, query: str, filename: str) -> Any:
         """Execute the code with retry logic."""
         max_retries = 5
         attempts = 0
         try:
-            return self.generate_code(query)
+            return self.generate_code(query, filename)
         except Exception as e:
             error_trace = traceback.format_exc()
             while attempts <= max_retries:
                 try:
-                    return self.generate_code(query, error_trace)
+                    return self.generate_code(df, query, filename, error_trace)
                 except Exception as e:
                     attempts += 1
                     if attempts > max_retries:
@@ -115,10 +167,10 @@ class PandasWrapper(BaseToolApiWrapper):
                         f"Retrying Code Generation ({attempts}/{max_retries})..."
                     )
     
-    def process_query(self, query: str) -> str:
+    def process_query(self, query: str, filename: str) -> str:
         """Analyze and process using query on dataset""" 
-        self._df = self._get_dataframe()
-        code = self.generate_code_with_retries(query)
+        df = self._get_dataframe(filename)
+        code = self.generate_code_with_retries(df, query, filename )
         dispatch_custom_event(
                 name="thinking_step",
                 data={
@@ -127,7 +179,7 @@ class PandasWrapper(BaseToolApiWrapper):
                     "toolkit": "pandas"
                 }
             )
-        result = self.execute_code(code)
+        result = self.execute_code(df, code, filename)
         dispatch_custom_event(
             name="thinking_step",
             data={
@@ -138,7 +190,7 @@ class PandasWrapper(BaseToolApiWrapper):
         )
         if result.get("df") is not None:
             df = result.pop("df")
-            self._save_dataframe(df)
+            self._save_dataframe(df, filename)
         return result
 
     def get_available_tools(self):
@@ -150,6 +202,7 @@ class PandasWrapper(BaseToolApiWrapper):
                 "args_schema": create_model(
                     "ProcessQueryModel",
                     query=(str, Field(description="Task to solve")),
+                    filename=(str, Field(description="File to be processed"))
                 )
             }
         ]
