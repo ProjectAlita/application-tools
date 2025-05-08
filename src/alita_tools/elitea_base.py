@@ -27,7 +27,10 @@ class BaseToolApiWrapper(BaseModel):
             mode = mode.split(TOOLKIT_SPLITTER)[1]
         for tool in self.get_available_tools():
             if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
+                execution = tool["ref"](*args, **kwargs)
+                if not isinstance(execution, str):
+                    execution = str(execution)
+                return execution
         else:
             raise ValueError(f"Unknown mode: {mode}")
 
