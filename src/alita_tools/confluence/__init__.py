@@ -33,9 +33,9 @@ class ConfluenceToolkit(BaseToolkit):
 
     @staticmethod
     def toolkit_config_schema() -> BaseModel:
+        wrapper = ConfluenceAPIWrapper.model_construct()
         selected_tools = {x['name']: x['args_schema'].schema() for x in
-                          ConfluenceAPIWrapper.model_construct().get_available_tools()}
-        ConfluenceToolkit.toolkit_max_length = get_max_toolkit_length(selected_tools)
+                          wrapper.get_available_tools()}
         return create_model(
             name,
             base_url=(str, Field(description="Confluence URL", json_schema_extra={'configuration': True, 'configuration_title': True})),
@@ -43,7 +43,7 @@ class ConfluenceToolkit(BaseToolkit):
             api_key=(SecretStr, Field(description="API key", default=None, json_schema_extra={'secret': True, 'configuration': True})),
             username=(str, Field(description="Username", default=None, json_schema_extra={'configuration': True})),
             space=(str, Field(description="Space", default=None, json_schema_extra={'toolkit_name': True,
-                                                                                    'max_toolkit_length': ConfluenceToolkit.toolkit_max_length})),
+                                                                                    'max_toolkit_length': wrapper.get_max_toolkit_length()})),
             cloud=(bool, Field(description="Hosting Option", json_schema_extra={'configuration': True})),
             limit=(int, Field(description="Pages limit per request", default=5)),
             labels=(Optional[str], Field(
@@ -85,7 +85,7 @@ class ConfluenceToolkit(BaseToolkit):
         if selected_tools is None:
             selected_tools = []
         confluence_api_wrapper = ConfluenceAPIWrapper(**kwargs)
-        prefix = clean_string(toolkit_name, ConfluenceToolkit.toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
+        prefix = clean_string(toolkit_name, confluence_api_wrapper.get_max_toolkit_length()) + TOOLKIT_SPLITTER if toolkit_name else ''
         available_tools = confluence_api_wrapper.get_available_tools()
         tools = []
         for tool in available_tools:
