@@ -16,6 +16,7 @@ from ..elitea_base import BaseToolApiWrapper
 from .dataframe.serializer import DataFrameSerializer
 from .dataframe.generator.base import CodeGenerator
 from .dataframe.executor.code_executor import CodeExecutor
+from langchain_core.callbacks import dispatch_custom_event
 
 logger = logging.getLogger(__name__)
 
@@ -118,30 +119,27 @@ class PandasWrapper(BaseToolApiWrapper):
         """Analyze and process using query on dataset""" 
         self._df = self._get_dataframe()
         code = self.generate_code_with_retries(query)
+        dispatch_custom_event(
+                name="thinking_step",
+                data={
+                    "message": f"Executing generated code... \n\n```python\n{code}\n```",
+                    "tool_name": "process_query",
+                    "toolkit": "pandas"
+                }
+            )
         result = self.execute_code(code)
+        dispatch_custom_event(
+            name="thinking_step",
+            data={
+                "message": f"Result of code execution... \n\n```\n{result}\n```",
+                "tool_name": "process_query",
+                "toolkit": "pandas"
+            }
+        )
         if result.get("df") is not None:
             df = result.pop("df")
             self._save_dataframe(df)
         return result
-        
-    # def execute(self, method_name: str, method_args: dict = {}, column: Optional[str] = None, csv_content: Optional[Any] = None):
-    #     """
-    #     Tool for working with data from CSV files.
-    #     IMPORTANT:
-    #     Don't request csv_content from user if he hasn't provided it - it is expected to extract data from artifact
-    #     """
-    #     bytes_data = self.bytes_content(csv_content if csv_content else self.csv_content)
-    #     encoding = chardet.detect(bytes_data)['encoding']
-    #     data = bytes_data.decode(encoding)
-    #     df = pd.read_csv(StringIO(data), sep=self._get_csv_delimiter(data), on_bad_lines='skip')
-
-    #     if column:
-    #         col = df[column]
-    #         result = getattr(col, method_name)
-    #     else:
-    #         result = getattr(df, method_name)
-
-    #     return str(result(**method_args))
 
     def get_available_tools(self):
         return [
