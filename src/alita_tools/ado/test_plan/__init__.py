@@ -22,7 +22,7 @@ class AzureDevOpsPlansToolkit(BaseToolkit):
         AzureDevOpsPlansToolkit.toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name_alias,
-            name=(str, Field(description="Toolkit name", json_schema_extra={'toolkit_name': True, 'max_toolkit_length': AzureDevOpsPlansToolkit.toolkit_max_length}, default= "ADO plans")),
+            name=(str, Field(description="Toolkit name", json_schema_extra={'toolkit_name': True, 'max_toolkit_length': AzureDevOpsPlansToolkit.toolkit_max_length})),
             organization_url=(str, Field(description="ADO organization url")),
             limit=(Optional[int], Field(description="ADO plans limit used for limitation of the list with results", default=5)),
             token=(SecretStr, Field(description="ADO token", json_schema_extra={'secret': True})),

@@ -159,7 +159,7 @@ class BitbucketAPIWrapper(BaseCodeToolApiWrapper):
         Returns:
             str: List of the files
         """
-        return str(self._bitbucket.get_files_list(file_path=file_path, branch=branch if branch else self._active_branch))
+        return str(self._bitbucket.get_files_list(file_path=file_path if file_path else '', branch=branch if branch else self._active_branch))
 
     def _read_file(self, file_path: str, branch: str) -> str:
         """
