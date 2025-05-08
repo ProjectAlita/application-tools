@@ -175,11 +175,11 @@ class GetFilesListTool(BaseTool):
         "GetFilesListModel",
         file_path=(str, Field(
             description="Package path to read files from. e.g. `src/agents/developer/tools/git/`. **IMPORTANT**: the path must not start with a slash")),
-        branch=(str, Field(
+        branch=(Optional[str], Field(
             description="branch - name of the branch file should be read from. e.g. `feature-1`. **IMPORTANT**: if branch not specified, try to determine from the chat history or clarify with user."))
     )
 
-    def _run(self, file_path: str, branch: str):
+    def _run(self, file_path: str, branch: Optional[str] = None):
         try:
             return self.api_wrapper._get_files(file_path, branch)
         except Exception:
