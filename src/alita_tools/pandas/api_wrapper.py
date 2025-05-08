@@ -126,18 +126,8 @@ class PandasWrapper(BaseToolApiWrapper):
         df.to_pickle(bytes_io)
         respone = self.alita.create_artifact(self.bucket_name, df_name, bytes_io.getvalue())
         return respone    
-    
-    
-    def generate_code(self, df: Any, task_to_solve: str, filename: str, error_trace: str=None) -> str:
-        """Generate pandas code using LLM based on the task to solve."""
-        code = CodeGenerator(
-            df=df,
-            df_description=DataFrameSerializer.serialize(df),
-            llm=self.llm
-        ).generate_code(task_to_solve, error_trace)
-        return code 
-    
-    def execute_code(self, df: Any, code: str, filename: str) -> str:
+        
+    def execute_code(self, df: Any, code: str) -> str:
         """Execute the generated code and return the result."""
         executor = CodeExecutor()
         def get_dataframe():
@@ -145,23 +135,23 @@ class PandasWrapper(BaseToolApiWrapper):
         executor.add_to_env("get_dataframe", get_dataframe)
         return executor.execute_and_return_result(code)
     
-    def generate_code_with_retries(self, df: Any, query: str, filename: str) -> Any:
+    def generate_code_with_retries(self, df: Any, query: str) -> Any:
         """Execute the code with retry logic."""
         max_retries = 5
         attempts = 0
+        codegen = CodeGenerator(df=df, df_description=DataFrameSerializer.serialize(df), llm=self.llm)
         try:
-            return self.generate_code(query, filename)
+            return codegen.generate_code(query, None)
         except Exception as e:
             error_trace = traceback.format_exc()
             while attempts <= max_retries:
                 try:
-                    return self.generate_code(df, query, filename, error_trace)
+                    return codegen.generate_code(query, error_trace)
                 except Exception as e:
                     attempts += 1
+                    error_trace = traceback.format_exc()
                     if attempts > max_retries:
-                        logger.info(
-                            f"Maximum retry attempts exceeded. Last error: {e}"
-                        )
+                        logger.info(f"Maximum retry attempts exceeded. Last error: {e}")
                         raise
                     logger.info(
                         f"Retrying Code Generation ({attempts}/{max_retries})..."
@@ -170,7 +160,7 @@ class PandasWrapper(BaseToolApiWrapper):
     def process_query(self, query: str, filename: str) -> str:
         """Analyze and process using query on dataset""" 
         df = self._get_dataframe(filename)
-        code = self.generate_code_with_retries(df, query, filename )
+        code = self.generate_code_with_retries(df, query)
         dispatch_custom_event(
                 name="thinking_step",
                 data={
@@ -179,7 +169,7 @@ class PandasWrapper(BaseToolApiWrapper):
                     "toolkit": "pandas"
                 }
             )
-        result = self.execute_code(df, code, filename)
+        result = self.execute_code(df, code)
         dispatch_custom_event(
             name="thinking_step",
             data={
