@@ -183,6 +183,63 @@ class PandasWrapper(BaseToolApiWrapper):
             self._save_dataframe(df, filename)
         return result
 
+    def save_dataframe(self, source_df: str, target_file: str) -> str:
+        """Save the dataframe to a file in the artifact repo with the specified format.
+        
+        Args:
+            source_df: Name of the source dataframe file
+            target_file: Name of the target file with extension
+        
+        Returns:
+            Confirmation message with details of saved file
+        """
+        df = self._get_dataframe(source_df)
+        if df is None:
+            raise ValueError(f"Could not load dataframe from {source_df}")
+            
+        ext = os.path.splitext(target_file)[1].lower()
+        
+        # For text-based formats, use StringIO
+        if ext in ['.csv', '.json', '.txt']:
+            buffer = StringIO()
+            if ext == '.csv':
+                df.to_csv(buffer, index=False)
+            elif ext == '.json':
+                df.to_json(buffer, orient="records", lines=True)
+            elif ext == '.txt':
+                buffer.write(str(df))
+                
+            content = buffer.getvalue().encode("utf-8")
+        
+        # For binary formats, use BytesIO
+        else:
+            from io import BytesIO
+            buffer = BytesIO()
+            
+            if ext == '.xlsx':
+                df.to_excel(buffer, index=False)
+            elif ext == '.parquet':
+                df.to_parquet(buffer)
+            elif ext in ['.pickle', '.pkl']:
+                df.to_pickle(buffer)
+            elif ext == '.feather':
+                df.to_feather(buffer)
+            elif ext in ['.h5', '.hdf5']:
+                df.to_hdf(buffer, key='df', mode='w')
+            else:
+                # Default to pickle for unknown formats
+                df.to_pickle(buffer)
+                
+            content = buffer.getvalue()
+        
+        response = self.alita.create_artifact(
+            self.bucket_name,
+            target_file,
+            content
+        )
+        
+        return f"Successfully saved dataframe to {target_file} in {self.bucket_name} with response: {response}"
+
     def get_available_tools(self):
         return [
             {
@@ -193,6 +250,16 @@ class PandasWrapper(BaseToolApiWrapper):
                     "ProcessQueryModel",
                     query=(str, Field(description="Task to solve")),
                     filename=(str, Field(description="File to be processed"))
+                )
+            },
+            {
+                "name": "save_dataframe",
+                "ref": self.save_dataframe,
+                "description": self.save_dataframe.__doc__,
+                "args_schema": create_model(
+                    "SaveDataFrameModel",
+                    source_df=(str, Field(description="Source dataframe file to be saved")),
+                    target_file=(str, Field(description="Target filename with extension for saving"))
                 )
             }
         ]
