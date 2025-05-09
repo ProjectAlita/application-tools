@@ -324,6 +324,39 @@ class ReadFileTool(BaseTool):
             logger.error(f"Unable to read file: {stacktrace}")
             return f"Unable to read file: {stacktrace}"
 
+class GetCommitsTool(BaseTool):
+    api_wrapper: GitLabAPIWrapper = Field(default_factory=GitLabAPIWrapper)
+    name: str = "get_commits"
+    description: str = """This tool is a wrapper for the GitLab API, useful when you need to retrieve a list of commits from the repository."""
+    args_schema: Type[BaseModel] = create_model(
+        "GetCommitsInput",
+        sha=(Optional[str],
+            Field(description="The commit SHA to start listing commits from. If not provided, the default branch is used.",
+                  default=None)),
+        path=(Optional[str],
+            Field(description="The file path to filter commits by. Only commits affecting this path will be returned.",
+                  default=None)),
+        since=(Optional[str],
+            Field(description="Only commits after this date will be returned. Use ISO 8601 format (e.g., '2023-01-01T00:00:00Z').",
+                  default=None)),
+        until=(Optional[str],
+            Field(description="Only commits before this date will be returned. Use ISO 8601 format (e.g., '2023-12-31T23:59:59Z').",
+                  default=None)),
+        author=(Optional[str],
+            Field(description="The author of the commits. Can be a username (string)", default=None))
+    )
+
+    def _run(self, sha: Optional[str] = None,
+            path: Optional[str] = None,
+            since: Optional[str] = None,
+            until: Optional[str] = None,
+            author: Optional[str] = None):
+        try:
+            return self.api_wrapper.get_commits(sha, path, since, until, author)
+        except Exception as e:
+            stacktrace = traceback.format_exc()
+            logger.error(f"Unable to get commits: {stacktrace}")
+            return f"Unable to get commits: {stacktrace}"
 
 __all__ = [
     {"name": "create_branch", "tool": CreateGitLabBranchTool},
@@ -338,5 +371,6 @@ __all__ = [
     {"name": "list_branches_in_repo", "tool": ListBranchesTool},
     {"name": "get_pr_changes", "tool": GetPullRequesChanges},
     {"name": "create_pr_change_comment", "tool": CreatePullRequestChangeComment},
-    {"name": "read_file", "tool": ReadFileTool}
+    {"name": "read_file", "tool": ReadFileTool},
+    {"name": "get_commits", "tool": GetCommitsTool}
 ]
