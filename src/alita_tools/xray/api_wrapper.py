@@ -170,7 +170,7 @@ class XrayApiWrapper(BaseToolApiWrapper):
             create_test_response = self._client.execute(query=graphql_mutation)
         except Exception as e:
             return ToolException(f"Unable to create new test due to error:\n{str(e)}")
-        return create_test_response
+        return f"Created test case:\n{create_test_response}"
 
     def execute_graphql(self, graphql: str) -> str:
         """Executes custom graphql query or mutation"""
