@@ -11,7 +11,7 @@ from .graphql_client_wrapper import GraphQLClientWrapper
 from .executor.github_code_executor import GitHubCodeExecutor
 from .generator.github_code_generator import GitHubCodeGenerator
 from .schemas import (
-    GitHubAuthConfig, 
+    GitHubAuthConfig,
     GitHubRepoConfig,
     ProcessGitHubQueryModel
 )
@@ -42,19 +42,19 @@ class AlitaGitHubAPIWrapper(BaseModel):
     github_app_id: Optional[str] = None
     github_app_private_key: Optional[str] = None
     github_base_url: Optional[str] = None
-    
+
     # Repository config
     github_repository: Optional[str] = None
     active_branch: Optional[str] = None
     github_base_branch: Optional[str] = None
-    
+
     # Add LLM instance
     llm: Optional[Any] = None
-    
+
     # Client instances - renamed without leading underscores and marked as exclude=True
     github_client_instance: Optional[GitHubClient] = Field(default=None, exclude=True)
     graphql_client_instance: Optional[GraphQLClientWrapper] = Field(default=None, exclude=True)
-    
+
     class Config:
         arbitrary_types_allowed = True
 
@@ -63,15 +63,15 @@ class AlitaGitHubAPIWrapper(BaseModel):
     def validate_environment(cls, values: Dict) -> Dict:
         """
         Initialize GitHub clients based on the provided values.
-        
+
         Args:
             values (Dict): Configuration values for GitHub API wrapper
-            
+
         Returns:
             Dict: Updated values dictionary
         """
         from langchain.utils import get_from_dict_or_env
-        
+
         # Get all authentication values
         github_access_token = get_from_dict_or_env(values, "github_access_token", "GITHUB_ACCESS_TOKEN", default='')
         github_username = get_from_dict_or_env(values, "github_username", "GITHUB_USERNAME", default='')
@@ -79,13 +79,13 @@ class AlitaGitHubAPIWrapper(BaseModel):
         github_app_id = get_from_dict_or_env(values, "github_app_id", "GITHUB_APP_ID", default='')
         github_app_private_key = get_from_dict_or_env(values, "github_app_private_key", "GITHUB_APP_PRIVATE_KEY", default='')
         github_base_url = get_from_dict_or_env(values, "github_base_url", "GITHUB_BASE_URL", default='https://api.github.com')
-        
+
         # Check that at least one authentication method is provided
         if not (github_access_token or (github_username and github_password) or github_app_id):
             raise ValueError(
                 "You must provide either a GitHub access token, username/password, or app credentials."
             )
-        
+
         auth_config = GitHubAuthConfig(
             github_access_token=github_access_token,
             github_username=github_username,
@@ -94,7 +94,7 @@ class AlitaGitHubAPIWrapper(BaseModel):
             github_app_private_key=github_app_private_key,
             github_base_url=github_base_url
         )
-        
+
         # Rest of initialization code remains the same
         github_repository = get_from_dict_or_env(values, "github_repository", "GITHUB_REPOSITORY")
         github_repository = GitHubClient.clean_repository_name(github_repository)
@@ -104,7 +104,7 @@ class AlitaGitHubAPIWrapper(BaseModel):
             active_branch=get_from_dict_or_env(values, "active_branch", "ACTIVE_BRANCH", default='main'),  # Change from 'ai' to 'main'
             github_base_branch=get_from_dict_or_env(values, "github_base_branch", "GITHUB_BASE_BRANCH", default="main")
         )
-        
+
         # Initialize GitHub client with keyword arguments
         github_client = GitHubClient(auth_config=auth_config, repo_config=repo_config)
         # Initialize GraphQL client with keyword argument
@@ -112,16 +112,16 @@ class AlitaGitHubAPIWrapper(BaseModel):
         # Set client attributes on the class (renamed from _github_client to github_client_instance)
         values["github_client_instance"] = github_client
         values["graphql_client_instance"] = graphql_client
-        
+
         # Update values
         values["github_repository"] = github_repository
         values["active_branch"] = repo_config.active_branch
         values["github_base_branch"] = repo_config.github_base_branch
-        
+
         # Ensure LLM is available in values if needed
         if "llm" not in values:
             values["llm"] = None
-            
+
         return values
 
     # Expose GitHub REST client methods directly via property
@@ -129,8 +129,8 @@ class AlitaGitHubAPIWrapper(BaseModel):
     def github_client(self) -> GitHubClient:
         """Access to GitHub REST client methods"""
         return self.github_client_instance
-        
-    # Expose GraphQL client methods directly via property  
+
+    # Expose GraphQL client methods directly via property
     @property
     def graphql_client(self) -> GraphQLClientWrapper:
         """Access to GitHub GraphQL client methods"""
@@ -148,7 +148,7 @@ class AlitaGitHubAPIWrapper(BaseModel):
                     "toolkit": "github"
                 }
             )
-            
+
             result = self.execute_github_code(code)
             dispatch_custom_event(
                 name="thinking_step",
@@ -178,10 +178,10 @@ class AlitaGitHubAPIWrapper(BaseModel):
         approved_tools = [
             {
                 "name": "generic_github_api_call",
-                "args_schema": GenericGithubAPICall,    
+                "args_schema": GenericGithubAPICall,
             }
         ]
-        
+
         tool_info = [
             {
                 "name": tool["name"],
@@ -189,7 +189,7 @@ class AlitaGitHubAPIWrapper(BaseModel):
             }
             for tool in approved_tools + self.graphql_client_instance.get_available_tools()
         ]
-        
+
         prompt_addon = f"""
         
         ** Default github repository **
