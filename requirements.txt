@@ -4,7 +4,7 @@ langchain_chroma~=0.1.0
 sentence-transformers==2.7.0
 pygithub==2.3.0
 atlassian_python_api==3.41.16
-markdownify==0.14.1
+markdownify~=1.1.0
 pillow==11.1.0
 requests_openapi==1.0.5
 duckduckgo_search==5.3.0
