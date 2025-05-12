@@ -13,7 +13,7 @@
 | src/alita\_tools/bitbucket/cloud\_api\_wrapper.py            |      118 |      109 |      8% |    13-198 |
 | src/alita\_tools/browser/crawler.py                          |       40 |       12 |     70% |20-24, 35-36, 46, 54-57 |
 | src/alita\_tools/browser/google\_search\_rag.py              |       28 |        8 |     71% | 24, 38-44 |
-| src/alita\_tools/browser/utils.py                            |       45 |       34 |     24% |16-29, 33-43, 47-64 |
+| src/alita\_tools/browser/utils.py                            |       50 |       38 |     24% |10-11, 19-32, 36-48, 52-69 |
 | src/alita\_tools/browser/wiki.py                             |       12 |        1 |     92% |        31 |
 | src/alita\_tools/confluence/api\_wrapper.py                  |      609 |      509 |     16% |148-154, 184-205, 208-216, 220-225, 231-258, 262-271, 275-296, 300-308, 312-353, 357-361, 365-374, 379-382, 386-393, 397-401, 405-419, 423-424, 428, 432, 437-451, 455-457, 465-483, 488-491, 495-496, 499-515, 519-523, 527-531, 535-552, 555-612, 622-665, 669-688, 691-695, 719-745, 769-807, 819-942, 951, 982-995, 1011-1087, 1108-1258, 1261 |
 | src/alita\_tools/elitea\_base.py                             |       55 |       39 |     29% |23, 26-35, 41, 44, 51-66, 91-113 |
@@ -37,7 +37,7 @@
 | src/alita\_tools/zephyr/Zephyr.py                            |       16 |        9 |     44% |18-21, 32-33, 42-48 |
 | src/alita\_tools/zephyr/api\_wrapper.py                      |       51 |       27 |     47% |44-50, 53-68, 72-75, 79, 84-90, 93 |
 | src/alita\_tools/zephyr/rest\_client.py                      |       92 |       64 |     30% |12-13, 38-42, 45, 48, 51, 57-65, 74, 78-85, 89-92, 95, 98, 136-165, 175-194 |
-|                                                    **TOTAL** | **5028** | **3961** | **21%** |           |
+|                                                    **TOTAL** | **5033** | **3965** | **21%** |           |
 
 
 ## Setup coverage badge
