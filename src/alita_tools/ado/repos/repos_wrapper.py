@@ -23,7 +23,8 @@ from langchain_core.tools import ToolException
 from msrest.authentication import BasicAuthentication
 from pydantic import Field, PrivateAttr, create_model, model_validator, SecretStr
 
-from .ItemVersion import ItemVersion
+# Fix import error
+# from .ItemVersion import ItemVersion
 from ..utils import extract_old_new_pairs, generate_diff, get_content_from_generator
 from ...elitea_base import BaseCodeToolApiWrapper, LoaderSchema
 
@@ -1091,7 +1092,8 @@ class ReposApiWrapper(BaseCodeToolApiWrapper):
         """
         try:
             search_criteria = GitQueryCommitsCriteria(
-                item_version=ItemVersion(version=sha, version_type='commit'),
+                # fix dependency issue with azure-devops
+                # item_version=ItemVersion(version=sha, version_type='commit'),
                 item_path=path,
                 from_date=str(datetime.fromisoformat(since)) if since else None,
                 to_date=str(datetime.fromisoformat(until)) if until else None,
@@ -1210,11 +1212,11 @@ class ReposApiWrapper(BaseCodeToolApiWrapper):
                 "name": "loader",
                 "description": self.loader.__doc__,
                 "args_schema": LoaderSchema,
-            },
-            {
-                "ref": self.get_commits,
-                "name": "get_commits",
-                "description": self.get_commits.__doc__,
-                "args_schema": ArgsSchema.GetCommits.value,
+            # },
+            # {
+            #     "ref": self.get_commits,
+            #     "name": "get_commits",
+            #     "description": self.get_commits.__doc__,
+            #     "args_schema": ArgsSchema.GetCommits.value,
             }
         ]
