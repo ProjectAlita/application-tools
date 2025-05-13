@@ -97,6 +97,8 @@ class BrowserToolkit(BaseToolkit):
                     logger.error(f"Google API Wrapper failed to initialize: {e}")
             elif tool == 'wiki':
                 tool_entry = WikipediaQueryRun(api_wrapper=WikipediaAPIWrapper())
+                # rename the tool to avoid conflicts
+                tool_entry.name = "wiki"
 
             tool_entry.name = f"{prefix}{tool_entry.name}"
             tools.append(tool_entry)
