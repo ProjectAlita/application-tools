@@ -79,9 +79,14 @@ XrayCreateTest = create_model(
 # preconditionIssueIds: the Precondition ids that be associated with the Test.
 # folderPath: the Test repository folder for the Test.
 # jira: the Jira object that will be used to create the Test.
-# Check this Jira endpoint for more information related with this field.
+# Examples:
+1. Create a new Test with type Manual:
+mutation { createTest( testType: { name: "Manual" }, steps: [ { action: "Create first example step", result: "First step was created" }, { action: "Create second example step with data", data: "Data for the step", result: "Second step was created with data" } ], jira: { fields: { summary:"Exploratory Test", project: {key: "CALC"} } } ) { test { issueId testType { name } steps { action data result } jira(fields: ["key"]) } warnings } }
 createTest(testType: UpdateTestTypeInput, steps: [CreateStepInput], unstructured: String, gherkin: String, preconditionIssueIds: [String], folderPath: String, jira: JSON!): CreateTestResult
-}"""))
+}
+2. Create a new Test with type Generic:
+mutation { createTest( testType: { name: "Generic" }, unstructured: "Perform exploratory tests on calculator.", jira: { fields: { summary:"Exploratory Test", project: {key: "CALC"} } } ) { test { issueId testType { name } unstructured jira(fields: ["key"]) } warnings } }
+"""))
 )
 
 
