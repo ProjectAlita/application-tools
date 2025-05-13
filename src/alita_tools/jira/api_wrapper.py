@@ -58,7 +58,8 @@ JiraCreateIssue = create_model(
                      "in the following STRING dictionary: "
                      "{'fields': {'project': {'key': 'project_key'}, "
                      "'summary': 'test issue', 'description': 'test description', "
-                     "'issuetype': {'name': 'Task'}, 'priority': {'name': 'Major'}}}"))))
+                     "'issuetype': {'name': 'Task'}, 'priority': {'name': 'Major'}}}\n"
+                     "*IMPORTANT*: Make sure fields are double-quoted."))))
 
 
 JiraUpdateIssue = create_model(
@@ -72,9 +73,9 @@ JiraUpdateIssue = create_model(
                      "you would pass in the following STRING dictionary: "
                      "{'key': 'issue key', 'fields': {'summary': 'updated issue', "
                      "'description': 'updated description', 'customfield_xxx': 'updated custom field'}, "
-                     "'update': {'labels': [ { 'add': 'test' } ]}}")
-    ))
-)
+                     "'update': {'labels': [ { 'add': 'test' } ]}}\n"
+                     "*IMPORTANT*: Make sure fields are double-quoted.")
+    )))
 
 AddCommentInput = create_model(
     "AddCommentInputModel",
@@ -1032,7 +1033,7 @@ class JiraApiWrapper(BaseToolApiWrapper):
                 existing_fields = [key for key, value in self._client.issue(jira_issue_key).get("fields").items() if value is not None]
                 existing_fields_str = ', '.join(existing_fields)
                 return f"Unable to find field '{field_name}' or it's empty. Available fields are: {existing_fields_str}"
-            
+
             # Regular expression to find image references in Jira markup
             image_pattern = r'!([^!|]+)(?:\|[^!]*)?!'
             
