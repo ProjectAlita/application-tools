@@ -1,7 +1,11 @@
-import re
-from typing import Any, List
-from pydantic import create_model, Field
 import builtins
+import functools
+from typing import Any, List
+
+import re
+import requests
+from pydantic import create_model, Field
+
 
 TOOLKIT_SPLITTER = "___"
 TOOL_NAME_LIMIT = 64
@@ -69,3 +73,25 @@ from pydantic_core import SchemaValidator
 def check_schema(model: BaseModel) -> None:
     schema_validator = SchemaValidator(schema=model.__pydantic_core_schema__)
     schema_validator.validate_python(model.__dict__)
+
+
+def check_connection_response(check_fun):
+    @functools.wraps(check_fun)
+    def _wrapper(*args, **kwargs):
+        try:
+            response = check_fun(*args, **kwargs)
+        except requests.exceptions.Timeout:
+            return "Service Unreachable: timeout"
+        except requests.exceptions.ConnectionError:
+            return "Service Unreachable: connectivity issue"
+        if response.status_code == 200:
+            return
+        elif response.status_code == 401:
+            return "Authentication Failed"
+        elif response.status_code == 403:
+            return "Insufficient Permissions"
+        elif response.status_code == 404:
+            return "Invalid URL"
+        else:
+            return f"Service Unreachable: return code {response.status_code}"
+    return _wrapper
