@@ -932,7 +932,7 @@ class ReposApiWrapper(BaseCodeToolApiWrapper):
                 results = []
                 for comment_data in inline_comments:
                     file_path = comment_data["file_path"]
-                    comment_text = comment_data["comment_text"][:1000]
+                    comment_text = comment_data["comment_text"]
                     left_line = comment_data.get("left_line")
                     right_line = comment_data.get("right_line")
                     left_range = comment_data.get("left_range")
