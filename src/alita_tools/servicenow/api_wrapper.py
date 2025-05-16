@@ -4,6 +4,8 @@ import json
 import traceback
 from typing import Optional, List, Any, Dict
 from json import JSONDecodeError
+
+from office365.directory.security.incidents.incident import Incident
 # TODO: Need to implement a validator that makes sense for ServiceNow, keeping the import for the time being.
 from pydantic import Field, PrivateAttr, model_validator, create_model, SecretStr
 # TODO: Need to implement retry and wait times.
@@ -19,7 +21,8 @@ logger = logging.getLogger(__name__)
 
 getIncidents = create_model(
     "getIncidents",
-    category=(str, Field(description="Category of incidents to get"))
+    category=(Optional[str], Field(description="Category of incidents to get")),
+    description=(Optional[str], Field(description="Content that the incident description can have"))
 )
 
 def parse_payload_params(params: Optional[str]) -> Dict[str, Any]:
@@ -56,10 +59,10 @@ class ServiceNowAPIWrapper(BaseToolApiWrapper):
         values['client'] = ServiceNowClient(base_url=base_url, username=username, password=password)
         return values
 
-    def get_incidents(self, category: str):
+    def get_incidents(self, category: Optional[str] = None, description: Optional[str] = None) -> List[Incident]:
         """Retrieves all incidents from ServiceNow from a given category."""
         try:
-            response = self.client.get_incidents(category=category)
+            response = self.client.get_incidents(category=category, description=description)
         except requests.exceptions.RequestException as e:
             raise ToolException(f"ServiceNow tool exception. {e}")
         return response.json()
