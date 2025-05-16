@@ -16,7 +16,7 @@ class ServiceNowClient(object):
         # Start of general urls used by ServiceNow API
         self.incidents_url = f"{self.base_url}/api/now/table/incident"
 
-    def get_incidents(self, category, description):
+    def get_incidents(self, category, description, number_of_entries):
         """Retrieve incidents from ServiceNow by category"""
         # TODO: The query parameters generation should be delegated to a separate function.
         #  Code meant to be refactored.
@@ -34,6 +34,8 @@ class ServiceNowClient(object):
         if description:
             endpoint_url += f"descriptionLIKE{description}{nested_query}"
 
+        if number_of_entries:
+            endpoint_url += f"&sysparm_limit={number_of_entries}"
         response = requests.get(
             url=endpoint_url,
             auth=(self.username, self.password.get_secret_value()),

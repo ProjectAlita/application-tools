@@ -22,7 +22,8 @@ logger = logging.getLogger(__name__)
 getIncidents = create_model(
     "getIncidents",
     category=(Optional[str], Field(description="Category of incidents to get")),
-    description=(Optional[str], Field(description="Content that the incident description can have"))
+    description=(Optional[str], Field(description="Content that the incident description can have")),
+    number_of_entries=(Optional[int], Field(description="Number of incidents to get"))
 )
 
 def parse_payload_params(params: Optional[str]) -> Dict[str, Any]:
@@ -59,10 +60,10 @@ class ServiceNowAPIWrapper(BaseToolApiWrapper):
         values['client'] = ServiceNowClient(base_url=base_url, username=username, password=password)
         return values
 
-    def get_incidents(self, category: Optional[str] = None, description: Optional[str] = None) -> List[Incident]:
+    def get_incidents(self, category: Optional[str] = None, description: Optional[str] = None, number_of_entries: Optional[int] = None) -> List[Incident]:
         """Retrieves all incidents from ServiceNow from a given category."""
         try:
-            response = self.client.get_incidents(category=category, description=description)
+            response = self.client.get_incidents(category=category, description=description, number_of_entries=number_of_entries)
         except requests.exceptions.RequestException as e:
             raise ToolException(f"ServiceNow tool exception. {e}")
         return response.json()
