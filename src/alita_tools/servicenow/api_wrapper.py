@@ -38,7 +38,7 @@ class ServiceNowAPIWrapper(BaseToolApiWrapper):
     base_url: str
     password: Optional[SecretStr] = None,
     username: Optional[str] = None
-    limit: Optional[int] = 5
+    limit: Optional[int] = None
     labels: Optional[List[str]] = []
     max_pages: Optional[int] = None
     number_of_retries: Optional[int] = None
