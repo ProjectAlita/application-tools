@@ -13,6 +13,7 @@ from langchain_core.tools import ToolException
 
 from ..elitea_base import BaseToolApiWrapper
 from ..llm.img_utils import ImageDescriptionCache
+from .servicenow_client import ServiceNowClient
 
 logger = logging.getLogger(__name__)
 
@@ -33,30 +34,34 @@ def parse_payload_params(params: Optional[str]) -> Dict[str, Any]:
 class ServiceNowAPIWrapper(BaseToolApiWrapper):
     # Changed from PrivateAttr to Optional field with exclude=True
     client: Optional[Any] = Field(default=None, exclude=True)
+    instance_alias: str
     base_url: str
     password: Optional[SecretStr] = None,
     username: Optional[str] = None
     limit: Optional[int] = 5
     labels: Optional[List[str]] = []
-    max_pages: Optional[int] = 10
-    number_of_retries: Optional[int] = 3
-    min_retry_seconds: Optional[int] = 2
-    max_retry_seconds: Optional[int] = 10
+    max_pages: Optional[int] = None
+    number_of_retries: Optional[int] = None
+    min_retry_seconds: Optional[int] = None
+    max_retry_seconds: Optional[int] = None
     llm: Any = None
     _image_cache: ImageDescriptionCache = PrivateAttr(default_factory=ImageDescriptionCache)
 
-    def get_incidents(self, category: str):
-        """ Creates a page in the Confluence space. Represents content in html (storage) or wiki (wiki) formats
-            Page could be either published status='current' or make a draft with status='draft'
-        """
-        endpoint_url = f"{self.base_url}/api/now/table/incident"
+    @model_validator(mode='before')
+    @classmethod
+    def validate_toolkit(cls, values):
+        base_url = values['base_url']
+        password = SecretStr(values.get('password'))
+        username = values.get('username')
+        values['client'] = ServiceNowClient(base_url=base_url, username=username, password=password)
+        return values
 
-        endpoint_url += f"?sysparm_query=category%3D{category}"
-        response = requests.get(
-            url=endpoint_url,
-            auth=(self.username, self.password.get_secret_value()),
-            headers={"Content-Type": "application/json", "Accept": "application/json"}
-        )
+    def get_incidents(self, category: str):
+        """Retrieves all incidents from ServiceNow from a given category."""
+        try:
+            response = self.client.get_incidents(category=category)
+        except requests.exceptions.RequestException as e:
+            raise ToolException(f"ServiceNow tool exception. {e}")
         return response.json()
 
     def get_available_tools(self):

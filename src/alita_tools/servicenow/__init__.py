@@ -1,5 +1,7 @@
 from typing import List, Literal, Optional
 from langchain_community.agent_toolkits.base import BaseToolkit
+from scripts.regsetup import description
+
 from .api_wrapper import ServiceNowAPIWrapper
 from langchain_core.tools import BaseTool
 from ..base.tool import BaseAction
@@ -11,10 +13,11 @@ name = "servicenow"
 def get_tools(tool):
     return ServiceNowToolkit().get_toolkit(
         selected_tools=tool['settings'].get('selected_tools', []),
+        instance_alias=tool['settings'].get('instance_alias', None),
         base_url=tool['settings']['base_url'],
         password=tool['settings'].get('password', None),
         username=tool['settings'].get('username', None),
-        limit=tool['settings'].get('limit', 5),
+        limit=tool['settings'].get('limit', None),
         labels=parse_list(tool['settings'].get('labels', None)),
         additional_fields=tool['settings'].get('additional_fields', []),
         verify_ssl=tool['settings'].get('verify_ssl', True),
@@ -35,19 +38,20 @@ class ServiceNowToolkit(BaseToolkit):
         ServiceNowToolkit.toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name,
+            instance_alias=(str, Field(description="Alias for the ServiceNow instance", json_schema_extra={'configuration': True, 'configuration_title': True})),
             base_url=(str, Field(description="ServiceNow URL", json_schema_extra={'configuration': True, 'configuration_title': True})),
             password=(SecretStr, Field(description="Password", default=None, json_schema_extra={'secret': True, 'configuration': True})),
             username=(str, Field(description="Username", default=None, json_schema_extra={'configuration': True})),
-            limit=(int, Field(description="Pages limit per request", default=5)),
+            limit=(Optional[int], Field(description="Pages limit per request", default=None)),
             labels=(Optional[str], Field(
                 description="List of comma separated labels used for labeling of agent's created or updated entities",
                 default=None,
                 examples="alita,elitea;another-label"
             )),
-            max_pages=(int, Field(description="Max total pages", default=10)),
-            number_of_retries=(int, Field(description="Number of retries", default=2)),
-            min_retry_seconds=(int, Field(description="Min retry, sec", default=10)),
-            max_retry_seconds=(int, Field(description="Max retry, sec", default=60)),
+            max_pages=(Optional[int], Field(description="Max total pages", default=None)),
+            number_of_retries=(Optional[int], Field(description="Number of retries", default=None)),
+            min_retry_seconds=(Optional[int], Field(description="Min retry, sec", default=None)),
+            max_retry_seconds=(Optional[int], Field(description="Max retry, sec", default=None)),
             selected_tools=(List[Literal[tuple(selected_tools)]],
                             Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
             __config__=ConfigDict(json_schema_extra={
@@ -84,7 +88,7 @@ class ServiceNowToolkit(BaseToolkit):
             tools.append(BaseAction(
                 api_wrapper=servicenow_api_wrapper,
                 name=prefix + tool["name"],
-                description=f"ServiceNow: {servicenow_api_wrapper}" + tool["description"],
+                description=f"ServiceNow: {servicenow_api_wrapper.instance_alias}" + tool["description"],
                 args_schema=tool["args_schema"]
             ))
         return cls(tools=tools)
