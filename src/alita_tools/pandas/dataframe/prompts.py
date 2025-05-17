@@ -1,21 +1,31 @@
+import os 
+
 PLAN_CODE_PROMPT = """
 <dataframe>
 {dataframe}
 </dataframe>
 
-
-Every function will be supplied with datafame as one of the required arguments.
-
 You are already provided with the following functions that you can call:
-<function>
-def get_dataframe() -> pd.Dataframe
-    '''This method returns the dataframe'''
-</function>
+
+{prompt_addon}
+
+---- 
 
 Update this initial code:
 ```python
-# TODO: import the required dependencies
+# You can use all these libraries in your code
 import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+import scipy.stats as ss
+import statsmodels
+import statsmodels.api as sm
+import factor_analyzer
+import sklearn
+import base64
+from io import BytesIO
+
+df = get_dataframe()
 
 # Write code here 
 
@@ -25,15 +35,20 @@ import pandas as pd
 {task}
 </user_task>
 
-At the end, declare "result" variable as a dictionary of type and value.
-IMPORTANT: Use get_dataframe function to get the dataframe to work with
-IMPORTANT: Imporant to add calls of the functions you created and form a result based on results.
+CHART GENERATION INSTRUCTIONS:
+When creating a chart, provide base64 encoded image as a string in the result dictionary with key "chart" and explanation what it is in result dictionary with key "result".
+To save charts you must use BytesIO() buffers
+Delete file after transforming it to base64 string.
+If you need to have multiple charts, put them as a list in the result dictionary with key "chart" and explanation what they are in result dictionary with key "result".
+
+IMPORTANT: Avoid using comments in code, they may cause validation errors.
 IMPORTANT: Avoid using __main__ or __name__ == "__main__" in the code.
 IMPORTANT: return dataset as "df" key in the result dictionary.
-
+IMPORTANT: last link of the code should start with `result = dict(df = df, result=<result of user task computation>)`
 
 Generate python code and return full updated code:
 """
-import os 
 
-DEFAULT_CHART_DIRECTORY = os.path.join("exports", "charts")
+DEFAULT_CHART_DIRECTORY = os.path.join("charts")
+if not os.path.exists(DEFAULT_CHART_DIRECTORY):
+    os.makedirs(DEFAULT_CHART_DIRECTORY)

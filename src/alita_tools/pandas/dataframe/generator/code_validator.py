@@ -1,6 +1,8 @@
 import ast
 import re
+from logging import getLogger
 
+logger = getLogger(__name__)
 
 class CodeRequirementValidator:
     """
@@ -70,5 +72,9 @@ class CodeRequirementValidator:
                 )
             return True
         except SyntaxError:
+            from traceback import format_exc
+            logger.error(f"Syntax error in code: {format_exc()}")
             # If there's a syntax error, the code doesn't meet the requirements
-            return False
+            return NameError(
+                f"Syntax error in code: {format_exc()}"
+            )

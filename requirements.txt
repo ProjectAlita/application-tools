@@ -53,3 +53,5 @@ pypdf2~=3.0.1
 astor~=0.8.1
 opencv-python==4.11.0.86 # for cv2 library
 python-pptx==1.0.2
+factor_analyzer==0.5.1
+statsmodels==0.14.4

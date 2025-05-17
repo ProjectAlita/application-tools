@@ -3,11 +3,12 @@
 # 
 
 import csv
-from io import StringIO
+from io import StringIO, BytesIO
 from typing import Any, Optional
 import traceback
 import os
-
+import base64
+from uuid import uuid4
 import chardet
 import logging
 import pandas as pd
@@ -173,15 +174,30 @@ class PandasWrapper(BaseToolApiWrapper):
         dispatch_custom_event(
             name="thinking_step",
             data={
-                "message": f"Result of code execution... \n\n```\n{result}\n```",
+                "message": f"Result of code execution... \n\n```\n{result['result']}\n```",
                 "tool_name": "process_query",
                 "toolkit": "pandas"
             }
         )
         if result.get("df") is not None:
             df = result.pop("df")
-            self._save_dataframe(df, filename)
-        return result
+            # Not saving dataframe to artifact repo for now
+            # self._save_dataframe(df, filename)
+        if result.get('chart'):
+            if isinstance(result['chart'], list):
+                for ind, chart in enumerate(result['chart']):
+                    chart_filename = f"chart_{uuid4()}.png"
+                    chart_data = base64.b64decode(chart)
+                    self.alita.create_artifact(self.bucket_name, chart_filename, chart_data)
+                    result['result'] = f"Chart #{ind} saved to {chart_filename}"
+            else:
+                # Handle single chart case (not in a list)
+                chart = result['chart']
+                chart_filename = f"chart_{uuid4()}.png"
+                chart_data = base64.b64decode(chart)
+                self.alita.create_artifact(self.bucket_name, chart_filename, chart_data)
+                result['result'] = f"Chart saved to {chart_filename}"
+        return result.get("result", None)
 
     def save_dataframe(self, source_df: str, target_file: str) -> str:
         """Save the dataframe to a file in the artifact repo with the specified format.
