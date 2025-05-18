@@ -3,12 +3,12 @@ import sklearn
 import pandas as pd
 from ..dataframe.utils import send_thinking_step
 
-def convert_str_column_to_categorical(df: pd.DataFrame, column_name: str, numeric_column_name: Optional[str] = None) -> str:
+def convert_str_column_to_categorical(df: pd.DataFrame, column_name: str, numeric_column_name: str) -> str:
     """ Convert string column to categorical column with numeric reprenrarion - adds new column to dataset.
     Args:
         df (pd.DataFrame): DataFrame to operate on
         column_name (str): Column name
-        numeric_column_name (Optional[str]): Name for the created numeric column. If None, defaults to '{column_name}_numeric'
+        numeric_column_name (str): Name for the created numeric column
     
     Returns:
         str: Name of the created numeric column
@@ -16,12 +16,12 @@ def convert_str_column_to_categorical(df: pd.DataFrame, column_name: str, numeri
     df[column_name] = pd.Categorical(df[column_name])
     return convert_categorical_colum_to_numeric(df, column_name, numeric_column_name)
 
-def convert_categorical_colum_to_numeric(df: pd.DataFrame, column_name: str, numeric_column_name: Optional[str] = None) -> str:
+def convert_categorical_colum_to_numeric(df: pd.DataFrame, column_name: str, numeric_column_name: str) -> str:
     """ Convert categorical column to numeric column - adds new column to dataset.
     Args:
         df (pd.DataFrame): DataFrame to operate on
         column_name (str): Column name
-        numeric_column_name (Optional[str]): Name for the created numeric column. If None, defaults to '{column_name}_numeric'
+        numeric_column_name (str): Name for the created numeric column
     
     Returns:
         str: Name of the created numeric column
@@ -31,28 +31,27 @@ def convert_categorical_colum_to_numeric(df: pd.DataFrame, column_name: str, num
         df[column_name] = pd.Categorical(df[column_name])
     
     categories = df[column_name].cat
-    numeric_column = numeric_column_name if numeric_column_name else f'{column_name}_numeric'
-    df[numeric_column] = categories.codes
+    df[numeric_column_name] = categories.codes
     
-    result = f'{column_name} categorical column values corresponds to {numeric_column} values: '
+    result = f'{column_name} categorical column values corresponds to {numeric_column_name} values: '
     for index, value in enumerate(categories.categories):
         result += f'Value: {value} corresponds to {categories.codes[index]} |'
     
     send_thinking_step(func="convert_categorical_colum_to_numeric", content=result)
     
-    return numeric_column
+    return numeric_column_name
 
 
 def label_based_on_bins(df: pd.DataFrame, column_name: str, bins: List[float], labels: List[str], 
-                     labeled_column_name: Optional[str] = None, numeric_column_name: Optional[str] = None) -> Dict[str, str]:
+                     labeled_column_name: str, numeric_column_name: str) -> Dict[str, str]:
     """ Categorize column based on integer or float bins and add new column with labels culumns needs to be numeric or categorical before binning
     Args:
         df (pd.DataFrame): DataFrame to operate on
         column_name (str): Column name
         bins (List[float]): List of bin values
         labels (List[str]): List of labels for each bin
-        labeled_column_name (Optional[str]): Name for the created labeled column. If None, defaults to '{column_name}_labeled'
-        numeric_column_name (Optional[str]): Name for the created numeric column. If None, defaults to '{column_name}_labeled_numeric'
+        labeled_column_name (str): Name for the created labeled column
+        numeric_column_name (str): Name for the created numeric column
     
     Returns:
         dict: Dictionary containing:
@@ -64,18 +63,15 @@ def label_based_on_bins(df: pd.DataFrame, column_name: str, bins: List[float], l
         send_thinking_step(func="label_based_on_bins", content=error_message)
         return {"labeled_column": "", "numeric_column": ""}
     
-    labeled_column = labeled_column_name if labeled_column_name else f'{column_name}_labeled'
-    numeric_column = numeric_column_name if numeric_column_name else f'{column_name}_labeled_numeric'
+    df[labeled_column_name] = pd.cut(df[column_name], bins=bins, labels=labels)
+    convert_categorical_colum_to_numeric(df, labeled_column_name, numeric_column_name)
     
-    df[labeled_column] = pd.cut(df[column_name], bins=bins, labels=labels)
-    convert_categorical_colum_to_numeric(df, labeled_column, numeric_column)
-    
-    message = f'Added new columns: {labeled_column} and {numeric_column} that are labeled representation of {column_name} and numeric representation of labels.'
+    message = f'Added new columns: {labeled_column_name} and {numeric_column_name} that are labeled representation of {column_name} and numeric representation of labels.'
     send_thinking_step(func="label_based_on_bins", content=message)
     
     result = {
-        "labeled_column": labeled_column,
-        "numeric_column": numeric_column
+        "labeled_column": labeled_column_name,
+        "numeric_column": numeric_column_name
     }
     
     return result
@@ -85,7 +81,6 @@ def descriptive_statistics(df: pd.DataFrame, columns: List[str],
                            metrics: Optional[List[str]]=None, 
                            group_by: Optional[List[str]]=None, 
                            group_by_value: Optional[str]=None,
-                           order_by: Optional[List[str]]=None,
                            n_limit: Optional[int]=None) -> pd.DataFrame:
     """Calculate the descriptive statistics for single or list of columns, if group_by is provided, calculate the statistics per group
     Args:
@@ -94,7 +89,6 @@ def descriptive_statistics(df: pd.DataFrame, columns: List[str],
         metrics (List[str], optional): list of metrics to calculate, available metrics are mean, median, std, min, max, count, 25%, 50%, 75%, Ignored when group_by is provided.
         group_by (List[str], optional): list of columns to group by, defaults to None.
         group_by_value (str, optional): could used when there is only one column to group by applies as filter defaults value to None.
-        order_by (List[str], optional): list of columns to order by, defaults to None.
         n_limit (int, optional): limit the number of rows returned, defaults to None.
         
     Returns:
@@ -115,6 +109,9 @@ def descriptive_statistics(df: pd.DataFrame, columns: List[str],
             result = df[df[group_by[0]] == group_by_value][columns].describe()
         else:
             result = df.groupby(group_by)[columns].describe()
+    if n_limit and len(result) > n_limit:
+        result = result.head(n_limit)
+    send_thinking_step(func="descriptive_statistics", content=f"Descriptive statistics for columns {', '.join(columns)}:\n\n{result.to_markdown()}")
     return result
     
 
@@ -123,7 +120,7 @@ def standardize(df: pd.DataFrame, column_names: List[str], std_column_suffix: st
     Args:
         df (pd.DataFrame): DataFrame to operate on
         column_names (List[str]): List of column names containing features to standardize
-        std_column_suffix (str): Suffix to append to column names for standardized columns. Defaults to "_std"
+        std_column_suffix (str): Suffix to append to column names for standardized columns (required)
     
     Returns:
         List[str]: Names of the created standardized columns

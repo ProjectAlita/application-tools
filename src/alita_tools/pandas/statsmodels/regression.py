@@ -156,14 +156,14 @@ def factorAnalysis(df: pd.DataFrame, columns: List[str]) -> tuple:
 
 
 def principal_component_analysis_2D(df: pd.DataFrame, feature_columns: List[str], target_column: str, 
-                               pc_x_column: Optional[str] = None, pc_y_column: Optional[str] = None) -> Dict[str, str]:
+                               pc_x_column: str, pc_y_column: str) -> Dict[str, str]:
     """ Principal component analysis (PCA) to decreases dementiality of data to 2 dimentions, very usefull in 2D data visualization. Adds new columns to dataset.
     Args:
         df (pd.DataFrame): DataFrame to operate on
         feature_columns (List[str]): List of column names containing features
         target_column (str): Column name with target values
-        pc_x_column (Optional[str]): Name for the first principal component column. If None, defaults to "pc_x"
-        pc_y_column (Optional[str]): Name for the second principal component column. If None, defaults to "pc_y"
+        pc_x_column (str): Name for the first principal component column
+        pc_y_column (str): Name for the second principal component column
         
     Returns:
         Dict[str, str]: Dictionary with keys 'pc_x' and 'pc_y' containing the names of the created principal component columns
@@ -175,16 +175,13 @@ def principal_component_analysis_2D(df: pd.DataFrame, feature_columns: List[str]
 
     principalComponents = pca.fit_transform(_df)
     
-    x_column = pc_x_column if pc_x_column else "pc_x"
-    y_column = pc_y_column if pc_y_column else "pc_y"
+    df[pc_x_column] = principalComponents[:, 0]
+    df[pc_y_column] = principalComponents[:, 1]
     
-    df[x_column] = principalComponents[:, 0]
-    df[y_column] = principalComponents[:, 1]
-    
-    result = f"Added new columns with principal components values: {x_column}, {y_column} from features columns {', '.join(feature_columns)}. Data sample: {df[[x_column, y_column, target_column]].head(5).to_string()}"
+    result = f"Added new columns with principal components values: {pc_x_column}, {pc_y_column} from features columns {', '.join(feature_columns)}. Data sample: {df[[pc_x_column, pc_y_column, target_column]].head(5).to_string()}"
     send_thinking_step(func="principal_component_analysis_2D", content=result)
     
     return {
-        "pc_x": x_column,
-        "pc_y": y_column
+        "pc_x": pc_x_column,
+        "pc_y": pc_y_column
     }

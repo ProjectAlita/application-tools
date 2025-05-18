@@ -146,11 +146,12 @@ def explode(df: pd.DataFrame, column_name: str) -> str:
     except KeyError as e:
         raise KeyError(f"Column {column_name} not found in DataFrame") from e
 
-def delimitred_column_values_to_list(df: pd.DataFrame, column_name:str, delimiter=";") -> str:
+def delimitred_column_values_to_list(df: pd.DataFrame, column_name:str, list_column_name: str, delimiter=";") -> str:
     """Convert delimiter separated string column values to list colum values, delimeters can be comma, semicolon, space, etc. make sure you use the right one
     Args:
         df (pd.DataFrame): DataFrame to operate on
         column_name (str): "Column name"
+        list_column_name (str): Name for the new column that will contain the list values
         delimiter (str, optional): "Delimiter of values in column". Defaults to ";".
         
     Returns:
@@ -166,15 +167,15 @@ def delimitred_column_values_to_list(df: pd.DataFrame, column_name:str, delimite
                     new_col.append(val.strip())
         else:
             new_col.append(str(value))
-        if not df.columns.str.contains(f"{column_name}_list").any():
-            df[f"{column_name}_list"] = ""
+        if not df.columns.str.contains(list_column_name).any():
+            df[list_column_name] = ""
         
-        df.at[i, f"{column_name}_list"] = new_col
-    result = f"Added new column {column_name}_list as a list of values from {column_name} column"
-    values_set = set_of_column_values(df, f"{column_name}_list")
+        df.at[i, list_column_name] = new_col
+    result = f"Added new column {list_column_name} as a list of values from {column_name} column"
+    values_set = set_of_column_values(df, list_column_name)
     result += f". Here is set of values: " + str(values_set)
     send_thinking_step(func="delimitred_column_values_to_list", content=result)
-    return f"{column_name}_list"
+    return list_column_name
 
 def covariance(df: pd.DataFrame, columns: Optional[List[str]]=None) -> pd.DataFrame:
     """Calculate covariance for dataset or subset of selected columns
