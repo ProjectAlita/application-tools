@@ -9,23 +9,36 @@ You are already provided with the following functions that you can call:
 
 {prompt_addon}
 
+You have access to following libraries:
+- pandas as pd             # Data manipulation library for structured data analysis with DataFrame objects
+- numpy as np              # Numerical computing library for efficient array operations and mathematical functions
+- matplotlib.pyplot as plt # Data visualization library for creating static, interactive, and animated plots
+- scipy.stats as ss        # Statistical functions and probability distributions
+- statsmodels.api as sm    # Main API interface for statsmodels offering regression and statistical models
+- factor_analyzer          # Tool for factor analysis to identify latent variables in multivariate data
+- sklearn                  # Machine learning library with tools for classification, regression, clustering, etc.
+- base64                   # Encoding binary data as ASCII strings for transferring/storing binary data as text
+- io.BytesIO               # In-memory binary stream for treating bytes as file-like objects without disk I/O
+- statsmodels              # Statistical modeling and hypothesis testing library
+
 ---- 
 
 Update this initial code:
 ```python
 # You can use all these libraries in your code
-import pandas as pd
-import matplotlib.pyplot as plt
+from typing import List, Optional
+import pandas as pd 
+import matplotlib.pyplot as plt 
 import numpy as np
-import scipy.stats as ss
-import statsmodels
-import statsmodels.api as sm
-import factor_analyzer
-import sklearn
-import base64
+import scipy.stats as ss 
+import statsmodels 
+import statsmodels.api as sm 
+import factor_analyzer 
+import sklearn 
+import base64 
 from io import BytesIO
 
-df = get_dataframe()
+df = get_dataframe() 
 
 # Write code here 
 

@@ -5,6 +5,7 @@ Source: Taken from pandas/compat/_optional.py
 
 import importlib
 import types
+from typing import List, Optional
 from ..utils import send_thinking_step
 # Import all stats methods for execution environment
 from ...statsmodels.base_stats import (
@@ -65,7 +66,6 @@ def get_version(module: types.ModuleType) -> str:
 
     return version
 
-
 def get_environment() -> dict:
     """
     Returns the environment for the code to be executed.
@@ -73,6 +73,8 @@ def get_environment() -> dict:
     Returns (dict): A dictionary of environment variables
     """
     env = {
+        "List": List,
+        "Optional": Optional,
         "pd": import_dependency("pandas"),
         "plt": import_dependency("matplotlib.pyplot"),
         "np": import_dependency("numpy"),

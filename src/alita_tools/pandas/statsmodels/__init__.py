@@ -3,6 +3,7 @@ Statistical model tools for pandas dataframes.
 This module provides functions for statistical analysis, hypothesis testing, and regression modeling.
 """
 
+import inspect
 from .base_stats import (
     convert_str_column_to_categorical, 
     convert_categorical_colum_to_numeric,
@@ -52,6 +53,18 @@ def _generate_function_docs(func, with_examples=True):
     doc = func.__doc__ or ""
     doc = doc.strip().split('\n')[0]  # Get the first line of docstring
     
+    # Get the actual function parameters using inspect
+    try:
+        signature = inspect.signature(func)
+        # Format the parameters string
+        params_str = ", ".join([
+            f"{param_name}: {param.annotation.__name__ if param.annotation != inspect.Parameter.empty else 'Any'}{' = ' + repr(param.default) if param.default != inspect.Parameter.empty else ''}"
+            for param_name, param in signature.parameters.items()
+        ])
+    except Exception:
+        # Fallback if inspection fails
+        params_str = "df: pd.DataFrame, **kwargs"
+    
     # Add examples for some common functions if requested
     examples = {
         "label_based_on_bins": "label_based_on_bins(df, 'age', '0|18|65|120', 'child|adult|senior')",
@@ -73,7 +86,7 @@ def _generate_function_docs(func, with_examples=True):
     if with_examples and func.__name__ in examples:
         doc += f" Example: {examples[func.__name__]}"
     
-    return f"<function>\ndef {func.__name__}(df: pd.DataFrame, ...) -> str:\n    '''{doc}'''\n</function>"
+    return f"<function>\ndef {func.__name__}({params_str}) -> str:\n    '''{doc}'''\n</function>"
 
 # Group functions by category
 function_categories = {

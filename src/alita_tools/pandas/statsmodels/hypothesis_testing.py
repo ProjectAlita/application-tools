@@ -1,5 +1,5 @@
 import pandas as pd
-from typing import Any, Optional
+from typing import List, Optional
 import scipy.stats as ss
 import statsmodels.api as sm
 import factor_analyzer
@@ -39,11 +39,11 @@ def two_sample_t_test(df: pd.DataFrame, column_one: str, column_two:str):
     return result
 
 
-def one_way_ANOVA(df: pd.DataFrame, columns:str, formula: str):
+def one_way_ANOVA(df: pd.DataFrame, columns: List[str], formula: str):
     """ One way ANOVA compares the variance in the group means of an independent variable on a dependent variable.
     Args:
         df (pd.DataFrame): DataFrame to operate on
-        columns (str): "Column names with one sample per column separated by | . Should be full list of colums used withing R formula"
+        columns (List[str]): List of column names used within the R formula
         formula (str): "R formula for representing relationship between variables"
     """
     _df, _, _ = _prepare_dataset(df, columns)
@@ -53,22 +53,20 @@ def one_way_ANOVA(df: pd.DataFrame, columns:str, formula: str):
     return table
 
 
-def two_way_ANOVA(df: pd.DataFrame, columns_set_one:str, formula_one: str, columns_set_two:str, formula_two: str):
+def two_way_ANOVA(df: pd.DataFrame, columns_set_one: List[str], formula_one: str, columns_set_two: Optional[List[str]]=None, formula_two: Optional[str]=None):
     """ Two way ANOVA compares the variance in the group means of two independent variables on a dependent variable and on each other.
     Args:
         df (pd.DataFrame): DataFrame to operate on
-        columns_set_one (str): "Column names with one sample per column separated by | . Should be full list of colums used withing R formula one"
+        columns_set_one (List[str]): List of column names used within R formula one
         formula_one (str): "R formula for ANOVA"
-        columns_set_two (str): "Column names with one sample per column separated by | . Should be full list of colums used withing R formula two"
-        formula_two (str): "R formula for ANOVA"
+        columns_set_two (Optional[List[str]], optional): List of column names used within R formula two
+        formula_two (Optional[str], optional): "R formula for ANOVA"
     """
     if not columns_set_two or not formula_two:
         return one_way_ANOVA(df, columns_set_one, formula_one)
     
-    _df, columns_set_one, columns_set_two = _prepare_dataset(df, columns_set_one, columns_set_two)
-    
-    _df_one = _df[columns_set_one]
-    _df_two = _df[columns_set_two]
+    _df_one = df[columns_set_one]
+    _df_two = df[columns_set_two]
     
     table = sm.stats.anova_lm(
         sm.formula.api.ols(formula_one, data=_df_one).fit(),
@@ -79,11 +77,11 @@ def two_way_ANOVA(df: pd.DataFrame, columns_set_one:str, formula_one: str, colum
     return table
 
 
-def krushkal_wallis_test(df: pd.DataFrame, columns:str):
+def krushkal_wallis_test(df: pd.DataFrame, columns: List[str]):
     """ Kruskal-Wallis test is a non-parametric statistical test that is used to evaluate whether the medians of two or more groups are different.
     Args:
         df (pd.DataFrame): DataFrame to operate on
-        columns (str): "Numeric column names separated by | "
+        columns (List[str]): List of numeric column names
     """
     _df, _, _ = _prepare_dataset(df, columns)
     res = ss.kruskal(*[_df[c] for c in _df.columns])
@@ -106,26 +104,20 @@ def chi_square_test(df: pd.DataFrame, column_one: str, column_two:str):
     send_thinking_step(func="chi_square_test", content=result)
     return result
 
- 
 
-def chi_square_test_on_data(df: pd.DataFrame, column_one_name: str, column_one_data: str, column_two_name: str, column_two_data:str):
+def chi_square_test_on_data(df: pd.DataFrame, column_one_name: str, column_one_data: List[float], column_two_name: str, column_two_data: List[float]):
     """ Chi-square test on data to determine whether observed frequencies are significantly different from expected frequencies.
     Args:
         df (pd.DataFrame): DataFrame to operate on
         column_one_name (str): "Column name for first sample "
-        column_one_data (str): "list of integer or float values separated by | "
+        column_one_data (List[float]): "List of values for first column"
         column_two_name (str): "Column name for second sample"
-        column_two_data (str):  "list of integer or float values separated by | "
+        column_two_data (List[float]): "List of values for second column"
     """
-    try:
-        column_one = [float(x.strip()) for x in column_one_data.split("|")]
-        column_two = [float(x.strip()) for x in column_two_data.split("|")]
-    except ValueError:
-        return "ERROR: Chi-square test on data requires numeric values separated by |"
     _df = pd.DataFrame(
         {
-            column_one_name: column_one,
-            column_two_name: column_two
+            column_one_name: column_one_data,
+            column_two_name: column_two_data
         }
     )
     res = ss.chi2_contingency(_df)
@@ -134,12 +126,11 @@ def chi_square_test_on_data(df: pd.DataFrame, column_one_name: str, column_one_d
     return result
 
 
-
-def bartlett_test(df: pd.DataFrame, columns:str):
+def bartlett_test(df: pd.DataFrame, columns: List[str]):
     """ Bartlett's test tests the null hypothesis that all input samples are from populations with equal variances, returns chi-square value and p-value
     Args:
         df (pd.DataFrame): DataFrame to operate on
-        columns (str): "Numeric columns names separated by | "
+        columns (List[str]): List of numeric column names
     """
     _df, _, _ = _prepare_dataset(df, columns)
     chi_square_value, p_value = factor_analyzer.factor_analyzer.calculate_bartlett_sphericity(_df)
@@ -148,50 +139,51 @@ def bartlett_test(df: pd.DataFrame, columns:str):
     return result
     
 
-def KMO_test(df: pd.DataFrame, columns:str):
+def KMO_test(df: pd.DataFrame, columns: List[str]):
     """ Kaiser-Meyer-Olkin (KMO) Test measures the suitability of data for factor analysis, returns KMO score less than 0.6 is considered inadequate
     Args:
         df (pd.DataFrame): DataFrame to operate on
-        columns (str): "Numeric columns names separated by | "
+        columns (List[str]): List of numeric column names
     """
     _df, _, _ = _prepare_dataset(df, columns)
     kmo_per_item, kmo_total = factor_analyzer.factor_analyzer.calculate_kmo(_df)
+    column_str = "|".join(columns)
     message = """#### KMO Test results:\n\n"""
     message = """##### KMO Total: {kmo_total}\n\n"""
-    message += f"""##### KMO per item: \n\n|{columns}|\n|{"|".join([str(round(x, 4)) for x in kmo_per_item])}|"""
+    message += f"""##### KMO per item: \n\n|{column_str}|\n|{"|".join([str(round(x, 4)) for x in kmo_per_item])}|"""
     
     send_thinking_step(func="KMO_test", content=message)
     return f'Kmo Total: {kmo_total}, KMO per item: {", ".join([str(round(x, 4)) for x in kmo_per_item])}'
 
 
 
-def mann_whitney_test(df: pd.DataFrame, columns: str, method: str='auto'):
+def mann_whitney_test(df: pd.DataFrame, columns: List[str], method: str='auto'):
     """ Mann-Whitney U test is a nonparametric test that allows two groups or conditions or treatments to be compared without making the assumption that values are normally distributed.
     Args:
         df (pd.DataFrame): DataFrame to operate on
-        columns (str): two numeric columns separated by | 
+        columns (List[str]): List containing two numeric column names
         method (str): "Method to use for calculating p-value, available methods are 'auto', 'asymptotic', 'exact', default is 'auto'"
     """
-    _df, columns, _ = _prepare_dataset(df, columns)
     if len(columns) != 2:
-        return "ERROR: Mann-Whitney U test requires two columns separated by |"
+        return "ERROR: Mann-Whitney U test requires two columns"
+    _df = df[columns].dropna()
     U1, p = ss.mannwhitneyu(_df[columns[0]], _df[columns[1]], method=method)
     result = f"U1-statistics: {U1}, p-value: {p}"
     send_thinking_step(func="mann_whitney_test", content=result)
     return result
     
 
-def wilcoxon_test(df: pd.DataFrame, columns: str, alternative:str='two-sided', method: str='auto'):
+def wilcoxon_test(df: pd.DataFrame, columns: List[str], alternative:str='two-sided', method: str='auto'):
     """ Wilcoxon signed-rank test is a nonparametric test that allows two groups or conditions or treatments to be compared without making the assumption that values are normally distributed.
     Args:
         df (pd.DataFrame): DataFrame to operate on
-        columns (str): one or two columns separated by | 
+        columns (List[str]): List containing one or two column names
         alternative (str): "Alternative hypothesis, available options are 'two-sided', 'less', 'greater', default is 'two-sided'"
         method (str): "Method to use for calculating p-value, available methods are 'auto', 'asymptotic', 'exact', default is 'auto'"
     """
-    _df, columns, _ = _prepare_dataset(df, columns)
-    if isinstance(columns, list) and len(columns) > 2:
-        return "ERROR: Wilcoxon signed-rank test requires one or two columns separated by |"
+    _df = df[columns].dropna()
+    if len(columns) > 2:
+        return "ERROR: Wilcoxon signed-rank test requires one or two columns"
     if alternative not in ['two-sided', 'less', 'greater']:
         alternative = 'two-sided'
     if method not in ['auto', 'asymptotic', 'exact']:
