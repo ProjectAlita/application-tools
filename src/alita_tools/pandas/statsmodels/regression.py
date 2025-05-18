@@ -1,12 +1,13 @@
 import pandas as pd
-from typing import List
+from typing import List, Union, Optional
 import statsmodels.api as sm
 import sklearn
 import factor_analyzer
+import numpy as np
 from ..dataframe.utils import send_thinking_step
 from .base_stats import _prepare_dataset, _test_a_model
 
-def linear_regression(df: pd.DataFrame, feature_columns: List[str], formula: str, target_column: str, model=None):
+def linear_regression(df: pd.DataFrame, feature_columns: List[str], formula: str, target_column: str, model=None) -> tuple:
     """ Build model to predict a dependent variable using two or more predictor variables
     Args:
         df (pd.DataFrame): DataFrame to operate on
@@ -14,6 +15,9 @@ def linear_regression(df: pd.DataFrame, feature_columns: List[str], formula: str
         formula (str): "R formula for representing relationship between dependent and independent variables"
         target_column (str): "target column we will be predicting"
         model: Optional model object where the trained model will be stored
+        
+    Returns:
+        tuple: (accuracy, summary) - Model accuracy and summary
     """
     
     _df, feature_columns, target_column = _prepare_dataset(df, feature_columns, target_column)
@@ -26,10 +30,10 @@ def linear_regression(df: pd.DataFrame, feature_columns: List[str], formula: str
     message += "\n\n```\n\n"""
     
     send_thinking_step(func="linear_regression", content=message)
-    return f"{accuracy}\n\n{trained_model.summary().as_text()}"
+    return accuracy, trained_model.summary()
 
 
-def logistic_regression(df: pd.DataFrame, feature_columns: List[str], formula: str, target_column: str, model=None):
+def logistic_regression(df: pd.DataFrame, feature_columns: List[str], formula: str, target_column: str, model=None) -> tuple:
     """ Build model to predict of probability of occurrence of an event
     Args:
         df (pd.DataFrame): DataFrame to operate on
@@ -37,6 +41,9 @@ def logistic_regression(df: pd.DataFrame, feature_columns: List[str], formula: s
         formula (str): "R formula for representing relationship between dependent and independent variables"
         target_column (str): "target column we will be predicting"
         model: Optional model object where the trained model will be stored
+        
+    Returns:
+        tuple: (accuracy, summary) - Model accuracy and summary
     """
     
     _df, feature_columns, target_column = _prepare_dataset(df, feature_columns, target_column)
@@ -49,10 +56,10 @@ def logistic_regression(df: pd.DataFrame, feature_columns: List[str], formula: s
     message += "\n\n```\n\n"""
     
     send_thinking_step(func="logistic_regression", content=message)
-    return f"{accuracy}\n\n{trained_model.summary().as_text()}"
+    return accuracy, trained_model.summary()
 
 
-def mixed_effect_lm(df: pd.DataFrame, feature_columns: List[str], formula: str, group_column: str, target_column: str, model=None):
+def mixed_effect_lm(df: pd.DataFrame, feature_columns: List[str], formula: str, group_column: str, target_column: str, model=None) -> tuple:
     """ Build a mixed effect model for regression analysis involving dependent data, random effects must be independently-realized for responses in different groups
     Args:
         df (pd.DataFrame): DataFrame to operate on
@@ -61,6 +68,9 @@ def mixed_effect_lm(df: pd.DataFrame, feature_columns: List[str], formula: str, 
         group_column (str): "column name with group values"
         target_column (str): "target column, to be used in testing of model"
         model: Optional model object where the trained model will be stored
+        
+    Returns:
+        tuple: (accuracy, summary) - Model accuracy and summary
     """
     all_columns = feature_columns + [group_column]
     _df = df[all_columns + [target_column]].dropna()
@@ -74,17 +84,20 @@ def mixed_effect_lm(df: pd.DataFrame, feature_columns: List[str], formula: str, 
     message += "\n\n```\n\n"""
     
     send_thinking_step(func="mixed_effect_lm", content=message)
-    return f"{accuracy}\n\n{trained_model.summary().as_text()}"
+    return accuracy, trained_model.summary()
     
 
 
-def predict(df: pd.DataFrame, feature_columns: List[str], feature_values: List[float], model=None):
+def predict(df: pd.DataFrame, feature_columns: List[str], feature_values: List[float], model=None) -> Union[np.ndarray, str]:
     """ Predict target column values using trained model
     Args:
         df (pd.DataFrame): DataFrame to operate on
         feature_columns (List[str]): List of feature column names
         feature_values (List[float]): List of feature values for prediction
         model: Trained model object to use for prediction
+        
+    Returns:
+        numpy.ndarray or str: Prediction results or error message if model is not trained
     """
     predict_ds = pd.DataFrame([feature_values], columns=feature_columns)
     if model is None:
@@ -95,22 +108,25 @@ def predict(df: pd.DataFrame, feature_columns: List[str], feature_values: List[f
     message += f"""##### Results:\n\n {', '.join([str(round(x, 4)) for x in predictions])}"""
     
     send_thinking_step(func="predict", content=message)
-    return f"Predictions: {', '.join([str(round(x, 4)) for x in predictions])}"
+    return predictions
 
 
 
-def factorAnalysis(df: pd.DataFrame, columns: List[str]):
+def factorAnalysis(df: pd.DataFrame, columns: List[str]) -> tuple:
     """ Factor analysis used to describe variability among observed, correlated variables in terms of a potentially lower number of unobserved variables called factors; KMO calculation included and score less than 0.6 is considered inadequate
     Args:
         df (pd.DataFrame): DataFrame to operate on
         columns (List[str]): List of column names for factor analysis
+        
+    Returns:
+        tuple: (eigenvalues, factor_variance, kmo) - Analysis results
     """
     _df, _, _ = _prepare_dataset(df, columns)
     _, kmo_model = factor_analyzer.factor_analyzer.calculate_kmo(_df)
     if kmo_model < 0.6:
         result = f"WARNING: KMO score is {kmo_model}, which is less than 0.6, so factor analysis is not recommended"
         send_thinking_step(func="factorAnalysis", content=result)
-        return result
+        return None, None, kmo_model
         
     fa = factor_analyzer.FactorAnalyzer()
     # Identify number of factors using eigenvalues
@@ -136,15 +152,18 @@ def factorAnalysis(df: pd.DataFrame, columns: List[str]):
     message = f"""#### Factor analysis results:\n\n{result}"""
     
     send_thinking_step(func="factorAnalysis", content=message)
-    return result
+    return ev, statistics, kmo_model
 
 
-def principal_component_analysis_2D(df: pd.DataFrame, feature_columns: List[str], target_column: str):
+def principal_component_analysis_2D(df: pd.DataFrame, feature_columns: List[str], target_column: str) -> List[str]:
     """ Principal component analysis (PCA) to decreases dementiality of data to 2 dimentions, very usefull in 2D data visualization. Adds new columns to dataset.
     Args:
         df (pd.DataFrame): DataFrame to operate on
         feature_columns (List[str]): List of column names containing features
         target_column (str): "Column name with target values"
+        
+    Returns:
+        List[str]: List of created principal component column names
     """
     _df = df.loc[:, feature_columns].values
     _df = sklearn.preprocessing.StandardScaler().fit_transform(_df)
@@ -157,4 +176,4 @@ def principal_component_analysis_2D(df: pd.DataFrame, feature_columns: List[str]
     
     result = f"Added new columns with principal components values: pc_x, pc_y from features columns {', '.join(feature_columns)}. Data sample: {df[['pc_x', 'pc_y', target_column]].head(5).to_string()}"
     send_thinking_step(func="principal_component_analysis_2D", content=result)
-    return result
+    return ["pc_x", "pc_y"]

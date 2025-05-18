@@ -5,7 +5,7 @@ Source: Taken from pandas/compat/_optional.py
 
 import importlib
 import types
-from typing import List, Optional
+from typing import List, Optional, Union
 from ..utils import send_thinking_step
 # Import all stats methods for execution environment
 from ...statsmodels.base_stats import (
@@ -36,7 +36,7 @@ from ...statsmodels.hypothesis_testing import (
     two_sample_t_test,
     one_way_ANOVA,
     two_way_ANOVA,
-    krushkal_wallis_test,
+    kruskal_wallis_test,
     chi_square_test,
     chi_square_test_on_data,
     bartlett_test,
@@ -75,6 +75,7 @@ def get_environment() -> dict:
     env = {
         "List": List,
         "Optional": Optional,
+        "Union": Union,
         "pd": import_dependency("pandas"),
         "plt": import_dependency("matplotlib.pyplot"),
         "np": import_dependency("numpy"),
@@ -112,7 +113,7 @@ def get_environment() -> dict:
         "two_sample_t_test": two_sample_t_test,
         "one_way_ANOVA": one_way_ANOVA,
         "two_way_ANOVA": two_way_ANOVA,
-        "krushkal_wallis_test": krushkal_wallis_test,
+        "krushkal_wallis_test": kruskal_wallis_test,
         "chi_square_test": chi_square_test,
         "chi_square_test_on_data": chi_square_test_on_data,
         "bartlett_test": bartlett_test,
