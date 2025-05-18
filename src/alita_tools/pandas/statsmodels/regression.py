@@ -1,5 +1,5 @@
 import pandas as pd
-from typing import List, Union, Optional
+from typing import List, Union, Optional, Dict
 import statsmodels.api as sm
 import sklearn
 import factor_analyzer
@@ -155,15 +155,18 @@ def factorAnalysis(df: pd.DataFrame, columns: List[str]) -> tuple:
     return ev, statistics, kmo_model
 
 
-def principal_component_analysis_2D(df: pd.DataFrame, feature_columns: List[str], target_column: str) -> List[str]:
+def principal_component_analysis_2D(df: pd.DataFrame, feature_columns: List[str], target_column: str, 
+                               pc_x_column: Optional[str] = None, pc_y_column: Optional[str] = None) -> Dict[str, str]:
     """ Principal component analysis (PCA) to decreases dementiality of data to 2 dimentions, very usefull in 2D data visualization. Adds new columns to dataset.
     Args:
         df (pd.DataFrame): DataFrame to operate on
         feature_columns (List[str]): List of column names containing features
-        target_column (str): "Column name with target values"
+        target_column (str): Column name with target values
+        pc_x_column (Optional[str]): Name for the first principal component column. If None, defaults to "pc_x"
+        pc_y_column (Optional[str]): Name for the second principal component column. If None, defaults to "pc_y"
         
     Returns:
-        List[str]: List of created principal component column names
+        Dict[str, str]: Dictionary with keys 'pc_x' and 'pc_y' containing the names of the created principal component columns
     """
     _df = df.loc[:, feature_columns].values
     _df = sklearn.preprocessing.StandardScaler().fit_transform(_df)
@@ -171,9 +174,17 @@ def principal_component_analysis_2D(df: pd.DataFrame, feature_columns: List[str]
     pca = sklearn.decomposition.PCA(n_components=2)
 
     principalComponents = pca.fit_transform(_df)
-    df[f"pc_x"] = principalComponents[:, 0]
-    df[f"pc_y"] = principalComponents[:, 1]
     
-    result = f"Added new columns with principal components values: pc_x, pc_y from features columns {', '.join(feature_columns)}. Data sample: {df[['pc_x', 'pc_y', target_column]].head(5).to_string()}"
+    x_column = pc_x_column if pc_x_column else "pc_x"
+    y_column = pc_y_column if pc_y_column else "pc_y"
+    
+    df[x_column] = principalComponents[:, 0]
+    df[y_column] = principalComponents[:, 1]
+    
+    result = f"Added new columns with principal components values: {x_column}, {y_column} from features columns {', '.join(feature_columns)}. Data sample: {df[[x_column, y_column, target_column]].head(5).to_string()}"
     send_thinking_step(func="principal_component_analysis_2D", content=result)
-    return ["pc_x", "pc_y"]
+    
+    return {
+        "pc_x": x_column,
+        "pc_y": y_column
+    }

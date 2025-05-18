@@ -3,29 +3,35 @@ import sklearn
 import pandas as pd
 from ..dataframe.utils import send_thinking_step
 
-def convert_str_column_to_categorical(df: pd.DataFrame, column_name: str) -> str:
+def convert_str_column_to_categorical(df: pd.DataFrame, column_name: str, numeric_column_name: Optional[str] = None) -> str:
     """ Convert string column to categorical column with numeric reprenrarion - adds new column to dataset.
     Args:
         df (pd.DataFrame): DataFrame to operate on
-        column_name (str): "Column name"
+        column_name (str): Column name
+        numeric_column_name (Optional[str]): Name for the created numeric column. If None, defaults to '{column_name}_numeric'
     
     Returns:
         str: Name of the created numeric column
     """
     df[column_name] = pd.Categorical(df[column_name])
-    return convert_categorical_colum_to_numeric(df, column_name)
+    return convert_categorical_colum_to_numeric(df, column_name, numeric_column_name)
 
-def convert_categorical_colum_to_numeric(df: pd.DataFrame, column_name: str) -> str:
+def convert_categorical_colum_to_numeric(df: pd.DataFrame, column_name: str, numeric_column_name: Optional[str] = None) -> str:
     """ Convert categorical column to numeric column - adds new column to dataset.
     Args:
         df (pd.DataFrame): DataFrame to operate on
-        column_name (str): "Column name"
+        column_name (str): Column name
+        numeric_column_name (Optional[str]): Name for the created numeric column. If None, defaults to '{column_name}_numeric'
     
     Returns:
         str: Name of the created numeric column
     """
+    # Ensure the column is categorical type before accessing .cat
+    if not pd.api.types.is_categorical_dtype(df[column_name]):
+        df[column_name] = pd.Categorical(df[column_name])
+    
     categories = df[column_name].cat
-    numeric_column = f'{column_name}_numeric'
+    numeric_column = numeric_column_name if numeric_column_name else f'{column_name}_numeric'
     df[numeric_column] = categories.codes
     
     result = f'{column_name} categorical column values corresponds to {numeric_column} values: '
@@ -37,13 +43,16 @@ def convert_categorical_colum_to_numeric(df: pd.DataFrame, column_name: str) -> 
     return numeric_column
 
 
-def label_based_on_bins(df: pd.DataFrame, column_name: str, bins: List[float], labels: List[str]) -> Dict[str, str]:
+def label_based_on_bins(df: pd.DataFrame, column_name: str, bins: List[float], labels: List[str], 
+                     labeled_column_name: Optional[str] = None, numeric_column_name: Optional[str] = None) -> Dict[str, str]:
     """ Categorize column based on integer or float bins and add new column with labels culumns needs to be numeric or categorical before binning
     Args:
         df (pd.DataFrame): DataFrame to operate on
-        column_name (str): "Column name"
-        bins (List[float]): "List of bin values"
-        labels (List[str]): "List of labels for each bin"
+        column_name (str): Column name
+        bins (List[float]): List of bin values
+        labels (List[str]): List of labels for each bin
+        labeled_column_name (Optional[str]): Name for the created labeled column. If None, defaults to '{column_name}_labeled'
+        numeric_column_name (Optional[str]): Name for the created numeric column. If None, defaults to '{column_name}_labeled_numeric'
     
     Returns:
         dict: Dictionary containing:
@@ -55,11 +64,11 @@ def label_based_on_bins(df: pd.DataFrame, column_name: str, bins: List[float], l
         send_thinking_step(func="label_based_on_bins", content=error_message)
         return {"labeled_column": "", "numeric_column": ""}
     
-    labeled_column = f'{column_name}_labeled'
-    numeric_column = f'{column_name}_labeled_numeric'
+    labeled_column = labeled_column_name if labeled_column_name else f'{column_name}_labeled'
+    numeric_column = numeric_column_name if numeric_column_name else f'{column_name}_labeled_numeric'
     
     df[labeled_column] = pd.cut(df[column_name], bins=bins, labels=labels)
-    convert_categorical_colum_to_numeric(df, labeled_column)
+    convert_categorical_colum_to_numeric(df, labeled_column, numeric_column)
     
     message = f'Added new columns: {labeled_column} and {numeric_column} that are labeled representation of {column_name} and numeric representation of labels.'
     send_thinking_step(func="label_based_on_bins", content=message)
@@ -109,11 +118,12 @@ def descriptive_statistics(df: pd.DataFrame, columns: List[str],
     return result
     
 
-def standardize(df: pd.DataFrame, column_names: List[str]) -> List[str]:
+def standardize(df: pd.DataFrame, column_names: List[str], std_column_suffix: str = "_std") -> List[str]:
     """standardize the dataset features onto unit scale (mean = 0 and variance = 1) which is a requirement for the optimal performance of many machine learning algorithm. Adds new columns to dataset.
     Args:
         df (pd.DataFrame): DataFrame to operate on
         column_names (List[str]): List of column names containing features to standardize
+        std_column_suffix (str): Suffix to append to column names for standardized columns. Defaults to "_std"
     
     Returns:
         List[str]: Names of the created standardized columns
@@ -122,7 +132,7 @@ def standardize(df: pd.DataFrame, column_names: List[str]) -> List[str]:
     _df = sklearn.preprocessing.StandardScaler().fit_transform(_df)
     new_columns = []
     for i, c in enumerate(column_names):
-        new_column = f"{c}_std"
+        new_column = f"{c}{std_column_suffix}"
         new_columns.append(new_column)
         df[new_column] = _df[:, i]
     
