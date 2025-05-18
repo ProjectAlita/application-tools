@@ -170,7 +170,19 @@ class PandasWrapper(BaseToolApiWrapper):
                     "toolkit": "pandas"
                 }
             )
-        result = self.execute_code(df, code)
+        try:
+            result = self.execute_code(df, code)
+        except Exception as e:
+            logger.error(f"Code execution failed: {format_exc()}")
+            dispatch_custom_event(
+                name="thinking_step",
+                data={
+                    "message": f"Code execution failed: {format_exc()}",
+                    "tool_name": "process_query",
+                    "toolkit": "pandas"
+                }
+            )
+            raise
         dispatch_custom_event(
             name="thinking_step",
             data={
