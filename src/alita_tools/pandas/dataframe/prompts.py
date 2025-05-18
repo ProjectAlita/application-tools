@@ -5,12 +5,13 @@ PLAN_CODE_PROMPT = """
 {dataframe}
 </dataframe>
 
-You are already provided with the following functions that you can call:
 
+You are already provided with the following functions that you can call:
 {prompt_addon}
 
 You have access to following libraries:
-- pandas as pd             # Data manipulation library for structured data analysis with DataFrame objects
+```
+- pandas as pd              Data manipulation library for structured data analysis with DataFrame objects
 - numpy as np              # Numerical computing library for efficient array operations and mathematical functions
 - matplotlib.pyplot as plt # Data visualization library for creating static, interactive, and animated plots
 - scipy.stats as ss        # Statistical functions and probability distributions
@@ -20,6 +21,7 @@ You have access to following libraries:
 - base64                   # Encoding binary data as ASCII strings for transferring/storing binary data as text
 - io.BytesIO               # In-memory binary stream for treating bytes as file-like objects without disk I/O
 - statsmodels              # Statistical modeling and hypothesis testing library
+```
 
 ---- 
 
@@ -47,6 +49,9 @@ df = get_dataframe()
 <user_task>
 {task}
 </user_task>
+
+CODE GENERATION INSTRUCTIONS:
+Do not invent column names by yourself, functions that transforms columns (like convert_str_column_to_categorical, label_based_on_bins, etc.) returns column names they created
 
 CHART GENERATION INSTRUCTIONS:
 When creating a chart, provide base64 encoded image as a string in the result dictionary with key "chart" and explanation what it is in result dictionary with key "result".
