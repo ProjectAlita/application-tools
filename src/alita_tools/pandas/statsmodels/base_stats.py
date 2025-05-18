@@ -43,7 +43,7 @@ def convert_categorical_colum_to_numeric(df: pd.DataFrame, column_name: str, num
 
 
 def label_based_on_bins(df: pd.DataFrame, column_name: str, bins: List[float], labels: List[str], 
-                     labeled_column_name: str, numeric_column_name: str) -> Dict[str, str]:
+                     labeled_column_name: str, numeric_column_name: str) -> None:
     """ Categorize column based on integer or float bins and add new column with labels culumns needs to be numeric or categorical before binning
     Args:
         df (pd.DataFrame): DataFrame to operate on
@@ -52,29 +52,17 @@ def label_based_on_bins(df: pd.DataFrame, column_name: str, bins: List[float], l
         labels (List[str]): List of labels for each bin
         labeled_column_name (str): Name for the created labeled column
         numeric_column_name (str): Name for the created numeric column
-    
-    Returns:
-        dict: Dictionary containing:
-            - labeled_column (str): Name of the created labeled column
-            - numeric_column (str): Name of the created numeric column
     """
     if len(bins) != len(labels)+1:
         error_message = f"ERROR: Number of bins should be equal to number of labels + 1."
         send_thinking_step(func="label_based_on_bins", content=error_message)
-        return {"labeled_column": "", "numeric_column": ""}
+        raise ValueError(error_message)
     
     df[labeled_column_name] = pd.cut(df[column_name], bins=bins, labels=labels)
     convert_categorical_colum_to_numeric(df, labeled_column_name, numeric_column_name)
     
     message = f'Added new columns: {labeled_column_name} and {numeric_column_name} that are labeled representation of {column_name} and numeric representation of labels.'
     send_thinking_step(func="label_based_on_bins", content=message)
-    
-    result = {
-        "labeled_column": labeled_column_name,
-        "numeric_column": numeric_column_name
-    }
-    
-    return result
 
 
 def descriptive_statistics(df: pd.DataFrame, columns: List[str], 
