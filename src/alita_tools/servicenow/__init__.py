@@ -1,6 +1,5 @@
 from typing import List, Literal, Optional
 from langchain_community.agent_toolkits.base import BaseToolkit
-from scripts.regsetup import description
 
 from .api_wrapper import ServiceNowAPIWrapper
 from langchain_core.tools import BaseTool

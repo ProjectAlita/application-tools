@@ -20,19 +20,17 @@ class ServiceNowClient(object):
         """Retrieve incidents from ServiceNow by category"""
         # TODO: The query parameters generation should be delegated to a separate function.
         #  Code meant to be refactored.
-        arguments = [category, description]
         # ^ operator at the end of a query without a following condition gets ignored, this enables us to not worry about
         # ending a query with an ^ operator without any follow-up.
-        nested_query = ("^" if len([arg for arg in locals().values() if arg is not None]) > 1 else "")
+        # This same rule applies to sysparam_query and & operators.
         endpoint_url = f"{self.incidents_url}"
-        if locals().values():
-            endpoint_url += f"?sysparm_query="
+        endpoint_url += f"?sysparm_query="
 
         if category:
-            endpoint_url += f"category={category}{nested_query}"
+            endpoint_url += f"category={category}^"
 
         if description:
-            endpoint_url += f"descriptionLIKE{description}{nested_query}"
+            endpoint_url += f"descriptionLIKE{description}^"
 
         if number_of_entries:
             endpoint_url += f"&sysparm_limit={number_of_entries}"

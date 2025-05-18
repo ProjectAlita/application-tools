@@ -40,7 +40,7 @@ class ServiceNowAPIWrapper(BaseToolApiWrapper):
     client: Optional[Any] = Field(default=None, exclude=True)
     instance_alias: str
     base_url: str
-    password: Optional[SecretStr] = None,
+    password: Optional[SecretStr] = None
     username: Optional[str] = None
     limit: Optional[int] = None
     labels: Optional[List[str]] = []
@@ -60,7 +60,7 @@ class ServiceNowAPIWrapper(BaseToolApiWrapper):
         values['client'] = ServiceNowClient(base_url=base_url, username=username, password=password)
         return values
 
-    def get_incidents(self, category: Optional[str] = None, description: Optional[str] = None, number_of_entries: Optional[int] = None) -> List[Incident]:
+    def get_incidents(self, category: Optional[str] = None, description: Optional[str] = None, number_of_entries: Optional[int] = None) -> str:
         """Retrieves all incidents from ServiceNow from a given category."""
         try:
             response = self.client.get_incidents(category=category, description=description, number_of_entries=number_of_entries)
