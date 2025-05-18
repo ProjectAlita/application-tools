@@ -43,7 +43,7 @@ def convert_categorical_colum_to_numeric(df: pd.DataFrame, column_name: str, num
 
 
 def label_based_on_bins(df: pd.DataFrame, column_name: str, bins: List[float], labels: List[str], 
-                     labeled_column_name: str, numeric_column_name: str) -> None:
+                     labeled_column_name: str, numeric_column_name: str) -> Dict[str, any]:
     """ Categorize column based on integer or float bins and add new column with labels culumns needs to be numeric or categorical before binning
     Args:
         df (pd.DataFrame): DataFrame to operate on
@@ -52,6 +52,14 @@ def label_based_on_bins(df: pd.DataFrame, column_name: str, bins: List[float], l
         labels (List[str]): List of labels for each bin
         labeled_column_name (str): Name for the created labeled column
         numeric_column_name (str): Name for the created numeric column
+    
+    Returns:
+        Dict[str, any]: Dictionary containing:
+            - labeled_column_name (str): Name of the created labeled column
+            - numeric_column_name (str): Name of the created numeric column
+            - bin_counts (dict): Count of values in each bin
+            - bin_percentages (dict): Percentage of values in each bin
+            - bin_statistics (pd.DataFrame): DataFrame with bin counts and percentages
     """
     if len(bins) != len(labels)+1:
         error_message = f"ERROR: Number of bins should be equal to number of labels + 1."
@@ -61,8 +69,40 @@ def label_based_on_bins(df: pd.DataFrame, column_name: str, bins: List[float], l
     df[labeled_column_name] = pd.cut(df[column_name], bins=bins, labels=labels)
     convert_categorical_colum_to_numeric(df, labeled_column_name, numeric_column_name)
     
-    message = f'Added new columns: {labeled_column_name} and {numeric_column_name} that are labeled representation of {column_name} and numeric representation of labels.'
+    # Calculate bin counts and percentages
+    bin_counts = df[labeled_column_name].value_counts().to_dict()
+    total_values = len(df[labeled_column_name].dropna())
+    bin_percentages = {k: round(v / total_values * 100, 2) for k, v in bin_counts.items()}
+    
+    # Create a DataFrame with bin statistics for easier analysis
+    bin_statistics = pd.DataFrame({
+        'Count': bin_counts,
+        'Percentage': bin_percentages
+    })
+    bin_statistics = bin_statistics.sort_index()  # Sort by bin labels
+    
+    # Format the binning results for the message
+    bin_results = "Binning results:\n"
+    bin_results += f"{'Bin Label':<15} {'Count':<10} {'Percentage':<10}\n"
+    bin_results += "-" * 35 + "\n"
+    
+    for label in labels:
+        count = bin_counts.get(label, 0)
+        percentage = bin_percentages.get(label, 0)
+        bin_results += f"{str(label):<15} {count:<10} {percentage}%\n"
+    
+    message = f'Added new columns: {labeled_column_name} and {numeric_column_name} that are labeled representation of {column_name} and numeric representation of labels.\n\n'
+    message += bin_results
     send_thinking_step(func="label_based_on_bins", content=message)
+    
+    # Return both column names and bin statistics
+    return {
+        'labeled_column_name': labeled_column_name,
+        'numeric_column_name': numeric_column_name,
+        'bin_counts': bin_counts,
+        'bin_percentages': bin_percentages,
+        'bin_statistics': bin_statistics
+    }
 
 
 def descriptive_statistics(df: pd.DataFrame, columns: List[str], 
@@ -74,13 +114,15 @@ def descriptive_statistics(df: pd.DataFrame, columns: List[str],
     Args:
         df (pd.DataFrame): DataFrame to operate on
         columns (List[str]): list of columns to calculate statistics for
-        metrics (List[str], optional): list of metrics to calculate, available metrics are mean, median, std, min, max, count, 25%, 50%, 75%, Ignored when group_by is provided.
+        metrics (List[str], optional): list of metrics to calculate, available metrics are mean, median, std, min, max, count, 25%, 50%, 75%.
+            These will be available in the returned DataFrame as MultiIndex columns, e.g. ('column_name', 'mean').
         group_by (List[str], optional): list of columns to group by, defaults to None.
         group_by_value (str, optional): could used when there is only one column to group by applies as filter defaults value to None.
         n_limit (int, optional): limit the number of rows returned, defaults to None.
         
     Returns:
-        pd.DataFrame: DataFrame containing descriptive statistics
+        pd.DataFrame: DataFrame containing descriptive statistics with MultiIndex columns.
+            When group_by is used, access statistics with df[('column_name', 'metric_name')], e.g. df[('Survived', 'mean')]
     """
     if n_limit:
         n_limit = int(n_limit) if isinstance(n_limit, str) else n_limit
