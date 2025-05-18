@@ -1,7 +1,7 @@
 import logging
 from typing import Optional
 
-from alita_sdk.utils.content_parser import parse_file_content
+from ..utils.content_parser import parse_file_content
 from langchain_core.tools import ToolException
 from office365.runtime.auth.client_credential import ClientCredential
 from office365.sharepoint.client_context import ClientContext
