@@ -396,20 +396,20 @@ class GitHubClient(BaseModel):
         except Exception as e:
             return f"Failed to get pull request: {str(e)}"
 
-    def list_pull_request_diffs(self, repo_name: str, pr_number: int) -> str:
+    def list_pull_request_diffs(self, pr_number: int, repo_name: Optional[str] = None) -> str:
         """
         Fetches the files included in a pull request.
 
         Parameters:
-            repo_name (str): Name of the repository in format 'owner/repo'
             pr_number (int): Number of the pull request to fetch diffs for
+            repo_name (Optional[str]): Name of the repository in format 'owner/repo'. If None, uses the default repository instance.
 
         Returns:
             str: A JSON string with files and patches included in the pull request.
         """
         try:
             # Grab PR
-            repo = self.github_api.get_repo(repo_name)
+            repo = self.github_api.get_repo(repo_name) if repo_name else self.github_repo_instance
             pr = repo.get_pull(int(pr_number))
             files = pr.get_files()
             data = []
