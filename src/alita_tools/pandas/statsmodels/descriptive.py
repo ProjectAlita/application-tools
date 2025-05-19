@@ -157,20 +157,25 @@ def delimitred_column_values_to_list(df: pd.DataFrame, column_name:str, list_col
     Returns:
         str: The name of the new column created
     """
-    for i, value in enumerate(df[column_name]):  
+    # Create empty column first if it doesn't exist
+    if list_column_name not in df.columns:
+        df[list_column_name] = None
+    
+    # Process each row using the actual DataFrame index
+    for idx, row in df.iterrows():
+        value = row[column_name]
         new_col = []
-        if not value:
+        if pd.isna(value) or value == "":
             new_col = []
-        elif type(value) == str and delimiter in value:
+        elif isinstance(value, str) and delimiter in value:
             for val in value.split(delimiter):
                 if val.strip():
                     new_col.append(val.strip())
         else:
             new_col.append(str(value))
-        if not df.columns.str.contains(list_column_name).any():
-            df[list_column_name] = ""
         
-        df.at[i, list_column_name] = new_col
+        # Use the actual index to set the value
+        df.at[idx, list_column_name] = new_col
     result = f"Added new column {list_column_name} as a list of values from {column_name} column"
     values_set = set_of_column_values(df, list_column_name)
     result += f". Here is set of values: " + str(values_set)
