@@ -30,12 +30,15 @@ def convert_categorical_colum_to_numeric(df: pd.DataFrame, column_name: str, num
     if not pd.api.types.is_categorical_dtype(df[column_name]):
         df[column_name] = pd.Categorical(df[column_name])
     
-    categories = df[column_name].cat
-    df[numeric_column_name] = categories.codes
+    # Create the numeric column directly from categorical codes
+    df[numeric_column_name] = df[column_name].cat.codes
     
+    # Build a mapping from category values to their numeric codes
     result = f'{column_name} categorical column values corresponds to {numeric_column_name} values: '
-    for index, value in enumerate(categories.categories):
-        result += f'Value: {value} corresponds to {categories.codes[index]} |'
+    
+    # Use simple iteration over categories and their corresponding codes (0, 1, 2, ...)
+    for i, category in enumerate(df[column_name].cat.categories):
+        result += f'Value: {category} corresponds to {i} | '
     
     send_thinking_step(func="convert_categorical_colum_to_numeric", content=result)
     
