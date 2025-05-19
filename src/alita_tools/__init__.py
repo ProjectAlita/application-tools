@@ -48,7 +48,6 @@ logger = logging.getLogger(__name__)
 
 def get_tools(tools_list, alita: 'AlitaClient', llm: 'LLMLikeObject', *args, **kwargs):
     tools = []
-    print("Tools")
     for tool in tools_list:
         tool['settings']['alita'] = alita
         tool['settings']['llm'] = llm
