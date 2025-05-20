@@ -1,4 +1,4 @@
-from typing import Dict, List, Literal, Optional, Union, Any
+from typing import Dict, List, Optional, Any
 from pydantic import BaseModel, Field, SecretStr, create_model
 
 # Base schemas for GitHub API wrapper
@@ -72,9 +72,10 @@ GetPR = create_model(
 
 CreatePR = create_model(
     "CreatePR",
-    pr_title=(str, Field(description="Title of the pull request")),
-    pr_body=(str, Field(description="Body of the pull request")),
-    branch_name=(str, Field(description="The name of the branch, e.g. `feature-branch`")),
+    title=(str, Field(description="Title of the pull request")),
+    body=(str, Field(description="Body of the pull request")),
+    head=(Optional[str], Field(description="The branch containing the changes (defaults to active_branch)")),
+    base=(Optional[str], Field(description="The target branch (defaults to github_base_branch)")),
     repo_name=(Optional[str], Field(default=None, description="Name of the repository (e.g., 'owner/repo'). If None, uses the default repository."))
 )
 
