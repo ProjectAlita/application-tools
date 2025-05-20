@@ -2,7 +2,7 @@ import logging
 from typing import List, Any, Optional
 from pydantic import model_validator, BaseModel, SecretStr
 from pydantic import create_model
-from pydantic.fields import Field
+from pydantic import Field
 import yagmail
 
 logger = logging.getLogger(__name__)
@@ -33,7 +33,7 @@ class YagmailWrapper(BaseModel):
         username = values['username']
         password = values['password']
         host = values.get("host")
-        values['client'] = yagmail.SMTP(user=username, password=password, host=host)
+        cls.client = yagmail.SMTP(user=username, password=password, host=host)
         return values
 
     def send_gmail_message(self, receiver: str, message: str, subject: str, cc=None):
