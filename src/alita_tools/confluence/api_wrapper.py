@@ -28,18 +28,25 @@ createPage = create_model(
     space=(Optional[str], Field(description="Confluence space that is used for page's creation", default=None)),
     title=(str, Field(description="Title of the page")),
     body=(str, Field(description="Body of the page")),
-    status=(Optional[str], Field(description="Page publishing option: 'current' for publish page, 'draft' to create draft.", default='current')),
+    status=(Optional[str],
+            Field(description="Page publishing option: 'current' for publish page, 'draft' to create draft.",
+                  default='current')),
     parent_id=(Optional[str], Field(description="Page parent id (optional)", default=None)),
-    representation=(Optional[str], Field(description="Content representation format: storage for html, wiki for markdown", default='storage')),
+    representation=(Optional[str],
+                    Field(description="Content representation format: storage for html, wiki for markdown",
+                          default='storage')),
     label=(Optional[str], Field(description="Page label (optional)", default=None)),
 )
 
 createPages = create_model(
     "createPages",
     space=(Optional[str], Field(description="Confluence space that is used for pages creation", default=None)),
-    pages_info=(str, Field(description="""JSON string containing information about page name and its content per syntax: [{"page1_name": "page1_content"}, {"page2_name": "page2_content"}]""")),
+    pages_info=(str, Field(
+        description="""JSON string containing information about page name and its content per syntax: [{"page1_name": "page1_content"}, {"page2_name": "page2_content"}]""")),
     parent_id=(Optional[str], Field(description="Page parent id (optional)", default=None)),
-    status=(Optional[str], Field(description="Page publishing option: 'current' for publish page, 'draft' to create draft.", default='current')),
+    status=(Optional[str],
+            Field(description="Page publishing option: 'current' for publish page, 'draft' to create draft.",
+                  default='current')),
 )
 
 deletePage = create_model(
@@ -51,7 +58,9 @@ deletePage = create_model(
 updatePageById = create_model(
     "updatePageById",
     page_id=(str, Field(description="Page id")),
-    representation=(Optional[str], Field(description="Content representation format: storage for html, wiki for markdown", default='storage')),
+    representation=(Optional[str],
+                    Field(description="Content representation format: storage for html, wiki for markdown",
+                          default='storage')),
     new_title=(Optional[str], Field(description="New page title", default=None)),
     new_body=(Optional[str], Field(description="New page content", default=None)),
     new_labels=(Optional[list], Field(description="Page labels", default=None)),
@@ -60,7 +69,9 @@ updatePageById = create_model(
 updatePageByTitle = create_model(
     "updatePageByTitle",
     page_title=(str, Field(description="Page title")),
-    representation=(Optional[str], Field(description="Content representation format: storage for html, wiki for markdown", default='storage')),
+    representation=(Optional[str],
+                    Field(description="Content representation format: storage for html, wiki for markdown",
+                          default='storage')),
     new_title=(Optional[str], Field(description="New page title", default=None)),
     new_body=(Optional[str], Field(description="New page content", default=None)),
     new_labels=(Optional[list], Field(description="Page labels", default=None)),
@@ -69,7 +80,9 @@ updatePageByTitle = create_model(
 updatePages = create_model(
     "updatePages",
     page_ids=(Optional[list], Field(description="List of ids of pages to be updated", default=None)),
-    new_contents=(Optional[list], Field(description="List of new contents for each page. If content the same for all the pages then it should be a list with a single entry", default=None)),
+    new_contents=(Optional[list], Field(
+        description="List of new contents for each page. If content the same for all the pages then it should be a list with a single entry",
+        default=None)),
     new_labels=(Optional[list], Field(description="Page labels", default=None)),
 )
 
@@ -112,11 +125,14 @@ pageId = create_model(
 )
 
 сonfluenceInput = create_model(
-     "сonfluenceInput",
-     method=(str, Field(description="The HTTP method to use for the request (GET, POST, PUT, DELETE, etc.). Required parameter.")),
-     relative_url=(str, Field(description="Required parameter: The relative URI for Confluence API. URI must start with a forward slash and '/rest/...'. Do not include query parameters in the URL, they must be provided separately in 'params'.")),
-     params=(Optional[str], Field(default="", description="Optional JSON of parameters to be sent in request body or query params. MUST be string with valid JSON. For search/read operations, you MUST always get minimum fields and set max results, until users ask explicitly for more fields. For search/read operations you must generate CQL query string and pass it as params."))
- )
+    "сonfluenceInput",
+    method=(str, Field(
+        description="The HTTP method to use for the request (GET, POST, PUT, DELETE, etc.). Required parameter.")),
+    relative_url=(str, Field(
+        description="Required parameter: The relative URI for Confluence API. URI must start with a forward slash and '/rest/...'. Do not include query parameters in the URL, they must be provided separately in 'params'.")),
+    params=(Optional[str], Field(default="",
+                                 description="Optional JSON of parameters to be sent in request body or query params. MUST be string with valid JSON. For search/read operations, you MUST always get minimum fields and set max results, until users ask explicitly for more fields. For search/read operations you must generate CQL query string and pass it as params."))
+)
 
 loaderParams = create_model(
     "LoaderParams",
@@ -140,9 +156,14 @@ loaderParams = create_model(
 GetPageWithImageDescriptions = create_model(
     "GetPageWithImageDescriptionsModel",
     page_id=(str, Field(description="Confluence page ID from which content with images will be extracted")),
-    prompt=(Optional[str], Field(description="Custom prompt to use for image description generation. If not provided, a default prompt will be used", default=None)),
-    context_radius=(Optional[int], Field(description="Number of characters to include before and after each image for context. Default is 500", default=500))
+    prompt=(Optional[str], Field(
+        description="Custom prompt to use for image description generation. If not provided, a default prompt will be used",
+        default=None)),
+    context_radius=(Optional[int], Field(
+        description="Number of characters to include before and after each image for context. Default is 500",
+        default=500))
 )
+
 
 def parse_payload_params(params: Optional[str]) -> Dict[str, Any]:
     if params:
@@ -152,6 +173,7 @@ def parse_payload_params(params: Optional[str]) -> Dict[str, Any]:
             stacktrace = traceback.format_exc()
             return ToolException(f"Confluence tool exception. Passed params are not valid JSON. {stacktrace}")
     return {}
+
 
 class ConfluenceAPIWrapper(BaseToolApiWrapper):
     # Changed from PrivateAttr to Optional field with exclude=True
@@ -201,7 +223,7 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
         elif token:
             values['client'] = Confluence(url=url, token=token, cloud=cloud)
         else:
-            values['client'] = Confluence(url=url,username=username, password=api_key, cloud=cloud)
+            values['client'] = Confluence(url=url, username=username, password=api_key, cloud=cloud)
         return values
 
     def __unquote_confluence_space(self) -> str | None:
@@ -224,7 +246,8 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
                 unquoted_space = f'"{unquoted_space}"'
         return unquoted_space
 
-    def create_page(self, title: str, body: str, status: str = 'current', space: str = None, parent_id: str = None, representation: str = 'storage', label: str = None):
+    def create_page(self, title: str, body: str, status: str = 'current', space: str = None, parent_id: str = None,
+                    representation: str = 'storage', label: str = None):
         """ Creates a page in the Confluence space. Represents content in html (storage) or wiki (wiki) formats
             Page could be either published status='current' or make a draft with status='draft'
         """
@@ -236,14 +259,16 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
         logger.info(f"Page will be created within the space {user_space}")
         parent_id_filled = parent_id if parent_id else self.client.get_space(user_space)['homepage']['id']
 
-        created_page = self.temp_create_page(space=user_space, title=title, body=body, status=status, parent_id=parent_id_filled, representation=representation)
+        created_page = self.temp_create_page(space=user_space, title=title, body=body, status=status,
+                                             parent_id=parent_id_filled, representation=representation)
 
         page_details = {
             'title': created_page['title'],
             'id': created_page['id'],
             'space key': created_page['space']['key'],
             'author': created_page['version']['by']['displayName'],
-            'link': created_page['_links']['base'] + (created_page['_links']['edit'] if status == 'draft' else created_page['_links']['webui'])
+            'link': created_page['_links']['base'] + (
+                created_page['_links']['edit'] if status == 'draft' else created_page['_links']['webui'])
         }
 
         logger.info(f"Page created: {page_details['link']}")
@@ -266,12 +291,14 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
         parent_id_filled = parent_id if parent_id else self.client.get_space(user_space)['homepage']['id']
         for page_item in json.loads(pages_info):
             for title, body in page_item.items():
-                created_page = self.create_page(title=title, body=body, status=status, parent_id=parent_id_filled, space=user_space)
+                created_page = self.create_page(title=title, body=body, status=status, parent_id=parent_id_filled,
+                                                space=user_space)
                 created_pages.append(created_page)
         return str(created_pages)
 
     # delete after https://github.com/atlassian-api/atlassian-python-api/pull/1452 will be merged
-    def temp_create_page(self, space, title, body, parent_id=None, type="page", representation="storage", editor=None, full_width=False, status='current'):
+    def temp_create_page(self, space, title, body, parent_id=None, type="page", representation="storage", editor=None,
+                         full_width=False, status='current'):
         logger.info('Creating %s "%s" -> "%s"', type, space, title)
         url = "rest/api/content/"
         data = {
@@ -299,7 +326,8 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
         """ Deletes a page by its defined page_id or page_title """
         if not page_id and not page_title:
             raise ValueError("Either page_id or page_title is required to delete the page")
-        resolved_page_id = page_id if page_id else (self.client.get_page_by_title(space=self.space, title=page_title) or {}).get('id')
+        resolved_page_id = page_id if page_id else (
+                    self.client.get_page_by_title(space=self.space, title=page_title) or {}).get('id')
         if resolved_page_id:
             self.client.remove_page(resolved_page_id)
             message = f"Page with ID '{resolved_page_id}' has been successfully deleted."
@@ -307,13 +335,15 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
             message = f"Page instance could not be resolved with id '{page_id}' and/or title '{page_title}'"
         return message
 
-    def update_page_by_id(self, page_id: str, representation: str = 'storage', new_title: str = None, new_body: str = None, new_labels: list = None):
+    def update_page_by_id(self, page_id: str, representation: str = 'storage', new_title: str = None,
+                          new_body: str = None, new_labels: list = None):
         """ Updates an existing Confluence page (using id or title) by replacing its content, title, labels """
         current_page = self.client.get_page_by_id(page_id, expand='version,body.view')
         if not current_page:
             return f"Page with ID {page_id} not found."
 
-        if new_title and current_page['title'] != new_title and self.client.get_page_by_title(space=self.space, title=new_title):
+        if new_title and current_page['title'] != new_title and self.client.get_page_by_title(space=self.space,
+                                                                                              title=new_title):
             return f"Page with title {new_title} already exists."
 
         current_version = current_page['version']['number']
@@ -321,7 +351,8 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
         body_to_use = new_body if new_body else current_page['body']['view']['value']
         representation_to_use = representation if representation else current_page['body']['view']['representation']
 
-        updated_page = self.client.update_page(page_id=page_id, title=title_to_use, body=body_to_use, representation=representation_to_use)
+        updated_page = self.client.update_page(page_id=page_id, title=title_to_use, body=body_to_use,
+                                               representation=representation_to_use)
         webui_link = updated_page['_links']['base'] + updated_page['_links']['webui']
         logger.info(f"Page updated: {webui_link}")
 
@@ -352,22 +383,27 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
 
         return f"The page '{page_id}' was updated successfully: '{webui_link}'. \nDetails: {str(update_details)}"
 
-    def update_page_by_title(self, page_title: str, representation: str = 'storage', new_title: str = None, new_body: str = None, new_labels: list = None):
+    def update_page_by_title(self, page_title: str, representation: str = 'storage', new_title: str = None,
+                             new_body: str = None, new_labels: list = None):
         """ Updates an existing Confluence page (using id or title) by replacing its content, title, labels """
         current_page = self.client.get_page_by_title(space=self.space, title=page_title)
         if not current_page:
             return f"Page with title {page_title} not found."
 
-        return self.update_page_by_id(page_id=current_page['id'], representation=representation, new_title=new_title, new_body=new_body, new_labels=new_labels)
+        return self.update_page_by_id(page_id=current_page['id'], representation=representation, new_title=new_title,
+                                      new_body=new_body, new_labels=new_labels)
 
     def update_pages(self, page_ids: list = None, new_contents: list = None, new_labels: list = None):
         """ Update a batch of pages in the Confluence space. """
         statuses = []
         if len(page_ids) != len(new_contents) and len(new_contents) != 1:
-            raise ValueError("New content should be provided for all the pages or it should contain only 1 new body for bulk update")
+            raise ValueError(
+                "New content should be provided for all the pages or it should contain only 1 new body for bulk update")
         if page_ids:
             for index, page_id in enumerate(page_ids):
-                status = self.update_page_by_id(page_id=page_id, new_body=new_contents[index if len(new_contents) != 1 else 0], new_labels=new_labels)
+                status = self.update_page_by_id(page_id=page_id,
+                                                new_body=new_contents[index if len(new_contents) != 1 else 0],
+                                                new_labels=new_labels)
                 statuses.append(status)
             return str(statuses)
         else:
@@ -437,7 +473,8 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
         start = 0
         pages_info = []
         for _ in range((self.max_pages + self.limit - 1) // self.limit):
-            pages = self.client.get_all_pages_by_label(label, start=start, limit=self.limit) #, expand="body.view.value"
+            pages = self.client.get_all_pages_by_label(label, start=start,
+                                                       limit=self.limit)  # , expand="body.view.value"
             if not pages:
                 break
 
@@ -495,7 +532,7 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
         base64_md_pattern = r'data:image/(png|jpeg|gif);base64,[a-zA-Z0-9+/=]+'
         return re.sub(base64_md_pattern, "[Image Removed]", content)
 
-    def _process_search(self, cql, skip_images:bool = False):
+    def _process_search(self, cql, skip_images: bool = False):
         start = 0
         pages_info = []
         for _ in range((self.max_pages + self.limit - 1) // self.limit):
@@ -524,15 +561,25 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
 
     def search_by_title(self, query: str, skip_images: bool = False):
         """Search pages in Confluence by query text in title."""
+
+        query = self._escape_cql_query(query)
         if not self.space:
             cql = f'(type=page) and (title~"{query}")'
         else:
             cql = f'(type=page and space={self.__sanitize_confluence_space()}) and (title~"{query}")'
         return self._process_search(cql, skip_images)
 
+    def _escape_cql_query(self, query: str) -> str:
+        """Escape special characters in a CQL query string."""
+        # List of special characters in CQL that need escaping
+        special_chars = r'\\|+*?[]{}()^$~#:'
+        # Escape each special character with a backslash
+        return re.sub(r'([{}])'.format(re.escape(special_chars)), r'\\\1', query)
+
     def site_search(self, query: str):
         """Search for pages in Confluence using site search by query text."""
         content = []
+        query = self._escape_cql_query(query)
         if not self.space:
             cql = f'(type=page) and (siteSearch~"{query}")'
         else:
@@ -693,8 +740,7 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
             body = markdownify(response.text, heading_style="ATX")
             return body
         return response.text
-    
-    
+
     def paginate_request(self, retrieval_method: Callable, **kwargs: Any) -> List:
         """Paginate the various methods to retrieve groups of pages.
 
@@ -743,31 +789,31 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
                     break
             docs.extend(batch)
         return docs[:max_pages]
-    
+
     def loader(self,
-            content_format: str,
-            page_ids: Optional[List[str]] = None,
-            label: Optional[str] = None,
-            cql: Optional[str] = None,
-            include_restricted_content: Optional[bool] = False,
-            include_archived_content: Optional[bool] = False,
-            include_attachments: Optional[bool] = False,
-            include_comments: Optional[bool] = False,
-            include_labels: Optional[bool] = False,
-            limit: Optional[int] = 10,
-            max_pages: Optional[int] = 10,
-            ocr_languages: Optional[str] = None,
-            keep_markdown_format: Optional[bool] = True,
-            keep_newlines: Optional[bool] = True,
-            bins_with_llm: bool = False,
-            **kwargs) -> Generator[str, None, None]:
+               content_format: str,
+               page_ids: Optional[List[str]] = None,
+               label: Optional[str] = None,
+               cql: Optional[str] = None,
+               include_restricted_content: Optional[bool] = False,
+               include_archived_content: Optional[bool] = False,
+               include_attachments: Optional[bool] = False,
+               include_comments: Optional[bool] = False,
+               include_labels: Optional[bool] = False,
+               limit: Optional[int] = 10,
+               max_pages: Optional[int] = 10,
+               ocr_languages: Optional[str] = None,
+               keep_markdown_format: Optional[bool] = True,
+               keep_newlines: Optional[bool] = True,
+               bins_with_llm: bool = False,
+               **kwargs) -> Generator[str, None, None]:
         """
         Loads content from Confluence based on parameters.
         Returns:
             Generator: A generator that yields content of pages that match specified criteria
         """
         from .loader import AlitaConfluenceLoader
-        
+
         content_formant = content_format.lower() if content_format else 'view'
         mapping = {
             'view': ContentFormat.VIEW,
@@ -777,7 +823,7 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
             'anonymous': ContentFormat.ANONYMOUS_EXPORT_VIEW
         }
         content_format = mapping.get(content_formant, ContentFormat.VIEW)
-        
+
         confluence_loader_params = {
             'url': self.base_url,
             'space_key': self.space,
@@ -798,21 +844,21 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
             'min_retry_seconds': self.min_retry_seconds,
             'max_retry_seconds': self.max_retry_seconds,
             'number_of_retries': self.number_of_retries
-            
+
         }
-        
+
         loader = AlitaConfluenceLoader(self.client, self.llm, bins_with_llm, **confluence_loader_params)
-        
+
         for document in loader._lazy_load(kwargs={}):
             yield document
 
     def _download_image(self, image_url):
         """
         Download an image from a URL using the already authenticated Confluence client
-        
+
         Args:
             image_url: URL to download the image from
-            
+
         Returns:
             Binary image data or None if download fails
         """
@@ -823,27 +869,27 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
                 # Extract content ID from the URL if possible
                 content_id_match = re.search(r'contentId-(\d+)', image_url)
                 attachment_name_match = re.search(r'name=([^&]+)', image_url)
-                
+
                 if content_id_match and attachment_name_match:
                     content_id = content_id_match.group(1)
                     attachment_name = attachment_name_match.group(1)
                     # URL decode the attachment name if needed
                     import urllib.parse
                     attachment_name = urllib.parse.unquote(attachment_name)
-                    
+
                     logger.info(f"Extracted content ID: {content_id}, attachment name: {attachment_name}")
-                    
+
                     # Find the attachment in the page
                     try:
                         attachments = self.client.get_attachments_from_content(content_id)['results']
                         attachment = None
-                        
+
                         # Find the attachment that matches the filename
                         for att in attachments:
                             if att['title'] == attachment_name:
                                 attachment = att
                                 break
-                        
+
                         if attachment:
                             # Get the download URL and retry with that
                             download_url = self.base_url.rstrip('/') + attachment['_links']['download']
@@ -852,14 +898,14 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
                             return self._download_image(download_url)
                     except Exception as e:
                         logger.warning(f"Error resolving blob URL attachment: {str(e)}")
-            
+
             # Clean up the URL by removing query parameters if causing issues
             parsed_url = image_url
             if '?' in image_url and ('version=' in image_url or 'modificationDate=' in image_url):
                 # Keep only the path part for Confluence server URLs
                 parsed_url = image_url.split('?')[0]
                 logger.info(f"Removed query parameters from URL: {parsed_url}")
-            
+
             # Extract the path from the URL - the client is already configured with base URL
             # and authentication, so we just need the path part
             relative_path = None
@@ -874,7 +920,7 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
                         if path_idx != -1:
                             relative_path = parsed_url[path_idx:]
                             break
-                
+
                 # If still no match, try to use the URL as is
                 if not relative_path:
                     if parsed_url.startswith('http'):
@@ -889,7 +935,7 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
                             allow_redirects=True,
                             timeout=30
                         )
-                        
+
                         if response.status_code == 200:
                             content_type = response.headers.get('Content-Type', '')
                             if 'text/html' in content_type.lower():
@@ -901,13 +947,13 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
                             return None
                     else:
                         relative_path = parsed_url
-            
+
             # Remove leading slash if present
             if relative_path and relative_path.startswith('/'):
                 relative_path = relative_path[1:]
-            
+
             logger.info(f"Downloading image using relative path: {relative_path}")
-            
+
             # Use the existing authenticated client to get the image
             response = self.client.request(
                 method="GET",
@@ -915,36 +961,37 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
                 advanced_mode=True,
                 headers={"User-Agent": "Mozilla/5.0 (compatible; ConfluenceAPI/1.0; Python)"}
             )
-            
+
             # Check if we got a successful response
             if response.status_code == 200:
                 content = response.content
                 content_type = response.headers.get('Content-Type', '')
                 logger.info(f"Downloaded image successfully. Content type: {content_type}")
-                
+
                 # Check for HTML content which likely indicates an error or login page
                 if 'text/html' in content_type.lower():
                     logger.warning(f"Received HTML content instead of image. Authentication issue likely.")
                     return None
-                
+
                 # Basic validation of image data - ensure we actually got image data
                 if len(content) < 100:
-                    logger.warning(f"Downloaded content suspiciously small ({len(content)} bytes), might not be a valid image")
+                    logger.warning(
+                        f"Downloaded content suspiciously small ({len(content)} bytes), might not be a valid image")
                     return None
-                
+
                 return content
             else:
                 logger.error(f"Failed to download image: HTTP {response.status_code} - {response.reason}")
                 return None
-                
+
         except Exception as e:
             logger.error(f"Error downloading image from {image_url}: {str(e)}")
             return None
-            
+
     def _get_default_image_analysis_prompt(self) -> str:
         """
         Get a default prompt for image analysis
-        
+
         Returns:
             Default prompt string
         """
@@ -957,7 +1004,7 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
         3. UI components if it's a screenshot
         4. Diagrams, charts, or technical illustrations
         5. The overall context and purpose of the image
-        
+
         ## Instructions:
         - Begin your description by referencing the image name provided
         - Provide a comprehensive description that could substitute for the image
@@ -966,44 +1013,45 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
         - Format your response clearly with appropriate paragraph breaks
         - Make it short
         """
-        
+
     def _collect_context_for_image(self, content: str, image_marker: str, context_radius: int = 500) -> str:
         """
         Collect text context around an image reference
-        
+
         Args:
             content: The full content text
             image_marker: The image reference marker
             context_radius: Number of characters to include before and after each image for context
-            
+
         Returns:
             Context text
         """
         try:
             start_idx = max(0, content.find(image_marker) - context_radius)
             end_idx = min(len(content), content.find(image_marker) + len(image_marker) + context_radius)
-            
+
             # Extract the surrounding text
             context = content[start_idx:end_idx]
-            
+
             # Clean up the context by removing excessive whitespace
             context = re.sub(r'\s+', ' ', context).strip()
-            
+
             return context
         except Exception as e:
             logger.error(f"Error collecting context for image: {str(e)}")
             return ""
-            
-    def _process_image_with_llm(self, image_data, image_name: str = "", context_text: str = "", custom_prompt: str = None):
+
+    def _process_image_with_llm(self, image_data, image_name: str = "", context_text: str = "",
+                                custom_prompt: str = None):
         """
         Process an image with LLM including surrounding context
-        
+
         Args:
             image_data: Binary image data
             image_name: Name of the image for reference
             context_text: Surrounding text context
             custom_prompt: Optional custom prompt for the LLM
-            
+
         Returns:
             Generated description from the LLM
         """
@@ -1012,16 +1060,16 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
         if cached_description:
             logger.info(f"Using cached description for image: {image_name}")
             return cached_description
-            
+
         try:
             from io import BytesIO
             from PIL import Image, UnidentifiedImageError
-            
+
             # Get the LLM instance
             llm = self.llm
             if not llm:
                 return "[LLM not available for image processing]"
-            
+
             # Try to load and validate the image with PIL
             try:
                 bio = BytesIO(image_data)
@@ -1037,7 +1085,7 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
             except Exception as img_error:
                 logger.warning(f"Error loading image {image_name}: {str(img_error)}")
                 return f"[Error loading image {image_name}: {str(img_error)}]"
-            
+
             try:
                 # Convert image to base64
                 buffer = BytesIO()
@@ -1047,22 +1095,22 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
             except Exception as conv_error:
                 logger.warning(f"Error converting image {image_name}: {str(conv_error)}")
                 return f"[Error converting image {image_name}: {str(conv_error)}]"
-            
+
             # Use default or custom prompt
             prompt = custom_prompt if custom_prompt else self._get_default_image_analysis_prompt()
-            
+
             # Add context information if available
             if image_name or context_text:
                 prompt += "\n\n## Additional Context Information:\n"
-                
+
                 if image_name:
                     prompt += f"- Image Name/Reference: {image_name}\n"
-                
+
                 if context_text:
                     prompt += f"- Surrounding Content: {context_text}\n"
-                    
+
                 prompt += "\nPlease incorporate this contextual information in your description when relevant."
-            
+
             # Perform LLM invocation with image
             result = llm.invoke([
                 HumanMessage(
@@ -1075,12 +1123,12 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
                     ]
                 )
             ])
-            
+
             description = result.content
-            
+
             # Cache the result for future use
             self._image_cache.set(image_data, description, image_name)
-            
+
             return description
         except Exception as e:
             logger.error(f"Error processing image with LLM: {str(e)}")
@@ -1090,18 +1138,18 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
         """
         Get a Confluence page and augment any images in it with textual descriptions that include
         image names and contextual information from surrounding text.
-        
+
         This method will:
         1. Extract the specified page content from Confluence
         2. Detect images in the content (both attachments and embedded/linked images)
         3. Retrieve and process each image with an LLM, providing surrounding context
         4. Replace image references with the generated text descriptions
-        
+
         Args:
             page_id: The Confluence page ID to retrieve
             prompt: Custom prompt for the LLM when analyzing images. If None, a default prompt will be used.
             context_radius: Number of characters to include before and after each image for context. Default is 500.
-            
+
         Returns:
             The page content with image references replaced with contextual descriptions
         """
@@ -1110,139 +1158,139 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
             page = self.client.get_page_by_id(page_id, expand="body.storage")
             if not page:
                 return f"Page with ID {page_id} not found."
-                
+
             page_title = page['title']
             page_content = page['body']['storage']['value']
-            
+
             # Regular expressions to find different types of image references in Confluence markup:
-            
+
             # 1. Attachment-based images - <ac:image><ri:attachment ri:filename="image.png" /></ac:image>
             attachment_image_pattern = r'<ac:image[^>]*>(?:.*?)<ri:attachment ri:filename="([^"]+)"[^>]*/>(?:.*?)</ac:image>'
-            
+
             # 2. URL-based images - <ac:image><ri:url ri:value="http://example.com/image.png" /></ac:image>
             url_image_pattern = r'<ac:image[^>]*>(?:.*?)<ri:url ri:value="([^"]+)"[^>]*/>(?:.*?)</ac:image>'
-            
+
             # 3. Base64 embedded images - <ac:image><ac:resource>...<ac:media-type>image/png</ac:media-type><ac:data>(base64 data)</ac:data></ac:resource></ac:image>
             base64_image_pattern = r'<ac:image[^>]*>(?:.*?)<ac:resource>(?:.*?)<ac:media-type>([^<]+)</ac:media-type>(?:.*?)<ac:data>([^<]+)</ac:data>(?:.*?)</ac:resource>(?:.*?)</ac:image>'
-            
+
             # Process attachment-based images
             def process_attachment_image(match):
                 """Process attachment-based image references and get contextual descriptions"""
                 image_filename = match.group(1)
                 full_match = match.group(0)  # The complete image reference
-                
+
                 logger.info(f"Processing attachment image reference: {image_filename}")
-                
+
                 try:
                     # Get the image attachment from the page
                     attachments = self.client.get_attachments_from_content(page_id)['results']
                     attachment = None
-                    
+
                     # Find the attachment that matches the filename
                     for att in attachments:
                         if att['title'] == image_filename:
                             attachment = att
                             break
-                    
+
                     if not attachment:
                         logger.warning(f"Could not find attachment for image: {image_filename}")
                         return f"[Image: {image_filename} - attachment not found]"
-                    
+
                     # Get the download URL and download the image
                     download_url = self.base_url.rstrip('/') + attachment['_links']['download']
                     logger.info(f"Downloading image from URL: {download_url}")
                     image_data = self._download_image(download_url)
-                    
+
                     if not image_data:
                         logger.error(f"Failed to download image from URL: {download_url}")
                         return f"[Image: {image_filename} - download failed]"
-                    
+
                     # Collect surrounding context
                     context_text = self._collect_context_for_image(page_content, full_match, context_radius)
-                    
+
                     # Process with LLM (will use cache if available)
                     description = self._process_image_with_llm(image_data, image_filename, context_text, prompt)
                     return f"[Image {image_filename} Description: {description}]"
-                    
+
                 except Exception as e:
                     logger.error(f"Error processing attachment image {image_filename}: {str(e)}")
                     return f"[Image: {image_filename} - Error: {str(e)}]"
-            
+
             # Process URL-based images
             def process_url_image(match):
                 """Process URL-based image references and get contextual descriptions"""
                 image_url = match.group(1)
                 full_match = match.group(0)  # The complete image reference
-                
+
                 logger.info(f"Processing URL image reference: {image_url}")
-                
+
                 try:
                     # Extract image name from URL for better reference
                     image_name = image_url.split('/')[-1]
-                    
+
                     # Download the image
                     logger.info(f"Downloading image from URL: {image_url}")
                     image_data = self._download_image(image_url)
-                    
+
                     if not image_data:
                         logger.error(f"Failed to download image from URL: {image_url}")
                         return f"[Image: {image_name} - download failed]"
-                    
+
                     # Collect surrounding context
                     context_text = self._collect_context_for_image(page_content, full_match, context_radius)
-                    
+
                     # Process with LLM (will use cache if available)
                     description = self._process_image_with_llm(image_data, image_name, context_text, prompt)
                     return f"[Image {image_name} Description: {description}]"
-                    
+
                 except Exception as e:
                     logger.error(f"Error processing URL image {image_url}: {str(e)}")
                     return f"[Image: {image_url} - Error: {str(e)}]"
-            
+
             # Process base64 embedded images
             def process_base64_image(match):
                 """Process base64 embedded image references and get contextual descriptions"""
                 media_type = match.group(1)
                 base64_data = match.group(2)
                 full_match = match.group(0)  # The complete image reference
-                
+
                 logger.info(f"Processing base64 embedded image of type: {media_type}")
-                
+
                 try:
                     # Generate a name for the image based on media type
                     image_format = media_type.split('/')[-1]
                     image_name = f"embedded-image.{image_format}"
-                    
+
                     # Decode base64 data
                     try:
                         image_data = base64.b64decode(base64_data)
                     except Exception as e:
                         logger.error(f"Failed to decode base64 image data: {str(e)}")
                         return f"[Image: embedded {media_type} - decode failed]"
-                    
+
                     # Collect surrounding context
                     context_text = self._collect_context_for_image(page_content, full_match, context_radius)
-                    
+
                     # Process with LLM (will use cache if available)
                     description = self._process_image_with_llm(image_data, image_name, context_text, prompt)
                     return f"[Image {image_name} Description: {description}]"
-                    
+
                 except Exception as e:
                     logger.error(f"Error processing base64 image: {str(e)}")
                     return f"[Image: embedded {media_type} - Error: {str(e)}]"
-            
+
             # Replace each type of image reference with its description
             processed_content = page_content
-            
+
             # 1. Process attachment-based images
             processed_content = re.sub(attachment_image_pattern, process_attachment_image, processed_content)
-            
+
             # 2. Process URL-based images
             processed_content = re.sub(url_image_pattern, process_url_image, processed_content)
-            
+
             # 3. Process base64 embedded images
             processed_content = re.sub(base64_image_pattern, process_base64_image, processed_content)
-            
+
             # Convert HTML to markdown for easier readability
             try:
                 augmented_markdown = markdownify(processed_content, heading_style="ATX")
@@ -1251,7 +1299,7 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
                 logger.warning(f"Failed to convert to markdown: {str(e)}. Returning HTML content.")
                 # If markdownify fails, return the processed HTML
                 return f"Page '{page_title}' (ID: {page_id}) with image descriptions:\n\n{processed_content}"
-            
+
         except Exception as e:
             stacktrace = traceback.format_exc()
             logger.error(f"Error processing page with images: {stacktrace}")
