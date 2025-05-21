@@ -7,7 +7,7 @@ from ..base.tool import BaseAction
 from pydantic import create_model, BaseModel, ConfigDict, Field, SecretStr
 from ..utils import clean_string, TOOLKIT_SPLITTER, get_max_toolkit_length, parse_list
 
-name = "servicenow"
+name = "service_now"
 
 def get_tools(tool):
     return ServiceNowToolkit().get_toolkit(
@@ -38,7 +38,7 @@ class ServiceNowToolkit(BaseToolkit):
         return create_model(
             name,
             instance_alias=(str, Field(description="Alias for the ServiceNow instance", json_schema_extra={'configuration': True, 'configuration_title': True})),
-            base_url=(str, Field(description="ServiceNow URL", json_schema_extra={'configuration': True, 'configuration_title': True})),
+            base_url=(str, Field(description="ServiceNow URL", json_schema_extra={'configuration': True})),
             password=(SecretStr, Field(description="Password", default=None, json_schema_extra={'secret': True, 'configuration': True})),
             username=(str, Field(description="Username", default=None, json_schema_extra={'configuration': True})),
             limit=(Optional[int], Field(description="Pages limit per request", default=None)),
@@ -57,6 +57,7 @@ class ServiceNowToolkit(BaseToolkit):
                 'metadata': {
                     "label": "ServiceNow",
                     "icon_url": None,
+                    "hidden": True,
                     "sections": {
                         "auth": {
                             "required": True,

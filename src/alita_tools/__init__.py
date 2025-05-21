@@ -5,7 +5,7 @@ from .github import get_tools as get_github, AlitaGitHubToolkit
 from .openapi import get_tools as get_openapi
 from .jira import get_tools as get_jira, JiraToolkit
 from .confluence import get_tools as get_confluence, ConfluenceToolkit
-from .servicenow import get_tools as get_servicenow, ServiceNowToolkit
+from .servicenow import get_tools as get_service_now, ServiceNowToolkit
 from .gitlab import get_tools as get_gitlab, AlitaGitlabToolkit
 from .gitlab_org import get_tools as get_gitlab_org, AlitaGitlabSpaceToolkit
 from .zephyr import get_tools as get_zephyr, ZephyrToolkit
@@ -62,7 +62,7 @@ def get_tools(tools_list, alita: 'AlitaClient', llm: 'LLMLikeObject', *args, **k
         elif tool['type'] == 'confluence':
             tools.extend(get_confluence(tool))
         elif tool['type'] == 'servicenow':
-            tools.extend(get_servicenow(tool))
+            tools.extend(get_service_now(tool))
         elif tool['type'] == 'gitlab':
             tools.extend(get_gitlab(tool))
         elif tool['type'] == 'gitlab_org':
