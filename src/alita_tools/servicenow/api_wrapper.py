@@ -21,7 +21,7 @@ getIncidents = create_model(
     category=(Optional[str], Field(description="Category of incidents to get")),
     description=(Optional[str], Field(description="Content that the incident description can have")),
     number_of_entries=(Optional[int], Field(description="Number of incidents to get")),
-    creation_date=(Optional[str], Field(description="The creation date of the incident, formated as year-month-day, example: 2018-09-16")),
+    creation_date=(Optional[str], Field(description="The creation date of the incident, formated as year-month-day, example: 2018-09-16"))
 )
 
 def parse_payload_params(params: Optional[str]) -> Dict[str, Any]:
