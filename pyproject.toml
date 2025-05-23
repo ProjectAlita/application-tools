@@ -62,6 +62,7 @@ markers = [
     "testio: marks TestIO tests",
     "yagmail: marks YagMail tests",
     "carrier: marks Carrier tests",
+    "gmail: marks Gmail tests",
 ]
 
 [tool.coverage.run]
