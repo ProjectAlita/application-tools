@@ -24,15 +24,15 @@ getIncidents = create_model(
     creation_date=(Optional[str], Field(description="The creation date of the incident, formated as year-month-day, example: 2018-09-16")),
 )
 
-createIncidents = create_model(
-    "createIncidents",
+createIncident = create_model(
+    "createIncident",
     category=(Optional[str], Field(description="Category of incidents to create")),
     description=(Optional[str], Field(description="Detailed description of the incident")),
     short_description=(Optional[str], Field(description="Short description of the incident")),
     impact=(Optional[int], Field(description="Impact of the incident, measured in numbers starting from 0 indicating no operation impact and 3 indicating a total service interruption")),
     incident_state=(Optional[int], Field(description="State of the incident, measured in numbers. Plain numbers are used to track the current state")),
     urgency=(Optional[int], Field(description="Urgency of the incident, measured in numbers, starting from 0 indicating no urgency at all up to 3 indicating maximum urgency")),
-    assignment_group=(Optional[str], Field(description="Assignment group of the incident"))
+    assignment_group=(Optional[str], Field(description="Assignment group of the incident")),
 )
 
 def parse_payload_params(params: Optional[str]) -> Dict[str, Any]:
@@ -87,10 +87,8 @@ class ServiceNowAPIWrapper(BaseToolApiWrapper):
             raise ToolException(f"ServiceNow tool exception. {e}")
         return response.json()
 
-    def create_incident(self, category: Optional[str] = None, description: Optional[str] = None,
-                        short_description: Optional[str] = None, impact: Optional[int] = None,
-                        incident_state: Optional[int] = None, urgency: Optional[int] = None,
-                        assignment_group: Optional[str] = None) -> str:
+    def create_incident(self, category: Optional[str] = None, description: Optional[str] = None, short_description: Optional[str] = None, impact: Optional[int] = None, incident_state: Optional[int] = None, urgency: Optional[int] = None, assignment_group: Optional[str] = None) -> str:
+        """Creates a new incident on the ServiceNow database."""
         try:
             args_dict = {
             'category': category,
@@ -130,5 +128,11 @@ class ServiceNowAPIWrapper(BaseToolApiWrapper):
                 "ref": self.get_incidents,
                 "description": self.get_incidents.__doc__,
                 "args_schema": getIncidents,
+            },
+            {
+                "name": "create_incident",
+                "ref": self.create_incident,
+                "description": self.create_incident.__doc__,
+                "args_schema": createIncident,
             }
         ]
