@@ -80,12 +80,6 @@ class AlitaGitHubAPIWrapper(BaseModel):
         github_app_private_key = get_from_dict_or_env(values, "github_app_private_key", "GITHUB_APP_PRIVATE_KEY", default='')
         github_base_url = get_from_dict_or_env(values, "github_base_url", "GITHUB_BASE_URL", default='https://api.github.com')
 
-        # Check that at least one authentication method is provided
-        if not (github_access_token or (github_username and github_password) or github_app_id):
-            raise ValueError(
-                "You must provide either a GitHub access token, username/password, or app credentials."
-            )
-
         auth_config = GitHubAuthConfig(
             github_access_token=github_access_token,
             github_username=github_username,
