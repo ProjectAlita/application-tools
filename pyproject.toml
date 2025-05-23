@@ -63,6 +63,7 @@ markers = [
     "yagmail: marks YagMail tests",
     "carrier: marks Carrier tests",
     "gmail: marks Gmail tests",
+    "confluence: marks Confluence tests",
 ]
 
 [tool.coverage.run]
