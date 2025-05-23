@@ -38,6 +38,7 @@ python_functions = "test_"
 testpaths = [ "tests",]
 markers = [
     "dependency: marks dependency from other tests",
+    "integration: marks Integration tests, should be refactored to e2e",
     "unit: marks tests as unit (deselect with '-m \"not unit\"')",
     "e2e: marks tests as end-to-end (deselect with '-m \"not e2e\"')",
     "base: marks base tool tests", "toolkit: marks toolkit tests",
