@@ -32,7 +32,7 @@ createIncident = create_model(
     impact=(Optional[int], Field(description="Impact of the incident, measured in numbers starting from 0 indicating no operation impact and 3 indicating a total service interruption")),
     incident_state=(Optional[int], Field(description="State of the incident, measured in numbers. Plain numbers are used to track the current state")),
     urgency=(Optional[int], Field(description="Urgency of the incident, measured in numbers, starting from 0 indicating no urgency at all up to 3 indicating maximum urgency")),
-    assignment_group=(Optional[str], Field(description="Assignment group of the incident")),
+    assignment_group=(Optional[str], Field(description="Assignment group of the incident"))
 )
 
 def parse_payload_params(params: Optional[str]) -> Dict[str, Any]:
