@@ -50,7 +50,19 @@ class ServiceNowClient(object):
         return response
 
     def create_incident(self, args: dict):
-        pass
+        """Creates new incidents in ServiceNow"""
+        endpoint_url = f"{self.incidents_url}"
+        update_dict = {}
+        for key, value in args.items():
+            if value is not None:
+                update_dict[key] = value
+        response = requests.get(
+            url=endpoint_url,
+            auth=(self.username, self.password.get_secret_value()),
+            headers={"Content-Type": "application/json", "Accept": "application/json"},
+            data=f'{update_dict}'
+        )
+        return response
 
     def update_incident(self, args: dict):
         pass
