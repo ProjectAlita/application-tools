@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import patch, MagicMock
 from pydantic import SecretStr, BaseModel, Field
-from typing import List, Literal
+from typing import List, Literal, Optional
 
 from src.alita_tools.testio import TestIOToolkit, get_tools, name as toolkit_module_name
 from src.alita_tools.testio.api_wrapper import TestIOApiWrapper
@@ -11,20 +11,21 @@ from src.alita_tools.utils import TOOLKIT_SPLITTER
 
 # Dummy Pydantic model for testing args_schema
 class DummyArgsSchema(BaseModel):
-    param1: str = Field(...)
+    param1: str = Field(description="Test parameter")
+    client_fields: Optional[List[str]] = Field(None, description="Fields to include in the response")
 
 
 # Mock data returned by TestIOApiWrapper.get_available_tools
 mock_tools_data = [
     {
         "name": "get_test_cases_for_test",
-        "description": "Get test cases.",
+        "description": "Retrieve detailed information about test cases for a particular launch (test) including test cases description, steps and expected result.",
         "args_schema": DummyArgsSchema,
         "ref": MagicMock()
     },
     {
         "name": "list_bugs_for_test_with_filter",
-        "description": "List bugs.",
+        "description": "Retrieve detailed information about bugs associated with test cases executed within a particular launch (test) with optional filters.",
         "args_schema": DummyArgsSchema,
         "ref": MagicMock()
     }
