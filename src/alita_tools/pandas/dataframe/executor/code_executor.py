@@ -1,7 +1,8 @@
 from typing import Any
-
+from traceback import format_exc
 from .code_environment import get_environment
 from ..errors import CodeExecutionError, NoResultFoundError
+            
 
 class CodeExecutor:
     """
@@ -26,7 +27,7 @@ class CodeExecutor:
         try:
             exec(code, self._environment)
         except Exception as e:
-            raise CodeExecutionError("Code execution failed") from e
+            raise CodeExecutionError(f"Code execution failed: {format_exc()}")
         return self._environment
 
     def execute_and_return_result(self, code: str) -> Any:

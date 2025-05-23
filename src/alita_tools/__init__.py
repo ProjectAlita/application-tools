@@ -5,6 +5,7 @@ from .github import get_tools as get_github, AlitaGitHubToolkit
 from .openapi import get_tools as get_openapi
 from .jira import get_tools as get_jira, JiraToolkit
 from .confluence import get_tools as get_confluence, ConfluenceToolkit
+from .servicenow import get_tools as get_service_now, ServiceNowToolkit
 from .gitlab import get_tools as get_gitlab, AlitaGitlabToolkit
 from .gitlab_org import get_tools as get_gitlab_org, AlitaGitlabSpaceToolkit
 from .zephyr import get_tools as get_zephyr, ZephyrToolkit
@@ -42,6 +43,7 @@ from .figma import get_tools as get_figma, FigmaToolkit
 from .salesforce import get_tools as get_salesforce, SalesforceToolkit
 from .carrier import get_tools as get_carrier, AlitaCarrierToolkit
 from .ocr import get_tools as get_ocr, OCRToolkit
+from .pptx import get_tools as get_pptx, PPTXToolkit
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +61,8 @@ def get_tools(tools_list, alita: 'AlitaClient', llm: 'LLMLikeObject', *args, **k
             tools.extend(get_jira(tool))
         elif tool['type'] == 'confluence':
             tools.extend(get_confluence(tool))
+        elif tool['type'] == 'servicenow':
+            tools.extend(get_service_now(tool))
         elif tool['type'] == 'gitlab':
             tools.extend(get_gitlab(tool))
         elif tool['type'] == 'gitlab_org':
@@ -109,6 +113,8 @@ def get_tools(tools_list, alita: 'AlitaClient', llm: 'LLMLikeObject', *args, **k
             tools.extend(get_carrier(tool))
         elif tool['type'] == 'ocr':
             tools.extend(get_ocr(tool))
+        elif tool['type'] == 'pptx':
+            tools.extend(get_pptx(tool))
         else:
             if tool.get("settings", {}).get("module"):
                 try:
@@ -140,6 +146,7 @@ def get_toolkits():
         XrayToolkit.toolkit_config_schema(),
         AlitaGitlabToolkit.toolkit_config_schema(),
         ConfluenceToolkit.toolkit_config_schema(),
+        ServiceNowToolkit.toolkit_config_schema(),
         AlitaBitbucketToolkit.toolkit_config_schema(),
         AlitaGitlabSpaceToolkit.toolkit_config_schema(),
         ZephyrScaleToolkit.toolkit_config_schema(),
@@ -162,4 +169,5 @@ def get_toolkits():
         SalesforceToolkit.toolkit_config_schema(),
         AlitaCarrierToolkit.toolkit_config_schema(),
         OCRToolkit.toolkit_config_schema(),
+        PPTXToolkit.toolkit_config_schema(),
     ]

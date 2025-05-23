@@ -5,7 +5,10 @@ from langchain_community.document_transformers import BeautifulSoupTransformer
 from langchain.text_splitter import CharacterTextSplitter
 import fitz
 
-from langchain_chroma import Chroma
+try:
+    from langchain_chroma import Chroma
+except ImportError:
+    Chroma = None
 
 from langchain_community.embeddings.sentence_transformer import (
     SentenceTransformerEmbeddings,
@@ -30,6 +33,8 @@ def get_page(urls, html_only=False):
 
 
 def webRag(urls, max_response_size, query):
+    if Chroma is None:
+        return "Chroma is not initialized. Web rag is not available."
     text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
     docs = text_splitter.split_documents(get_page(urls))
     embedding_function = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
@@ -40,7 +45,7 @@ def webRag(urls, max_response_size, query):
         text += f"\n\n{doc.page_content}"
         if len(text) > max_response_size:
             break
-    return text
+    return text if text else "No results found."
 
 
 def getPDFContent(url):

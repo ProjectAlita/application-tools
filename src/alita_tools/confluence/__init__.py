@@ -22,6 +22,7 @@ def get_tools(tool):
         additional_fields=tool['settings'].get('additional_fields', []),
         verify_ssl=tool['settings'].get('verify_ssl', True),
         alita=tool['settings'].get('alita'),
+        llm=tool['settings'].get('llm', None),
         toolkit_name=tool.get('toolkit_name')
     ).get_tools()
 
@@ -37,11 +38,11 @@ class ConfluenceToolkit(BaseToolkit):
         ConfluenceToolkit.toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name,
-            base_url=(str, Field(description="Confluence URL", json_schema_extra={'configuration': True})),
+            base_url=(str, Field(description="Confluence URL", json_schema_extra={'configuration': True, 'configuration_title': True})),
             token=(SecretStr, Field(description="Token", default=None, json_schema_extra={'secret': True, 'configuration': True})),
             api_key=(SecretStr, Field(description="API key", default=None, json_schema_extra={'secret': True, 'configuration': True})),
             username=(str, Field(description="Username", default=None, json_schema_extra={'configuration': True})),
-            space=(str, Field(description="Space", default=None, json_schema_extra={'toolkit_name': True,
+            space=(str, Field(description="Space", json_schema_extra={'toolkit_name': True,
                                                                                     'max_toolkit_length': ConfluenceToolkit.toolkit_max_length})),
             cloud=(bool, Field(description="Hosting Option", json_schema_extra={'configuration': True})),
             limit=(int, Field(description="Pages limit per request", default=5)),

@@ -3,6 +3,7 @@ import traceback
 import logging
 from pandas import DataFrame
 from ..prompts import PLAN_CODE_PROMPT
+from ...statsmodels import prompt_addon
 from .code_cleaning import CodeCleaner
 from .code_validator import CodeRequirementValidator
 
@@ -31,7 +32,7 @@ class CodeGenerator:
         """
         try:
             logger.debug(f"Using Prompt: {prompt}")
-            prompt = PLAN_CODE_PROMPT.format(dataframe=self._df_description, task=prompt)
+            prompt = PLAN_CODE_PROMPT.format(dataframe=self._df_description, task=prompt, prompt_addon=prompt_addon)
             if error_trace:
                 prompt += f"\n Last time you failed to generate the code <ErrorTrace>{error_trace}</ErrorTrace>"
             messages = [

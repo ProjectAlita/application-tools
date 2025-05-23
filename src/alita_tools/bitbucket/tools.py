@@ -75,6 +75,7 @@ class CreateFileTool(BaseTool):
         logger.info(f"Create file in the repository {file_path} with content: {file_contents}")
         return self.api_wrapper.create_file(file_path, file_contents, branch)
 
+
 class UpdateFileTool(BaseTool):
     api_wrapper: BitbucketAPIWrapper = Field(default_factory=BitbucketAPIWrapper)
     name: str = "update_file"
@@ -167,25 +168,37 @@ class ReadFileTool(BaseTool):
             logger.error(f"Unable to read file: {stacktrace}")
             return f"Unable to read file: {stacktrace}"
 
+
 class GetFilesListTool(BaseTool):
     api_wrapper: BitbucketAPIWrapper = Field(default_factory=BitbucketAPIWrapper)
     name: str = "get_files"
-    description: str = "This tool returns list of files from defined package and branch"
+    description: str = """
+    This tool returns list of files.
+    IMPORTANT: *User may leave it empty if he wants to read files from the root of the repository and using active branch.*
+
+    Args:
+        file_path (Optional[str], default: None): Package path to read files from. e.g. `src/agents/developer/tools/git/`. **IMPORTANT**: the path must not start with a slash.
+        branch (Optional[str], default: None): branch - name of the branch file should be read from. e.g. `feature-1`. **IMPORTANT**: if branch not specified, try to determine from the chat history, leave it empty.
+    """
     args_schema: Type[BaseModel] = create_model(
         "GetFilesListModel",
-        file_path=(str, Field(
-            description="Package path to read files from. e.g. `src/agents/developer/tools/git/`. **IMPORTANT**: the path must not start with a slash")),
-        branch=(str, Field(
-            description="branch - name of the branch file should be read from. e.g. `feature-1`. **IMPORTANT**: if branch not specified, try to determine from the chat history or clarify with user."))
+        file_path=(Optional[str], Field(
+            description="Package path to read files from. e.g. `src/agents/developer/tools/git/`. Default: None. "
+                        "**IMPORTANT**: the path must not start with a slash")),
+        branch=(Optional[str], Field(
+            description="branch - name of the branch file should be read from. e.g. `feature-1`. Default: None. "
+                        "**IMPORTANT**: if branch not specified, try to determine from the chat history or use active branch.",
+            default=None))
     )
 
-    def _run(self, file_path: str, branch: str):
+    def _run(self, file_path: Optional[str] = None, branch: Optional[str] = None):
         try:
             return self.api_wrapper._get_files(file_path, branch)
         except Exception:
             stacktrace = traceback.format_exc()
             logger.error(f"Unable to read file: {stacktrace}")
             return f"Unable to read file: {stacktrace}"
+
 
 class LoaderTool(BaseTool):
     api_wrapper: BitbucketAPIWrapper = Field(default_factory=BitbucketAPIWrapper)
@@ -195,10 +208,11 @@ class LoaderTool(BaseTool):
     args_schema: Type[BaseModel] = LoaderSchema
 
     def _run(self,
-               branch: Optional[str] = None,
-               whitelist: Optional[List[str]] = None,
-               blacklist: Optional[List[str]] = None):
+             branch: Optional[str] = None,
+             whitelist: Optional[List[str]] = None,
+             blacklist: Optional[List[str]] = None):
         return self.api_wrapper.loader(branch, whitelist, blacklist)
+
 
 __all__ = [
     {"name": "create_branch", "tool": CreateBitbucketBranchTool},

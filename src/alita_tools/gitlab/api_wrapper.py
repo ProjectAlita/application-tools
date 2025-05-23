@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
+from langchain_core.tools import ToolException
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from pydantic import BaseModel, model_validator, SecretStr
@@ -420,3 +422,56 @@ class GitLabAPIWrapper(BaseModel):
         paired_contents = list(zip(old_contents, new_contents))
 
         return paired_contents
+
+    def get_commits(
+            self,
+            sha: Optional[str] = None,
+            path: Optional[str] = None,
+            since: Optional[str] = None,
+            until: Optional[str] = None,
+            author: Optional[str] = None,
+    ) -> str:
+        """
+        Retrieves a list of commits from the repository.
+
+        Parameters:
+            sha (Optional[str]): The commit SHA to start listing commits from.
+            path (Optional[str]): The file path to filter commits by.
+            since (Optional[datetime]): Only commits after this date will be returned.
+            until (Optional[datetime]): Only commits before this date will be returned.
+            author (Optional[str]): The author of the commits.
+
+        Returns:
+            str: A list of commit data or an error message.
+        """
+        try:
+            # Prepare the parameters for the API call
+            params = {
+                "ref_name": sha,
+                "path": path,
+                "since": datetime.fromisoformat(since) if since else None,
+                "until": datetime.fromisoformat(until) if until else None,
+                "author": author if isinstance(author, str) else None,
+                "all" : True
+            }
+            # Remove None values from the parameters
+            params = {key: value for key, value in params.items() if value is not None}
+
+            # Call the GitHub API to get commits
+            commits = self._repo_instance.commits.list(**params)
+
+            # Convert the commits to a list of dictionaries for easier processing
+            commit_list = [
+                {
+                    "sha": commit.id,
+                    "author": commit.author_name,
+                    "createdAt": commit.created_at,
+                    "message": commit.message,
+                    "url": commit.web_url,
+                }
+                for commit in commits
+            ]
+
+            return commit_list
+        except Exception as e:
+            return ToolException(f"Unable to retrieve commits due to error:\n{str(e)}")

@@ -1,5 +1,6 @@
 import logging
 import re
+from datetime import datetime
 from enum import Enum
 from json import dumps
 from typing import List, Union, Optional
@@ -16,7 +17,7 @@ from azure.devops.v7_0.git.models import (
     GitPullRequestSearchCriteria,
     GitPush,
     GitRefUpdate,
-    GitVersionDescriptor,
+    GitVersionDescriptor, GitQueryCommitsCriteria,
 )
 from langchain_core.tools import ToolException
 from msrest.authentication import BasicAuthentication
@@ -195,7 +196,45 @@ class ArgsSchema(Enum):
             Field(description="The name of the branch, e.g. `my_branch`."),
         ),
     )
-
+    GetCommits = create_model(
+        "GetCommits",
+        sha=(
+            Optional[str],
+            Field(
+                description="The commit SHA to start listing commits from. If not provided, the default branch is used.",
+                default=None
+            ),
+        ),
+        path=(
+            Optional[str],
+            Field(
+                description="The file path to filter commits by. Only commits affecting this path will be returned.",
+                default=None
+            ),
+        ),
+        since=(
+            Optional[str],
+            Field(
+                description="Only commits after this date will be returned. Use ISO 8601 format (e.g., '2023-01-01T00:00:00Z').",
+                default=None
+            ),
+        ),
+        until=(
+            Optional[str],
+            Field(
+                description="Only commits before this date will be returned. Use ISO 8601 format (e.g., '2023-12-31T23:59:59Z').",
+                default=None
+            ),
+        ),
+        author=(
+            Optional[str],
+            Field(
+                description=(
+                    "The author of the commits. Can be a username (string)"
+                ), default=None
+            ),
+        ),
+    )
 
 class ReposApiWrapper(BaseCodeToolApiWrapper):
     organization_url: Optional[str]
@@ -893,7 +932,7 @@ class ReposApiWrapper(BaseCodeToolApiWrapper):
                 results = []
                 for comment_data in inline_comments:
                     file_path = comment_data["file_path"]
-                    comment_text = comment_data["comment_text"][:1000]
+                    comment_text = comment_data["comment_text"]
                     left_line = comment_data.get("left_line")
                     right_line = comment_data.get("right_line")
                     left_range = comment_data.get("left_range")
@@ -1028,6 +1067,56 @@ class ReposApiWrapper(BaseCodeToolApiWrapper):
             logger.error(msg)
             raise ToolException(msg)
 
+    def get_commits(
+            self,
+            sha: Optional[str] = None,
+            path: Optional[str] = None,
+            since: Optional[str] = None,
+            until: Optional[str] = None,
+            author: Optional[str] = None,
+    ) -> str:
+        """
+        Retrieves a list of commits from the repository.
+
+        Parameters:
+            sha (Optional[str]): The commit SHA to start listing commits from.
+            path (Optional[str]): The file path to filter commits by.
+            since (Optional[datetime]): Only commits after this date will be returned.
+            until (Optional[datetime]): Only commits before this date will be returned.
+            author (Optional[str]): The author of the commits.
+
+        Returns:
+            str: A list of commit data or an error message.
+        """
+        try:
+            search_criteria = GitQueryCommitsCriteria(
+                item_version=GitVersionDescriptor(version=sha, version_type='commit'),
+                item_path=path,
+                from_date=str(datetime.fromisoformat(since)) if since else None,
+                to_date=str(datetime.fromisoformat(until)) if until else None,
+                author=author if isinstance(author, str) else None
+            )
+
+            commits = self._client.get_commits(
+                repository_id=self.repository_id,
+                project=self.project,
+                search_criteria=search_criteria)
+
+            commit_list = [
+                {
+                    "sha": commit.commit_id,
+                    "author": commit.author.name,
+                    "createdAt": str(commits[0].author.date),
+                    "message": commit.comment,
+                    "url": commit.remote_url,
+                }
+                for commit in commits
+            ]
+
+            return commit_list
+        except Exception as e:
+            return ToolException(f"Unable to retrieve commits due to error:\n{str(e)}")
+
     def get_available_tools(self):
         """Return a list of available tools."""
         return [
@@ -1120,5 +1209,11 @@ class ReposApiWrapper(BaseCodeToolApiWrapper):
                 "name": "loader",
                 "description": self.loader.__doc__,
                 "args_schema": LoaderSchema,
+            },
+            {
+                "ref": self.get_commits,
+                "name": "get_commits",
+                "description": self.get_commits.__doc__,
+                "args_schema": ArgsSchema.GetCommits.value,
             }
         ]

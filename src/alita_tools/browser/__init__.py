@@ -15,6 +15,7 @@ logger = getLogger(__name__)
 
 name = "browser"
 
+
 def get_tools(tool):
     return BrowserToolkit().get_toolkit(
         selected_tools=tool['settings'].get('selected_tools', []),
@@ -22,6 +23,7 @@ def get_tools(tool):
         google_cse_id=tool['settings'].get("google_cse_id"),
         toolkit_name=tool.get('toolkit_name', '')
     ).get_tools()
+
 
 class BrowserToolkit(BaseToolkit):
     tools: List[BaseTool] = []
@@ -50,8 +52,10 @@ class BrowserToolkit(BaseToolkit):
             name,
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Browser", "icon_url": None}}),
             google_cse_id=(Optional[str], Field(description="Google CSE id", default=None)),
-            google_api_key=(Optional[SecretStr], Field(description="Google API key", default=None, json_schema_extra={'secret': True})),
-            selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
+            google_api_key=(Optional[SecretStr],
+                            Field(description="Google API key", default=None, json_schema_extra={'secret': True})),
+            selected_tools=(List[Literal[tuple(selected_tools)]],
+                            Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
             __validators__={
                 "validate_google_fields": model_validator(mode='before')(validate_google_fields)
             }
@@ -65,9 +69,9 @@ class BrowserToolkit(BaseToolkit):
         prefix = clean_string(toolkit_name, cls.toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
         if not selected_tools:
             selected_tools = [
-                'single_url_crawler', 
-                'multi_url_crawler', 
-                'get_html_content', 
+                'single_url_crawler',
+                'multi_url_crawler',
+                'get_html_content',
                 'google',
                 'wiki']
         for tool in selected_tools:
@@ -88,16 +92,20 @@ class BrowserToolkit(BaseToolkit):
                         google_cse_id=kwargs.get("google_cse_id"),
                     )
                     tool_entry = GoogleSearchResults(api_wrapper=google_api_wrapper)
+                    # rename the tool to avoid conflicts
+                    tool_entry.name = "google"
                 except Exception as e:
                     logger.error(f"Google API Wrapper failed to initialize: {e}")
             elif tool == 'wiki':
                 tool_entry = WikipediaQueryRun(api_wrapper=WikipediaAPIWrapper())
+                # rename the tool to avoid conflicts
+                tool_entry.name = "wiki"
 
             # Only add the tool if it was successfully created
             if tool_entry is not None:
                 tool_entry.name = f"{prefix}{tool_entry.name}"
                 tools.append(tool_entry)
         return cls(tools=tools)
-            
+
     def get_tools(self):
         return self.tools

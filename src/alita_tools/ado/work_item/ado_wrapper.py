@@ -56,9 +56,9 @@ ADOGetWorkItem = create_model(
 
 ADOLinkWorkItem = create_model(
     "ADOLinkWorkItem",
-    source_id=(int, Field(description="ID of the work item you plan to add link to", default=None)),
-    target_id=(int, Field(description="ID of the work item linked to source one", default=None)),
-    link_type=(str, Field(description="Link type: System.LinkTypes.Dependency-forward, etc.", default=None)),
+    source_id=(int, Field(description="ID of the work item you plan to add link to")),
+    target_id=(int, Field(description="ID of the work item linked to source one")),
+    link_type=(str, Field(description="Link type: System.LinkTypes.Dependency-forward, etc.")),
     attributes=(Optional[dict], Field(description="Dict with attributes used for work items linking. Example: `comment`, etc. and syntax 'comment': 'Some linking comment'", default=None))
 )
 

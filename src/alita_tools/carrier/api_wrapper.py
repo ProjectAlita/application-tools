@@ -30,7 +30,7 @@ class CarrierAPIWrapper(BaseModel):
         try:
             credentials = CarrierCredentials(
                 url=self.url,
-                token=self.private_token,
+                token=self.private_token.get_secret_value(),
                 organization=self.organization,
                 project_id=self.project_id
             )

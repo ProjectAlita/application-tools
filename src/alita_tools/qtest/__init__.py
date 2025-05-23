@@ -1,11 +1,12 @@
 from typing import List, Literal, Optional
 
+import requests
 from langchain_core.tools import BaseToolkit, BaseTool
 from pydantic import create_model, BaseModel, ConfigDict, Field, SecretStr
 
 from .api_wrapper import QtestApiWrapper
 from .tool import QtestAction
-from ..utils import clean_string, get_max_toolkit_length, TOOLKIT_SPLITTER
+from ..utils import clean_string, get_max_toolkit_length, TOOLKIT_SPLITTER, check_connection_response
 
 name = "qtest"
 
@@ -29,14 +30,28 @@ class QtestToolkit(BaseToolkit):
     def toolkit_config_schema() -> BaseModel:
         selected_tools = {x['name']: x['args_schema'].schema() for x in QtestApiWrapper.model_construct().get_available_tools()}
         QtestToolkit.toolkit_max_length = get_max_toolkit_length(selected_tools)
-        return create_model(
+        m = create_model(
             name,
-            base_url=(str, Field(description="QTest base url", json_schema_extra={'configuration': True})),
+            base_url=(str, Field(description="QTest base url", json_schema_extra={'configuration': True, 'configuration_title': True})),
             qtest_project_id=(int, Field(description="QTest project id", json_schema_extra={'toolkit_name': True, 'max_toolkit_length': QtestToolkit.toolkit_max_length})),
             qtest_api_token=(SecretStr, Field(description="QTest API token", json_schema_extra={'secret': True, 'configuration': True})),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "QTest", "icon_url": "qtest.svg"}})
         )
+
+        @check_connection_response
+        def check_connection(self):
+            response = requests.get(
+                f'{self.base_url}/api/v3/projects',
+                headers={
+                    'Authorization': f'Bearer {self.qtest_api_token}'
+                },
+                timeout=5
+            )
+
+            return response
+        m.check_connection = check_connection
+        return m
 
     @classmethod
     def get_toolkit(cls, selected_tools: list[str] | None = None, toolkit_name: Optional[str] = None, **kwargs):

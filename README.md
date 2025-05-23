@@ -36,6 +36,8 @@ Expected result is linked **_alita_tools_** folder in project structure.
 ### How to run
 ##### Install all dependencies:
 
+In Windows environments replace **bin** with **Scripts**
+
 ```bash
 python -m venv .venv && . .venv/bin/activate &&
 python -m pip install --upgrade pip

@@ -1,18 +1,12 @@
 import logging
 from typing import Optional
 
-from PIL import Image
-from pptx import Presentation
-from pptx.enum.shapes import MSO_SHAPE_TYPE
-import io
-import pymupdf
+from ..utils.content_parser import parse_file_content
 from langchain_core.tools import ToolException
 from office365.runtime.auth.client_credential import ClientCredential
 from office365.sharepoint.client_context import ClientContext
 from pydantic import Field, PrivateAttr, create_model, model_validator, SecretStr
-from transformers import BlipProcessor, BlipForConditionalGeneration
 
-from .utils import read_docx_from_bytes
 from ..elitea_base import BaseToolApiWrapper
 
 NoInput = create_model(
@@ -136,68 +130,7 @@ class SharepointApiWrapper(BaseToolApiWrapper):
         except Exception as e:
             logging.error(f"Failed to load file from SharePoint: {e}. Path: {path}. Please, double check file name and path.")
             return ToolException("File not found. Please, check file name and path.")
-
-        if file.name.endswith('.txt'):
-            try:
-                file_content_str = file_content.decode('utf-8')
-            except Exception as e:
-                logging.error(f"Error decoding file content: {e}")
-        elif file.name.endswith('.docx'):
-            file_content_str = read_docx_from_bytes(file_content)
-        elif file.name.endswith('.pdf'):
-            with pymupdf.open(stream=file_content, filetype="pdf") as report:
-                text_content = ''
-                if page_number is not None:
-                    page = report.load_page(page_number - 1)
-                    text_content += self.read_pdf_page(report, page, page_number, is_capture_image)
-                else:
-                    for index, page in enumerate(report, start=1):
-                        text_content += self.read_pdf_page(report, page, index, is_capture_image)
-                file_content_str = text_content
-        elif file.name.endswith('.pptx'):
-            prs = Presentation(io.BytesIO(file_content))
-            text_content = ''
-            if page_number is not None:
-                text_content += self.read_pptx_slide(prs.slides[page_number - 1], page_number, is_capture_image)
-            else:
-                for index, slide in enumerate(prs.slides, start=1):
-                    text_content += self.read_pptx_slide(slide, index, is_capture_image)
-            file_content_str = text_content
-        else:
-            return ToolException("Not supported type of files entered. Supported types are TXT and DOCX only.")
-        return file_content_str
-
-    def read_pdf_page(self, report, page, index, is_capture_images):
-        text_content = f'Page: {index}\n'
-        text_content += page.get_text()
-        if is_capture_images:
-            images = page.get_images(full=True)
-            for i, img in enumerate(images):
-                xref = img[0]
-                base_image = report.extract_image(xref)
-                img_bytes = base_image["image"]
-                text_content += self.describe_image(Image.open(io.BytesIO(img_bytes)).convert("RGB"))
-        return text_content
-
-    def read_pptx_slide(self, slide, index, is_capture_image):
-        text_content = f'Slide: {index}\n'
-        for shape in slide.shapes:
-            if hasattr(shape, "text"):
-                text_content += shape.text + "\n"
-            elif is_capture_image and shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
-                try:
-                    caption = self.describe_image(Image.open(io.BytesIO(shape.image.blob)).convert("RGB"))
-                except:
-                    caption = "\n[Picture: unknown]\n"
-                text_content += caption
-        return text_content
-
-    def describe_image(self, image):
-        processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
-        model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-base")
-        inputs = processor(image, return_tensors="pt")
-        out = model.generate(**inputs)
-        return "\n[Picture: " + processor.decode(out[0], skip_special_tokens=True) + "]\n"
+        return parse_file_content(file.name, file_content, is_capture_image, page_number)
 
     def get_available_tools(self):
         return [

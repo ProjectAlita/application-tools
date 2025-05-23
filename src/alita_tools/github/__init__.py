@@ -22,6 +22,7 @@ def _get_toolkit(tool) -> BaseToolkit:
         github_password=tool['settings'].get('password', ''),
         github_app_id=tool['settings'].get('app_id', None),
         github_app_private_key=tool['settings'].get('app_private_key', None),
+        llm=tool['settings'].get('llm', None),
         toolkit_name=tool.get('toolkit_name')
     )
 
@@ -68,7 +69,7 @@ class AlitaGitHubToolkit(BaseToolkit):
                     },
                 }
             ),
-            base_url=(Optional[str], Field(description="Base API URL", default="https://api.github.com")),
+            base_url=(Optional[str], Field(description="Base API URL", default="https://api.github.com", json_schema_extra={'configuration': True, 'configuration_title': True})),
             app_id=(Optional[str], Field(description="Github APP ID", default=None, json_schema_extra={'configuration': True})),
             app_private_key=(Optional[SecretStr], Field(description="Github APP private key", default=None, json_schema_extra={'secret': True, 'configuration': True})),
 

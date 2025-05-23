@@ -13,8 +13,6 @@ def get_tools(tool):
     return PandasToolkit().get_toolkit(
         selected_tools=tool['settings'].get('selected_tools', []),
         bucket_name=tool['settings'].get('bucket_name', None),
-        df_name=tool['settings'].get('df_name', None),
-        file_name=tool['settings'].get('file_name', None),
         alita=tool['settings'].get('alita', None),
         llm=tool['settings'].get('llm', None),
         toolkit_name=tool.get('toolkit_name')
@@ -32,8 +30,6 @@ class PandasToolkit(BaseToolkit):
         return create_model(
             name,
             bucket_name=(str, Field(default=None, title="Bucket name", description="Bucket where the content file is stored", json_schema_extra={'toolkit_name': True, 'max_toolkit_length': PandasToolkit.toolkit_max_length})),
-            file_name=(str, Field(default=None, title="File name", description="File to be processed")),
-            df_name=(Optional[str], Field(default=None, title="DataFrame name", description="Name of the DataFrame to be processed")),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Pandas", "icon_url": "pandas-icon.svg"}})
         )

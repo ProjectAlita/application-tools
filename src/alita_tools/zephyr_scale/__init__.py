@@ -55,6 +55,14 @@ class ZephyrScaleToolkit(BaseToolkit):
                                     {
                                         "name": "Token",
                                         "fields": ["token"]
+                                    },
+                                    {
+                                        "name": "Password",
+                                        "fields": ["username", "password"]
+                                    },
+                                    {
+                                        "name": "Cookie",
+                                        "fields": ["cookies"]
                                     }
                                 ]
                             }
