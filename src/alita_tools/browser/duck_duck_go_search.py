@@ -1,4 +1,6 @@
 from langchain_community.document_loaders import AsyncChromiumLoader
+from typing import Type # Add Type import
+
 from langchain_community.document_transformers import BeautifulSoupTransformer
 from langchain.text_splitter import CharacterTextSplitter
 from duckduckgo_search import DDGS
@@ -18,7 +20,7 @@ class DuckDuckGoSearch(BaseTool):
     name: str = "DuckDuckGo_Search"
     max_response_size: int = 3000
     description: str = "Searches DuckDuckGo for the query and returns the top 5 results, and them provide summary documents"
-    args_schema = searchPages
+    args_schema: Type[BaseModel] = searchPages
 
     def _run(self, query: str, run_manager=None):
         default_k = 5

@@ -12,13 +12,14 @@ name = "qtest"
 
 
 def get_tools(tool):
-    return QtestToolkit().get_toolkit(
+    toolkit = QtestToolkit.get_toolkit(
         selected_tools=tool['settings'].get('selected_tools', []),
         base_url=tool['settings'].get('base_url', None),
         qtest_project_id=tool['settings'].get('qtest_project_id', tool['settings'].get('project_id', None)),
         qtest_api_token=tool['settings'].get('qtest_api_token', None),
         toolkit_name=tool.get('toolkit_name')
-    ).get_tools()
+    )
+    return toolkit.tools
 
 
 class QtestToolkit(BaseToolkit):
