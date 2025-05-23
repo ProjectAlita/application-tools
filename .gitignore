@@ -2,6 +2,10 @@
 .aider*
 tst*
 .vscode
+.idea
+
+# link.py created to link the applications-tools to the alita-sdk. Useful to avoid submitting it by mistake.
+link.py
 
 # Allure Docs
 docs/*
