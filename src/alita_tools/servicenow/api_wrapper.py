@@ -29,9 +29,9 @@ createIncident = create_model(
     category=(Optional[str], Field(description="Category of incidents to create")),
     description=(Optional[str], Field(description="Detailed description of the incident")),
     short_description=(Optional[str], Field(description="Short description of the incident")),
-    impact=(Optional[int], Field(description="Impact of the incident, measured in numbers starting from 0 indicating no operation impact and 3 indicating a total service interruption")),
+    impact=(Optional[int], Field(description="Impact of the incident, measured in numbers starting from 0 indicating no operation impact and a value given by the user indicating a total service interruption")),
     incident_state=(Optional[int], Field(description="State of the incident, measured in numbers. Plain numbers are used to track the current state")),
-    urgency=(Optional[int], Field(description="Urgency of the incident, measured in numbers, starting from 0 indicating no urgency at all up to 3 indicating maximum urgency")),
+    urgency=(Optional[int], Field(description="Urgency of the incident, measured in numbers, starting from 0 indicating no urgency at all up to a value given by the user indicating maximum urgency")),
     assignment_group=(Optional[str], Field(description="Assignment group of the incident"))
 )
 
