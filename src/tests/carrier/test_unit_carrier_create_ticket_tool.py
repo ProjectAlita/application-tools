@@ -73,10 +73,9 @@ class TestCarrierCreateTicketTool:
         del invalid_data["title"] # Remove a required field
         with pytest.raises(ValidationError) as exc_info:
             TicketData.model_validate(invalid_data)
-        assert "'title'" in str(exc_info.value) # Check error message mentions title
+        assert "title" in str(exc_info.value) # Check error message mentions title
 
     @pytest.mark.negative
-    @pytest.mark.skip(reason="Source code issue: Validator uses info.field_name, not field.name")
     @pytest.mark.parametrize("field_name, invalid_date", [
         ("start_date", "2024/05/01"),
         ("start_date", "01-05-2024"),

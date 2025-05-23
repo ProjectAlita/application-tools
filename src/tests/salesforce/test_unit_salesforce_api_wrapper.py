@@ -53,7 +53,7 @@ class TestSalesforceApiWrapper:
         assert call_kwargs['data'] == {
             "grant_type": "client_credentials",
             "client_id": salesforce_api_wrapper.client_id,
-            "client_secret": salesforce_api_wrapper.client_secret,
+            "client_secret": salesforce_api_wrapper.client_secret.get_secret_value(),
         }
         mock_response.raise_for_status.assert_called_once()
         assert salesforce_api_wrapper._access_token == "fake_token"

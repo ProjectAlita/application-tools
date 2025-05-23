@@ -126,14 +126,14 @@ class TestBrowserToolkit:
             'multi_url_crawler',
             'get_html_content',
             # 'get_pdf_content', # Not in default list
-            'google_search_results_json', # 'google' maps to this name
-            'wikipedia' # 'wiki' maps to this name
+            'google', # Tool is renamed to 'google' in the implementation
+            'wiki' # Tool is renamed to 'wiki' in the implementation
         ]
         tool_names_none = sorted([t.name for t in tools_none])
         tool_names_empty = sorted([t.name for t in tools_empty])
 
-        assert tool_names_none == sorted(default_tool_names)
-        assert tool_names_empty == sorted(default_tool_names)
+        assert sorted(tool_names_none) == sorted(default_tool_names)
+        assert sorted(tool_names_empty) == sorted(default_tool_names)
 
         # Check tool types
         assert any(isinstance(t, SingleURLCrawler) for t in tools_none)
@@ -202,19 +202,24 @@ class TestBrowserToolkit:
             google_cse_id=google_cse
         )
         tools = toolkit.get_tools()
-        # The test expects 1 tool, but we'll skip this assertion since the implementation
-        # might have issues we're not fixing
+        # Verify we have exactly 1 tool
+        assert len(tools) == 1
         assert isinstance(tools[0], GoogleSearchResults)
+        # Verify the tool was renamed to 'google'
+        assert tools[0].name == 'google'
         mock_google_api.assert_called_once_with(google_api_key=google_key, google_cse_id=google_cse)
 
     @pytest.mark.negative
-    @patch('alita_tools.browser.GoogleSearchAPIWrapper', side_effect=Exception("Init failed"))
+    @patch('alita_tools.browser.GoogleSearchAPIWrapper')
     @patch('alita_tools.browser.logger.error')
     def test_get_toolkit_google_init_exception(self, mock_logger, mock_google_api):
         """Test toolkit handles exception during GoogleSearchAPIWrapper init and logs error."""
         selected = ['google']
         google_key = SecretStr("test_key")
         google_cse = "test_cse"
+        
+        # Make the GoogleSearchAPIWrapper constructor raise an exception
+        mock_google_api.side_effect = Exception("Init failed")
 
         # Expecting the tool not to be added if init fails
         toolkit = BrowserToolkit.get_toolkit(
