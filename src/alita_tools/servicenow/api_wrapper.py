@@ -31,8 +31,20 @@ createIncident = create_model(
     short_description=(Optional[str], Field(description="Short description of the incident")),
     impact=(Optional[int], Field(description="Impact of the incident, measured in numbers starting from 0 indicating no operation impact and a value given by the user indicating a total service interruption")),
     incident_state=(Optional[int], Field(description="State of the incident, measured in numbers. Plain numbers are used to track the current state")),
-    urgency=(Optional[int], Field(description="Urgency of the incident, measured in numbers, starting from 0 indicating no urgency at all up to a value given by the user indicating maximum urgency")),
+    urgency=(Optional[int], Field(description="Urgency of the incident, measured in numbers starting from 0 indicating no urgency at all up to a value given by the user indicating maximum urgency")),
     assignment_group=(Optional[str], Field(description="Assignment group of the incident"))
+)
+
+updateIncident = create_model(
+    "updateIncident",
+    sys_id=(str, Field(description="Sys ID of the incident")),
+    category=(Optional[str], Field(description="New category to assign to the incident, if requested")),
+    description=(Optional[str], Field(description="New detailed description to assign to the incident, if requested")),
+    short_description=(Optional[str], Field(description="New short description to assign to the incident, if requested")),
+    impact=(Optional[int], Field(description="New impact to assign to the incident, if requested. Measured in numbers starting from 0 indicating no urgency at all up to a value given by the user indicating maximum urgency")),
+    incident_state=(Optional[int], Field(description="New state of the incident, if requested. Measured in numbers. Plain numbers are used to track the current state")),
+    urgency=(Optional[int], Field(description="New urgency to assign to the incident, if requested. Measured in numbers starting from 0 indicating no urgency at all up to a value given by the user indicating maximum urgency")),
+    assignment_group=(Optional[str], Field(description="New assignment group to assign to the incident, if requested"))
 )
 
 def parse_payload_params(params: Optional[str]) -> Dict[str, Any]:
@@ -105,6 +117,25 @@ class ServiceNowAPIWrapper(BaseToolApiWrapper):
             raise ToolException(f"ServiceNow tool exception. {e}")
         return response.json()
 
+    def update_incident(self, sys_id: str, category: Optional[str] = None, description: Optional[str] = None, short_description: Optional[str] = None, impact: Optional[int] = None, incident_state: Optional[int] = None, urgency: Optional[int] = None, assignment_group: Optional[str] = None) -> str:
+        """Updates an existing incident on the ServiceNow database."""
+        try:
+            args_dict = {
+            'sys_id': sys_id,
+            'category': category,
+            'description': description,
+            'short_description': short_description,
+            'impact': impact,
+            'incident_state': incident_state,
+            'urgency': urgency,
+            'assignment_group': assignment_group
+            }
+            function_call = self.wrap_function(self.client.update_incident)
+            response = function_call(args_dict)
+        except requests.exceptions.RequestException as e:
+            raise ToolException(f"ServiceNow tool exception. {e}")
+        return response.json()
+
     def wrap_function(self, func: Callable) -> Callable:
         """Wraps a function in an ergonomic way using tenacity to avoid code clutter."""
         function_to_return = retry(
@@ -134,5 +165,11 @@ class ServiceNowAPIWrapper(BaseToolApiWrapper):
                 "ref": self.create_incident,
                 "description": self.create_incident.__doc__,
                 "args_schema": createIncident,
+            },
+            {
+                "name": "update_incident",
+                "ref": self.update_incident,
+                "description": self.update_incident.__doc__,
+                "args_schema": updateIncident,
             }
         ]

@@ -56,7 +56,7 @@ class ServiceNowClient(object):
         for key, value in args.items():
             if value is not None:
                 update_dict[key] = value
-        response = requests.get(
+        response = requests.post(
             url=endpoint_url,
             auth=(self.username, self.password.get_secret_value()),
             headers={"Content-Type": "application/json", "Accept": "application/json"},
@@ -65,4 +65,21 @@ class ServiceNowClient(object):
         return response
 
     def update_incident(self, args: dict):
-        pass
+        """Updates an incident in ServiceNow"""
+        endpoint_url = f"{self.incidents_url}"
+        update_dict = {}
+        incident_id = args.get("sys_id")
+        if not incident_id:
+            raise ValueError("incident_id is required")
+        endpoint_url += f"/{incident_id}"
+        args.pop("sys_id")
+        for key, value in args.items():
+            if value is not None:
+                update_dict[key] = value
+        response = requests.patch(
+            url=endpoint_url,
+            auth=(self.username, self.password.get_secret_value()),
+            headers={"Content-Type": "application/json", "Accept": "application/json"},
+            data=f'{update_dict}'
+        )
+        return response
