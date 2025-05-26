@@ -36,7 +36,45 @@ TestPlanGetModel = create_model(
 
 TestSuiteCreateModel = create_model(
     "TestSuiteCreateModel",
-    test_suite_create_params=(str, Field(description="JSON of the test suite create parameters")),
+    test_suite_create_params=(str, Field(description="""JSON of the test suite create parameters.
+    test_suite_create_params model:
+    {
+        'default_configurations': '[TestConfigurationReference]',
+        'default_testers': '[IdentityRef]',
+        'inherit_default_configurations': 'bool',
+        'name': 'str',
+        'parent_suite': '[TestSuiteReference]',
+        'query_string':'str',
+        'requirement_id':'int',
+        'suite_type': 'object'
+    }
+    default_configurations model:
+    {
+        'id':'int',
+        'name':'str'
+    }
+    default_testers model:
+    {
+        '_links':'dict',
+        'descriptor':'str',
+        'display_name':'str',
+        'url':'str',
+        'directory_alias':'str',
+        'id':'str',
+        'image_url':'str',
+        'inactive':'bool',
+        'is_aad_identity':'bool',
+        'is_container':'bool',
+        'is_deleted_in_origin':'bool',
+        'profile_url':'str',
+        'unique_name':'str'
+    }
+    parent_suite model:
+    {
+        'id':'int',
+        'name':'str'
+    }
+    """)),
     project=(str, Field(description="Project ID or project name")),
     plan_id=(int, Field(description="ID of the test plan that contains the suites"))
 )
