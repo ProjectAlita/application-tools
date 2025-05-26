@@ -72,6 +72,6 @@ def log_action(action: str, details: dict = None):
     """
     logger = logging.getLogger(__name__)
     log_message = action
-    if details:
+    if details is not None:  # Check for None instead of truthiness to handle empty dicts
         log_message += f": {json.dumps(details, indent=2)}"
     logger.info(log_message)

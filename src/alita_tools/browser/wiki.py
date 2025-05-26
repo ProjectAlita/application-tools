@@ -18,7 +18,7 @@ class WikipediaQueryRun(BaseTool):
         "people, places, companies, facts, historical events, or other subjects. "
         "Input should be a search query."
     )
-    api_wrapper: WikipediaAPIWrapper
+    api_wrapper: WikipediaAPIWrapper = None  # Add default None value
     args_schema: Type[BaseModel] = create_model("WikipediaQueryRunModel",
                                  query=(str, Field(description="Query text to search pages")))
 

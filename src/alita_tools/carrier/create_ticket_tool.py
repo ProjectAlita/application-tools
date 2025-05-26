@@ -51,15 +51,15 @@ class TicketData(BaseModel):
 
     # Validate date strings to ensure user is providing them in a correct format
     @field_validator("start_date", "end_date", mode="before")
-    def validate_date_format(cls, value, field):
+    def validate_date_format(cls, value, info):
         if not isinstance(value, str):
-            raise ValueError(f"{field.name} must be a string in YYYY-MM-DD format.")
+            raise ValueError(f"{info.field_name} must be a string in YYYY-MM-DD format.")
         try:
             # Attempt to parse
             datetime.strptime(value, "%Y-%m-%d")
         except ValueError:
             raise ValueError(
-                f"Invalid date format for {field.name}. Expected 'YYYY-MM-DD', got '{value}'."
+                f"Invalid date format for {info.field_name}. Expected 'YYYY-MM-DD', got '{value}'."
             )
         return value
 
