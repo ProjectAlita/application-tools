@@ -93,10 +93,26 @@ addCase = create_model(
         Custom fields are supported as well and must be submitted with their
         system name, prefixed with 'custom_', e.g.:
         {
-            ..
-            "custom_preconds": "These are the preconditions for a test case"
-            ..
+            ...
+            "template_id": 1,
+            "custom_preconds": "These are the preconditions for a test case",
+            "custom_steps": "Step-by-step instructions for the test.",
+            "custom_expected": "The final expected result."
+            ...
         }
+        OR
+        {
+            ...
+            "template_id": 2,
+            "custom_preconds": "These are the preconditions for a test case",
+            "custom_steps_separated": [
+                {"content": "Step 1 description", "expected": "Step 1 expected result"},
+                {"content": "Step 2 description", "expected": "Step 2 expected result"},
+                {"shared_step_id": 5}
+            ]
+            ...
+        }
+
         The following custom field types are supported:
             Checkbox: bool
                 True for checked and false otherwise
@@ -121,6 +137,17 @@ addCase = create_model(
                 A string with matches the syntax of a URL
             User: int
                 The ID of a user for the custom field
+
+        **Notes for `steps` and `expected`:**
+        - The `steps` field can take one of two forms based on template id:
+          1. A **string** for simple test steps, mapped to `custom_steps`.
+             - Template ID should be 1 passed as default
+             - The `expected` field in this case should also be a **string** and is mapped to `custom_expected`.
+          2. A **list of dictionaries** for detailed step-by-step instructions, mapped to `custom_steps_separated`.
+             - Template ID should be 2 passed as default
+             - Each dictionary requires a `content` key for the step text and an `expected` key for the individual expected outcome.
+             - If `shared_step_id` is included, it is preserved for that step.
+        - `expected` values must always be strings and are required when `steps` is a single string or may be supplied per step when `steps` is a list.
         """,
         default={}))
 )
@@ -165,8 +192,12 @@ class TestrailAPIWrapper(BaseToolApiWrapper):
                         The estimate, e.g. "30s" or "1m 45s"
                         etc.
                         Custom fields are supported with prefix 'custom_', e.g.:
-                        custom_preconds: str
-                        'These are the preconditions for a test case'
+                        :custom_steps: str
+                        Steps in String format (requires template_id: 1)
+                        :custom_steps_separated: dict
+                        Steps in Dict format (requires template_id: 2)
+                        :custom_preconds: str
+                        These are the preconditions for a test case
             """
         try:
             created_case = self._client.cases.add_case(section_id=section_id, title=title, **case_properties)
@@ -189,7 +220,6 @@ class TestrailAPIWrapper(BaseToolApiWrapper):
             extracted_cases_data = []
             for case in extracted_cases['cases']:
                 extracted_cases_data.append({"id": case['id'], "title": case['title']})
-
         except StatusCodeError as e:
             return ToolException(f"Unable to extract testcases {e}")
         return f"Extracted test case:\n{str(extracted_cases_data)}"
@@ -199,10 +229,13 @@ class TestrailAPIWrapper(BaseToolApiWrapper):
         try:
             params = json.loads(json_case_arguments)
             extracted_cases = self._client.cases.get_cases(project_id=project_id, **params)
-            return str(extracted_cases['cases'])
+            extracted_cases_data = []
+            if extracted_cases['cases'] is not None:
+                for case in extracted_cases['cases']:
+                    extracted_cases_data.append({"id": case['id'], "title": case['title']})
         except StatusCodeError as e:
             return ToolException(f"Unable to extract testcases {e}")
-        return f"Extracted test case:\n{str(all_cases_concatenated)}"
+        return f"Extracted test case:\n{str(extracted_cases_data)}"
 
     def get_available_tools(self):
         return [
