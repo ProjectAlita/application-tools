@@ -312,7 +312,7 @@ class TestrailAPIWrapper(BaseToolApiWrapper):
                 section_id=section_id, title=title, **case_properties
             )
         except StatusCodeError as e:
-            raise f"Unable to add new testcase {e}"
+            return ToolException(f"Unable to add new testcase {e}")
         return f"New test case has been created: id - {created_case['id']} at '{created_case['created_on']}')"
 
     def get_case(self, testcase_id: str):
@@ -320,7 +320,7 @@ class TestrailAPIWrapper(BaseToolApiWrapper):
         try:
             extracted_case = self._client.cases.get_case(testcase_id)
         except StatusCodeError as e:
-            raise ToolException(f"Unable to extract testcase {e}")
+            return ToolException(f"Unable to extract testcase {e}")
         return f"Extracted test case:\n{str(extracted_case)}"
 
     def get_cases(
@@ -339,13 +339,22 @@ class TestrailAPIWrapper(BaseToolApiWrapper):
         """
         try:
             extracted_cases = self._client.cases.get_cases(project_id=project_id)
-            extracted_cases_data = []
-            for case in extracted_cases["cases"]:
-                extracted_cases_data.append({"title": case["title"], "id": case["id"]})
-        except StatusCodeError as e:
-            raise ToolException(f"Unable to extract testcases {e}")
+            cases = extracted_cases.get("cases")
 
-        return self._to_markup(extracted_cases_data, output_format)
+            if cases is None:
+                return ToolException("No test cases found in the extracted data.")
+
+            extracted_cases_data = [
+                {"title": case.get("title", "N/A"), "id": case.get("id")}
+                for case in cases
+            ]
+
+            if not extracted_cases_data:
+                return ToolException("No valid test case data found to format.")
+
+            return self._to_markup(extracted_cases_data, output_format)
+        except StatusCodeError as e:
+            return ToolException(f"Unable to extract testcases {e}")
 
     def get_cases_by_filter(
         self,
@@ -372,7 +381,7 @@ class TestrailAPIWrapper(BaseToolApiWrapper):
             elif isinstance(json_case_arguments, dict):
                 params = json_case_arguments
             else:
-                raise ToolException(
+                return ToolException(
                     "json_case_arguments must be a JSON string or dictionary."
                 )
 
@@ -380,18 +389,15 @@ class TestrailAPIWrapper(BaseToolApiWrapper):
                 project_id=project_id, **params
             )
 
-            extracted_cases_data = []
-            if extracted_cases.get("cases"):
-                extracted_cases_data = [
-                    {"title": case["title"], "id": case["id"]}
-                    for case in extracted_cases["cases"]
-                ]
-        except StatusCodeError as e:
-            raise ToolException(f"Unable to extract test cases: {e}")
-        except (ValueError, json.JSONDecodeError) as e:
-            raise ToolException(f"Invalid parameter for json_case_arguments: {e}")
+            cases = extracted_cases.get("cases")
+            if cases is None:
+                return ToolException("No cases found in the extracted data.")
 
-        return self._to_markup(extracted_cases_data, output_format)
+            return self._to_markup(cases, output_format)
+        except StatusCodeError as e:
+            return ToolException(f"Unable to extract test cases: {e}")
+        except (ValueError, json.JSONDecodeError) as e:
+            return ToolException(f"Invalid parameter for json_case_arguments: {e}")
 
     def update_case(self, case_id: str, case_properties: Optional[dict]):
         """Updates an existing test case (partial updates are supported, i.e.
@@ -423,7 +429,7 @@ class TestrailAPIWrapper(BaseToolApiWrapper):
                 case_id=case_id, **case_properties
             )
         except StatusCodeError as e:
-            raise f"Unable to update testcase #{case_id} due to {e}"
+            return ToolException(f"Unable to update testcase #{case_id} due to {e}")
         return (
             f"Test case #{case_id} has been updated at '{updated_case['updated_on']}')"
         )
@@ -440,7 +446,7 @@ class TestrailAPIWrapper(BaseToolApiWrapper):
             str: The data in the specified format.
         """
         if output_format not in {"json", "csv", "markdown"}:
-            raise ToolException(
+            return ToolException(
                 f"Invalid format `{output_format}`. Supported formats: 'json', 'csv', 'markdown'."
             )
 
