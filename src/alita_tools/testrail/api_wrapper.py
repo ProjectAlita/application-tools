@@ -24,6 +24,13 @@ getCases = create_model(
             description="Desired output format. Supported values: 'json', 'csv', 'markdown'. Defaults to 'json'.",
         ),
     ),
+    keys=(
+        List[str],
+        Field(
+            default=["title", "id"],
+            description="A list of case field keys to include in the data output. If None, defaults to ['title', 'id'].",
+        ),
+    ),
 )
 
 getCasesByFilter = create_model(
@@ -79,6 +86,13 @@ getCasesByFilter = create_model(
         Field(
             default="json",
             description="Desired output format. Supported values: 'json', 'csv', 'markdown'. Defaults to 'json'.",
+        ),
+    ),
+    keys=(
+        Optional[List[str]],
+        Field(
+            default=None,
+            description="A list of case field keys to include in the data output",
         ),
     ),
 )
@@ -261,6 +275,15 @@ updateCase = create_model(
 )
 
 
+SUPPORTED_KEYS = {
+    "id", "title", "section_id", "template_id", "type_id", "priority_id", "milestone_id",
+    "refs", "created_by", "created_on", "updated_by", "updated_on", "estimate",
+    "estimate_forecast", "suite_id", "display_order", "is_deleted", "case_assignedto_id",
+    "custom_automation_type", "custom_preconds", "custom_steps", "custom_testrail_bdd_scenario",
+    "custom_expected", "custom_steps_separated", "custom_mission", "custom_goals"
+}
+
+
 class TestrailAPIWrapper(BaseToolApiWrapper):
     url: str
     password: Optional[SecretStr] = None,
@@ -312,7 +335,7 @@ class TestrailAPIWrapper(BaseToolApiWrapper):
                 section_id=section_id, title=title, **case_properties
             )
         except StatusCodeError as e:
-            raise f"Unable to add new testcase {e}"
+            return ToolException(f"Unable to add new testcase {e}")
         return f"New test case has been created: id - {created_case['id']} at '{created_case['created_on']}')"
 
     def get_case(self, testcase_id: str):
@@ -320,11 +343,11 @@ class TestrailAPIWrapper(BaseToolApiWrapper):
         try:
             extracted_case = self._client.cases.get_case(testcase_id)
         except StatusCodeError as e:
-            raise ToolException(f"Unable to extract testcase {e}")
+            return ToolException(f"Unable to extract testcase {e}")
         return f"Extracted test case:\n{str(extracted_case)}"
 
     def get_cases(
-        self, project_id: str, output_format: str = "json"
+        self, project_id: str, output_format: str = "json", keys: List[str] = None
     ) -> Union[str, ToolException]:
         """
         Extracts a list of test cases in the specified format: `json`, `csv`, or `markdown`.
@@ -333,25 +356,46 @@ class TestrailAPIWrapper(BaseToolApiWrapper):
             project_id (str): The project ID to extract test cases from.
             output_format (str): Desired output format. Options are 'json', 'csv', 'markdown'.
                                 Default is 'json'.
+            keys (List[str]): A list of case field keys to include in the data output.
+                              If None, defaults to ['id', 'title'].
 
         Returns:
             str: A representation of the test cases in the specified format
         """
+        if keys is None:
+            keys = ["title", "id"]
+
+        invalid_keys = [key for key in keys if key not in SUPPORTED_KEYS]
+
         try:
             extracted_cases = self._client.cases.get_cases(project_id=project_id)
-            extracted_cases_data = []
-            for case in extracted_cases["cases"]:
-                extracted_cases_data.append({"title": case["title"], "id": case["id"]})
-        except StatusCodeError as e:
-            raise ToolException(f"Unable to extract testcases {e}")
+            cases = extracted_cases.get("cases")
 
-        return self._to_markup(extracted_cases_data, output_format)
+            if cases is None:
+                return ToolException("No test cases found in the extracted data.")
+
+            extracted_cases_data = [
+                {key: case.get(key, "N/A") for key in keys} for case in cases
+            ]
+
+            if not extracted_cases_data:
+                return ToolException("No valid test case data found to format.")
+
+            result = self._to_markup(extracted_cases_data, output_format)
+
+            if invalid_keys:
+                return f"{result}\n\nInvalid keys: {invalid_keys}"
+
+            return result
+        except StatusCodeError as e:
+            return ToolException(f"Unable to extract testcases {e}")
 
     def get_cases_by_filter(
         self,
         project_id: str,
         json_case_arguments: Union[str, dict],
         output_format: str = "json",
+        keys: Optional[List[str]] = None
     ) -> Union[str, ToolException]:
         """
         Extracts test cases from a specified project based on given case attributes.
@@ -362,17 +406,21 @@ class TestrailAPIWrapper(BaseToolApiWrapper):
                                                     Can be a JSON string or a dictionary.
             output_format (str): Desired output format. Options are 'json', 'csv', 'markdown'.
                                  Default is 'json'.
+            keys (Optional[List[str]]): An optional list of case field keys to include in the data output.
 
         Returns:
             str: A representation of the test cases in the specified format.
         """
+        if keys:
+            invalid_keys = [key for key in keys if key not in SUPPORTED_KEYS]
+
         try:
             if isinstance(json_case_arguments, str):
                 params = json.loads(json_case_arguments)
             elif isinstance(json_case_arguments, dict):
                 params = json_case_arguments
             else:
-                raise ToolException(
+                return ToolException(
                     "json_case_arguments must be a JSON string or dictionary."
                 )
 
@@ -380,18 +428,31 @@ class TestrailAPIWrapper(BaseToolApiWrapper):
                 project_id=project_id, **params
             )
 
-            extracted_cases_data = []
-            if extracted_cases.get("cases"):
-                extracted_cases_data = [
-                    {"title": case["title"], "id": case["id"]}
-                    for case in extracted_cases["cases"]
-                ]
-        except StatusCodeError as e:
-            raise ToolException(f"Unable to extract test cases: {e}")
-        except (ValueError, json.JSONDecodeError) as e:
-            raise ToolException(f"Invalid parameter for json_case_arguments: {e}")
+            cases = extracted_cases.get("cases")
 
-        return self._to_markup(extracted_cases_data, output_format)
+            if cases is None:
+                return ToolException("No test cases found in the extracted data.")
+
+            if keys is None:
+                return self._to_markup(cases, output_format)
+
+            extracted_cases_data = [
+                {key: case.get(key, "N/A") for key in keys} for case in cases
+            ]
+
+            if extracted_cases_data is None:
+                return ToolException("No valid test case data found to format.")
+
+            result = self._to_markup(extracted_cases_data, output_format)
+
+            if invalid_keys:
+                return f"{result}\n\nInvalid keys: {invalid_keys}"
+
+            return result
+        except StatusCodeError as e:
+            return ToolException(f"Unable to extract test cases: {e}")
+        except (ValueError, json.JSONDecodeError) as e:
+            return ToolException(f"Invalid parameter for json_case_arguments: {e}")
 
     def update_case(self, case_id: str, case_properties: Optional[dict]):
         """Updates an existing test case (partial updates are supported, i.e.
@@ -423,7 +484,7 @@ class TestrailAPIWrapper(BaseToolApiWrapper):
                 case_id=case_id, **case_properties
             )
         except StatusCodeError as e:
-            raise f"Unable to update testcase #{case_id} due to {e}"
+            return ToolException(f"Unable to update testcase #{case_id} due to {e}")
         return (
             f"Test case #{case_id} has been updated at '{updated_case['updated_on']}')"
         )
@@ -440,7 +501,7 @@ class TestrailAPIWrapper(BaseToolApiWrapper):
             str: The data in the specified format.
         """
         if output_format not in {"json", "csv", "markdown"}:
-            raise ToolException(
+            return ToolException(
                 f"Invalid format `{output_format}`. Supported formats: 'json', 'csv', 'markdown'."
             )
 
