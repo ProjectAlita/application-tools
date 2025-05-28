@@ -25,7 +25,7 @@ getCases = create_model(
         ),
     ),
     keys=(
-        List[str],
+        Optional[List[str]],
         Field(
             default=["title", "id"],
             description="A list of case field keys to include in the data output. If None, defaults to ['title', 'id'].",
@@ -347,7 +347,7 @@ class TestrailAPIWrapper(BaseToolApiWrapper):
         return f"Extracted test case:\n{str(extracted_case)}"
 
     def get_cases(
-        self, project_id: str, output_format: str = "json", keys: List[str] = None
+        self, project_id: str, output_format: str = "json", keys: Optional[List[str]] = None
     ) -> Union[str, ToolException]:
         """
         Extracts a list of test cases in the specified format: `json`, `csv`, or `markdown`.
