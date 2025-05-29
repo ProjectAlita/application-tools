@@ -36,6 +36,7 @@ DirectoryPath = create_model(
 ReadFile = create_model(
     "ReadFile",
     file_path=(str, Field(description="The path to the file to read, e.g. `src/main.py`")),
+    branch=(Optional[str], Field(description="The branch to read the file from, e.g. `main`", default=None)),
     repo_name=(Optional[str], Field(default=None, description="Name of the repository (e.g., 'owner/repo'). If None, uses the default repository."))
 )
 
