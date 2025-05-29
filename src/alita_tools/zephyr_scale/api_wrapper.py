@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Any, Optional, List, Dict
+from typing import Any, Optional, List, Dict, Tuple
 
 from pydantic import model_validator, BaseModel, SecretStr
 from langchain_core.tools import ToolException
@@ -160,14 +160,23 @@ ZephyrSearchTestCases = create_model(
     order_by=(Optional[str], Field(description="Field to order results by", default="name")),
     order_direction=(Optional[str], Field(description="Order direction", default="ASC")),
     archived=(Optional[bool], Field(description="Include archived test cases", default=False)),
-    fields=(Optional[List[str]], Field(description="Fields to include in the response (default: key, name)", default=["key", "name"])),
+    fields=(Optional[List[str]], Field(description="Fields to include in the response (default: key, name). Regular fields include key, name, id, labels, folder, etc. Custom fields can be included in the following ways:Individual custom fields via customFields.field_name format, All custom fields via customFields in the fields list", default=["key", "name"])),
     limit_results=(Optional[int], Field(description="Maximum number of filtered results to return", default=10)),
     folder_id=(Optional[str], Field(description="Filter test cases by folder ID", default=None)),
     folder_name=(Optional[str], Field(description="Filter test cases by folder name (full or partial)", default=None)),
     exact_folder_match=(Optional[bool], Field(description="Whether to match the folder name exactly or allow partial matches", default=False)),
     folder_path=(Optional[str], Field(description="Filter test cases by folder path (e.g., 'Root/Parent/Child')", default=None)),
     include_subfolders=(Optional[bool], Field(description="Include test cases from subfolders of matching folders", default=True)),
-    labels=(Optional[List[str]], Field(description="Filter test cases by labels", default=None))
+    labels=(Optional[List[str]], Field(description="Filter test cases by labels", default=None)),
+    custom_fields=(Optional[str], Field(
+        description="JSON string containing custom field filters (e.g., {\"Country\": \"All\", \"Is Automated\": \"Yes\"}).",
+        default=None)),
+    steps_search=(Optional[str], Field(
+        description="Search term to find in test case steps (description, expected result, or test data)",
+        default=None)),
+    include_steps=(Optional[bool], Field(
+        description="Whether to include test steps in the response",
+        default=False))
 )
 
 ZephyrGetTestsRecursive = create_model(
@@ -213,6 +222,13 @@ ZephyrGetTestsByFolderPath = create_model(
     startAt=(Optional[int], Field(
         description="Zero-indexed starting position. Should be a multiple of maxResults.",
         default=0))
+)
+
+
+ZephyrUpdateTestSteps = create_model(
+    "ZephyrUpdateTestSteps",
+    test_case_key=(str, Field(description="The key of the test case")),
+    steps_updates=(str, Field(description="JSON string representing the test steps to update. Format: [{\"index\": 0, \"description\": \"Updated step description\", \"testData\": \"Updated test data\", \"expectedResult\": \"Updated expected result\"}]"))
 )
 
 
@@ -271,6 +287,7 @@ class ZephyrScaleApiWrapper(BaseToolApiWrapper):
         Args:
             project_key: Jira project key filter
             folder_id: Folder ID filter
+            custom_fields: JSON string containing custom field filters (e.g., {"Country": "All", "Is Automated": "Yes"})
             maxResults: A hint as to the maximum number of results to return in each call
             startAt: Zero-indexed starting position. Should be a multiple of maxResults
         """
@@ -284,7 +301,7 @@ class ZephyrScaleApiWrapper(BaseToolApiWrapper):
             kwargs["maxResults"] = maxResults
         if startAt:
             kwargs["startAt"] = startAt
-
+            
         test_cases = self._api.test_cases.get_test_cases(**kwargs)
         # Convert each test case to a string and join them with new line
         test_cases_str = str(self._parse_tests(test_cases))
@@ -499,6 +516,415 @@ class ZephyrScaleApiWrapper(BaseToolApiWrapper):
         except Exception as e:
             return ToolException(f"Unable to create/update test script for test case with key: {test_case_key}:\n{str(e)}")
             
+    # Helper methods for folder operations
+    def _get_folders(self, project_key: str, folder_type: str = "TEST_CASE", max_results: int = 100) -> List[Dict]:
+        """Get all folders in a project
+        
+        Args:
+            project_key: Jira project key
+            folder_type: Type of folder (default: TEST_CASE)
+            max_results: Maximum number of folders to retrieve
+            
+        Returns:
+            List of folder objects
+        
+        Raises:
+            ToolException: If there's an error getting folders
+        """
+        all_folders = []
+        try:
+            for folder in self._api.folders.get_folders(
+                maxResults=max_results, 
+                projectKey=project_key, 
+                folderType=folder_type
+            ):
+                all_folders.append(folder)
+            return all_folders
+        except Exception as e:
+            raise ToolException(f"Error getting folders: {str(e)}")
+    
+    def _build_folder_hierarchy(self, all_folders: List[Dict]) -> Dict:
+        """Build a folder hierarchy from a list of folders
+        
+        Args:
+            all_folders: List of folder objects
+            
+        Returns:
+            Dictionary representing the folder hierarchy
+        """
+        folder_hierarchy = {}
+        for folder in all_folders:
+            folder_id = folder.get('id')
+            parent_id = folder.get('parentId')
+            
+            if folder_id not in folder_hierarchy:
+                folder_hierarchy[folder_id] = {
+                    'folder': folder,
+                    'children': []
+                }
+            else:
+                folder_hierarchy[folder_id]['folder'] = folder
+                
+            if parent_id:
+                if parent_id not in folder_hierarchy:
+                    folder_hierarchy[parent_id] = {
+                        'folder': None,
+                        'children': [folder_id]
+                    }
+                else:
+                    folder_hierarchy[parent_id]['children'].append(folder_id)
+        
+        return folder_hierarchy
+    
+    def _find_folders_by_name(self, all_folders: List[Dict], folder_name: str, exact_match: bool = False) -> List[str]:
+        """Find folders matching a name
+        
+        Args:
+            all_folders: List of folder objects
+            folder_name: Name to search for
+            exact_match: Whether to match the name exactly
+            
+        Returns:
+            List of folder IDs matching the name
+        """
+        matching_folder_ids = []
+        for folder in all_folders:
+            folder_name_val = folder.get('name', '')
+            if exact_match:
+                if folder_name_val == folder_name:
+                    matching_folder_ids.append(folder.get('id'))
+            else:
+                if folder_name.lower() in folder_name_val.lower():
+                    matching_folder_ids.append(folder.get('id'))
+        
+        return matching_folder_ids
+    
+    def _get_folder_paths(self, folder_hierarchy: Dict) -> Tuple[Dict, List[str]]:
+        """Build full paths for each folder
+        
+        Args:
+            folder_hierarchy: Dictionary representing the folder hierarchy
+            
+        Returns:
+            Tuple of (folder_paths, root_folders)
+                folder_paths: Dictionary mapping folder IDs to their full paths
+                root_folders: List of root folder IDs
+        """
+        folder_paths = {}
+        root_folders = []
+        
+        # Identify root folders
+        for folder_id, data in folder_hierarchy.items():
+            folder = data.get('folder')
+            if folder and not folder.get('parentId'):
+                root_folders.append(folder_id)
+        
+        # Function to build full paths for each folder
+        def build_folder_paths(folder_id, current_path=""):
+            if folder_id not in folder_hierarchy or not folder_hierarchy[folder_id]['folder']:
+                return
+                
+            folder_name = folder_hierarchy[folder_id]['folder'].get('name', '')
+            if current_path:
+                full_path = f"{current_path}/{folder_name}"
+            else:
+                full_path = folder_name
+                
+            folder_paths[folder_id] = full_path
+            
+            # Process children
+            for child_id in folder_hierarchy[folder_id]['children']:
+                build_folder_paths(child_id, full_path)
+        
+        # Build paths starting from root folders
+        for root_id in root_folders:
+            build_folder_paths(root_id)
+        
+        return folder_paths, root_folders
+    
+    def _find_folder_by_path(self, folder_paths: Dict, folder_path: str) -> Optional[str]:
+        """Find a folder by its path
+        
+        Args:
+            folder_paths: Dictionary mapping folder IDs to their full paths
+            folder_path: Path to search for
+            
+        Returns:
+            Folder ID or None if not found
+        """
+        for folder_id, path in folder_paths.items():
+            if path == folder_path:
+                return folder_id
+        return None
+    
+    def _collect_subfolders(self, folder_hierarchy: Dict, parent_folder_ids: List[str], include_parents: bool = True) -> List[str]:
+        """Collect all subfolders of the given parent folders
+        
+        Args:
+            folder_hierarchy: Dictionary representing the folder hierarchy
+            parent_folder_ids: List of parent folder IDs
+            include_parents: Whether to include the parent folders in the result
+            
+        Returns:
+            List of all subfolder IDs (and parent IDs if include_parents is True)
+        """
+        result_folder_ids = parent_folder_ids.copy() if include_parents else []
+        # collected_folders = set(result_folder_ids)
+        
+        # Function to recursively collect subfolders
+        def collect_subfolders_recursive(parent_folder_id):
+            if int(parent_folder_id) not in folder_hierarchy.keys():
+                return              
+            
+            for child_id in folder_hierarchy[int(parent_folder_id)].get('children', []):
+                result_folder_ids.append(child_id)
+                collect_subfolders_recursive(child_id)
+        
+        # Start recursive collection for each parent folder
+        for folder_id in parent_folder_ids:
+            collect_subfolders_recursive(folder_id)
+        
+        return list(set(result_folder_ids))  # Remove duplicates
+    
+    def _get_test_cases_from_folders(self, project_key: str, folder_ids: List[str], 
+                                     max_results: int = 100, start_at: int = 0, 
+                                     params: Dict = None) -> List[Dict]:
+        """Get test cases from multiple folders
+        
+        Args:
+            project_key: Jira project key
+            folder_ids: List of folder IDs
+            max_results: Maximum number of results per folder
+            start_at: Starting position
+            params: Additional parameters for the API call
+            
+        Returns:
+            List of test case objects
+        """
+        all_test_cases = []
+        base_params = params.copy() if params else {}
+        base_params.update({
+            "projectKey": project_key,
+            "maxResults": max_results,
+            "startAt": start_at
+        })
+        
+        for folder_id in folder_ids:
+            folder_params = base_params.copy()
+            folder_params["folderId"] = folder_id
+            try:
+                test_cases = self._api.test_cases.get_test_cases(**folder_params)
+                all_test_cases.extend(test_cases)
+            except Exception as e:
+                logger.warning(f"Error getting test cases from folder {folder_id}: {str(e)}")
+        
+        return all_test_cases
+    
+    def _process_custom_fields_param(self, custom_fields: str) -> Dict:
+        """Process custom fields parameter from JSON string
+        
+        Args:
+            custom_fields: JSON string containing custom fields
+            
+        Returns:
+            Dictionary of parameters to add to the API call
+            
+        Raises:
+            ToolException: If the JSON is invalid
+        """
+        params = {}
+        if not custom_fields:
+            return params
+            
+        try:
+            custom_fields_dict = json.loads(custom_fields)
+            for field_name, field_value in custom_fields_dict.items():
+                # Format according to Zephyr Scale API: customField_{fieldName}
+                field_key = f"customField_{field_name.replace(' ', '_')}"
+                params[field_key] = field_value
+            return params
+        except json.JSONDecodeError as e:
+            raise ToolException(f"Invalid JSON format for custom_fields: {str(e)}")
+    
+    def _filter_test_cases(self, test_cases: List[Dict], search_term: str = None, 
+                          labels: List[str] = None, custom_fields_dict: Dict = None) -> List[Dict]:
+        """Filter test cases based on criteria
+        
+        Args:
+            test_cases: List of test case objects
+            search_term: Term to search for in name and key
+            labels: List of labels to filter by
+            custom_fields_dict: Custom fields to filter by
+            
+        Returns:
+            Filtered list of test case objects
+        """
+        filtered_cases = []
+        
+        for tc in test_cases:
+            # Apply search term filter if provided
+            search_match = True
+            if search_term:
+                search_match = (search_term.lower() in str(tc.values()).lower())
+            
+            # Apply labels filter if provided
+            labels_match = True
+            if labels and len(labels) > 0:
+                tc_labels = tc.get('labels', [])
+                # Check if at least one of the specified labels exists in the test case
+                labels_match = any(label in tc_labels for label in labels)
+            
+            # Apply custom fields filter if provided
+            custom_fields_match = True
+            if custom_fields_dict:
+                for field_name, expected_value in custom_fields_dict.items():
+                    # Check if the test case has the custom field and the expected value
+                    if "customFields" in tc and field_name in tc.get("customFields", {}):
+                        actual_value = tc["customFields"][field_name]
+                        print(f"Checking custom field '{field_name}': expected={expected_value}, actual={actual_value}, isinstance(expected_value, list)={isinstance(expected_value, list)}, isinstance(actual_value, list)={isinstance(actual_value, list)}, any(ev in actual_value for ev in expected_value)={any(ev in actual_value for ev in expected_value)}")
+                        # Handle different types of custom field values (single value, list, etc.)
+                        # if isinstance(actual_value, list) and isinstance(expected_value, list):
+                        #     # For list values, check if they match exactly
+                        #     if set(actual_value) != set(expected_value):
+                        #         custom_fields_match = False
+                        #         break
+                        if isinstance(actual_value, list) and isinstance(expected_value, list):
+                            # For list values, check if they contain the expected value
+                            if not any(ev in actual_value for ev in expected_value):
+                                custom_fields_match = False
+                                break
+                        elif isinstance(actual_value, list) and not isinstance(expected_value, list):
+                            # For list values, check if expected value is in the list
+                            if expected_value not in actual_value:
+                                custom_fields_match = False
+                                break
+                        else:
+                            # For single values, check for exact match
+                            if actual_value != expected_value:
+                                custom_fields_match = False
+                                break
+                    else:
+                        # If the test case doesn't have the custom field, it doesn't match
+                        custom_fields_match = False
+                        break
+            
+            # Add test case if it matches all filters
+            if search_match and labels_match and custom_fields_match:
+                filtered_cases.append(tc)
+                
+        return filtered_cases
+    
+    def _filter_test_steps(self, test_cases: List[Dict], steps_search: str, include_steps: bool = False) -> Tuple[List[Dict], Dict]:
+        """Filter test cases based on their steps
+        
+        Args:
+            test_cases: List of test case objects
+            steps_search: Term to search for in steps
+            include_steps: Whether to include matching steps in the results
+            
+        Returns:
+            Tuple of (filtered_cases, steps_search_results)
+                filtered_cases: List of test cases with matching steps
+                steps_search_results: Dictionary mapping test case keys to their matching steps
+        """
+        filtered_cases = []
+        steps_search_results = {}
+        
+        # Collect test case keys
+        test_case_keys = [tc.get('key') for tc in test_cases]
+        
+        # For each test case, check if any steps match the search term
+        for tc_key in test_case_keys:
+            try:
+                # Get steps for this test case
+                steps = self._api.test_cases.get_test_steps(tc_key)
+                
+                # Check if any step matches the search term
+                matching_steps = []
+                for step in steps:
+                    description = step.get('inline', {}).get('description', '')
+                    test_data = step.get('inline', {}).get('testData', '')
+                    expected_result = step.get('inline', {}).get('expectedResult', '')
+                    
+                    # Check if search term appears in any step field
+                    if ((description and steps_search.lower() in description.lower()) or
+                        (test_data and steps_search.lower() in test_data.lower()) or
+                        (expected_result and steps_search.lower() in expected_result.lower())):
+                        # If we need to include steps in the response, save the matching step
+                        if include_steps:
+                            matching_steps.append(step)
+                        else:
+                            # Just mark as matching, no need to save the step details
+                            matching_steps = True
+                            break
+                
+                # If any steps matched, add to our results
+                if matching_steps:
+                    steps_search_results[tc_key] = matching_steps
+            except Exception as e:
+                logger.warning(f"Error getting steps for test case {tc_key}: {str(e)}")
+        
+        # Filter test cases based on step search results
+        for tc in test_cases:
+            tc_key = tc.get('key')
+            if tc_key in steps_search_results:
+                # If including steps, add them to the test case
+                if include_steps:
+                    tc['steps'] = steps_search_results[tc_key]
+                filtered_cases.append(tc)
+        
+        return filtered_cases, steps_search_results
+    
+    def _format_test_case_results(self, test_cases: List[Dict], fields: List[str], 
+                                 search_criteria: Dict = None) -> Tuple[List[Dict], str]:
+        """Format test case results
+        
+        Args:
+            test_cases: List of test case objects
+            fields: Fields to include in the response
+            search_criteria: Dictionary of search criteria for the response message
+            
+        Returns:
+            Tuple of (formatted_cases, message)
+                formatted_cases: List of formatted test case objects
+                message: Response message
+        """
+        # Keep only the requested fields for each test case
+        result_cases = []
+        for tc in test_cases:
+            result_case = {}
+            for field in fields:
+                if field in tc:
+                    result_case[field] = tc[field]
+                # Check if the field is a custom field request
+                elif field.startswith("customFields."):
+                    custom_field_name = field.split(".", 1)[1]
+                    if "customFields" in tc and custom_field_name in tc["customFields"]:
+                        # Create customFields object if it doesn't exist yet
+                        if "customFields" not in result_case:
+                            result_case["customFields"] = {}
+                        # Add the custom field to the result
+                        result_case["customFields"][custom_field_name] = tc["customFields"][custom_field_name]
+                # If requesting all customFields
+                elif field == "customFields" and "customFields" in tc:
+                    result_case["customFields"] = tc["customFields"]
+            
+            result_cases.append(result_case)
+        
+        # Build a helpful response message
+        message = f"Found {len(result_cases)} test cases"
+        if search_criteria:
+            response_details = []
+            for key, value in search_criteria.items():
+                if value:
+                    response_details.append(f"{key} '{value}'")
+            
+            search_details = " and ".join(response_details)
+            if search_details:
+                message += f" matching {search_details}"
+        
+        return result_cases, message
+
     def search_test_cases(self, project_id: str, search_term: Optional[str] = None, 
                          max_results: Optional[int] = 1000, start_at: Optional[int] = 0,
                          order_by: Optional[str] = "name", order_direction: Optional[str] = "ASC", 
@@ -506,7 +932,8 @@ class ZephyrScaleApiWrapper(BaseToolApiWrapper):
                          limit_results: Optional[int] = None, folder_id: Optional[str] = None,
                          folder_name: Optional[str] = None, exact_folder_match: Optional[bool] = False,
                          folder_path: Optional[str] = None, include_subfolders: Optional[bool] = True,
-                         labels: Optional[List[str]] = None) -> str:
+                         labels: Optional[List[str]] = None, custom_fields: Optional[str] = None,
+                         steps_search: Optional[str] = None, include_steps: Optional[bool] = False) -> str:
         """Searches for test cases using custom search API.
         
         Args:
@@ -525,129 +952,43 @@ class ZephyrScaleApiWrapper(BaseToolApiWrapper):
             folder_path: Filter test cases by folder path (e.g., 'Root/Parent/Child')
             include_subfolders: Include test cases from subfolders of matching folders
             labels: Filter test cases by labels
+            custom_fields: JSON string containing custom field filters (e.g., {"Country": "All", "Is Automated": "Yes"})
+            steps_search: Search term to find in test case steps (description, expected result, or test data)
+            include_steps: Whether to include test steps in the response
         """
         try:
-            # Use the Python SDK for searching test cases
-            logger.debug("Searching test cases using the Python SDK")
-            
             # First, handle folder name and folder path search
             target_folder_ids = []
             
-            # If we have folder_name or folder_path, we need to build the folder hierarchy
+            # If we have folder_name or folder_path, we need to get folders and build the folder hierarchy
             if folder_name or folder_path:
                 # Get all folders in the project
-                all_folders = []
-                try:
-                    for folder in self._api.folders.get_folders(
-                        maxResults=max_results, 
-                        projectKey=project_id, 
-                        folderType="TEST_CASE"
-                    ):
-                        all_folders.append(folder)
-                except Exception as e:
-                    return ToolException(f"Error getting folders: {str(e)}")
+                all_folders = self._get_folders(project_id, "TEST_CASE", 1000)
                 
                 # Build folder hierarchy
-                folder_hierarchy = {}
-                for folder in all_folders:
-                    folder_id_val = folder.get('id')
-                    parent_id = folder.get('parentId')
-                    if folder_id_val not in folder_hierarchy:
-                        folder_hierarchy[folder_id_val] = {
-                            'folder': folder,
-                            'children': []
-                        }
-                    else:
-                        folder_hierarchy[folder_id_val]['folder'] = folder
-                    
-                    if parent_id:
-                        if parent_id not in folder_hierarchy:
-                            folder_hierarchy[parent_id] = {
-                                'folder': None,
-                                'children': [folder_id_val]
-                            }
-                        else:
-                            folder_hierarchy[parent_id]['children'].append(folder_id_val)
+                folder_hierarchy = self._build_folder_hierarchy(all_folders)
                 
                 # Handle folder name search
                 if folder_name:
-                    # Find folders matching the name
-                    for folder in all_folders:
-                        folder_name_val = folder.get('name', '')
-                        if exact_folder_match:
-                            if folder_name_val == folder_name:
-                                target_folder_ids.append(folder.get('id'))
-                        else:
-                            if folder_name.lower() in folder_name_val.lower():
-                                target_folder_ids.append(folder.get('id'))
+                    matching_ids = self._find_folders_by_name(all_folders, folder_name, exact_folder_match)
+                    target_folder_ids.extend(matching_ids)
                 
                 # Handle folder path search
                 if folder_path:
-                    folder_paths = {}
-                    root_folders = []
-                    
-                    # Identify root folders
-                    for folder in all_folders:
-                        if not folder.get('parentId'):
-                            root_folders.append(folder.get('id'))
-                    
-                    # Function to build full paths for each folder
-                    def build_folder_paths(folder_id, current_path=""):
-                        if folder_id not in folder_hierarchy or not folder_hierarchy[folder_id]['folder']:
-                            return
-                        
-                        folder_name = folder_hierarchy[folder_id]['folder'].get('name', '')
-                        if current_path:
-                            full_path = f"{current_path}/{folder_name}"
-                        else:
-                            full_path = folder_name
-                        
-                        folder_paths[folder_id] = full_path
-                        
-                        # Process children
-                        for child_id in folder_hierarchy[folder_id]['children']:
-                            build_folder_paths(child_id, full_path)
-                    
-                    # Build paths starting from root folders
-                    for root_id in root_folders:
-                        build_folder_paths(root_id)
-                    
-                    # Find the folder matching the exact path
-                    for folder_id, path in folder_paths.items():
-                        if path == folder_path:
-                            target_folder_ids.append(folder_id)
-                            break
+                    folder_paths, _ = self._get_folder_paths(folder_hierarchy)
+                    target_folder_id = self._find_folder_by_path(folder_paths, folder_path)
+                    if target_folder_id:
+                        target_folder_ids.append(target_folder_id)
                 
                 # If include_subfolders is True, add all subfolders of matching folders
                 if include_subfolders and target_folder_ids:
-                    # Function to recursively collect subfolders
-                    def collect_subfolders(parent_folder_id, collected_folders=None):
-                        if collected_folders is None:
-                            collected_folders = set()
-                        
-                        if parent_folder_id not in folder_hierarchy or parent_folder_id in collected_folders:
-                            return
-                        
-                        collected_folders.add(parent_folder_id)
-                        
-                        for child_id in folder_hierarchy[parent_folder_id].get('children', []):
-                            if child_id not in collected_folders:
-                                target_folder_ids.append(child_id)
-                                collect_subfolders(child_id, collected_folders)
-                    
-                    # Start recursive collection for each matching folder
-                    original_target_ids = target_folder_ids.copy()
-                    for folder_id in original_target_ids:
-                        collect_subfolders(folder_id)
-                
-                # Remove duplicates from target folder IDs
-                target_folder_ids = list(set(target_folder_ids))
+                    target_folder_ids = self._collect_subfolders(folder_hierarchy, target_folder_ids)
                 
                 # If we have target folder IDs but no folder_id is specified, use the first one
                 if target_folder_ids and not folder_id:
                     folder_id = target_folder_ids[0]
             
-            # Prepare parameters for the SDK call
+            # Prepare parameters for the API call
             params = {
                 "projectKey": project_id,
                 "maxResults": max_results,
@@ -658,42 +999,40 @@ class ZephyrScaleApiWrapper(BaseToolApiWrapper):
             if folder_id:
                 params["folderId"] = folder_id
             
+            # Process custom fields if provided
+            custom_fields_params = {}
+            custom_fields_dict = None
+            if custom_fields:
+                try:
+                    custom_fields_dict = json.loads(custom_fields)
+                    custom_fields_params = self._process_custom_fields_param(custom_fields)
+                    # params.update(custom_fields_params)
+                except Exception as e:
+                    return ToolException(f"Error processing custom fields: {str(e)}")
+            
             # Get test cases from the API
             all_test_cases = []
             
             # If we have multiple target folder IDs, get test cases from each folder
             if target_folder_ids and include_subfolders:
-                for target_id in target_folder_ids:
-                    folder_params = params.copy()
-                    folder_params["folderId"] = target_id
-                    try:
-                        test_cases = self._api.test_cases.get_test_cases(**folder_params)
-                        all_test_cases.extend(test_cases)
-                    except Exception as e:
-                        logger.warning(f"Error getting test cases from folder {target_id}: {str(e)}")
+                all_test_cases = self._get_test_cases_from_folders(
+                    project_id, target_folder_ids, max_results, start_at, params
+                )
             else:
                 # Just use the standard params (which might include a single folder_id)
                 all_test_cases = self._api.test_cases.get_test_cases(**params)
             
-            # Apply filtering based on search term and labels
-            filtered_cases = []
-            for tc in all_test_cases:
-                # Apply search term filter if provided
-                search_match = True
-                if search_term:
-                    search_match = (search_term.lower() in tc.get('name', '').lower() or 
-                                    search_term.lower() in tc.get('key', '').lower())
-                
-                # Apply labels filter if provided
-                labels_match = True
-                if labels and len(labels) > 0:
-                    tc_labels = tc.get('labels', [])
-                    # Check if at least one of the specified labels exists in the test case
-                    labels_match = any(label in tc_labels for label in labels)
-                
-                # Add test case if it matches all filters
-                if search_match and labels_match:
-                    filtered_cases.append(tc)
+            # Apply filtering based on search term, labels, and custom fields
+            filtered_cases = self._filter_test_cases(
+                all_test_cases, search_term, labels, custom_fields_dict
+            )
+            
+            # If steps_search is provided, filter by test steps
+            if steps_search:
+                filtered_cases, steps_search_results = self._filter_test_steps(
+                    filtered_cases, steps_search, include_steps
+                )
+            #ToDo later: if steps_search_results is not empty, need to be added to output (maybe).
             
             # Sort the results if needed
             if order_by and filtered_cases:
@@ -704,32 +1043,18 @@ class ZephyrScaleApiWrapper(BaseToolApiWrapper):
             if limit_results is not None and limit_results < len(filtered_cases):
                 filtered_cases = filtered_cases[:limit_results]
             
-            # Keep only the requested fields for each test case
-            result_cases = []
-            for tc in filtered_cases:
-                result_case = {}
-                for field in fields:
-                    if field in tc:
-                        result_case[field] = tc[field]
-                result_cases.append(result_case)
+            # Format the results
+            search_criteria = {
+                "folder name": folder_name,
+                "folder path": folder_path,
+                "folder ID": folder_id,
+                "search term": search_term,
+                "labels": labels,
+                "custom fields": custom_fields,
+                "steps containing": steps_search
+            }
             
-            # Build a helpful response message
-            response_details = []
-            if folder_name:
-                response_details.append(f"folder name '{folder_name}'")
-            if folder_path:
-                response_details.append(f"folder path '{folder_path}'")
-            if folder_id:
-                response_details.append(f"folder ID '{folder_id}'")
-            if search_term:
-                response_details.append(f"search term '{search_term}'")
-            if labels:
-                response_details.append(f"labels {labels}")
-            
-            search_details = " and ".join(response_details)
-            message = f"Found {len(result_cases)} test cases"
-            if search_details:
-                message += f" matching {search_details}"
+            result_cases, message = self._format_test_case_results(filtered_cases, fields, search_criteria)
             
             return f"{message}: {json.dumps(result_cases, indent=2)}"
                 
@@ -748,84 +1073,50 @@ class ZephyrScaleApiWrapper(BaseToolApiWrapper):
         Returns:
             A string with all test cases found in the folder and its subfolders
         """
-        # Store all test cases
-        all_test_cases = []
-        
-        # First, get all test cases from the specified folder
-        kwargs = {}
-        if project_key:
-            kwargs["projectKey"] = project_key
-        if folder_id:
-            kwargs["folderId"] = folder_id
-        kwargs["maxResults"] = maxResults
-        kwargs["startAt"] = startAt
-        
-        # Get test cases from the specified folder
         try:
-            test_cases = self._api.test_cases.get_test_cases(**kwargs)
-            all_test_cases.extend(test_cases)
-        except Exception as e:
-            return ToolException(f"Error getting test cases from folder {folder_id}: {str(e)}")
-        
-        # Get all folders in the project
-        all_folders = []
-        try:
-            for folder in self._api.folders.get_folders(
-                maxResults=100, 
-                projectKey=project_key, 
-                folderType="TEST_CASE"
-            ):
-                all_folders.append(folder)
-        except Exception as e:
-            return ToolException(f"Error getting folders: {str(e)}")
-        
-        # Build folder hierarchy
-        folder_hierarchy = {}
-        for folder in all_folders:
-            folder_id_val = folder.get('id')
-            parent_id = folder.get('parentId')
-            if folder_id_val not in folder_hierarchy:
-                folder_hierarchy[folder_id_val] = {
-                    'folder': folder,
-                    'children': []
-                }
-            else:
-                folder_hierarchy[folder_id_val]['folder'] = folder
-                
-            if parent_id:
-                if parent_id not in folder_hierarchy:
-                    folder_hierarchy[parent_id] = {
-                        'folder': None,
-                        'children': [folder_id_val]
-                    }
-                else:
-                    folder_hierarchy[parent_id]['children'].append(folder_id_val)
-        
-        # Function to recursively collect test cases from subfolders
-        def collect_subfolder_tests(parent_folder_id):
-            if parent_folder_id not in folder_hierarchy:
-                return
+            # Store all test cases
+            all_test_cases = []
             
-            for child_id in folder_hierarchy[parent_folder_id]['children']:
-                # Get test cases from this subfolder
-                subfolder_kwargs = kwargs.copy()
-                subfolder_kwargs["folderId"] = child_id
+            # Prepare base parameters for API calls
+            base_params = {
+                "maxResults": maxResults,
+                "startAt": startAt
+            }
+            if project_key:
+                base_params["projectKey"] = project_key
+            
+            # First, get test cases from the specified folder if a folder_id was provided
+            if folder_id:
+                folder_params = base_params.copy()
+                folder_params["folderId"] = folder_id
                 try:
-                    subfolder_test_cases = self._api.test_cases.get_test_cases(**subfolder_kwargs)
-                    all_test_cases.extend(subfolder_test_cases)
+                    test_cases = self._api.test_cases.get_test_cases(**folder_params)
+                    all_test_cases.extend(test_cases)
                 except Exception as e:
-                    logger.warning(f"Error getting test cases from subfolder {child_id}: {str(e)}")
-                
-                # Recursively process this subfolder's children
-                collect_subfolder_tests(child_id)
-        
-        # Start recursive collection if a folder ID was specified
-        if folder_id:
-            collect_subfolder_tests(folder_id)
-        
-        # Convert the test cases to a string
-        parsed_tests = self._parse_tests(all_test_cases)
-        return f"Extracted {len(all_test_cases)} tests recursively: {str(parsed_tests)}"
+                    logger.warning(f"Error getting test cases from folder {folder_id}: {str(e)}")
+            
+            # Get all folders in the project
+            all_folders = self._get_folders(project_key, "TEST_CASE", 1000)
+            
+            # Build folder hierarchy
+            folder_hierarchy = self._build_folder_hierarchy(all_folders)
+            # If a folder_id was specified, collect all its subfolders
+            if folder_id:
+                # Get all subfolders of the specified folder
+                subfolder_ids = self._collect_subfolders(folder_hierarchy, [folder_id], include_parents=False)
+                # Get test cases from all subfolders
+                if subfolder_ids:
+                    subfolder_test_cases = self._get_test_cases_from_folders(
+                        project_key, subfolder_ids, maxResults, startAt, base_params
+                    )
+                    all_test_cases.extend(subfolder_test_cases)
+            
+            # Convert the test cases to a string
+            parsed_tests = self._parse_tests(all_test_cases)
+            return f"Extracted {len(all_test_cases)} tests recursively: {str(parsed_tests)}"
+            
+        except Exception as e:
+            return ToolException(f"Error retrieving test cases recursively: {str(e)}")
 
     @staticmethod
     def _parse_tests(tests) -> list:
@@ -886,100 +1177,32 @@ class ZephyrScaleApiWrapper(BaseToolApiWrapper):
         Returns:
             A string with all test cases found in matching folders
         """
-        # Store all test cases and matching folder IDs
-        all_test_cases = []
-        matching_folder_ids = []
-        
-        # Get all folders in the project
-        all_folders = []
         try:
-            for folder in self._api.folders.get_folders(
-                maxResults=100, 
-                projectKey=project_key, 
-                folderType="TEST_CASE"
-            ):
-                all_folders.append(folder)
+            # Get all folders in the project
+            all_folders = self._get_folders(project_key, "TEST_CASE", 1000)
+            
+            # Find folders matching the name
+            matching_folder_ids = self._find_folders_by_name(all_folders, folder_name, exact_match)
+            
+            if not matching_folder_ids:
+                return f"No folders found matching name: {folder_name}"
+            
+            # If include_subfolders is True, add all subfolders
+            if include_subfolders:
+                folder_hierarchy = self._build_folder_hierarchy(all_folders)
+                matching_folder_ids = self._collect_subfolders(folder_hierarchy, matching_folder_ids)
+                print (f"Collecting subfolders for {len(matching_folder_ids)} matching folders: {matching_folder_ids}")
+            # Get test cases from all matching folders
+            all_test_cases = self._get_test_cases_from_folders(
+                project_key, matching_folder_ids, maxResults, startAt
+            )
+            
+            # Convert the test cases to a string
+            parsed_tests = self._parse_tests(all_test_cases)
+            return f"Extracted {len(all_test_cases)} tests from {len(matching_folder_ids)} folders matching '{folder_name}': {str(parsed_tests)}"
+            
         except Exception as e:
-            return ToolException(f"Error getting folders: {str(e)}")
-        
-        # Find folders matching the name
-        for folder in all_folders:
-            folder_name_val = folder.get('name', '')
-            if exact_match:
-                if folder_name_val == folder_name:
-                    matching_folder_ids.append(folder.get('id'))
-            else:
-                if folder_name.lower() in folder_name_val.lower():
-                    matching_folder_ids.append(folder.get('id'))
-        
-        if not matching_folder_ids:
-            return f"No folders found matching name: {folder_name}"
-            
-        # Build folder hierarchy if we need to include subfolders
-        folder_hierarchy = {}
-        if include_subfolders:
-            for folder in all_folders:
-                folder_id_val = folder.get('id')
-                parent_id = folder.get('parentId')
-                if folder_id_val not in folder_hierarchy:
-                    folder_hierarchy[folder_id_val] = {
-                        'folder': folder,
-                        'children': []
-                    }
-                else:
-                    folder_hierarchy[folder_id_val]['folder'] = folder
-                
-                if parent_id:
-                    if parent_id not in folder_hierarchy:
-                        folder_hierarchy[parent_id] = {
-                            'folder': None,
-                            'children': [folder_id_val]
-                        }
-                    else:
-                        folder_hierarchy[parent_id]['children'].append(folder_id_val)
-        
-        # Function to recursively collect test cases from subfolders
-        def collect_subfolder_tests(parent_folder_id, collected_folders=None):
-            if collected_folders is None:
-                collected_folders = set()
-                
-            if parent_folder_id not in folder_hierarchy or parent_folder_id in collected_folders:
-                return
-                
-            collected_folders.add(parent_folder_id)
-            
-            for child_id in folder_hierarchy[parent_folder_id].get('children', []):
-                if child_id not in collected_folders:
-                    # Add this subfolder ID to our list of folders to search
-                    matching_folder_ids.append(child_id)
-                    # Recursively process this subfolder's children
-                    collect_subfolder_tests(child_id, collected_folders)
-        
-        # Start recursive collection for each matching folder if including subfolders
-        if include_subfolders:
-            original_matching_ids = matching_folder_ids.copy()
-            for folder_id in original_matching_ids:
-                collect_subfolder_tests(folder_id)
-        
-        # Remove duplicates from matching folder IDs
-        matching_folder_ids = list(set(matching_folder_ids))
-        
-        # Get test cases from all matching folders
-        for folder_id in matching_folder_ids:
-            try:
-                folder_test_cases = self._api.test_cases.get_test_cases(
-                    projectKey=project_key,
-                    folderId=folder_id,
-                    maxResults=maxResults,
-                    startAt=startAt
-                )
-                all_test_cases.extend(folder_test_cases)
-            except Exception as e:
-                logger.warning(f"Error getting test cases from folder {folder_id}: {str(e)}")
-        
-        # Convert the test cases to a string
-        parsed_tests = self._parse_tests(all_test_cases)
-        return f"Extracted {len(all_test_cases)} tests from {len(matching_folder_ids)} folders matching '{folder_name}': {str(parsed_tests)}"
+            return ToolException(f"Error getting tests by folder name: {str(e)}")
 
     def get_tests_by_folder_path(self, project_key: str, folder_path: str, include_subfolders: Optional[bool] = True,
                                 maxResults: Optional[int] = 100, startAt: Optional[int] = 0):
@@ -995,131 +1218,106 @@ class ZephyrScaleApiWrapper(BaseToolApiWrapper):
         Returns:
             A string with all test cases found in the specified folder path
         """
-        # Store all test cases
-        all_test_cases = []
-        
-        # Get all folders in the project
-        all_folders = []
         try:
-            for folder in self._api.folders.get_folders(
-                maxResults=100, 
-                projectKey=project_key, 
-                folderType="TEST_CASE"
-            ):
-                all_folders.append(folder)
-        except Exception as e:
-            return ToolException(f"Error getting folders: {str(e)}")
-        
-        # Build folder hierarchy with paths
-        folder_hierarchy = {}
-        folder_paths = {}
-        root_folders = []
-        
-        # First pass: collect all folders and their basic relationships
-        for folder in all_folders:
-            folder_id = folder.get('id')
-            parent_id = folder.get('parentId')
+            # Get all folders in the project
+            all_folders = self._get_folders(project_key, "TEST_CASE", 1000)
             
-            if folder_id not in folder_hierarchy:
-                folder_hierarchy[folder_id] = {
-                    'folder': folder,
-                    'children': []
-                }
-            else:
-                folder_hierarchy[folder_id]['folder'] = folder
-                
-            if parent_id:
-                if parent_id not in folder_hierarchy:
-                    folder_hierarchy[parent_id] = {
-                        'folder': None,
-                        'children': [folder_id]
-                    }
-                else:
-                    folder_hierarchy[parent_id]['children'].append(folder_id)
-            else:
-                # This is a root folder
-                root_folders.append(folder_id)
-        
-        # Function to build full paths for each folder
-        def build_folder_paths(folder_id, current_path=""):
-            if folder_id not in folder_hierarchy or not folder_hierarchy[folder_id]['folder']:
-                return
-                
-            folder_name = folder_hierarchy[folder_id]['folder'].get('name', '')
-            if current_path:
-                full_path = f"{current_path}/{folder_name}"
-            else:
-                full_path = folder_name
-                
-            folder_paths[folder_id] = full_path
+            # Build folder hierarchy
+            folder_hierarchy = self._build_folder_hierarchy(all_folders)
             
-            # Process children
-            for child_id in folder_hierarchy[folder_id]['children']:
-                build_folder_paths(child_id, full_path)
-        
-        # Build paths starting from root folders
-        for root_id in root_folders:
-            build_folder_paths(root_id)
-        
-        # Find the folder matching the exact path
-        target_folder_id = None
-        for folder_id, path in folder_paths.items():
-            if path == folder_path:
-                target_folder_id = folder_id
-                break
-        
-        if not target_folder_id:
-            return f"No folder found with path: {folder_path}"
-        
-        # Get test cases from the target folder
-        try:
-            folder_test_cases = self._api.test_cases.get_test_cases(
-                projectKey=project_key,
-                folderId=target_folder_id,
-                maxResults=maxResults,
-                startAt=startAt
+            # Get folder paths
+            folder_paths, _ = self._get_folder_paths(folder_hierarchy)
+            
+            # Find the folder matching the exact path
+            target_folder_id = self._find_folder_by_path(folder_paths, folder_path)
+            
+            if not target_folder_id:
+                return f"No folder found with path: {folder_path}"
+            
+            # Get test cases from the target folder
+            folder_ids = [target_folder_id]
+            
+            # If including subfolders, add all subfolders
+            if include_subfolders:
+                folder_ids = self._collect_subfolders(folder_hierarchy, folder_ids)
+            
+            # Get test cases from all matching folders
+            all_test_cases = self._get_test_cases_from_folders(
+                project_key, folder_ids, maxResults, startAt
             )
-            all_test_cases.extend(folder_test_cases)
-        except Exception as e:
-            return ToolException(f"Error getting test cases from folder path {folder_path}: {str(e)}")
-        
-        # If including subfolders, recursively get test cases from subfolders
-        if include_subfolders:
-            # Function to recursively collect test cases from subfolders
-            def collect_subfolder_tests(parent_folder_id, collected_folders=None):
-                if collected_folders is None:
-                    collected_folders = set()
-                    
-                if parent_folder_id not in folder_hierarchy or parent_folder_id in collected_folders:
-                    return
-                    
-                collected_folders.add(parent_folder_id)
-                
-                for child_id in folder_hierarchy[parent_folder_id].get('children', []):
-                    if child_id not in collected_folders:
-                        # Get test cases from this subfolder
-                        try:
-                            subfolder_test_cases = self._api.test_cases.get_test_cases(
-                                projectKey=project_key,
-                                folderId=child_id,
-                                maxResults=maxResults,
-                                startAt=startAt
-                            )
-                            all_test_cases.extend(subfolder_test_cases)
-                        except Exception as e:
-                            logger.warning(f"Error getting test cases from subfolder {child_id}: {str(e)}")
-                        
-                        # Recursively process this subfolder's children
-                        collect_subfolder_tests(child_id, collected_folders)
             
-            # Start recursive collection from the target folder
-            collect_subfolder_tests(target_folder_id)
-        
-        # Convert the test cases to a string
-        parsed_tests = self._parse_tests(all_test_cases)
-        return f"Extracted {len(all_test_cases)} tests from folder path '{folder_path}': {str(parsed_tests)}"
-    
+            # Convert the test cases to a string
+            parsed_tests = self._parse_tests(all_test_cases)
+            return f"Extracted {len(all_test_cases)} tests from folder path '{folder_path}': {str(parsed_tests)}"
+            
+        except Exception as e:
+            return ToolException(f"Error getting tests by folder path: {str(e)}")
 
+    def update_test_steps(self, test_case_key: str, steps_updates: str) -> str:
+        """Updates specific test steps in a test case.
+        
+        Args:
+            test_case_key: The key of the test case
+            steps_updates: JSON string representing the test steps to update. Format:
+                [{
+                    "index": 0,  # Zero-based index of the step to update
+                    "description": "Updated step description",  # Optional
+                    "testData": "Updated test data",  # Optional
+                    "expectedResult": "Updated expected result"  # Optional
+                }]
+                
+        Returns:
+            A confirmation message with the update result
+        """
+        try:
+            # Get current test steps
+            current_steps = self._api.test_cases.get_test_steps(test_case_key)
+            if not current_steps:
+                return ToolException(f"No test steps found for test case: {test_case_key}")
+            
+            # Parse updates from JSON string
+            try:
+                updates = json.loads(steps_updates)
+                if not isinstance(updates, list):
+                    return ToolException("Steps updates must be a JSON array")
+            except json.JSONDecodeError as e:
+                return ToolException(f"Invalid JSON format for steps_updates: {str(e)}")
+            
+            # Apply updates to the steps
+            for update in updates:
+                if 'index' not in update:
+                    return ToolException("Each update must contain an 'index' field")
+                
+                index = update.get('index')
+                if not isinstance(index, int) or index < 0 or index >= len(current_steps):
+                    return ToolException(f"Step index {index} is out of range. Valid range: 0-{len(current_steps)-1}")
+                
+                # Get the current step
+                step = current_steps[index]
+                
+                # Only update the inline field if it exists
+                if 'inline' not in step:
+                    return ToolException(f"Step at index {index} does not have an inline field")
+                
+                # Update the fields that are provided
+                if 'description' in update:
+                    step['inline']['description'] = update['description']
+                if 'testData' in update:
+                    step['inline']['testData'] = update['testData']
+                if 'expectedResult' in update:
+                    step['inline']['expectedResult'] = update['expectedResult']
+            
+            # Update all steps back to the test case
+            update_response = self._api.test_cases.post_test_steps(
+                test_case_key,
+                'OVERWRITE',  # Use OVERWRITE mode to replace all steps
+                current_steps
+            )
+            
+            return f"Test steps updated for test case `{test_case_key}`: {len(updates)} step(s) modified"
+        except Exception as e:
+            return ToolException(f"Error updating test steps for test case {test_case_key}: {str(e)}")
+    
     def get_available_tools(self):
         return [
             {
@@ -1151,6 +1349,12 @@ class ZephyrScaleApiWrapper(BaseToolApiWrapper):
                 "description": self.add_test_steps.__doc__,
                 "args_schema": ZephyrTestStepsInputModel,
                 "ref": self.add_test_steps,
+            },
+            {
+                "name": "update_test_steps",
+                "description": self.update_test_steps.__doc__,
+                "args_schema": ZephyrUpdateTestSteps,
+                "ref": self.update_test_steps,
             },
             {
                 "name": "get_folders",
