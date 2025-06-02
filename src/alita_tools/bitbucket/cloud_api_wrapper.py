@@ -104,7 +104,7 @@ class BitbucketServerApi(BitbucketApiAbstract):
             updated_file_content = updated_file_content.replace(old, new)
 
         if file_content == updated_file_content:
-            return (
+            raise ToolException(
                 "File content was not updated because old content was not found or empty. "
                 "It may be helpful to use the read_file action to get "
                 "the current file contents."
@@ -180,7 +180,7 @@ class BitbucketCloudApi(BitbucketApiAbstract):
         }
         return self.repository.post(path='src', data=form_data, files={}, headers={'Content-Type': 'application/x-www-form-urlencoded'})
 
-    def update_file(self, file_path: str, update_query: str, branch: str) -> str:
+    def update_file(self, file_path: str, update_query: str, branch: str) -> ToolException | str:
 
         file_content = self.get_file(file_path=file_path, branch=branch)
         updated_file_content = file_content
@@ -190,7 +190,7 @@ class BitbucketCloudApi(BitbucketApiAbstract):
             updated_file_content = updated_file_content.replace(old, new)
 
         if file_content == updated_file_content:
-            return (
+            return ToolException(
                 "File content was not updated because old content was not found or empty. "
                 "It may be helpful to use the read_file action to get "
                 "the current file contents."
