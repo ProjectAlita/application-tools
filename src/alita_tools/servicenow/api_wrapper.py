@@ -18,7 +18,9 @@ getIncidents = create_model(
     category=(Optional[str], Field(description="Category of incidents to get", default=None)),
     description=(Optional[str], Field(description="Content that the incident description can have", default=None)),
     number_of_entries=(Optional[int], Field(description="Number of incidents to get", default=100)),
-    creation_date=(Optional[str], Field(description="The creation date of the incident, formated as year-month-day, example: 2018-09-16", default=None))
+    creation_date=(Optional[str], Field(description="The creation date of the incident, formated as year-month-day, example: 2018-09-16", default=None)),
+    sys_id=(Optional[str], Field(description="The sys_id of the incident", default=None)),
+    number=(Optional[str], Field(description="The incident number, e.g., INC0000001", default=None))
 )
 
 createIncident = create_model(
@@ -60,7 +62,14 @@ class ServiceNowAPIWrapper(BaseToolApiWrapper):
         cls.client = ServiceNowClient(base_url, (username, password.get_secret_value()))
         return values
 
-    def get_incidents(self, category: Optional[str] = None, description: Optional[str] = None, number_of_entries: Optional[int] = 100, creation_date: Optional[str] = None) -> ToolException | str:
+    def get_incidents(self,
+                      category: Optional[str] = None,
+                      description: Optional[str] = None,
+                      number_of_entries: Optional[int] = 100,
+                      creation_date: Optional[str] = None,
+                      sys_id: Optional[str] = None,
+                      number: Optional[str] = None,
+                      ) -> ToolException | str:
         """Retrieves all incidents from ServiceNow from a given category."""
         try:
             gr = self.client.GlideRecord('incident')
@@ -72,6 +81,10 @@ class ServiceNowAPIWrapper(BaseToolApiWrapper):
                 gr.add_query('description', 'CONTAINS', description)
             if creation_date:
                 gr.add_query('creation_date', creation_date)
+            if sys_id:
+                gr.add_query('sys_id', sys_id)
+            if number:
+                gr.add_query('number', number)
             gr.query()
             incidents = self.parse_glide_results(gr._GlideRecord__results)
             return json.dumps(incidents)
