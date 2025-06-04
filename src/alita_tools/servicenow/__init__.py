@@ -80,7 +80,7 @@ class ServiceNowToolkit(BaseToolkit):
             tools.append(BaseAction(
                 api_wrapper=servicenow_api_wrapper,
                 name=prefix + tool["name"],
-                description=f"ServiceNow: {servicenow_api_wrapper.instance_alias} " + tool["description"],
+                description=f"ServiceNow: {servicenow_api_wrapper.base_url} " + tool["description"],
                 args_schema=tool["args_schema"]
             ))
         return cls(tools=tools)
