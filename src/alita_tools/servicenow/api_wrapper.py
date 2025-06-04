@@ -49,7 +49,6 @@ updateIncident = create_model(
 )
 
 class ServiceNowAPIWrapper(BaseToolApiWrapper):
-    instance_alias: str
     base_url: str
     password: SecretStr
     username: str
