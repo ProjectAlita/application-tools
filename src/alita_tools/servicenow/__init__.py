@@ -5,7 +5,7 @@ from .api_wrapper import ServiceNowAPIWrapper
 from langchain_core.tools import BaseTool
 from ..base.tool import BaseAction
 from pydantic import create_model, BaseModel, ConfigDict, Field, SecretStr
-from ..utils import clean_string, TOOLKIT_SPLITTER, get_max_toolkit_length, parse_list
+from ..utils import clean_string, TOOLKIT_SPLITTER, get_max_toolkit_length
 
 name = "service_now"
 
@@ -32,7 +32,12 @@ class ServiceNowToolkit(BaseToolkit):
         ServiceNowToolkit.toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name,
-            base_url=(str, Field(description="ServiceNow URL", json_schema_extra={'configuration': True})),
+            base_url=(str, Field(description="ServiceNow URL", json_schema_extra={
+                        'toolkit_name': True,
+                        'max_toolkit_length': ServiceNowToolkit.toolkit_max_length,
+                        'configuration': True,
+                        'configuration_title': True
+                    })),
             username=(str, Field(description="Username", default=None, json_schema_extra={'configuration': True})),
             password=(SecretStr, Field(description="Password", default=None, json_schema_extra={'secret': True, 'configuration': True})),
             response_fields=(Optional[str], Field(description="Response fields", default=None)),
@@ -42,7 +47,7 @@ class ServiceNowToolkit(BaseToolkit):
                 'metadata': {
                     "label": "ServiceNow",
                     "icon_url": None,
-                    "hidden": True,
+                    "hidden": False,
                     "sections": {
                         "auth": {
                             "required": True,
@@ -65,7 +70,7 @@ class ServiceNowToolkit(BaseToolkit):
         if 'response_fields' in kwargs and isinstance(kwargs['response_fields'], str):
             kwargs['fields'] = [field.strip() for field in kwargs['response_fields'].split(',') if field.strip()]
         servicenow_api_wrapper = ServiceNowAPIWrapper(**kwargs)
-        prefix = clean_string(toolkit_name, ServiceNowToolkit.toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
+        prefix = clean_string(toolkit_name, cls.toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
         available_tools = servicenow_api_wrapper.get_available_tools()
         tools = []
         for tool in available_tools:
@@ -75,7 +80,7 @@ class ServiceNowToolkit(BaseToolkit):
             tools.append(BaseAction(
                 api_wrapper=servicenow_api_wrapper,
                 name=prefix + tool["name"],
-                description=f"ServiceNow: {servicenow_api_wrapper.instance_alias}" + tool["description"],
+                description=f"ServiceNow: {servicenow_api_wrapper.instance_alias} " + tool["description"],
                 args_schema=tool["args_schema"]
             ))
         return cls(tools=tools)

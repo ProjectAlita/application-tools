@@ -1,48 +1,49 @@
 import logging
 
 import json
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from pydantic import Field, model_validator, create_model, SecretStr
 from pysnc import ServiceNowClient
 from pysnc.record import GlideElement, GlideRecord
 
 from langchain_core.tools import ToolException
-
 from ..elitea_base import BaseToolApiWrapper
 
 logger = logging.getLogger(__name__)
 
 getIncidents = create_model(
     "getIncidents",
-    data=(str, Field(
+    data=(Optional[Dict[str, Any]], Field(
         description=(
-            "JSON string containing optional filters to retrieve incidents. "
-            "Accepted keys: category, description, number_of_entries (int), "
+            "A dictionary containing filters to retrieve incidents. Can be empty to retrieve all incidents. "
+            "Possible keys include: category, description, number_of_entries (int), "
             "creation_date (YYYY-MM-DD), sys_id, number"
-        )
+        ),
+        default={},
+        examples=[{"description": "Network issue", "category": "network"}]
     ))
 )
 
 createIncident = create_model(
     "createIncident",
-    data=(str, Field(
+    data=(Optional[Dict[str, Any]], Field(
         description=(
-            "JSON string containing the incident fields to create. "
-            "Fields may include: category, description, short_description, "
-            "impact, incident_state, urgency, assignment_group"
-        )
+            "The dictionary of fields used to create an incident. Can be empty to create a default incident."
+            "Possible fields include: category, description, short_description, impact, incident_state, urgency, "
+            "and assignment_group."
+        ),
+        default={}
     ))
 )
 
 updateIncident = create_model(
     "updateIncident",
     sys_id=(str, Field(description="Sys ID of the incident")),
-    data=(str, Field(
+    data=(Dict[str, Any], Field(
         description=(
-            "JSON string containing the incident fields to update. "
-            "Fields may include: category, description, short_description, "
-            "impact, incident_state, urgency, assignment_group"
+            "A dictionary containing the incident fields to update. Possible fields include: category, description, "
+            "short_description, impact, incident_state, urgency, and assignment_group."
         )
     ))
 )
@@ -63,23 +64,20 @@ class ServiceNowAPIWrapper(BaseToolApiWrapper):
         cls.client = ServiceNowClient(base_url, (username, password.get_secret_value()))
         return values
 
-    def get_incidents(self, data: str) -> ToolException | str:
-        """Retrieves all incidents from ServiceNow from a given category."""
+    def get_incidents(self, data: Optional[Dict[str, Any]] = None) -> ToolException | str:
+        """Retrieves incidents from the ServiceNow database based on the provided filters."""
+
         try:
-            params = json.loads(data)
+            data = data or {}
             gr = self.client.GlideRecord('incident')
-            gr.limit = params.get('number_of_entries', 100)
+            gr.limit = data.get('number_of_entries', 100)
             gr.fields = self.fields
-            if 'category' in params and params['category']:
-                gr.add_query('category', params['category'])
-            if 'description' in params and params['description']:
-                gr.add_query('description', 'CONTAINS', params['description'])
-            if 'creation_date' in params and params['creation_date']:
-                gr.add_query('creation_date', params['creation_date'])
-            if 'sys_id' in params and params['sys_id']:
-                gr.add_query('sys_id', params['sys_id'])
-            if 'number' in params and params['number']:
-                gr.add_query('number', params['number'])
+            for filter, value in data.items():
+                if value is not None:
+                    if filter == 'description':
+                        gr.add_query('description', 'CONTAINS', value)
+                    else:
+                        gr.add_query(filter, value)
             gr.query()
             incidents = self.parse_glide_results(gr._GlideRecord__results)
             return json.dumps(incidents)
@@ -94,13 +92,12 @@ class ServiceNowAPIWrapper(BaseToolApiWrapper):
             parsed.append(parsed_item)
         return parsed
 
-    def create_incident(self, data: str) -> ToolException | str:
+    def create_incident(self, data: Optional[Dict[str, str]] = {}) -> ToolException | str:
         """Creates a new incident on the ServiceNow database."""
         try:
-            parsed_data = json.loads(data)
             gr = self.client.GlideRecord('incident')
             gr.initialize()
-            self.update_record(gr, parsed_data)
+            self._update_record(gr, data)
 
             gr.insert()
             incidents = self.parse_glide_results(gr._GlideRecord__results)
@@ -108,21 +105,20 @@ class ServiceNowAPIWrapper(BaseToolApiWrapper):
         except Exception as e:
             return ToolException(f"ServiceNow tool exception. {e}")
 
-    def update_incident(self, sys_id: str, data: str) -> ToolException | str:
+    def update_incident(self, sys_id: str, data: Optional[Dict[str, Any]] = {}) -> ToolException | str:
         """Updates an existing incident on the ServiceNow database."""
         try:
-            parsed_data = json.loads(data)
             gr = self.client.GlideRecord('incident')
             if not gr.get(sys_id):
                 return ToolException(f"Incident with sys_id '{sys_id}' not found")
-            self.update_record(gr, parsed_data)
+            self._update_record(gr, data)
             gr.update()
             incidents = self.parse_glide_results(gr._GlideRecord__results)
             return json.dumps(incidents)
         except Exception as e:
             return ToolException(f"ServiceNow tool exception. {e}")
 
-    def update_record(self, gr: GlideRecord, data: dict):
+    def _update_record(self, gr: GlideRecord, data: dict):
         allowed_fields = ['category', 'description', 'short_description',
                           'impact', 'incident_state', 'urgency', 'assignment_group']
         for field in allowed_fields:
