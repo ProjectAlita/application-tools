@@ -5,7 +5,7 @@ from typing import Optional
 
 from pydantic import Field, model_validator, create_model, SecretStr
 from pysnc import ServiceNowClient
-from pysnc.record import GlideElement
+from pysnc.record import GlideElement, GlideRecord
 
 from langchain_core.tools import ToolException
 
@@ -15,35 +15,36 @@ logger = logging.getLogger(__name__)
 
 getIncidents = create_model(
     "getIncidents",
-    category=(Optional[str], Field(description="Category of incidents to get", default=None)),
-    description=(Optional[str], Field(description="Content that the incident description can have", default=None)),
-    number_of_entries=(Optional[int], Field(description="Number of incidents to get", default=100)),
-    creation_date=(Optional[str], Field(description="The creation date of the incident, formated as year-month-day, example: 2018-09-16", default=None)),
-    sys_id=(Optional[str], Field(description="The sys_id of the incident", default=None)),
-    number=(Optional[str], Field(description="The incident number, e.g., INC0000001", default=None))
+    data=(str, Field(
+        description=(
+            "JSON string containing optional filters to retrieve incidents. "
+            "Accepted keys: category, description, number_of_entries (int), "
+            "creation_date (YYYY-MM-DD), sys_id, number"
+        )
+    ))
 )
 
 createIncident = create_model(
     "createIncident",
-    category=(Optional[str], Field(description="Category of incidents to create", default=None)),
-    description=(Optional[str], Field(description="Detailed description of the incident", default=None)),
-    short_description=(Optional[str], Field(description="Short description of the incident", default=None)),
-    impact=(Optional[int], Field(description="Impact of the incident, measured in numbers starting from 0 indicating no operation impact and a value given by the user indicating a total service interruption", default=None)),
-    incident_state=(Optional[int], Field(description="State of the incident, measured in numbers. Plain numbers are used to track the current state", default=None)),
-    urgency=(Optional[int], Field(description="Urgency of the incident, measured in numbers starting from 0 indicating no urgency at all up to a value given by the user indicating maximum urgency", default=None)),
-    assignment_group=(Optional[str], Field(description="Assignment group of the incident", default=None))
+    data=(str, Field(
+        description=(
+            "JSON string containing the incident fields to create. "
+            "Fields may include: category, description, short_description, "
+            "impact, incident_state, urgency, assignment_group"
+        )
+    ))
 )
 
 updateIncident = create_model(
     "updateIncident",
     sys_id=(str, Field(description="Sys ID of the incident")),
-    category=(Optional[str], Field(description="New category to assign to the incident, if requested", default=None)),
-    description=(Optional[str], Field(description="New detailed description to assign to the incident, if requested", default=None)),
-    short_description=(Optional[str], Field(description="New short description to assign to the incident, if requested", default=None)),
-    impact=(Optional[int], Field(description="New impact to assign to the incident, if requested. Measured in numbers starting from 0 indicating no urgency at all up to a value given by the user indicating maximum urgency", default=None)),
-    incident_state=(Optional[int], Field(description="New state of the incident, if requested. Measured in numbers. Plain numbers are used to track the current state", default=None)),
-    urgency=(Optional[int], Field(description="New urgency to assign to the incident, if requested. Measured in numbers starting from 0 indicating no urgency at all up to a value given by the user indicating maximum urgency", default=None)),
-    assignment_group=(Optional[str], Field(description="New assignment group to assign to the incident, if requested", default=None))
+    data=(str, Field(
+        description=(
+            "JSON string containing the incident fields to update. "
+            "Fields may include: category, description, short_description, "
+            "impact, incident_state, urgency, assignment_group"
+        )
+    ))
 )
 
 class ServiceNowAPIWrapper(BaseToolApiWrapper):
@@ -62,29 +63,23 @@ class ServiceNowAPIWrapper(BaseToolApiWrapper):
         cls.client = ServiceNowClient(base_url, (username, password.get_secret_value()))
         return values
 
-    def get_incidents(self,
-                      category: Optional[str] = None,
-                      description: Optional[str] = None,
-                      number_of_entries: Optional[int] = 100,
-                      creation_date: Optional[str] = None,
-                      sys_id: Optional[str] = None,
-                      number: Optional[str] = None,
-                      ) -> ToolException | str:
+    def get_incidents(self, data: str) -> ToolException | str:
         """Retrieves all incidents from ServiceNow from a given category."""
         try:
+            params = json.loads(data)
             gr = self.client.GlideRecord('incident')
-            gr.limit = number_of_entries
+            gr.limit = params.get('number_of_entries', 100)
             gr.fields = self.fields
-            if category:
-                gr.add_query('category', category)
-            if description:
-                gr.add_query('description', 'CONTAINS', description)
-            if creation_date:
-                gr.add_query('creation_date', creation_date)
-            if sys_id:
-                gr.add_query('sys_id', sys_id)
-            if number:
-                gr.add_query('number', number)
+            if 'category' in params and params['category']:
+                gr.add_query('category', params['category'])
+            if 'description' in params and params['description']:
+                gr.add_query('description', 'CONTAINS', params['description'])
+            if 'creation_date' in params and params['creation_date']:
+                gr.add_query('creation_date', params['creation_date'])
+            if 'sys_id' in params and params['sys_id']:
+                gr.add_query('sys_id', params['sys_id'])
+            if 'number' in params and params['number']:
+                gr.add_query('number', params['number'])
             gr.query()
             incidents = self.parse_glide_results(gr._GlideRecord__results)
             return json.dumps(incidents)
@@ -99,31 +94,13 @@ class ServiceNowAPIWrapper(BaseToolApiWrapper):
             parsed.append(parsed_item)
         return parsed
 
-    def create_incident(self, category: Optional[str] = None,
-                        description: Optional[str] = None,
-                        short_description: Optional[str] = None,
-                        impact: Optional[int] = None,
-                        incident_state: Optional[int] = None,
-                        urgency: Optional[int] = None,
-                        assignment_group: Optional[str] = None) -> ToolException | str:
+    def create_incident(self, data: str) -> ToolException | str:
         """Creates a new incident on the ServiceNow database."""
         try:
+            parsed_data = json.loads(data)
             gr = self.client.GlideRecord('incident')
             gr.initialize()
-            if category is not None:
-                gr.category = category
-            if description is not None:
-                gr.description = description
-            if short_description is not None:
-                gr.short_description = short_description
-            if impact is not None:
-                gr.impact = impact
-            if incident_state is not None:
-                gr.incident_state = incident_state
-            if urgency is not None:
-                gr.urgency = urgency
-            if assignment_group is not None:
-                gr.assignment_group = assignment_group
+            self.update_record(gr, parsed_data)
 
             gr.insert()
             incidents = self.parse_glide_results(gr._GlideRecord__results)
@@ -131,40 +108,26 @@ class ServiceNowAPIWrapper(BaseToolApiWrapper):
         except Exception as e:
             return ToolException(f"ServiceNow tool exception. {e}")
 
-    def update_incident(self, sys_id: str,
-                        category: Optional[str] = None,
-                        description: Optional[str] = None,
-                        short_description: Optional[str] = None,
-                        impact: Optional[int] = None,
-                        incident_state: Optional[int] = None,
-                        urgency: Optional[int] = None,
-                        assignment_group: Optional[str] = None) -> ToolException | str:
+    def update_incident(self, sys_id: str, data: str) -> ToolException | str:
         """Updates an existing incident on the ServiceNow database."""
         try:
+            parsed_data = json.loads(data)
             gr = self.client.GlideRecord('incident')
             if not gr.get(sys_id):
                 return ToolException(f"Incident with sys_id '{sys_id}' not found")
-
-            if category is not None:
-                gr.category = category
-            if description is not None:
-                gr.description = description
-            if short_description is not None:
-                gr.short_description = short_description
-            if impact is not None:
-                gr.impact = impact
-            if incident_state is not None:
-                gr.incident_state = incident_state
-            if urgency is not None:
-                gr.urgency = urgency
-            if assignment_group is not None:
-                gr.assignment_group = assignment_group
-
+            self.update_record(gr, parsed_data)
             gr.update()
             incidents = self.parse_glide_results(gr._GlideRecord__results)
             return json.dumps(incidents)
         except Exception as e:
             return ToolException(f"ServiceNow tool exception. {e}")
+
+    def update_record(self, gr: GlideRecord, data: dict):
+        allowed_fields = ['category', 'description', 'short_description',
+                          'impact', 'incident_state', 'urgency', 'assignment_group']
+        for field in allowed_fields:
+            if field in data and data[field] is not None:
+                setattr(gr, field, data[field])
 
     def get_available_tools(self):
         return [
