@@ -68,7 +68,7 @@ class ServiceNowToolkit(BaseToolkit):
         if selected_tools is None:
             selected_tools = []
         if 'response_fields' in kwargs and isinstance(kwargs['response_fields'], str):
-            kwargs['fields'] = [field.strip() for field in kwargs['response_fields'].split(',') if field.strip()]
+            kwargs['fields'] = [field.strip().lower() for field in kwargs['response_fields'].split(',') if field.strip()]
         servicenow_api_wrapper = ServiceNowAPIWrapper(**kwargs)
         prefix = clean_string(toolkit_name, cls.toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
         available_tools = servicenow_api_wrapper.get_available_tools()
