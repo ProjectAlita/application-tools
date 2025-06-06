@@ -75,7 +75,7 @@ def log_action(action: str, details: dict = None):
     """
     logger = logging.getLogger(__name__)
     log_message = action
-    if details:
+    if details is not None:  # Check for None instead of truthiness to handle empty dicts
         log_message += f": {json.dumps(details, indent=2)}"
     logger.info(log_message)
 
@@ -130,3 +130,4 @@ def calculate_thresholds(results, report_percentile, thresholds):
                         "value": results['requests'][req][report_percentile],
                         "threshold": rt_threshold, "status": "PASSED", "metric": "ms"})
     return data
+

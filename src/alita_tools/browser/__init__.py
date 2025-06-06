@@ -75,7 +75,8 @@ class BrowserToolkit(BaseToolkit):
                 'google',
                 'wiki']
         for tool in selected_tools:
-
+            tool_entry = None  # Initialize tool_entry to None for each iteration
+            
             if tool == 'single_url_crawler':
                 tool_entry = SingleURLCrawler()
             elif tool == 'multi_url_crawler':
@@ -100,8 +101,10 @@ class BrowserToolkit(BaseToolkit):
                 # rename the tool to avoid conflicts
                 tool_entry.name = "wiki"
 
-            tool_entry.name = f"{prefix}{tool_entry.name}"
-            tools.append(tool_entry)
+            # Only add the tool if it was successfully created
+            if tool_entry is not None:
+                tool_entry.name = f"{prefix}{tool_entry.name}"
+                tools.append(tool_entry)
         return cls(tools=tools)
 
     def get_tools(self):

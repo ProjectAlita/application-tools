@@ -54,11 +54,16 @@ class TestIOApiWrapper(BaseToolApiWrapper):
     @model_validator(mode='before')
     @classmethod
     def validate_toolkit(cls, values):
-        values['endpoint'] = values.get('endpoint').rstrip('/')
-        values['headers'] = {
-            "Accept": "application/json",
-            "Authorization": f"Bearer {values['api_key']}",
-        }
+        endpoint = values.get('endpoint')
+        if endpoint is not None:
+            values['endpoint'] = endpoint.rstrip('/')
+
+        api_key = values.get('api_key')
+        if api_key is not None:
+            values['headers'] = {
+                "Accept": "application/json",
+                "Authorization": f"Bearer {api_key.get_secret_value()}",
+            }
         return values
 
     def _handle_response(self, response: requests.Response):
@@ -81,7 +86,7 @@ class TestIOApiWrapper(BaseToolApiWrapper):
         if client_fields:
             return self.filter_fields(data, client_fields)
         return data
-        
+
 
     def get_test_cases_statuses_for_test(
         self,

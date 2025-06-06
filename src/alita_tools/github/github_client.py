@@ -855,17 +855,18 @@ class GitHubClient(BaseModel):
             from traceback import format_exc
             return f"File not found `{file_path}` on branch `{branch}`. Error: {str(e)}"
 
-    def read_file(self, file_path: str, repo_name: Optional[str] = None) -> str:
+    def read_file(self, file_path: str, branch: Optional[str] = None, repo_name: Optional[str] = None) -> str:
         """
         Read a file from the active branch
         Parameters:
             file_path(str): the file path
+            branch (Optional[str]): The branch to read the file from. Defaults to the active branch.
             repo_name (Optional[str]): Name of the repository in format 'owner/repo'
-            
+
         Returns:
             str: The file contents as a string
         """
-        return self._read_file(file_path, self.active_branch, repo_name)
+        return self._read_file(file_path, branch if branch else self.active_branch, repo_name)
 
     def loader(self,
                branch: Optional[str] = None,

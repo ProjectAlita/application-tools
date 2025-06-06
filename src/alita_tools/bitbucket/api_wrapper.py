@@ -125,7 +125,7 @@ class BitbucketAPIWrapper(BaseCodeToolApiWrapper):
         except Exception as e:
             return ToolException(f"File was not created due to error: {str(e)}")
 
-    def update_file(self, file_path: str, update_query: str, branch: str) -> str:
+    def update_file(self, file_path: str, update_query: str, branch: str) -> ToolException | str:
         """
         Updates file on the bitbucket repo
         Parameters:
@@ -145,8 +145,8 @@ class BitbucketAPIWrapper(BaseCodeToolApiWrapper):
             str: A success or failure message
         """
         try:
-            self._bitbucket.update_file(file_path=file_path, update_query=update_query, branch=branch)
-            return f"File has been updated: {file_path}."
+            result = self._bitbucket.update_file(file_path=file_path, update_query=update_query, branch=branch)
+            return result if isinstance(result, ToolException) else f"File has been updated: {file_path}."
         except Exception as e:
             return ToolException(f"File was not updated due to error: {str(e)}")
 

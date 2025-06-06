@@ -1,72 +1,128 @@
 import logging
-import requests
-import json
-import traceback
-from typing import Optional, List, Any, Dict
-from json import JSONDecodeError
 
-from office365.directory.security.incidents.incident import Incident
-# TODO: Need to implement a validator that makes sense for ServiceNow, keeping the import for the time being.
-from pydantic import Field, PrivateAttr, model_validator, create_model, SecretStr
-# TODO: Need to implement retry and wait times.
-from tenacity import retry, stop_after_attempt, wait_exponential, before_sleep_log
+import json
+from typing import Optional, Dict, Any
+
+from pydantic import Field, model_validator, create_model, SecretStr
+from pysnc import ServiceNowClient
+from pysnc.record import GlideElement, GlideRecord
 
 from langchain_core.tools import ToolException
-
 from ..elitea_base import BaseToolApiWrapper
-from ..llm.img_utils import ImageDescriptionCache
-from .servicenow_client import ServiceNowClient
 
 logger = logging.getLogger(__name__)
 
 getIncidents = create_model(
     "getIncidents",
-    category=(Optional[str], Field(description="Category of incidents to get")),
-    description=(Optional[str], Field(description="Content that the incident description can have")),
-    number_of_entries=(Optional[int], Field(description="Number of incidents to get"))
+    data=(Optional[Dict[str, Any]], Field(
+        description=(
+            "A dictionary containing filters to retrieve incidents. Can be empty to retrieve all incidents. "
+            "Possible keys include: category, description, number_of_entries (int), "
+            "creation_date (YYYY-MM-DD), sys_id, number"
+        ),
+        default={},
+        examples=[{"description": "Network issue", "category": "network"}]
+    ))
 )
 
-def parse_payload_params(params: Optional[str]) -> Dict[str, Any]:
-    if params:
-        try:
-            return json.loads(params)
-        except JSONDecodeError:
-            stacktrace = traceback.format_exc()
-            return ToolException(f"ServiceNow tool exception. Passed params are not valid JSON. {stacktrace}")
-    return {}
+createIncident = create_model(
+    "createIncident",
+    data=(Optional[Dict[str, Any]], Field(
+        description=(
+            "The dictionary of fields used to create an incident. Can be empty to create a default incident."
+            "Possible fields include: category, description, short_description, impact, incident_state, urgency, "
+            "and assignment_group."
+        ),
+        default={}
+    ))
+)
+
+updateIncident = create_model(
+    "updateIncident",
+    sys_id=(str, Field(description="Sys ID of the incident")),
+    data=(Dict[str, Any], Field(
+        description=(
+            "A dictionary containing the incident fields to update. Possible fields include: category, description, "
+            "short_description, impact, incident_state, urgency, and assignment_group."
+        )
+    ))
+)
 
 class ServiceNowAPIWrapper(BaseToolApiWrapper):
-    # Changed from PrivateAttr to Optional field with exclude=True
-    client: Optional[Any] = Field(default=None, exclude=True)
-    instance_alias: str
     base_url: str
-    password: Optional[SecretStr] = None
-    username: Optional[str] = None
-    limit: Optional[int] = None
-    labels: Optional[List[str]] = []
-    max_pages: Optional[int] = None
-    number_of_retries: Optional[int] = None
-    min_retry_seconds: Optional[int] = None
-    max_retry_seconds: Optional[int] = None
-    llm: Any = None
-    _image_cache: ImageDescriptionCache = PrivateAttr(default_factory=ImageDescriptionCache)
+    password: SecretStr
+    username: str
 
     @model_validator(mode='before')
     @classmethod
     def validate_toolkit(cls, values):
         base_url = values['base_url']
-        password = SecretStr(values.get('password'))
-        username = values.get('username')
-        values['client'] = ServiceNowClient(base_url=base_url, username=username, password=password)
+        password = SecretStr(values['password'])
+        username = values['username']
+        cls.fields = values.get('fields', ['sys_id', 'number', 'state', 'short_description', 'description', 'priority', 'category', 'urgency', 'impact', 'creation_date'])
+        cls.client = ServiceNowClient(base_url, (username, password.get_secret_value()))
         return values
 
-    def get_incidents(self, category: Optional[str] = None, description: Optional[str] = None, number_of_entries: Optional[int] = None) -> str:
-        """Retrieves all incidents from ServiceNow from a given category."""
+    def get_incidents(self, data: Optional[Dict[str, Any]] = None) -> ToolException | str:
+        """Retrieves incidents from the ServiceNow database based on the provided filters."""
+
         try:
-            response = self.client.get_incidents(category=category, description=description, number_of_entries=number_of_entries)
-        except requests.exceptions.RequestException as e:
-            raise ToolException(f"ServiceNow tool exception. {e}")
-        return response.json()
+            data = data or {}
+            gr = self.client.GlideRecord('incident')
+            gr.limit = data.get('number_of_entries', 100)
+            gr.fields = self.fields
+            for filter, value in data.items():
+                if value is not None:
+                    if filter == 'description':
+                        gr.add_query('description', 'CONTAINS', value)
+                    else:
+                        gr.add_query(filter, value)
+            gr.query()
+            incidents = self.parse_glide_results(gr._GlideRecord__results)
+            return json.dumps(incidents)
+        except Exception as e:
+            return ToolException(f"ServiceNow tool exception. {e}")
+
+    def parse_glide_results(self, results):
+        parsed = []
+        for item in results:
+            parsed_item = {k: (v.get_value() if isinstance(v, GlideElement) else v)
+                           for k, v in item.items()}
+            parsed.append(parsed_item)
+        return parsed
+
+    def create_incident(self, data: Optional[Dict[str, str]] = {}) -> ToolException | str:
+        """Creates a new incident on the ServiceNow database."""
+        try:
+            gr = self.client.GlideRecord('incident')
+            gr.initialize()
+            self._update_record(gr, data)
+
+            gr.insert()
+            incidents = self.parse_glide_results(gr._GlideRecord__results)
+            return json.dumps(incidents)
+        except Exception as e:
+            return ToolException(f"ServiceNow tool exception. {e}")
+
+    def update_incident(self, sys_id: str, data: Optional[Dict[str, Any]] = {}) -> ToolException | str:
+        """Updates an existing incident on the ServiceNow database."""
+        try:
+            gr = self.client.GlideRecord('incident')
+            if not gr.get(sys_id):
+                return ToolException(f"Incident with sys_id '{sys_id}' not found")
+            self._update_record(gr, data)
+            gr.update()
+            incidents = self.parse_glide_results(gr._GlideRecord__results)
+            return json.dumps(incidents)
+        except Exception as e:
+            return ToolException(f"ServiceNow tool exception. {e}")
+
+    def _update_record(self, gr: GlideRecord, data: dict):
+        allowed_fields = ['category', 'description', 'short_description',
+                          'impact', 'incident_state', 'urgency', 'assignment_group']
+        for field in allowed_fields:
+            if field in data and data[field] is not None:
+                setattr(gr, field, data[field])
 
     def get_available_tools(self):
         return [
@@ -75,5 +131,17 @@ class ServiceNowAPIWrapper(BaseToolApiWrapper):
                 "ref": self.get_incidents,
                 "description": self.get_incidents.__doc__,
                 "args_schema": getIncidents,
+            },
+            {
+                "name": "create_incident",
+                "ref": self.create_incident,
+                "description": self.create_incident.__doc__,
+                "args_schema": createIncident,
+            },
+            {
+                "name": "update_incident",
+                "ref": self.update_incident,
+                "description": self.update_incident.__doc__,
+                "args_schema": updateIncident,
             }
         ]

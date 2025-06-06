@@ -61,7 +61,7 @@ def get_tools(tools_list, alita: 'AlitaClient', llm: 'LLMLikeObject', *args, **k
             tools.extend(get_jira(tool))
         elif tool['type'] == 'confluence':
             tools.extend(get_confluence(tool))
-        elif tool['type'] == 'servicenow':
+        elif tool['type'] == 'service_now':
             tools.extend(get_service_now(tool))
         elif tool['type'] == 'gitlab':
             tools.extend(get_gitlab(tool))

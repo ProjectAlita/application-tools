@@ -97,6 +97,13 @@ getPageTree = create_model(
     page_id=(str, Field(description="Page id")),
 )
 
+getPageIdByTitleInput= create_model(
+    "getPageIdByTitleInput",
+    title=(str, Field(description="Page title")),
+    type=(Optional[str], Field(description="Jira type of content: Page or Blogpost. Defaults to page", default="page")),
+
+)
+
 pageExists = create_model(
     "pageExists",
     title=(str, Field(description="Title of the page")),
@@ -520,14 +527,20 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
             yield self.process_page(page, skip_images)
 
     def read_page_by_id(self, page_id: str, skip_images: bool = False):
-        """Reads a page by its id in the Confluence space."""
-
+        """Reads a page by its id in the Confluence space. If id is not available, but there is a title - use get_page_id first."""
         result = list(self.get_pages_by_id([page_id], skip_images))
         if not result:
             "Page not found"
         return result[0].page_content
         # return self._strip_base64_images(result[0].page_content) if skip_images else result[0].page_content
-
+    def get_page_id_by_title(self, title: str, type: str = "page"):
+        """
+        Provide page id from search result by title.
+        :param title: title
+        :param type: type of content: page or blogpost. Defaults to page
+        """
+        return self.client.get_page_id(space=self.space, title=title, type=type)
+    
     def _strip_base64_images(self, content):
         base64_md_pattern = r'data:image/(png|jpeg|gif);base64,[a-zA-Z0-9+/=]+'
         return re.sub(base64_md_pattern, "[Image Removed]", content)
@@ -1414,5 +1427,11 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
                 "ref": self.loader,
                 "description": self.loader.__doc__,
                 "args_schema": loaderParams,
+            },
+            {
+                "name": "get_page_id_by_title",
+                "ref": self.get_page_id_by_title,
+                "description": self.get_page_id_by_title.__doc__,
+                "args_schema": getPageIdByTitleInput,
             }
         ]

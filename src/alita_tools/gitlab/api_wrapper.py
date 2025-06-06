@@ -60,7 +60,6 @@ class GitLabAPIWrapper(BaseModel):
         """Set the active branch for the bot."""
         self._active_branch = branch
         self._repo_instance.default_branch = branch
-        self._repo_instance.save()
         return f"Active branch set to {branch}"
 
 
@@ -71,21 +70,21 @@ class GitLabAPIWrapper(BaseModel):
 
     def list_files(self, path: str = None, recursive: bool = True, branch: str = None) -> List[str]:
         """List files by defined path."""
-        self.set_active_branch(branch)
+        branch = branch if branch else self._active_branch
         files = self._get_all_files(path, recursive, branch)
         paths = [file['path'] for file in files if file['type'] == 'blob']
         return f"Files: {paths}"
 
     def list_folders(self, path: str = None, recursive: bool = True, branch: str = None) -> List[str]:
         """List folders by defined path."""
-        self.set_active_branch(branch)
+        branch = branch if branch else self._active_branch
         files = self._get_all_files(path, recursive, branch)
         paths = [file['path'] for file in files if file['type'] == 'tree']
         return f"Folders: {paths}"
 
     def _get_all_files(self, path: str = None, recursive: bool = True, branch: str = None):
-        self.set_active_branch(branch)
-        return self._repo_instance.repository_tree(path=path, ref=branch if branch else self._active_branch,
+        branch = branch if branch else self._active_branch
+        return self._repo_instance.repository_tree(path=path, ref=branch,
                                                     recursive=recursive, all=True)
 
     def create_branch(self, branch_name: str) -> None:
