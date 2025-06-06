@@ -57,11 +57,23 @@ class CarrierAPIWrapper(BaseModel):
     def fetch_test_data(self, start_time: str) -> List[Dict[str, Any]]:
         return self._client.fetch_test_data(start_time)
 
-    def fetch_audit_logs(self, auditable_ids: List[int], days: int = 5) -> List[Dict[str, Any]]:
-        return self._client.fetch_audit_logs(auditable_ids, days)
+    def get_reports_list(self) -> List[Dict[str, Any]]:
+        return self._client.get_reports_list()
+
+    def get_tests_list(self) -> List[Dict[str, Any]]:
+        return self._client.get_tests_list()
+
+    def run_test(self, test_id: str, json_body):
+        return self._client.run_test(test_id, json_body)
+
+    def get_engagements_list(self) -> List[Dict[str, Any]]:
+        return self._client.get_engagements_list()
 
     def download_and_unzip_reports(self, file_name: str, bucket: str, extract_to: str = "/tmp") -> str:
         return self._client.download_and_unzip_reports(file_name, bucket, extract_to)
 
-    def get_report_file_name(self, report_id: str, extract_to: str = "/tmp") -> Optional[str]:
+    def get_report_file_name(self, report_id: str, extract_to: str = "/tmp"):
         return self._client.get_report_file_name(report_id, extract_to)
+
+    def upload_excel_report(self, bucket_name: str, excel_report_name: str):
+        return self._client.upload_excel_report(bucket_name, excel_report_name)

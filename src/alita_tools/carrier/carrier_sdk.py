@@ -1,8 +1,7 @@
 import json
 import logging
 import requests
-from typing import Any, Dict, List, Optional
-from datetime import datetime, timedelta
+from typing import Any, Dict, List
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger("carrier_sdk")
@@ -53,10 +52,6 @@ class CarrierClient(BaseModel):
             logger.error(f"Response was not valid JSON. Body:\n{response.text[:500]}")
             raise CarrierAPIError("Server returned non-JSON response")
 
-    def fetch_test_data(self, start_time: str) -> List[Dict[str, Any]]:
-        endpoint = f"api/v1/test-data?start_time={start_time}"
-        return self.request('get', endpoint)
-
     def create_ticket(self, ticket_data: Dict[str, Any]) -> Dict[str, Any]:
         endpoint = f"api/v1/issues/issues/{self.credentials.project_id}"
         logger.info(f"ENDPOINT: {endpoint}")
@@ -76,25 +71,21 @@ class CarrierClient(BaseModel):
         endpoint = f"api/v1/issues/issues/{self.credentials.project_id}?board_id={board_id}&limit=100"
         return self.request('get', endpoint).get("rows", [])
 
-    def fetch_audit_logs(self, auditable_ids: List[int], days: int = 5) -> List[Dict[str, Any]]:
-        recent_logs = []
-        end_date = datetime.now()
-        start_date = end_date - timedelta(days=days)
+    def get_reports_list(self) -> List[Dict[str, Any]]:
+        endpoint = f"api/v1/backend_performance/reports/{self.credentials.project_id}"
+        return self.request('get', endpoint).get("rows", [])
 
-        for auditable_id in auditable_ids:
-            params = {
-                "auditable_type": "Issue",
-                "auditable_id": auditable_id,
-                "offset": 0,
-                "limit": 100
-            }
-            endpoint = f"api/v1/audit_logs/logs/{self.credentials.project_id}"
-            logs = self.request('get', endpoint, params=params).get("rows", [])
-            recent_logs.extend(
-                [log for log in logs if datetime.strptime(log["created_at"], "%Y-%m-%dT%H:%M:%S.%f") >= start_date]
-            )
+    def get_tests_list(self) -> List[Dict[str, Any]]:
+        endpoint = f"api/v1/backend_performance/tests/{self.credentials.project_id}"
+        return self.request('get', endpoint).get("rows", [])
 
-        return recent_logs
+    def run_test(self, test_id: str, json_body):
+        endpoint = f"api/v1/backend_performance/test/{self.credentials.project_id}/{test_id}"
+        return self.request('post', endpoint, json=json_body).get("result_id", "")
+
+    def get_engagements_list(self) -> List[Dict[str, Any]]:
+        endpoint = f"api/v1/engagements/engagements/{self.credentials.project_id}"
+        return self.request('get', endpoint).get("items", [])
 
     def download_and_unzip_reports(self, file_name: str, bucket: str, extract_to: str = "/tmp") -> str:
         endpoint = f"api/v1/artifacts/artifact/{self.credentials.project_id}/{bucket}/{file_name}"
@@ -103,13 +94,22 @@ class CarrierClient(BaseModel):
         with open(local_file_path, 'wb') as f:
             f.write(response.content)
 
+        extract_dir = f"{local_file_path.replace('.zip', '')}"
+        import shutil
+        try:
+            shutil.rmtree(extract_dir)
+        except Exception as e:
+            print(e)
         import zipfile
         with zipfile.ZipFile(local_file_path, 'r') as zip_ref:
-            zip_ref.extractall(extract_to)
+            zip_ref.extractall(extract_dir)
+        import os
+        if os.path.exists(local_file_path):
+            os.remove(local_file_path)
 
-        return local_file_path
+        return extract_dir
 
-    def get_report_file_name(self, report_id: str, extract_to: str = "/tmp") -> Optional[str]:
+    def get_report_file_name(self, report_id: str, extract_to: str = "/tmp"):
         endpoint = f"api/v1/backend_performance/reports/{self.credentials.project_id}?report_id={report_id}"
         report_info = self.request('get', endpoint)
         bucket_name = report_info["name"].replace("_", "").replace(" ", "").lower()
@@ -121,6 +121,15 @@ class CarrierClient(BaseModel):
 
         for file_name in file_list:
             if file_name.startswith(report_archive_prefix):
-                return self.download_and_unzip_reports(file_name, bucket_name, extract_to)
+                return report_info, self.download_and_unzip_reports(file_name, bucket_name, extract_to)
 
-        return None
+        return report_info, None
+
+    def upload_excel_report(self, bucket_name: str, excel_report_name: str):
+        upload_url = f'api/v1/artifacts/artifacts/{self.credentials.project_id}/{bucket_name}'
+        full_url = f"{self.credentials.url.rstrip('/')}/{upload_url.lstrip('/')}"
+        files = {'file': open(excel_report_name, 'rb')}
+        headers = {'Authorization': f'bearer {self.credentials.token}'}
+        s3_config = {'integration_id': 1, 'is_local': False}
+        requests.post(full_url, params=s3_config, allow_redirects=True, files=files, headers=headers)
+

@@ -1,18 +1,16 @@
 import logging
 import json
 import traceback
-from typing import Type, Optional, List
 from datetime import datetime
+from typing import Type, Optional, List
 from langchain_core.tools import BaseTool, ToolException
-from pydantic import BaseModel, Field, ValidationError, field_validator
+from pydantic.fields import Field
+from pydantic import create_model, BaseModel, ValidationError, field_validator
 from .api_wrapper import CarrierAPIWrapper
+
 
 logger = logging.getLogger(__name__)
 
-
-#
-# 1) DATA MODELS
-#
 
 class TicketData(BaseModel):
     """
@@ -23,13 +21,13 @@ class TicketData(BaseModel):
       - description
       - severity
       - type
+      - engagement
       - board_id
       - start_date
       - end_date
 
     Optional fields:
       - external_link
-      - engagement
       - assignee
       - tags
     """
@@ -39,13 +37,13 @@ class TicketData(BaseModel):
     description: str = Field(..., description="Detailed description of the ticket.")
     severity: str = Field(..., description="Severity level, e.g., 'Critical', 'High', 'Medium', 'Low'.")
     type: str = Field(..., description="Type of ticket, e.g., 'Activity', 'Bug', 'Task'.")
+    engagement: Optional[str] = Field(None, description="Engagement ID (e.g., f09b73a0-c547-426a-aeef-...)")
     board_id: str = Field(..., description="ID of the board where the ticket is created.")
     start_date: str = Field(..., description="Start date in YYYY-MM-DD format.")
     end_date: str = Field(..., description="End date in YYYY-MM-DD format.")
 
     # Optional fields
     external_link: Optional[str] = Field(None, description="External link for added context.")
-    engagement: Optional[str] = Field(None, description="Engagement ID (e.g., f09b73a0-c547-426a-aeef-...)")
     assignee: Optional[str] = Field(None, description="User to whom the ticket is assigned, e.g. 'Select'")
     tags: Optional[List[str]] = Field(None, description="List of tags to add to the ticket.")
 
@@ -73,9 +71,9 @@ class CreateTicketTool(BaseTool):
     Tool that expects top-level fields for the ticket (e.g. 'title', 'description'),
     rather than a 'ticket_data' dict. This matches your invocation style:
 
-    { 
+    {
       "title": "Perf Ticket",
-      "description": "DO what you must", 
+      "description": "DO what you must",
       "severity": "Medium",
       "type": "Task",
       "board_id": "4",
@@ -101,7 +99,7 @@ class CreateTicketTool(BaseTool):
         (title, description, severity, etc.) as separate arguments.
         """
         # 1) If no fields at all were provided
-        required_fields = ['title', 'description', 'severity', 'type', 'board_id', 'start_date', 'end_date']
+        required_fields = ['title', 'description', 'severity', 'type', 'engagement', 'board_id', 'start_date', 'end_date']
 
         if not fields:
             error_msg = (
@@ -114,12 +112,24 @@ class CreateTicketTool(BaseTool):
                 "  'description': 'Details of the issue...',\n"
                 "  'severity': 'High',\n"
                 "  'type': 'Bug',\n"
+                "  'engagement': 'Carrier',\n"
                 "  'board_id': '123'\n"
                 "  'start_date': '2025-03-27', 'end_date': '2025-03-29'\n"
                 "}\n"
             )
             logger.warning(error_msg)
             raise ToolException(error_msg)
+
+        # Set correct engagement
+        engagement_name = fields.get("engagement")
+        engagements = self.api_wrapper.get_engagements_list()
+
+        engagement_hash = next(
+            (e["hash_id"] for e in engagements if e.get("name") == engagement_name),
+            engagement_name  # fallback to original if not found
+        )
+
+        fields["engagement"] = engagement_hash
 
         # 2) Validate using the TicketData Pydantic schema
         try:
@@ -137,21 +147,6 @@ class CreateTicketTool(BaseTool):
         # 3) Attempt to create the ticket
         try:
             payload = validated_ticket.model_dump(exclude_none=True)
-
-            # 3.1 ) Overwrite or set 'tags' based on type
-            # e.g., 'Task', 'Epic', 'Issue'
-            ticket_type = payload.get("type", "")
-            # Dynamically get the project_id from your wrapper’s credentials
-            project_id = self.api_wrapper._client.credentials.project_id
-
-            # Suppose you have a user_type → tags logic
-            ticket_type = payload.get("type", "")
-            if ticket_type == "Task":
-                payload["tags"] = [{"tag": f"task_{project_id}", "color": "#33ff57"}]
-            elif ticket_type == "Epic":
-                payload["tags"] = [{"tag": f"epic_prj_{project_id}", "color": "#ff5733"}]
-            else:
-                payload["tags"] = []
 
             response = self.api_wrapper.create_ticket(payload)
 
@@ -180,10 +175,35 @@ class CreateTicketTool(BaseTool):
             )
 
 
-# Export for toolkit discovery:
-__all__ = [
-    {
-        "name": "create_ticket",
-        "tool": CreateTicketTool
-    }
-]
+class FetchTicketsTool(BaseTool):
+    api_wrapper: CarrierAPIWrapper = Field(..., description="Carrier API Wrapper instance")
+    name: str = "get_ticket_list"
+    description: str = "Fetch tickets from a specific board."
+    args_schema: Type[BaseModel] = create_model(
+        "FetchTicketsInput",
+        board_id=(str, Field(description="Board ID from which tickets will be fetched")),
+        tag_name=(str, Field(default="", description="Tag name from which tickets titles will be fetched")),
+        status=(str, Field(default="", description="Status for tickets titles will be fetched"))
+    )
+
+    def _run(self, board_id: str, tag_name="", status=""):
+        try:
+            tickets = self.api_wrapper.fetch_tickets(board_id)
+
+            # Filter tickets by status and tag
+            if tag_name:
+                tickets = [
+                    ticket for ticket in tickets
+                    if any(tag["tag"] == tag_name.lower() for tag in ticket["tags"])
+                ]
+            if status:
+                tickets = [
+                    ticket for ticket in tickets
+                    if ticket["status"] == status
+                ]
+
+            return f"\n".join(ticket["title"] for ticket in tickets)
+        except Exception:
+            stacktrace = traceback.format_exc()
+            logger.error(f"Error fetching tickets: {stacktrace}")
+            raise ToolException(stacktrace)
