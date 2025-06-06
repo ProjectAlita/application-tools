@@ -114,7 +114,7 @@ class RunTestByIDTool(BaseTool):
             }
 
             report_id = self.api_wrapper.run_test(test_id, json_body)
-            return f"Test started. Report id: {report_id}"
+            return f"Test started. Report id: {report_id}. Link to report: https://platform.getcarrier.io/-/performance/backend/results?result_id={report_id}"
 
         except Exception:
             stacktrace = traceback.format_exc()
