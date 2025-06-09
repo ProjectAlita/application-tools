@@ -118,11 +118,12 @@ class ServiceNowAPIWrapper(BaseToolApiWrapper):
             return ToolException(f"ServiceNow tool exception. {e}")
 
     def _update_record(self, gr: GlideRecord, data: dict):
-        allowed_fields = ['category', 'description', 'short_description',
-                          'impact', 'incident_state', 'urgency', 'assignment_group']
-        for field in allowed_fields:
-            if field in data and data[field] is not None:
-                setattr(gr, field, data[field])
+        for field, value in data.items():
+            if value is not None:
+                try:
+                    gr.set_value(field, value)
+                except AttributeError as e:
+                    raise ToolException(f"Warning: Cannot set field '{field}': {e}")
 
     def get_available_tools(self):
         return [
