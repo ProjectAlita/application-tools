@@ -1,15 +1,13 @@
 from __future__ import annotations
-import os
 import re
 import fnmatch
 import tiktoken
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
 from github import Auth, Github, GithubIntegration, Repository
-from github.GitCommit import GitCommit
 from github.Consts import DEFAULT_BASE_URL
 from langchain_core.tools import ToolException
 
@@ -19,7 +17,7 @@ from .schemas import (
 )
 
 from .schemas import (
-    GitHubAuthConfig, 
+    GitHubAuthConfig,
     GitHubRepoConfig,
     NoInput,
     BranchName,
@@ -73,44 +71,44 @@ from langchain_community.tools.github.prompt import (
 
 class GitHubClient(BaseModel):
     """Client for interacting with the GitHub REST API."""
-    
+
     # Config for Pydantic model
     class Config:
         arbitrary_types_allowed = True
-    
+
     # Public attributes that can be serialized/deserialized
     github_repository: str = Field(default="")
     active_branch: str = Field(default="")
     github_base_branch: str = Field(default="main")
     github_base_url: str = Field(default=DEFAULT_BASE_URL)
-    
+
     # Using optional variables with None defaults instead of PrivateAttr
     github_api: Optional[Github] = Field(default=None, exclude=True)
     github_repo_instance: Optional[Repository.Repository] = Field(default=None, exclude=True)
-    
+
     # Adding auth config and repo config as optional fields for initialization
     auth_config: Optional[GitHubAuthConfig] = Field(default=None, exclude=True)
     repo_config: Optional[GitHubRepoConfig] = Field(default=None, exclude=True)
-    
+
     @model_validator(mode='before')
     def initialize_github_client(cls, values):
         """
         Initialize the GitHub client after the model is created.
         This replaces the need for a custom __init__ method.
-        
+
         Returns:
             The initialized values dictionary
         """
-        
+
         if values.get("repo_config"):
             values["github_repository"] = values["repo_config"].github_repository
             values["active_branch"] = values["repo_config"].active_branch
             values["github_base_branch"] = values["repo_config"].github_base_branch
-        
+
         # If auth_config is provided, update base URL and set up authentication
         if values.get("auth_config"):
             values["github_base_url"] = values["auth_config"].github_base_url or DEFAULT_BASE_URL
-            
+
             # Set up authentication
             auth = None
             if values["auth_config"].github_access_token:
@@ -122,14 +120,14 @@ class GitHubClient(BaseModel):
                 private_key = values["auth_config"].github_app_private_key.get_secret_value()
                 header = "-----BEGIN RSA PRIVATE KEY-----"
                 footer = "-----END RSA PRIVATE KEY-----"
-                
+
                 if header not in private_key:
                     key_body = private_key
                     body = key_body.replace(" ", "\n")
                     private_key = f"{header}\n{body}\n{footer}"
-                    
+
                 auth = Auth.AppAuth(values["auth_config"].github_app_id, private_key)
-            
+
             # Initialize GitHub client
             if auth is None:
                 values["github_api"] = Github(base_url=values["github_base_url"])
@@ -139,7 +137,7 @@ class GitHubClient(BaseModel):
                 values["github_api"] = installation.get_github_for_installation()
             else:
                 values["github_api"] = Github(base_url=values["github_base_url"], auth=auth)
-            
+
             # Get repository instance
             if values.get("github_repository"):
                 values["github_repo_instance"] = values["github_api"].get_repo(values["github_repository"])
@@ -148,20 +146,20 @@ class GitHubClient(BaseModel):
             values["github_api"] = Github(base_url=values.get("github_base_url", DEFAULT_BASE_URL))
             if values.get("github_repository"):
                 values["github_repo_instance"] = values["github_api"].get_repo(values["github_repository"])
-                
+
         return values
 
     @staticmethod
     def clean_repository_name(repo_link: str) -> str:
         """
         Clean and format a repository name from various input formats.
-        
+
         Args:
             repo_link: Repository link or name in various formats
-            
+
         Returns:
             Cleaned repository name in format "owner/repo"
-            
+
         Raises:
             ToolException: If the repository name is invalid
         """
@@ -173,23 +171,23 @@ class GitHubClient(BaseModel):
     def _get_files(self, directory_path: str, ref: str, repo_name: Optional[str] = None) -> List[str]:
         """
         Get all files in a directory recursively.
-        
+
         Args:
             directory_path: Path to the directory
             ref: Branch or commit reference
             repo_name: Optional repository name to override default
-            
+
         Returns:
             List of file paths
         """
         from github import GithubException
-        
+
         try:
             repo = self.github_api.get_repo(repo_name) if repo_name else self.github_repo_instance
             contents = repo.get_contents(directory_path, ref=ref)
         except GithubException as e:
             return f"Error: status code {e.status}, {e.message}"
-        
+
         files = []
         while contents:
             file_content = contents.pop(0)
@@ -201,7 +199,7 @@ class GitHubClient(BaseModel):
                     pass
             else:
                 files.append(file_content)
-        
+
         return [file.path for file in files]
 
     def get_files_from_directory(self, directory_path: str, repo_name: Optional[str] = None) -> str:
@@ -452,21 +450,21 @@ class GitHubClient(BaseModel):
             repo = self.github_api.get_repo(repo_name) if repo_name else self.github_repo_instance
             i = 0
             new_branch_name = proposed_branch_name
-            
+
             # Get base branch - if repo_name is specified, use github_base_branch
             base_branch_name = self.github_base_branch if repo_name else (self.active_branch if self.active_branch else self.github_base_branch)
             base_branch = repo.get_branch(base_branch_name)
-            
+
             for i in range(1000):
                 try:
                     repo.create_git_ref(
                         ref=f"refs/heads/{new_branch_name}", sha=base_branch.commit.sha
                     )
-                    
+
                     # Only set active branch if using the default repository
                     if not repo_name:
                         self.active_branch = new_branch_name
-                    
+
                     return (
                         f"Branch '{new_branch_name}' created successfully" +
                         ("" if repo_name else ", and set as current active branch.")
@@ -479,7 +477,7 @@ class GitHubClient(BaseModel):
                             new_branch_name = f"{proposed_branch_name}_v{i+1}"
                     else:
                         return f"Unable to create branch due to error: {str(e)}"
-            
+
             return (
                 "Unable to create branch. "
                 "At least 1000 branches exist with named derived from "
@@ -495,20 +493,20 @@ class GitHubClient(BaseModel):
             file_path (str): The path of the file to be created
             file_contents (str): The content of the file to be created
             repo_name (Optional[str]): Name of the repository in format 'owner/repo'
-            
+
         Returns:
             str: A success or failure message
         """
         try:
             repo = self.github_api.get_repo(repo_name) if repo_name else self.github_repo_instance
             branch = self.active_branch
-            
+
             if branch == self.github_base_branch:
                 return (
                     f"You're attempting to commit directly to the {self.github_base_branch} branch, "
                     "which is protected. Please create a new branch and try again."
                 )
-                
+
             try:
                 file = repo.get_contents(file_path, ref=branch)
                 if file:
@@ -595,20 +593,20 @@ class GitHubClient(BaseModel):
                 Hello Mars!
                 >>>> NEW
             repo_name (Optional[str]): Name of the repository in format 'owner/repo'
-                
+
         Returns:
             A success or failure message
         """
         try:
             repo = self.github_api.get_repo(repo_name) if repo_name else self.github_repo_instance
             branch = self.active_branch
-            
+
             if branch == self.github_base_branch:
                 return (
                     f"You're attempting to commit directly to the {self.github_base_branch} branch, "
                     "which is protected. Please create a new branch and try again."
                 )
-                
+
             file_path: str = file_query.split("\n")[0]
 
             file_content = self._read_file(file_path, branch, repo_name)
@@ -634,28 +632,28 @@ class GitHubClient(BaseModel):
             return f"Updated file {file_path}"
         except Exception as e:
             return f"Unable to update file due to error:\n{str(e)}"
-            
+
     def delete_file(self, file_path: str, repo_name: Optional[str] = None) -> str:
         """
         Deletes a file from the repository.
-        
+
         Parameters:
             file_path (str): The path of the file to delete
             repo_name (Optional[str]): Name of the repository in format 'owner/repo'
-            
+
         Returns:
             str: A success or failure message
         """
         try:
             repo = self.github_api.get_repo(repo_name) if repo_name else self.github_repo_instance
             branch = self.active_branch
-            
+
             if branch == self.github_base_branch:
                 return (
                     f"You're attempting to commit directly to the {self.github_base_branch} branch, "
                     "which is protected. Please create a new branch and try again."
                 )
-                
+
             try:
                 file = repo.get_contents(file_path, ref=branch)
                 if not file:
@@ -688,7 +686,7 @@ class GitHubClient(BaseModel):
         # We're mainly checking that the query isn't empty and doesn't contain dangerous characters
         if not query or not query.strip():
             return False
-        
+
         # Check for potentially dangerous inputs (basic validation)
         dangerous_patterns = [
             r'<script', r'javascript:', r'onerror=', r'onclick=',
@@ -843,7 +841,7 @@ class GitHubClient(BaseModel):
             file_path(str): the file path
             branch(str): the branch to read the file from
             repo_name (Optional[str]): Name of the repository in format 'owner/repo'
-            
+
         Returns:
             str: The file decoded as a string, or an error message if not found
         """
@@ -861,7 +859,7 @@ class GitHubClient(BaseModel):
         Parameters:
             file_path(str): the file path
             repo_name (Optional[str]): Name of the repository in format 'owner/repo'
-            
+
         Returns:
             str: The file contents as a string
         """
@@ -882,7 +880,7 @@ class GitHubClient(BaseModel):
             repo_name (Optional[str]): Name of the repository in format 'owner/repo'
 
         Returns:
-            str: Parsed file content as JSON 
+            str: Parsed file content as JSON
 
         Example:
             # Use 'feature-branch', include '.py' files, exclude 'test_' files
@@ -919,10 +917,10 @@ class GitHubClient(BaseModel):
     def list_branches_in_repo(self, repo_name: Optional[str] = None) -> str:
         """
         Lists all branches in the repository.
-        
+
         Parameters:
             repo_name (Optional[str]): Name of the repository in format 'owner/repo'
-            
+
         Returns:
             str: JSON string containing a list of branches
         """
@@ -933,15 +931,15 @@ class GitHubClient(BaseModel):
             return branch_list
         except Exception as e:
             return f"Failed to list branches: {str(e)}"
-            
+
     def set_active_branch(self, branch_name: str, repo_name: Optional[str] = None) -> str:
         """
         Sets the active branch for future operations.
-        
+
         Parameters:
             branch_name (str): Name of the branch to set as active
             repo_name (Optional[str]): Name of the repository in format 'owner/repo'
-            
+
         Returns:
             str: Success message or error
         """
@@ -952,7 +950,7 @@ class GitHubClient(BaseModel):
                     "Cannot set active branch for external repository. "
                     "The active branch setting only applies to the default repository."
                 )
-                
+
             # Check if the branch exists
             repo = self.github_repo_instance
             try:
@@ -979,7 +977,7 @@ class GitHubClient(BaseModel):
         """
         try:
             repo = self.github_api.get_repo(repo_name) if repo_name else self.github_repo_instance
-            
+
             # First try to get the workflow by its filename
             try:
                 workflow = repo.get_workflow(workflow_id)
@@ -993,7 +991,7 @@ class GitHubClient(BaseModel):
 
             # Create a workflow dispatch event
             workflow_run = workflow.create_dispatch(ref, inputs or {})
-            
+
             # Return run details
             result = {
                 "success": True,
@@ -1004,32 +1002,32 @@ class GitHubClient(BaseModel):
                 "ref": ref,
                 "inputs": inputs or {}
             }
-            
+
             return result
         except Exception as e:
             return f"An error occurred while triggering workflow: {str(e)}"
-    
+
     def get_workflow_status(self, run_id: str, repo_name: Optional[str] = None) -> str:
         """
         Gets the status and details of a specific GitHub Actions workflow run.
-        
+
         Parameters:
             run_id (str): The ID of the workflow run to get status for
             repo_name (Optional[str]): Name of the repository to get workflow status from
-        
+
         Returns:
             str: A JSON string containing details about the workflow run status
         """
         try:
             repo = self.github_api.get_repo(repo_name) if repo_name else self.github_repo_instance
-            
+
             # Get the workflow run
             run = repo.get_workflow_run(int(run_id))
-            
+
             # Get additional details about the run jobs
             jobs = list(run.get_jobs())
             job_details = []
-            
+
             for job in jobs:
                 job_details.append({
                     "id": job.id,
@@ -1040,7 +1038,7 @@ class GitHubClient(BaseModel):
                     "completed_at": job.completed_at.isoformat() if job.completed_at else None,
                     "url": job.html_url
                 })
-            
+
             # Compile the results
             result = {
                 "id": run.id,
@@ -1056,7 +1054,7 @@ class GitHubClient(BaseModel):
                 "jobs": job_details,
                 "url": run.html_url
             }
-            
+
             return result
         except Exception as e:
             # Return error as JSON instead of plain text
@@ -1064,39 +1062,39 @@ class GitHubClient(BaseModel):
                 "error": True,
                 "message": f"An error occurred while getting workflow status: {str(e)}"
             }
-    
+
     def get_workflow_logs(self, run_id: str, repo_name: Optional[str] = None) -> str:
         """
         Gets the logs from a GitHub Actions workflow run.
-        
+
         Parameters:
             run_id (str): The ID of the workflow run to get logs for
             repo_name (Optional[str]): Name of the repository to get workflow logs from
-        
+
         Returns:
             str: A JSON string containing logs from the workflow run's jobs
         """
         try:
             repo = self.github_api.get_repo(repo_name) if repo_name else self.github_repo_instance
-            
+
             # Get the workflow run
             run = repo.get_workflow_run(int(run_id))
-            
+
             # Get the run's logs
             try:
                 # First approach: Try to get logs from the API directly if possible
                 log_url = run.logs_url
                 logs_zip = run.get_logs()  # This will give us a bytes object with the ZIP content
-                
+
                 import zipfile
                 from io import BytesIO
-                
+
                 log_contents = {}
                 with zipfile.ZipFile(BytesIO(logs_zip)) as zip_file:
                     for file_name in zip_file.namelist():
                         with zip_file.open(file_name) as log_file:
                             log_contents[file_name] = log_file.read().decode('utf-8', errors='replace')
-                
+
                 # Return the extracted logs
                 return {
                     "run_id": run.id,
@@ -1108,7 +1106,7 @@ class GitHubClient(BaseModel):
                 # Fallback approach: Get logs from individual jobs
                 jobs = list(run.get_jobs())
                 job_logs = []
-                
+
                 for job in jobs:
                     job_logs.append({
                         "job_id": job.id,
@@ -1127,7 +1125,7 @@ class GitHubClient(BaseModel):
                         ],
                         "logs_url": job.logs_url if hasattr(job, 'logs_url') else "No direct logs URL available"
                     })
-                
+
                 return {
                     "run_id": run.id,
                     "status": run.status,
@@ -1137,16 +1135,16 @@ class GitHubClient(BaseModel):
                 }
         except Exception as e:
             return f"An error occurred while getting workflow logs: {str(e)}"
-            
+
     def comment_on_issue(self, issue_number: str, comment: str, repo_name: Optional[str] = None) -> str:
         """
         Adds a comment to an issue or pull request
-        
+
         Parameters:
             issue_number (str): The issue or PR number to comment on
             comment (str): The text of the comment to add
             repo_name (Optional[str]): Name of the repository in format 'owner/repo'
-            
+
         Returns:
             str: Success message with URL to the comment
         """
@@ -1154,23 +1152,23 @@ class GitHubClient(BaseModel):
             repo = self.github_api.get_repo(repo_name) if repo_name else self.github_repo_instance
             issue = repo.get_issue(int(issue_number))
             new_comment = issue.create_comment(comment)
-            
+
             return f"Comment added successfully! URL: {new_comment.html_url}"
         except Exception as e:
             return f"Failed to add comment: {str(e)}"
-            
-    def create_pull_request(self, title: str, body: str, head: Optional[str] = None, 
+
+    def create_pull_request(self, title: str, body: str, head: Optional[str] = None,
                            base: Optional[str] = None, repo_name: Optional[str] = None) -> str:
         """
         Creates a new pull request
-        
+
         Parameters:
             title (str): Title of the PR
             body (str): Description of the PR
             head (Optional[str]): The branch containing the changes (defaults to active_branch)
             base (Optional[str]): The target branch (defaults to github_base_branch)
             repo_name (Optional[str]): Name of the repository in format 'owner/repo'
-            
+
         Returns:
             str: Success message with PR URL and number
         """
@@ -1178,33 +1176,33 @@ class GitHubClient(BaseModel):
             repo = self.github_api.get_repo(repo_name) if repo_name else self.github_repo_instance
             head_branch = head if head else self.active_branch
             base_branch = base if base else self.github_base_branch
-            
+
             pr = repo.create_pull(
                 title=title,
                 body=body,
                 head=head_branch,
                 base=base_branch
             )
-            
+
             return f"Pull request created successfully! PR #{pr.number}, URL: {pr.html_url}"
         except Exception as e:
             return f"Failed to create pull request: {str(e)}"
-            
+
     def get_issues(self, state: str = "open", repo_name: Optional[str] = None) -> str:
         """
         Get a list of issues from the repository
-        
+
         Parameters:
             state (str): Filter by state ("open", "closed", or "all")
             repo_name (Optional[str]): Name of the repository in format 'owner/repo'
-            
+
         Returns:
             str: JSON string with issue data
         """
         try:
             repo = self.github_api.get_repo(repo_name) if repo_name else self.github_repo_instance
             issues = repo.get_issues(state=state)
-            
+
             issue_list = [
                 {
                     "number": issue.number,
@@ -1218,11 +1216,11 @@ class GitHubClient(BaseModel):
                 }
                 for issue in issues
             ]
-            
+
             return issue_list
         except Exception as e:
             return f"Failed to get issues: {str(e)}"
-            
+
     def list_open_pull_requests(self, repo_name: Optional[str] = None) -> str:
         """
         Lists all open pull requests for a repository.
@@ -1236,7 +1234,7 @@ class GitHubClient(BaseModel):
         try:
             repo = self.github_api.get_repo(repo_name) if repo_name else self.github_repo_instance
             open_prs = repo.get_pulls(state='open')
-            
+
             pr_list = []
             for pr in open_prs:
                 pr_data = {
@@ -1251,39 +1249,53 @@ class GitHubClient(BaseModel):
                     "base": pr.base.ref
                 }
                 pr_list.append(pr_data)
-                
+
             return pr_list
         except Exception as e:
             return f"Failed to list open pull requests: {str(e)}"
-    
-    def generic_github_api_call(self, method: str, method_kwargs: dict) -> str:
+
+    def generic_github_api_call(self, method: str, method_kwargs: Optional[Dict[str, Any]] = None) -> str:
         """
         Generic method to make API calls to GitHub.
-        method will be the name of the method to call on the GitHub API (python library)
+        method will be the name of the method to call on the GitHub API (python library).
         method_kwargs will be the parameters to pass to that method.
 
         Parameters:
-            method (str): The API method to call (e.g., 'get_repo', 'get_user', etc.)
-            method_kwargs: Keyword arguments for the API method
+            method (str): The API method to call (e.g., 'get_repo', 'get_user', etc.).
+            method_kwargs (Optional[Dict[str, Any]]): Keyword arguments for the API method.
 
         Returns:
-            JSON string with the response from the API call
+            JSON string with the response from the API call or an appropriate error message.
         """
         try:
-            # First check if method exists on github_api
+            # Default `method_kwargs` to an empty dictionary if None is provided
+            method_kwargs = method_kwargs or {}
+
+            if method == "get_repo" and "full_name_or_id" not in method_kwargs:
+                # You can customize the value based on your requirements
+                method_kwargs["full_name_or_id"] = self.github_repository
+
+            # Ensure `method` exists on the GitHub API or repository instance
             if hasattr(self.github_api, method):
                 _method = getattr(self.github_api, method)
-            # Then check if it exists on github_repo_instance
             elif self.github_repo_instance and hasattr(self.github_repo_instance, method):
                 _method = getattr(self.github_repo_instance, method)
             else:
-                return f"API method '{method}' not found on GitHub API or repository instance (neither Github API client not Repo API instance)"
+                return f"API method '{method}' not found on GitHub API or repository instance."
+
+            # Call the method with the provided arguments
             response = _method(**method_kwargs)
-            return response.raw_data
+
+            # Ensure `raw_data` exists in the response object
+            if hasattr(response, "raw_data"):
+                return response.raw_data
+            else:
+                return f"API method '{method}' was called successfully, but 'raw_data' attribute is missing in the response."
+
         except Exception as e:
             import traceback
             return f"API call failed: {traceback.format_exc()}"
-    
+
     def get_available_tools(self) -> List[Dict[str, Any]]:
         return [
              {
@@ -1468,5 +1480,5 @@ class GitHubClient(BaseModel):
                 "description": self.generic_github_api_call.__doc__,
                 "args_schema": GenericGithubAPICall,
             },
-            
+
         ]

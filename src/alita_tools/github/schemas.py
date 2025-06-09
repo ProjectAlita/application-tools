@@ -174,7 +174,7 @@ GetWorkflowLogs = create_model(
 GenericGithubAPICall = create_model(
     "GenericGithubAPICall",
     method=(str, Field(description="The GitHub API method to call (e.g., 'get_repo', 'get_user')")),
-    method_kwargs=(Dict[str, Any], Field(description="Keyword arguments for the API method as a dictionary"))
+    method_kwargs=(Optional[Dict[str, Any]], Field(description="Keyword arguments for the API method as a dictionary"))
 )
 
 ListProjectIssues = create_model(
