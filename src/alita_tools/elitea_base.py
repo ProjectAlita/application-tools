@@ -24,7 +24,7 @@ class BaseToolApiWrapper(BaseModel):
 
     def run(self, mode: str, *args: Any, **kwargs: Any):
         if TOOLKIT_SPLITTER in mode:
-            mode = mode.split(TOOLKIT_SPLITTER)[1]
+            mode = mode.rsplit(TOOLKIT_SPLITTER, maxsplit=1)[1]
         for tool in self.get_available_tools():
             if tool["name"] == mode:
                 execution = tool["ref"](*args, **kwargs)
