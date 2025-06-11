@@ -71,7 +71,7 @@ class GetReportByIDTool(BaseTool):
     description: str = "Get report data from the Carrier platform."
     args_schema: Type[BaseModel] = create_model(
         "GetReportByIdInput",
-        report_id=(str, Field(default="", description="Report id to retrieve")),
+        report_id=(str, Field(description="Report id to retrieve")),
     )
 
     def _run(self, report_id: str):
@@ -129,7 +129,7 @@ class CreateExcelReportTool(BaseTool):
             try:
                 calc_thr_j = calculate_thresholds(result_stats_j, pct, thresholds)
             except Exception as e:
-                print(e)
+                logger.error(e)
                 calc_thr_j = []
 
             excel_report_file_name = f'/tmp/reports_test_results_{report["build_id"]}_excel_report.xlsx'
@@ -147,7 +147,7 @@ class CreateExcelReportTool(BaseTool):
             try:
                 shutil.rmtree(file_path)
             except Exception as e:
-                print(e)
+                logger.error(e)
             if os.path.exists(excel_report_file_name):
                 os.remove(excel_report_file_name)
 

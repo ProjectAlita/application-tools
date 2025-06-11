@@ -55,7 +55,7 @@ class GetTestByIDTool(BaseTool):
     description: str = "Get test data from the Carrier platform."
     args_schema: Type[BaseModel] = create_model(
         "GetTestByIdInput",
-        test_id=(str, Field(default="", description="Test id to retrieve")),
+        test_id=(str, Field(description="Test id to retrieve")),
     )
 
     def _run(self, test_id: str):
