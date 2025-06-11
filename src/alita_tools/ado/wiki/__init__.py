@@ -9,6 +9,18 @@ from ...utils import clean_string, TOOLKIT_SPLITTER, get_max_toolkit_length
 name = "azure_devops_wiki"
 name_alias = 'ado_wiki'
 
+def get_tools(tool: dict) -> List[BaseTool]:
+    config_dict = {
+        # common
+        "selected_tools": tool['settings'].get('selected_tools', []),
+        "organization_url": tool['settings']['organization_url'],
+        "project": tool['settings'].get('project', None),
+        "token": tool['settings'].get('token', None),
+        "limit": tool['settings'].get('limit', 5),
+    }
+    return AzureDevOpsWikiToolkit().get_toolkit(**config_dict).get_tools()
+
+
 class AzureDevOpsWikiToolkit(BaseToolkit):
     tools: List[BaseTool] = []
     toolkit_max_length: int = 0
