@@ -1004,7 +1004,16 @@ class JiraApiWrapper(BaseToolApiWrapper):
             logger.error(f"Error downloading attachment: {str(e)}")
             return None
 
-    def get_field_with_image_descriptions(self, jira_issue_key: str, field_name: str, prompt: Optional[str] = None, context_radius: int = 500):
+    def _extract_image_data(self, field_data):
+        """
+        Extracts image data from general JSON response
+        """
+        if isinstance(field_data, dict) and 'filename' in field_data and 'content' in field_data:
+            return f"!{field_data['filename']}|alt={field_data['filename']}!"
+        return str(field_data)
+
+    def get_field_with_image_descriptions(self, jira_issue_key: str, field_name: str, prompt: Optional[str] = None,
+                                          context_radius: int = 500):
         """
         Get a field from Jira issue and augment any images in it with textual descriptions that include
         image names and contextual information from surrounding text.
@@ -1035,11 +1044,13 @@ class JiraApiWrapper(BaseToolApiWrapper):
                 existing_fields_str = ', '.join(existing_fields)
                 return f"Unable to find field '{field_name}' or it's empty. Available fields are: {existing_fields_str}"
 
-            # Ensure field_content is a string. If it's a list, join the elements into a single string.
+            # Handle multiple images or non-string content
             if isinstance(field_content, list):
-                field_content = ' '.join(map(str, field_content))
+                field_content = ' '.join(map(self._extract_image_data, field_content))
+            elif isinstance(field_content, dict):
+                field_content = self._extract_image_data(field_content)
             elif not isinstance(field_content, str):
-                return f"Unsupported field content type: {type(field_content)}. Expected a string or list of strings."
+                return f"Unsupported field content type: {type(field_content)}. Expected a string, list, or dict."
 
             # Regular expression to find image references in Jira markup
             image_pattern = r'!([^!|]+)(?:\|[^!]*)?!'
@@ -1095,6 +1106,7 @@ class JiraApiWrapper(BaseToolApiWrapper):
             return f"Field '{field_name}' from issue '{jira_issue_key}' with image descriptions:\n\n{augmented_content}"
 
         except Exception as e:
+            from traceback import format_exc
             stacktrace = format_exc()
             logger.error(f"Error processing field with images: {stacktrace}")
             return f"Error processing field with images: {str(e)}"
