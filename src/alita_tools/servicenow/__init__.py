@@ -5,7 +5,7 @@ from .api_wrapper import ServiceNowAPIWrapper
 from langchain_core.tools import BaseTool
 from ..base.tool import BaseAction
 from pydantic import create_model, BaseModel, ConfigDict, Field, SecretStr
-from ..utils import clean_string, TOOLKIT_SPLITTER, get_max_toolkit_length, parse_list
+from ..utils import clean_string, TOOLKIT_SPLITTER, get_max_toolkit_length
 
 name = "service_now"
 
@@ -16,12 +16,7 @@ def get_tools(tool):
         base_url=tool['settings']['base_url'],
         password=tool['settings'].get('password', None),
         username=tool['settings'].get('username', None),
-        limit=tool['settings'].get('limit', None),
-        labels=parse_list(tool['settings'].get('labels', None)),
-        additional_fields=tool['settings'].get('additional_fields', []),
-        verify_ssl=tool['settings'].get('verify_ssl', True),
-        alita=tool['settings'].get('alita'),
-        llm=tool['settings'].get('llm', None),
+        response_fields=tool['settings'].get('response_fields', None),
         toolkit_name=tool.get('toolkit_name')
     ).get_tools()
 
@@ -37,27 +32,22 @@ class ServiceNowToolkit(BaseToolkit):
         ServiceNowToolkit.toolkit_max_length = get_max_toolkit_length(selected_tools)
         return create_model(
             name,
-            instance_alias=(str, Field(description="Alias for the ServiceNow instance", json_schema_extra={'configuration': True, 'configuration_title': True})),
-            base_url=(str, Field(description="ServiceNow URL", json_schema_extra={'configuration': True})),
-            password=(SecretStr, Field(description="Password", default=None, json_schema_extra={'secret': True, 'configuration': True})),
+            base_url=(str, Field(description="ServiceNow URL", json_schema_extra={
+                        'toolkit_name': True,
+                        'max_toolkit_length': ServiceNowToolkit.toolkit_max_length,
+                        'configuration': True,
+                        'configuration_title': True
+                    })),
             username=(str, Field(description="Username", default=None, json_schema_extra={'configuration': True})),
-            limit=(Optional[int], Field(description="Pages limit per request", default=None)),
-            labels=(Optional[str], Field(
-                description="List of comma separated labels used for labeling of agent's created or updated entities",
-                default=None,
-                examples="alita,elitea;another-label"
-            )),
-            max_pages=(Optional[int], Field(description="Max total pages", default=None)),
-            number_of_retries=(Optional[int], Field(description="Number of retries", default=None)),
-            min_retry_seconds=(Optional[int], Field(description="Min retry, sec", default=None)),
-            max_retry_seconds=(Optional[int], Field(description="Max retry, sec", default=None)),
+            password=(SecretStr, Field(description="Password", default=None, json_schema_extra={'secret': True, 'configuration': True})),
+            response_fields=(Optional[str], Field(description="Response fields", default=None)),
             selected_tools=(List[Literal[tuple(selected_tools)]],
                             Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
             __config__=ConfigDict(json_schema_extra={
                 'metadata': {
                     "label": "ServiceNow",
                     "icon_url": None,
-                    "hidden": True,
+                    "hidden": False,
                     "sections": {
                         "auth": {
                             "required": True,
@@ -77,8 +67,10 @@ class ServiceNowToolkit(BaseToolkit):
     def get_toolkit(cls, selected_tools: list[str] | None = None, toolkit_name: Optional[str] = None, **kwargs):
         if selected_tools is None:
             selected_tools = []
+        if 'response_fields' in kwargs and isinstance(kwargs['response_fields'], str):
+            kwargs['fields'] = [field.strip().lower() for field in kwargs['response_fields'].split(',') if field.strip()]
         servicenow_api_wrapper = ServiceNowAPIWrapper(**kwargs)
-        prefix = clean_string(toolkit_name, ServiceNowToolkit.toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
+        prefix = clean_string(toolkit_name, cls.toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
         available_tools = servicenow_api_wrapper.get_available_tools()
         tools = []
         for tool in available_tools:
@@ -88,7 +80,7 @@ class ServiceNowToolkit(BaseToolkit):
             tools.append(BaseAction(
                 api_wrapper=servicenow_api_wrapper,
                 name=prefix + tool["name"],
-                description=f"ServiceNow: {servicenow_api_wrapper.instance_alias}" + tool["description"],
+                description=f"ServiceNow: {servicenow_api_wrapper.base_url} " + tool["description"],
                 args_schema=tool["args_schema"]
             ))
         return cls(tools=tools)

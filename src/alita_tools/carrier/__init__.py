@@ -5,11 +5,9 @@ from pydantic import create_model, BaseModel, ConfigDict, Field, SecretStr
 from functools import lru_cache
 
 from .api_wrapper import CarrierAPIWrapper
-from .create_ticket_tool import __all__ as create_ticket_tool
-from .tools import __all__ as available_tools
+from .tools import __all__
 from ..utils import clean_string, TOOLKIT_SPLITTER, get_max_toolkit_length
 
-__all__ = create_ticket_tool + available_tools
 logger = logging.getLogger(__name__)
 
 name = 'carrier'
