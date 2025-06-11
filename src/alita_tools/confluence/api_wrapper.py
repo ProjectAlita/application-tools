@@ -160,6 +160,17 @@ loaderParams = create_model(
     bins_with_llm=(Optional[bool], Field(description="Use LLM for processing binary files.", default=False)),
 )
 
+indexPagesParams = create_model(
+    "indexPagesParams",
+    vectorstore_type=(str, Field(description="Vectorstore type (Chroma, PGVector, Elastic, etc.)")),
+    vectorstore_params=(dict, Field(description="Vectorstore connection parameters")),
+    embedding_model=(str, Field(description="Embedding model")),
+    embedding_model_params=(dict, Field(description="Embedding model parameters")),
+    loader_params=(Optional[dict], Field(description="Parameters for Confluence loader", default_factory=dict)),
+    chunking_tool=(Optional[str], Field(description="Name of chunking tool", default="markdown")),
+    chunking_config=(Optional[dict], Field(description="Chunking tool configuration", default_factory=dict)),
+)
+
 GetPageWithImageDescriptions = create_model(
     "GetPageWithImageDescriptionsModel",
     page_id=(str, Field(description="Confluence page ID from which content with images will be extracted")),
@@ -865,6 +876,42 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
         for document in loader._lazy_load(kwargs={}):
             yield document
 
+    def index_pages(self, vectorstore_type: str, vectorstore_params: dict,
+                    embedding_model: str, embedding_model_params: dict,
+                    loader_params: Optional[dict] = None,
+                    chunking_tool: Optional[str] = "markdown",
+                    chunking_config: Optional[dict] = None):
+        """Load Confluence pages and index them in the vector store."""
+        from alita_sdk.tools.vectorstore import VectorStoreWrapper
+        from alita_tools.chunkers import __all__ as chunkers
+
+        loader_params = loader_params or {}
+        chunking_config = chunking_config or {}
+
+        documents = self.loader(**loader_params)
+
+        chunker = chunkers.get(chunking_tool) if chunking_tool else None
+        if chunker:
+            if chunking_config.get('embedding_model') and chunking_config.get('embedding_model_params'):
+                from alita_sdk.langchain.interfaces.llm_processor import get_embeddings
+                embedding = get_embeddings(
+                    chunking_config['embedding_model'],
+                    chunking_config['embedding_model_params']
+                )
+                chunking_config['embedding'] = embedding
+            chunking_config['llm'] = self.llm
+            documents = chunker(documents, chunking_config)
+
+        vector_wrapper = VectorStoreWrapper(
+            llm=self.llm,
+            vectorstore_type=vectorstore_type,
+            embedding_model=embedding_model,
+            embedding_model_params=embedding_model_params,
+            vectorstore_params=vectorstore_params,
+        )
+
+        return vector_wrapper.index_documents(documents)
+
     def _download_image(self, image_url):
         """
         Download an image from a URL using the already authenticated Confluence client
@@ -1427,6 +1474,12 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
                 "ref": self.loader,
                 "description": self.loader.__doc__,
                 "args_schema": loaderParams,
+            },
+            {
+                "name": "index_pages",
+                "ref": self.index_pages,
+                "description": self.index_pages.__doc__,
+                "args_schema": indexPagesParams,
             },
             {
                 "name": "get_page_id_by_title",
