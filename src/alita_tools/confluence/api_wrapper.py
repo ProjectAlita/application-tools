@@ -1,6 +1,5 @@
 import re
 import logging
-import hashlib
 import requests
 import json
 import base64
@@ -97,7 +96,7 @@ getPageTree = create_model(
     page_id=(str, Field(description="Page id")),
 )
 
-getPageIdByTitleInput= create_model(
+getPageIdByTitleInput = create_model(
     "getPageIdByTitleInput",
     title=(str, Field(description="Page title")),
     type=(Optional[str], Field(description="Jira type of content: Page or Blogpost. Defaults to page", default="page")),
@@ -160,6 +159,23 @@ loaderParams = create_model(
     bins_with_llm=(Optional[bool], Field(description="Use LLM for processing binary files.", default=False)),
 )
 
+indexPagesParams = create_model(
+    "indexPagesParams",
+    vectorstore_type=(str, Field(description="Vectorstore type (Chroma, PGVector, Elastic, etc.)")),
+    vectorstore_params=(dict, Field(description="Vectorstore connection parameters")),
+    embedding_model=(Optional[str], Field(description="Embedding model", default="HuggingFaceEmbeddings")),
+    embedding_model_params=(Optional[dict], Field(description="Embedding model parameters",
+                                                  default={"model_name": "sentence-transformers/all-MiniLM-L6-v2"})),
+    loader_params=(Optional[dict], Field(description="Parameters for Confluence loader", default_factory=dict)),
+    chunking_tool=(Optional[str], Field(description="Name of chunking tool", default="markdown")),
+    chunking_config=(Optional[dict], Field(description="Chunking tool configuration", default_factory=dict)),
+)
+
+searchIndexParams = create_model(
+    "searchIndexParams",
+    query=(str, Field(description="Query text to search in the index")),
+)
+
 GetPageWithImageDescriptions = create_model(
     "GetPageWithImageDescriptionsModel",
     page_id=(str, Field(description="Confluence page ID from which content with images will be extracted")),
@@ -205,6 +221,10 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
     ocr_languages: Optional[str] = None
     keep_newlines: Optional[bool] = True
     llm: Any = None
+    # indexer related
+    connection_string: Optional[SecretStr] = None
+    collection_name: Optional[str] = None
+
     _image_cache: ImageDescriptionCache = PrivateAttr(default_factory=ImageDescriptionCache)
 
     @model_validator(mode='before')
@@ -334,7 +354,7 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
         if not page_id and not page_title:
             raise ValueError("Either page_id or page_title is required to delete the page")
         resolved_page_id = page_id if page_id else (
-                    self.client.get_page_by_title(space=self.space, title=page_title) or {}).get('id')
+                self.client.get_page_by_title(space=self.space, title=page_title) or {}).get('id')
         if resolved_page_id:
             self.client.remove_page(resolved_page_id)
             message = f"Page with ID '{resolved_page_id}' has been successfully deleted."
@@ -533,6 +553,7 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
             "Page not found"
         return result[0].page_content
         # return self._strip_base64_images(result[0].page_content) if skip_images else result[0].page_content
+
     def get_page_id_by_title(self, title: str, type: str = "page"):
         """
         Provide page id from search result by title.
@@ -540,7 +561,7 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
         :param type: type of content: page or blogpost. Defaults to page
         """
         return self.client.get_page_id(space=self.space, title=title, type=type)
-    
+
     def _strip_base64_images(self, content):
         base64_md_pattern = r'data:image/(png|jpeg|gif);base64,[a-zA-Z0-9+/=]+'
         return re.sub(base64_md_pattern, "[Image Removed]", content)
@@ -864,6 +885,51 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
 
         for document in loader._lazy_load(kwargs={}):
             yield document
+
+    def index_pages(self, vectorstore_type: str, vectorstore_params: dict,
+                    embedding_model: str = "HuggingFaceEmbeddings",
+                    embedding_model_params: dict = {"model_name": "sentence-transformers/all-MiniLM-L6-v2"},
+                    loader_params: Optional[dict] = None,
+                    chunking_tool: Optional[str] = "markdown",
+                    chunking_config: Optional[dict] = None):
+        """Load Confluence pages and index them in the vector store."""
+
+        from alita_sdk.tools.vectorstore import VectorStoreWrapper
+        from alita_tools.chunkers import __all__ as chunkers
+
+        loader_params = loader_params or {}
+        chunking_config = chunking_config or {}
+
+        logger.info(f"Indexing pages with loader_params: {loader_params}, ")
+        documents = self.loader(**loader_params)
+
+        chunker = chunkers.get(chunking_tool)
+        if chunker:
+            from alita_sdk.langchain.interfaces.llm_processor import get_embeddings
+            embedding = get_embeddings(
+                # TODO: add dynamic selection of embedding model
+                embedding_model,
+                embedding_model_params
+            )
+            chunking_config['embedding'] = embedding
+            chunking_config['llm'] = self.llm
+            documents = chunker(documents, chunking_config)
+
+        # set vector store parameters
+        if not self.collection_name or not self.connection_string:
+            raise ToolException("collection_name or connection_string for vector store is not set")
+        vectorstore_params.update({'collection_name': self.collection_name})
+        vectorstore_params.update({'connection_string': self.connection_string})
+
+        vector_wrapper = VectorStoreWrapper(
+            llm=self.llm,
+            vectorstore_type=vectorstore_type,
+            embedding_model=embedding_model,
+            embedding_model_params=embedding_model_params,
+            vectorstore_params=vectorstore_params,
+        )
+
+        return vector_wrapper.index_documents(documents)
 
     def _download_image(self, image_url):
         """
@@ -1427,6 +1493,12 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
                 "ref": self.loader,
                 "description": self.loader.__doc__,
                 "args_schema": loaderParams,
+            },
+            {
+                "name": "index_pages",
+                "ref": self.index_pages,
+                "description": self.index_pages.__doc__,
+                "args_schema": indexPagesParams,
             },
             {
                 "name": "get_page_id_by_title",
