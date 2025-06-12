@@ -75,5 +75,8 @@ class CarrierAPIWrapper(BaseModel):
     def get_report_file_name(self, report_id: str, extract_to: str = "/tmp"):
         return self._client.get_report_file_name(report_id, extract_to)
 
+    def get_report_file_log(self, bucket: str, file_name: str):
+        return self._client.get_report_file_log(bucket, file_name)
+
     def upload_excel_report(self, bucket_name: str, excel_report_name: str):
         return self._client.upload_excel_report(bucket_name, excel_report_name)

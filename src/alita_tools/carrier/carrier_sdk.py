@@ -125,6 +125,17 @@ class CarrierClient(BaseModel):
 
         return report_info, None
 
+    def get_report_file_log(self, bucket: str, file_name: str):
+        bucket_endpoint = f"api/v1/artifacts/artifact/default/{self.credentials.project_id}/{bucket}/{file_name}"
+        full_url = f"{self.credentials.url.rstrip('/')}/{bucket_endpoint.lstrip('/')}"
+        headers = {'Authorization': f'bearer {self.credentials.token}'}
+        s3_config = {'integration_id': 1, 'is_local': False}
+        response = requests.get(full_url, params=s3_config, headers=headers)
+        file_path = f"/tmp/{file_name}"
+        with open(file_path, 'wb') as f:
+            f.write(response.content)
+        return file_path
+
     def upload_excel_report(self, bucket_name: str, excel_report_name: str):
         upload_url = f'api/v1/artifacts/artifacts/{self.credentials.project_id}/{bucket_name}'
         full_url = f"{self.credentials.url.rstrip('/')}/{upload_url.lstrip('/')}"
