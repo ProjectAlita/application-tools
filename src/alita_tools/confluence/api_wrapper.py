@@ -968,10 +968,6 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
                            embedding_model: str, embedding_model_params: dict):
         """ Initializes the vector store wrapper with the provided parameters."""
 
-        # TODO: REMOVE after testing
-        # DEBUG only:
-        self.collection_name = "p2676__0f3b71ae" if not self.collection_name else self.collection_name
-
         # set vector store parameters
         if not self.collection_name:
             raise ToolException("collection_name for vector store is not set")
@@ -1546,12 +1542,6 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
                 "description": self.execute_generic_confluence.__doc__,
                 "args_schema": сonfluenceInput,
                 "ref": self.execute_generic_confluence,
-            },
-            {
-                "name": "loader",
-                "ref": self.loader,
-                "description": self.loader.__doc__,
-                "args_schema": loaderParams,
             },
             {
                 "name": "index_pages",
