@@ -67,7 +67,7 @@ jobs:
 
       - name: Create Pull Request
         if: github.event_name == 'workflow_dispatch' && inputs.create-pr == true
-        uses: peter-evans/create-pull-request@v5
+        uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "chore: update alita-sdk and alita_tools to version ${{ steps.get_version.outputs.version }}"
