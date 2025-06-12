@@ -65,7 +65,7 @@
             <a id="nextFileLink" class="nav" href="z_ebd6a542dae282ac_elitea_base_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.8.2">coverage.py v7.8.2</a>,
-            created at 2025-06-12 12:24 +0000
+            created at 2025-06-12 12:38 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -1062,7 +1062,7 @@
     <p class="pln"><span class="n"><a id="t980" href="#t980">980</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="mis show_mis"><span class="n"><a id="t981" href="#t981">981</a></span><span class="t">        <span class="nam">vectorstore_params</span><span class="op">[</span><span class="str">"collection_name"</span><span class="op">]</span> <span class="op">=</span> <span class="nam">self</span><span class="op">.</span><span class="nam">collection_name</span>&nbsp;</span><span class="r"></span></p>
     <p class="mis show_mis"><span class="n"><a id="t982" href="#t982">982</a></span><span class="t">        <span class="key">if</span> <span class="nam">vectorstore_type</span><span class="op">.</span><span class="nam">lower</span><span class="op">(</span><span class="op">)</span> <span class="op">!=</span> <span class="str">"chroma"</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t983" href="#t983">983</a></span><span class="t">            <span class="nam">vectorstore_params</span><span class="op">[</span><span class="str">"connection_string"</span><span class="op">]</span> <span class="op">=</span> <span class="nam">self</span><span class="op">.</span><span class="nam">connection_string</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t983" href="#t983">983</a></span><span class="t">            <span class="nam">vectorstore_params</span><span class="op">[</span><span class="str">"connection_string"</span><span class="op">]</span> <span class="op">=</span> <span class="nam">self</span><span class="op">.</span><span class="nam">connection_string</span><span class="op">.</span><span class="nam">get_secret_value</span><span class="op">(</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t984" href="#t984">984</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="mis show_mis"><span class="n"><a id="t985" href="#t985">985</a></span><span class="t">        <span class="key">return</span> <span class="nam">VectorStoreWrapper</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t986" href="#t986">986</a></span><span class="t">            <span class="nam">llm</span><span class="op">=</span><span class="nam">self</span><span class="op">.</span><span class="nam">llm</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
@@ -1663,7 +1663,7 @@
             <a class="nav" href="z_ebd6a542dae282ac_elitea_base_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.8.2">coverage.py v7.8.2</a>,
-            created at 2025-06-12 12:24 +0000
+            created at 2025-06-12 12:38 +0000
         </p>
     </div>
 </footer>
