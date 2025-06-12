@@ -15,6 +15,7 @@ from langchain_core.tools import ToolException
 from langchain_core.messages import HumanMessage
 from markdownify import markdownify
 from langchain_community.document_loaders.confluence import ContentFormat
+from alita_sdk.tools.vectorstore import VectorStoreWrapper
 
 from ..elitea_base import BaseToolApiWrapper
 from ..llm.img_utils import ImageDescriptionCache
@@ -174,6 +175,35 @@ indexPagesParams = create_model(
 searchIndexParams = create_model(
     "searchIndexParams",
     query=(str, Field(description="Query text to search in the index")),
+    vectorstore_type=(str, Field(description="Vectorstore type (Chroma, PGVector, Elastic, etc.)")),
+    vectorstore_params=(dict, Field(description="Vectorstore connection parameters")),
+    embedding_model=(Optional[str], Field(description="Embedding model", default="HuggingFaceEmbeddings")),
+    embedding_model_params=(Optional[dict], Field(description="Embedding model parameters",
+                                                  default={"model_name": "sentence-transformers/all-MiniLM-L6-v2"})),
+    doctype=(Optional[str], Field(description="Document type to search for", default='code')),
+    filter=(Optional[dict | str], Field(
+        description="Filter to apply to the search results. Can be a dictionary or a JSON string.",
+        default={},
+        examples=["{\"key\": \"value\"}", "{\"status\": \"active\"}"]
+    )),
+    cut_off=(Optional[float], Field(description="Cut-off score for search results", default=0.5)),
+    search_top=(Optional[int], Field(description="Number of top results to return", default=10)),
+    reranker=(Optional[dict], Field(
+        description="Reranker configuration. Can be a dictionary with reranking parameters.",
+        default={}
+    )),
+    full_text_search=(Optional[Dict[str, Any]], Field(
+        description="Full text search parameters. Can be a dictionary with search options.",
+        default=None
+    )),
+    reranking_config=(Optional[Dict[str, Dict[str, Any]]], Field(
+        description="Reranking configuration. Can be a dictionary with reranking settings.",
+        default=None
+    )),
+    extended_search=(Optional[List[str]], Field(
+        description="List of additional fields to include in the search results.",
+        default=None
+    )),
 )
 
 GetPageWithImageDescriptions = create_model(
@@ -894,7 +924,6 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
                     chunking_config: Optional[dict] = None):
         """Load Confluence pages and index them in the vector store."""
 
-        from alita_sdk.tools.vectorstore import VectorStoreWrapper
         from alita_tools.chunkers import __all__ as chunkers
 
         loader_params = loader_params or {}
@@ -915,21 +944,51 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
             chunking_config['llm'] = self.llm
             documents = chunker(documents, chunking_config)
 
-        # set vector store parameters
-        if not self.collection_name or not self.connection_string:
-            raise ToolException("collection_name or connection_string for vector store is not set")
-        vectorstore_params.update({'collection_name': self.collection_name})
-        vectorstore_params.update({'connection_string': self.connection_string})
+        return (self._init_vector_store(vectorstore_type, vectorstore_params, embedding_model, embedding_model_params)
+                .index_documents(documents))
 
-        vector_wrapper = VectorStoreWrapper(
+    def search_index(self,
+                     query: str,
+                     vectorstore_type: str, vectorstore_params: dict,
+                     embedding_model: str = "HuggingFaceEmbeddings",
+                     embedding_model_params: dict = {"model_name": "sentence-transformers/all-MiniLM-L6-v2"},
+                     doctype: str = 'code',
+                     filter: dict | str = {}, cut_off: float = 0.5,
+                     search_top: int = 10, reranker: dict = {},
+                     full_text_search: Optional[Dict[str, Any]] = None,
+                     reranking_config: Optional[Dict[str, Dict[str, Any]]] = None,
+                     extended_search: Optional[List[str]] = None):
+        """ Searches indexed documents in the vector store."""
+
+        return (self._init_vector_store(vectorstore_type, vectorstore_params, embedding_model, embedding_model_params)
+                .search_documents(query, doctype, filter, cut_off, search_top, reranker,
+                                  full_text_search, reranking_config, extended_search))
+
+    def _init_vector_store(self, vectorstore_type: str, vectorstore_params: dict,
+                           embedding_model: str, embedding_model_params: dict):
+        """ Initializes the vector store wrapper with the provided parameters."""
+
+        # TODO: REMOVE after testing
+        # DEBUG only:
+        self.collection_name = "p2676__0f3b71ae" if not self.collection_name else self.collection_name
+
+        # set vector store parameters
+        if not self.collection_name:
+            raise ToolException("collection_name for vector store is not set")
+        if vectorstore_type.lower() != "chroma" and not self.connection_string:
+            raise ToolException("connection_string for vector store is not set")
+
+        vectorstore_params["collection_name"] = self.collection_name
+        if vectorstore_type.lower() != "chroma":
+            vectorstore_params["connection_string"] = self.connection_string
+
+        return VectorStoreWrapper(
             llm=self.llm,
             vectorstore_type=vectorstore_type,
             embedding_model=embedding_model,
             embedding_model_params=embedding_model_params,
             vectorstore_params=vectorstore_params,
         )
-
-        return vector_wrapper.index_documents(documents)
 
     def _download_image(self, image_url):
         """
@@ -1499,6 +1558,12 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
                 "ref": self.index_pages,
                 "description": self.index_pages.__doc__,
                 "args_schema": indexPagesParams,
+            },
+            {
+                "name": "search_index",
+                "ref": self.search_index,
+                "description": self.search_index.__doc__,
+                "args_schema": searchIndexParams,
             },
             {
                 "name": "get_page_id_by_title",
