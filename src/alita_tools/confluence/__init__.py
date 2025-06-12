@@ -26,7 +26,7 @@ def get_tools(tool):
         toolkit_name=tool.get('toolkit_name'),
         # indexer settings
         connection_string = tool['settings'].get('connection_string', None),
-        collection_name = tool['settings'].get('collection_name', None),
+        collection_name = tool['id'],
     ).get_tools()
 
 
@@ -63,10 +63,7 @@ class ConfluenceToolkit(BaseToolkit):
             # indexer settings
             connection_string = (Optional[SecretStr], Field(description="Connection string for vectorstore",
                                                             default=None,
-                                                            json_schema_extra={'secret': True, 'hidden': True})),
-            collection_name = (Optional[str], Field(description="Collection name for vectorstore",
-                                                            default=None, json_schema_extra={'hidden': True})),
-
+                                                            json_schema_extra={'secret': True})),
             __config__=ConfigDict(json_schema_extra={
                 'metadata': {
                     "label": "Confluence",
