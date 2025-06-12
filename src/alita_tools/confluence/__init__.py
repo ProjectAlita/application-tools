@@ -62,7 +62,8 @@ class ConfluenceToolkit(BaseToolkit):
                             Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
             # indexer settings
             connection_string = (Optional[SecretStr], Field(description="Connection string for vectorstore",
-                                                            default=None, json_schema_extra={'hidden': True})),
+                                                            default=None,
+                                                            json_schema_extra={'secret': True, 'hidden': True})),
             collection_name = (Optional[str], Field(description="Collection name for vectorstore",
                                                             default=None, json_schema_extra={'hidden': True})),
 
