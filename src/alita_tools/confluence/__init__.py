@@ -26,7 +26,7 @@ def get_tools(tool):
         toolkit_name=tool.get('toolkit_name'),
         # indexer settings
         connection_string = tool['settings'].get('connection_string', None),
-        collection_name = tool['id'],
+        collection_name = str(tool['id']),
     ).get_tools()
 
 
