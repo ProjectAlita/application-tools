@@ -1,7 +1,9 @@
-from typing import Dict, List, Optional, Literal
+from functools import lru_cache
+from typing import Type
+from typing import List, Optional
 
 from langchain_core.tools import BaseTool, BaseToolkit
-from pydantic import create_model, BaseModel, ConfigDict, Field, SecretStr
+from pydantic import BaseModel, Field, SecretStr, field_validator, computed_field
 
 from .api_wrapper import AlitaGitHubAPIWrapper
 from .tool import GitHubAction
@@ -9,6 +11,105 @@ from .tool import GitHubAction
 from ..utils import clean_string, TOOLKIT_SPLITTER, get_max_toolkit_length
 
 name = "github"
+
+
+@lru_cache(maxsize=1)
+def get_available_tools() -> dict[str, dict]:
+    api_wrapper = AlitaGitHubAPIWrapper.model_construct()
+    available_tools: dict = {
+        x['name']: x['args_schema'].model_json_schema() for x in
+        api_wrapper.get_available_tools()
+    }
+    return available_tools
+
+toolkit_max_length = lru_cache(maxsize=1)(lambda: get_max_toolkit_length(get_available_tools()))
+
+
+class AlitaGitHubToolkitConfig(BaseModel):
+    class Config:
+        title = name
+        json_schema_extra = {
+            'metadata': {
+                "label": "GitHub",
+                "icon_url": None,
+                "sections": {
+                    "auth": {
+                        "required": False,
+                        "subsections": [
+                            {
+                                "name": "Token",
+                                "fields": ["access_token"]
+                            },
+                            {
+                                "name": "Password",
+                                "fields": ["username", "password"]
+                            },
+                            {
+                                "name": "App private key",
+                                "fields": ["app_id", "app_private_key"]
+                            },
+                        ]
+                    }
+                }
+            }
+        }
+
+    base_url: Optional[str] = Field(
+        default="https://api.github.com",
+        description="Base API URL",
+        json_schema_extra={'configuration': True, 'configuration_title': True}
+    )
+    app_id: Optional[str] = Field(
+        default=None,
+        description="Github APP ID",
+        json_schema_extra={'configuration': True},
+    )
+    app_private_key: Optional[SecretStr] = Field(
+        default=None,
+        description="Github APP private key",
+        json_schema_extra={'secret': True, 'configuration': True},
+    )
+    access_token: Optional[SecretStr] = Field(
+        default=None,
+        description="Github Access Token",
+        json_schema_extra={'secret': True, 'configuration': True},
+    )
+    username: Optional[str] = Field(
+        default=None,
+        description="Github Username",
+        json_schema_extra={'configuration': True},
+    )
+    password: Optional[SecretStr] = Field(
+        default=None,
+        description="Github Password",
+        json_schema_extra={'secret': True, 'configuration': True},
+    )
+    repository: str = Field(
+        description="Github repository",
+        json_schema_extra={
+            'toolkit_name': True,
+            'max_toolkit_length': 100  # Example limit; adjust as needed
+        },
+    )
+    active_branch: Optional[str] = Field(
+        default="main",
+        description="Active branch",
+    )
+    base_branch: Optional[str] = Field(
+        default="main",
+        description="Github Base branch",
+    )
+    selected_tools: List[str] = Field(
+        default=[],
+        description="Selected tools",
+        json_schema_extra={'args_schemas': get_available_tools()},
+    )
+
+    @field_validator('selected_tools', mode='before', check_fields=False)
+    @classmethod
+    def selected_tools_validator(cls, value: List[str]) -> list[str]:
+        return [i for i in value if i in get_available_tools()]
+
 
 def _get_toolkit(tool) -> BaseToolkit:
     return AlitaGitHubToolkit().get_toolkit(
@@ -26,85 +127,56 @@ def _get_toolkit(tool) -> BaseToolkit:
         toolkit_name=tool.get('toolkit_name')
     )
 
+
 def get_toolkit():
     return AlitaGitHubToolkit.toolkit_config_schema()
+
 
 def get_tools(tool):
     return _get_toolkit(tool).get_tools()
 
+
 class AlitaGitHubToolkit(BaseToolkit):
     tools: List[BaseTool] = []
-    toolkit_max_length: int = 0
+
+    api_wrapper: Optional[AlitaGitHubAPIWrapper] = Field(default_factory=AlitaGitHubAPIWrapper.model_construct)
+    toolkit_name: Optional[str] = None
+
+    @computed_field
+    @property
+    def tool_prefix(self) -> str:
+        return clean_string(self.toolkit_name, toolkit_max_length()) + TOOLKIT_SPLITTER if self.toolkit_name else ''
+
+    @computed_field
+    @property
+    def available_tools(self) -> List[dict]:
+        return self.api_wrapper.get_available_tools()
 
     @staticmethod
-    def toolkit_config_schema() -> BaseModel:
-        selected_tools = {x['name']: x['args_schema'].schema() for x in AlitaGitHubAPIWrapper.model_construct().get_available_tools()}
-        AlitaGitHubToolkit.toolkit_max_length = get_max_toolkit_length(selected_tools)
-        return create_model(
-            name,
-            __config__=ConfigDict(
-                json_schema_extra={
-                    'metadata': {
-                        "label": "GitHub",
-                        "icon_url": None,
-                        "sections": {
-                            "auth": {
-                                "required": False,
-                                "subsections": [
-                                    {
-                                        "name": "Token",
-                                        "fields": ["access_token"]
-                                    },
-                                    {
-                                        "name": "Password",
-                                        "fields": ["username", "password"]
-                                    },
-                                    {
-                                        "name": "App private key",
-                                        "fields": ["app_id", "app_private_key"]
-                                    }
-                                ]
-                            }
-                        }
-                    },
-                }
-            ),
-            base_url=(Optional[str], Field(description="Base API URL", default="https://api.github.com", json_schema_extra={'configuration': True, 'configuration_title': True})),
-            app_id=(Optional[str], Field(description="Github APP ID", default=None, json_schema_extra={'configuration': True})),
-            app_private_key=(Optional[SecretStr], Field(description="Github APP private key", default=None, json_schema_extra={'secret': True, 'configuration': True})),
-
-            access_token=(Optional[SecretStr], Field(description="Github Access Token", default=None, json_schema_extra={'secret': True, 'configuration': True})),
-
-            username=(Optional[str], Field(description="Github Username", default=None, json_schema_extra={'configuration': True})),
-            password=(Optional[SecretStr], Field(description="Github Password", default=None, json_schema_extra={'secret': True, 'configuration': True})),
-
-            repository=(str, Field(description="Github repository", json_schema_extra={'toolkit_name': True, 'max_toolkit_length': AlitaGitHubToolkit.toolkit_max_length})),
-            active_branch=(Optional[str], Field(description="Active branch", default="main")),
-            base_branch=(Optional[str], Field(description="Github Base branch", default="main")),
-            selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools}))
-        )
+    def toolkit_config_schema() -> Type[BaseModel]:
+        return AlitaGitHubToolkitConfig
 
     @classmethod
-    def get_toolkit(cls, selected_tools: list[str] | None = None, toolkit_name: Optional[str] = None, **kwargs):
-        if selected_tools is None:
-            selected_tools = []
+    def get_toolkit(cls, selected_tools: list[str] | None = None, toolkit_name: Optional[str] = None, **kwargs) -> "AlitaGitHubToolkit":
         github_api_wrapper = AlitaGitHubAPIWrapper(**kwargs)
-        available_tools: List[Dict] = github_api_wrapper.get_available_tools()
-        tools = []
-        prefix = clean_string(toolkit_name, AlitaGitHubToolkit.toolkit_max_length) + TOOLKIT_SPLITTER if toolkit_name else ''
-        for tool in available_tools:
-            if selected_tools:
-                if tool["name"] not in selected_tools:
-                    continue
-            tools.append(GitHubAction(
-                api_wrapper=github_api_wrapper,
-                name=prefix + tool["name"],
-                mode=tool["mode"],
-                # set unique description for declared tools to differentiate the same methods for different toolkits
-                description=f"Repository: {github_api_wrapper.github_repository}\n" + tool["description"],
-                args_schema=tool["args_schema"]
-            ))
-        return cls(tools=tools)
+        instance = cls(
+            tools=[],
+            api_wrapper=github_api_wrapper,
+            toolkit_name=toolkit_name
+        )
+        if selected_tools:
+            selected_tools = set(selected_tools)
+            for t in instance.available_tools:
+                if t["name"] in selected_tools:
+                    instance.tools.append(GitHubAction(
+                        api_wrapper=instance.api_wrapper,
+                        name=instance.tool_prefix + t["name"],
+                        mode=t["mode"],
+                        # set unique description for declared tools to differentiate the same methods for different toolkits
+                        description=f"Repository: {github_api_wrapper.github_repository}\n" + t["description"],
+                        args_schema=t["args_schema"]
+                    ))
+        return instance
 
     def get_tools(self):
         return self.tools

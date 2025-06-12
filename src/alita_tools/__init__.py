@@ -1,176 +1,329 @@
 import logging
 from importlib import import_module
+from typing import Dict, List
 
-from .github import get_tools as get_github, AlitaGitHubToolkit
-from .openapi import get_tools as get_openapi
-from .jira import get_tools as get_jira, JiraToolkit
-from .confluence import get_tools as get_confluence, ConfluenceToolkit
-from .servicenow import get_tools as get_service_now, ServiceNowToolkit
-from .gitlab import get_tools as get_gitlab, AlitaGitlabToolkit
-from .gitlab_org import get_tools as get_gitlab_org, AlitaGitlabSpaceToolkit
-from .zephyr import get_tools as get_zephyr, ZephyrToolkit
-from .browser import get_tools as get_browser, BrowserToolkit
-from .report_portal import get_tools as get_report_portal, ReportPortalToolkit
-from .bitbucket import get_tools as get_bitbucket, AlitaBitbucketToolkit
-from .testrail import get_tools as get_testrail, TestrailToolkit
-from .testio import get_tools as get_testio, TestIOToolkit
-from .xray import get_tools as get_xray_cloud, XrayToolkit
-from .sharepoint import get_tools as get_sharepoint, SharepointToolkit
-from .qtest import get_tools as get_qtest, QtestToolkit
-from .zephyr_scale import get_tools as get_zephyr_scale, ZephyrScaleToolkit
-from .zephyr_enterprise import get_tools as get_zephyr_enterprise, ZephyrEnterpriseToolkit
-from .ado import get_tools as get_ado
-from .ado.repos import AzureDevOpsReposToolkit
-from .ado.test_plan import AzureDevOpsPlansToolkit
-from .ado.work_item import AzureDevOpsWorkItemsToolkit
-from .ado.wiki import AzureDevOpsWikiToolkit
-from .rally import get_tools as get_rally, RallyToolkit
-from .sql import get_tools as get_sql, SQLToolkit
-from .code.sonar import get_tools as get_sonar, SonarToolkit
-from .google_places import get_tools as get_google_places, GooglePlacesToolkit
-from .yagmail import get_tools as get_yagmail, AlitaYagmailToolkit
-from .cloud.aws import AWSToolkit
-from .cloud.azure import AzureToolkit
-from .cloud.gcp import GCPToolkit
-from .cloud.k8s import KubernetesToolkit
-from .custom_open_api import OpenApiToolkit as CustomOpenApiToolkit
-from .elastic import ElasticToolkit
-from .keycloak import KeycloakToolkit
-from .localgit import AlitaLocalGitToolkit
-from .pandas import get_tools as get_pandas, PandasToolkit
-from .azure_ai.search import AzureSearchToolkit, get_tools as get_azure_search
-from .figma import get_tools as get_figma, FigmaToolkit
-from .salesforce import get_tools as get_salesforce, SalesforceToolkit
-from .carrier import get_tools as get_carrier, AlitaCarrierToolkit
-from .ocr import get_tools as get_ocr, OCRToolkit
-from .pptx import get_tools as get_pptx, PPTXToolkit
+# ado is an exceptional toolkit, unfortunately
+from .ado import get_tools as get_ado_tools, supported_types as ado_supported_types
+
 
 logger = logging.getLogger(__name__)
 
-def get_tools(tools_list, alita: 'AlitaClient', llm: 'LLMLikeObject', *args, **kwargs):
+# Registry that holds the name of the toolkit, import path, get_tools function, and toolkit class
+TOOLKIT_REGISTRY: list[Dict[str, str]] = [
+    {
+        "import_path": ".github",
+        "get_function_name": "get_tools",
+        "toolkit_class_name": "AlitaGitHubToolkit",
+    },
+    {
+        "import_path": ".openapi",
+        "get_function_name": "get_tools",
+        "toolkit_class_name": "AlitaOpenAPIToolkit",
+    },
+    {
+        "import_path": ".jira",
+        "get_function_name": "get_tools",
+        "toolkit_class_name": "JiraToolkit",
+    },
+    {
+        "import_path": ".confluence",
+        "get_function_name": "get_tools",
+        "toolkit_class_name": "ConfluenceToolkit",
+    },
+    {
+        "import_path": ".servicenow",
+        "get_function_name": "get_tools",
+        "toolkit_class_name": "ServiceNowToolkit",
+    },
+    {
+        "import_path": ".gitlab",
+        "get_function_name": "get_tools",
+        "toolkit_class_name": "AlitaGitlabToolkit",
+    },
+    {
+        "import_path": ".gitlab_org",
+        "get_function_name": "get_tools",
+        "toolkit_class_name": "AlitaGitlabSpaceToolkit",
+    },
+    {
+        "import_path": ".zephyr",
+        "get_function_name": "get_tools",
+        "toolkit_class_name": "ZephyrToolkit",
+    },
+    {
+        "import_path": ".browser",
+        "get_function_name": "get_tools",
+        "toolkit_class_name": "BrowserToolkit",
+    },
+    {
+        "import_path": ".yagmail",
+        "get_function_name": "get_tools",
+        "toolkit_class_name": "AlitaYagmailToolkit",
+    },
+    {
+        "import_path": ".report_portal",
+        "get_function_name": "get_tools",
+        "toolkit_class_name": "ReportPortalToolkit",
+    },
+    {
+        "import_path": ".bitbucket",
+        "get_function_name": "get_tools",
+        "toolkit_class_name": "AlitaBitbucketToolkit",
+    },
+    {
+        "import_path": ".testrail",
+        "get_function_name": "get_tools",
+        "toolkit_class_name": "TestrailToolkit",
+    },
+    {
+        "import_path": ".testio",
+        "get_function_name": "get_tools",
+        "toolkit_class_name": "TestIOToolkit",
+    },
+    {
+        "import_path": ".xray",
+        "get_function_name": "get_tools",
+        "toolkit_class_name": "XrayToolkit",
+    },
+    {
+        "import_path": ".sharepoint",
+        "get_function_name": "get_tools",
+        "toolkit_class_name": "SharepointToolkit",
+    },
+    {
+        "import_path": ".qtest",
+        "get_function_name": "get_tools",
+        "toolkit_class_name": "QtestToolkit",
+    },
+    {
+        "import_path": ".zephyr_scale",
+        "get_function_name": "get_tools",
+        "toolkit_class_name": "ZephyrScaleToolkit",
+    },
+    {
+        "import_path": ".zephyr_enterprise",
+        "get_function_name": "get_tools",
+        "toolkit_class_name": "ZephyrEnterpriseToolkit",
+    },
+    {
+        "import_path": ".rally",
+        "get_function_name": "get_tools",
+        "toolkit_class_name": "RallyToolkit",
+    },
+    {
+        "import_path": ".sql",
+        "get_function_name": "get_tools",
+        "toolkit_class_name": "SQLToolkit",
+    },
+    {
+        "import_path": ".code.sonar",
+        "get_function_name": "get_tools",
+        "toolkit_class_name": "SonarToolkit",
+    },
+    {
+        "import_path": ".google_places",
+        "get_function_name": "get_tools",
+        "toolkit_class_name": "GooglePlacesToolkit",
+    },
+    {
+        "import_path": ".azure_ai.search",
+        "get_function_name": "get_tools",
+        "toolkit_class_name": "AzureSearchToolkit",
+    },
+    {
+        "import_path": ".pandas",
+        "get_function_name": "get_tools",
+        "toolkit_class_name": "PandasToolkit",
+    },
+    {
+        "import_path": ".figma",
+        "get_function_name": "get_tools",
+        "toolkit_class_name": "FigmaToolkit",
+    },
+    {
+        "import_path": ".salesforce",
+        "get_function_name": "get_tools",
+        "toolkit_class_name": "SalesforceToolkit",
+    },
+    {
+        "import_path": ".carrier",
+        "get_function_name": "get_tools",
+        "toolkit_class_name": "AlitaCarrierToolkit",
+    },
+    {
+        "import_path": ".ocr",
+        "get_function_name": "get_tools",
+        "toolkit_class_name": "OCRToolkit",
+    },
+    {
+        "import_path": ".pptx",
+        "get_function_name": "get_tools",
+        "toolkit_class_name": "PPTXToolkit",
+    },
+    {
+        "import_path": ".ado.repos",
+        "get_function_name": "get_tools",
+        "toolkit_class_name": "AzureDevOpsReposToolkit",
+    },
+    {
+        "import_path": ".ado.work_item",
+        "get_function_name": "get_tools",
+        "toolkit_class_name": "AzureDevOpsWorkItemsToolkit",
+    },
+    {
+        "import_path": ".ado.wiki",
+        "get_function_name": "get_tools",
+        "toolkit_class_name": "AzureDevOpsWikiToolkit",
+    },
+    {
+        "import_path": ".ado.test_plan",
+        "get_function_name": "get_tools",
+        "toolkit_class_name": "AzureDevOpsPlansToolkit",
+    },
+    {
+        "import_path": ".elastic",
+        "get_function_name": "get_tools",
+        "toolkit_class_name": "ElasticToolkit",
+    },
+    {
+        "import_path": ".custom_open_api",
+        "get_function_name": "get_tools",
+        "toolkit_class_name": "OpenApiToolkit",
+    },
+    {
+        "import_path": ".localgit",
+        "get_function_name": "get_tools",
+        "toolkit_class_name": "AlitaLocalGitToolkit",
+    },
+    {
+        "import_path": ".cloud.aws",
+        "get_function_name": "get_tools",
+        "toolkit_class_name": "AWSToolkit",
+    },
+    {
+        "import_path": ".cloud.azure",
+        "get_function_name": "get_tools",
+        "toolkit_class_name": "AzureToolkit",
+    },
+    {
+        "import_path": ".cloud.gcp",
+        "get_function_name": "get_tools",
+        "toolkit_class_name": "GCPToolkit",
+    },
+    {
+        "import_path": ".cloud.k8s",
+        "get_function_name": "get_tools",
+        "toolkit_class_name": "KubernetesToolkit",
+    },
+    {
+        "import_path": ".keycloak",
+        "get_function_name": "get_tools",
+        "toolkit_class_name": "KeycloakToolkit",
+    }
+]
+
+
+# Dynamically import everything once and store references
+IMPORTED_TOOLKITS = {}
+for toolkit_info in TOOLKIT_REGISTRY:
+    import_path = toolkit_info['import_path']
+    try:
+        mod = import_module(import_path, package=__name__)
+        try:
+            toolkit_name = getattr(mod, 'name')
+            get_function = getattr(mod, toolkit_info["get_function_name"])
+            toolkit_class = getattr(mod, toolkit_info["toolkit_class_name"])
+        except AttributeError as e:
+            logger.error(f'Error importing toolkit {toolkit_info["import_path"]}: {e}')
+            raise
+        if toolkit_name and get_function and toolkit_class:
+            IMPORTED_TOOLKITS[toolkit_name] = {
+                "get_function": get_function,
+                "toolkit_class": toolkit_class,
+                'name': toolkit_name
+            }
+    except ImportError as e:
+        logger.warning(
+            "Could not import '%s' library; skipping. Reason: %s",
+            toolkit_info['import_path'], e
+        )
+
+
+def get_tools(tools_list: list[dict], alita: "AlitaClient", llm: "LLMLikeObject", *args, **kwargs) -> List[dict]:
+
+
     tools = []
     for tool in tools_list:
+        tool.setdefault("settings", {})
         # validate tool name syntax - it cannot be started with _
         for tool_name in tool.get('settings', {}).get('selected_tools', []):
             if tool_name.startswith('_'):
                 raise ValueError(f"Tool name '{tool_name}' from toolkit '{tool.get('type', '')}' cannot start with '_'")
-        tool['settings']['alita'] = alita
-        tool['settings']['llm'] = llm
-        if tool['type'] == 'openapi':
-            tools.extend(get_openapi(tool))
-        elif tool['type'] == 'github':
-            tools.extend(get_github(tool))
-        elif tool['type'] == 'jira':
-            tools.extend(get_jira(tool))
-        elif tool['type'] == 'confluence':
-            tools.extend(get_confluence(tool))
-        elif tool['type'] == 'service_now':
-            tools.extend(get_service_now(tool))
-        elif tool['type'] == 'gitlab':
-            tools.extend(get_gitlab(tool))
-        elif tool['type'] == 'gitlab_org':
-            tools.extend(get_gitlab_org(tool))
-        elif tool['type'] == 'zephyr':
-            tools.extend(get_zephyr(tool))
-        elif tool['type'] == 'browser':
-            tools.extend(get_browser(tool))
-        elif tool['type'] == 'yagmail':
-            tools.extend(get_yagmail(tool))
-        elif tool['type'] == 'report_portal':
-            tools.extend(get_report_portal(tool))
-        elif tool['type'] == 'bitbucket':
-            tools.extend(get_bitbucket(tool))
-        elif tool['type'] == 'testrail':
-            tools.extend(get_testrail(tool))
-        elif tool['type'] in ['ado_boards', 'ado_wiki', 'ado_plans', 'ado_repos', 'azure_devops_repos']:
-            tools.extend(get_ado(tool['type'], tool))
-        elif tool['type'] == 'testio':
-            tools.extend(get_testio(tool))
-        elif tool['type'] == 'xray_cloud':
-            tools.extend(get_xray_cloud(tool))
-        elif tool['type'] == 'sharepoint':
-            tools.extend(get_sharepoint(tool))
-        elif tool['type'] == 'qtest':
-            tools.extend(get_qtest(tool))
-        elif tool['type'] == 'zephyr_scale':
-            tools.extend(get_zephyr_scale(tool))
-        elif tool['type'] == 'zephyr_enterprise':
-            tools.extend(get_zephyr_enterprise(tool))
-        elif tool['type'] == 'rally':
-            tools.extend(get_rally(tool))
-        elif tool['type'] == 'sql':
-            tools.extend(get_sql(tool))
-        elif tool['type'] == 'sonar':
-            tools.extend(get_sonar(tool))
-        elif tool['type'] == 'google_places':
-            tools.extend(get_google_places(tool))
-        elif tool['type'] == 'azure_search':
-            tools.extend(get_azure_search(tool))
-        elif tool['type'] == 'pandas':
-            tools.extend(get_pandas(tool))
-        elif tool['type'] == 'figma':
-            tools.extend(get_figma(tool))
-        elif tool['type'] == 'salesforce':
-            tools.extend(get_salesforce(tool))
-        elif tool['type'] == 'carrier':
-            tools.extend(get_carrier(tool))
-        elif tool['type'] == 'ocr':
-            tools.extend(get_ocr(tool))
-        elif tool['type'] == 'pptx':
-            tools.extend(get_pptx(tool))
+        tool["settings"]["alita"] = alita
+        tool["settings"]["llm"] = llm
+
+        # Identify the toolkit name or type
+        ttype: str = tool["type"]
+
+        # If we have a dynamic import function for the type
+        if ttype in IMPORTED_TOOLKITS:
+            toolkit_info = IMPORTED_TOOLKITS[ttype]
+            try:
+                toolkit_tools = toolkit_info["get_function"](tool)
+                tools.extend(toolkit_tools)
+            except Exception as e:
+                logger.warning("Error getting tools for '%s'. Reason: %s", ttype, e)
+        elif ttype in ado_supported_types:
+            try:
+                toolkit_tools = get_ado_tools(tool_type=ttype, tool=tool)
+                tools.extend(toolkit_tools)
+            except Exception as e:
+                logger.warning("Error getting tools for '%s'. Reason: %s", ttype, e)
         else:
+            # Fallback for custom modules
             if tool.get("settings", {}).get("module"):
                 try:
                     settings = tool.get("settings", {})
                     mod = import_module(settings.pop("module"))
                     tkitclass = getattr(mod, settings.pop("class"))
-                    toolkit = tkitclass.get_toolkit(**tool["settings"])
+                    toolkit = tkitclass.get_toolkit(**settings)
                     tools.extend(toolkit.get_tools())
                 except Exception as e:
-                    logger.error(f"Error in getting toolkit: {e}")
+                    logger.warning(
+                        "Error in getting custom toolkit [%s]. Skipping. Reason: %s",
+                        tool.get("type"), e
+                    )
+            else:
+                logger.warning(
+                    "Unrecognized toolkit '%s' and no custom module provided. Skipping.",
+                    ttype
+                )
     return tools
 
+
 def get_toolkits():
-    return [
-        AlitaGitHubToolkit.toolkit_config_schema(),
-        TestrailToolkit.toolkit_config_schema(),
-        JiraToolkit.toolkit_config_schema(),
-        AzureDevOpsPlansToolkit.toolkit_config_schema(),
-        AzureDevOpsWikiToolkit.toolkit_config_schema(),
-        AzureDevOpsWorkItemsToolkit.toolkit_config_schema(),
-        RallyToolkit.toolkit_config_schema(),
-        QtestToolkit.toolkit_config_schema(),
-        ReportPortalToolkit.toolkit_config_schema(),
-        TestIOToolkit.toolkit_config_schema(),
-        SQLToolkit.toolkit_config_schema(),
-        SonarToolkit.toolkit_config_schema(),
-        GooglePlacesToolkit.toolkit_config_schema(),
-        BrowserToolkit.toolkit_config_schema(),
-        XrayToolkit.toolkit_config_schema(),
-        AlitaGitlabToolkit.toolkit_config_schema(),
-        ConfluenceToolkit.toolkit_config_schema(),
-        ServiceNowToolkit.toolkit_config_schema(),
-        AlitaBitbucketToolkit.toolkit_config_schema(),
-        AlitaGitlabSpaceToolkit.toolkit_config_schema(),
-        ZephyrScaleToolkit.toolkit_config_schema(),
-        ZephyrEnterpriseToolkit.toolkit_config_schema(),
-        ZephyrToolkit.toolkit_config_schema(),
-        AlitaYagmailToolkit.toolkit_config_schema(),
-        SharepointToolkit.toolkit_config_schema(),
-        AzureDevOpsReposToolkit.toolkit_config_schema(),
-        AWSToolkit.toolkit_config_schema(),
-        AzureToolkit.toolkit_config_schema(),
-        GCPToolkit.toolkit_config_schema(),
-        KubernetesToolkit.toolkit_config_schema(),
-        CustomOpenApiToolkit.toolkit_config_schema(),
-        ElasticToolkit.toolkit_config_schema(),
-        KeycloakToolkit.toolkit_config_schema(),
-        AlitaLocalGitToolkit.toolkit_config_schema(),
-        PandasToolkit.toolkit_config_schema(),
-        AzureSearchToolkit.toolkit_config_schema(),
-        FigmaToolkit.toolkit_config_schema(),
-        SalesforceToolkit.toolkit_config_schema(),
-        AlitaCarrierToolkit.toolkit_config_schema(),
-        OCRToolkit.toolkit_config_schema(),
-        PPTXToolkit.toolkit_config_schema(),
-    ]
+    schemas = []
+    for ttype, info in IMPORTED_TOOLKITS.items():
+        # If we have a valid class ref, call the .toolkit_config_schema(), etc.
+        if info.get("toolkit_class"):
+            try:
+                config_schema = info["toolkit_class"].toolkit_config_schema()
+                schemas.append(config_schema)
+            except AttributeError:
+                logger.warning(
+                    "Toolkit class for '%s' does not have 'toolkit_config_schema'. Skipping.",
+                    ttype
+                )
+    return schemas
+
+
+def get_supported_tool_types() -> List[str]:
+    """
+    Get a list of all supported tool types.
+    
+    Returns:
+        List of supported tool type strings
+    """
+    result = set(IMPORTED_TOOLKITS.keys())
+    result.update(ado_supported_types)
+    return list(result)

@@ -1,135 +1,127 @@
-from typing import Any, Dict, List, Optional, Union, Tuple
+import json
 import logging
 import traceback
-import json
-import re
-from pydantic import BaseModel, model_validator, Field
+from typing import Any, Optional, Self
 
-from .github_client import GitHubClient
-from .graphql_client_wrapper import GraphQLClientWrapper
+from langchain_core.callbacks import dispatch_custom_event
+from langchain_core.utils import get_from_env
+from pydantic import model_validator, Field, field_validator, SecretStr, ConfigDict
+from pydantic_core.core_schema import ValidationInfo
+
 # Add imports for the executor and generator
 from .executor.github_code_executor import GitHubCodeExecutor
 from .generator.github_code_generator import GitHubCodeGenerator
+from .github_client import GitHubClient
+from .graphql_client_wrapper import GraphQLClientWrapper
 from .schemas import (
     GitHubAuthConfig,
-    GitHubRepoConfig,
-    ProcessGitHubQueryModel
+    GitHubRepoConfig
 )
-
-from langchain_core.callbacks import dispatch_custom_event
 
 logger = logging.getLogger(__name__)
 
-# Import prompts for tools
-from .tool_prompts import (
-    UPDATE_FILE_PROMPT,
-    CREATE_ISSUE_PROMPT,
-    UPDATE_ISSUE_PROMPT,
-    CREATE_ISSUE_ON_PROJECT_PROMPT,
-    UPDATE_ISSUE_ON_PROJECT_PROMPT,
-    CODE_AND_RUN
-)
 
-
-class AlitaGitHubAPIWrapper(BaseModel):
+class AlitaGitHubAPIWrapper(GitHubAuthConfig, GitHubRepoConfig):
     """
     Wrapper for GitHub API that integrates both REST and GraphQL functionality.
     """
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+        from_attributes=True
+    )
+
     # Authentication config
-    github_access_token: Optional[str] = None
-    github_username: Optional[str] = None
-    github_password: Optional[str] = None
-    github_app_id: Optional[str] = None
-    github_app_private_key: Optional[str] = None
-    github_base_url: Optional[str] = None
+    github_access_token: Optional[SecretStr] = Field(default=None, json_schema_extra={'env_key': 'GITHUB_ACCESS_TOKEN'})
+    github_username: Optional[str] = Field(default=None, json_schema_extra={'env_key': 'GITHUB_USERNAME'})
+    github_password: Optional[SecretStr] = Field(default=None, json_schema_extra={'env_key': 'GITHUB_PASSWORD'})
+    github_app_id: Optional[str] = Field(default=None, json_schema_extra={'env_key': 'GITHUB_APP_ID'})
+    github_app_private_key: Optional[SecretStr] = Field(default=None,
+                                                        json_schema_extra={'env_key': 'GITHUB_APP_PRIVATE_KEY'})
+    github_base_url: Optional[str] = Field(default='https://api.github.com',
+                                           json_schema_extra={'env_key': 'GITHUB_BASE_URL'})
 
     # Repository config
-    github_repository: Optional[str] = None
-    active_branch: Optional[str] = None
-    github_base_branch: Optional[str] = None
+    github_repository: Optional[str] = Field(default=None, json_schema_extra={'env_key': 'GITHUB_REPOSITORY'})
+    github_base_branch: Optional[str] = 'main'
 
     # Add LLM instance
     llm: Optional[Any] = None
 
-    # Client instances - renamed without leading underscores and marked as exclude=True
-    github_client_instance: Optional[GitHubClient] = Field(default=None, exclude=True)
-    graphql_client_instance: Optional[GraphQLClientWrapper] = Field(default=None, exclude=True)
+    _github_client_instance: Optional[GitHubClient] = None
+    _graphql_client_instance: Optional[GraphQLClientWrapper] = None
 
-    class Config:
-        arbitrary_types_allowed = True
-
-    @model_validator(mode='before')
     @classmethod
-    def validate_environment(cls, values: Dict) -> Dict:
-        """
-        Initialize GitHub clients based on the provided values.
+    def model_construct(cls, *args, **kwargs) -> Self:
+        klass = super().model_construct(*args, **kwargs)
+        klass._github_client_instance = GitHubClient.model_construct()
+        klass._graphql_client_instance = GraphQLClientWrapper.model_construct()
+        return klass
 
-        Args:
-            values (Dict): Configuration values for GitHub API wrapper
-
-        Returns:
-            Dict: Updated values dictionary
-        """
-        from langchain.utils import get_from_dict_or_env
-
-        # Get all authentication values
-        github_access_token = get_from_dict_or_env(values, "github_access_token", "GITHUB_ACCESS_TOKEN", default='')
-        github_username = get_from_dict_or_env(values, "github_username", "GITHUB_USERNAME", default='')
-        github_password = get_from_dict_or_env(values, "github_password", "GITHUB_PASSWORD", default='')
-        github_app_id = get_from_dict_or_env(values, "github_app_id", "GITHUB_APP_ID", default='')
-        github_app_private_key = get_from_dict_or_env(values, "github_app_private_key", "GITHUB_APP_PRIVATE_KEY", default='')
-        github_base_url = get_from_dict_or_env(values, "github_base_url", "GITHUB_BASE_URL", default='https://api.github.com')
-
-        auth_config = GitHubAuthConfig(
-            github_access_token=github_access_token,
-            github_username=github_username,
-            github_password=github_password,
-            github_app_id=github_app_id,  # This will be None if not provided - GitHubAuthConfig should allow this
-            github_app_private_key=github_app_private_key,
-            github_base_url=github_base_url
+    @property
+    def auth_config(self):
+        return GitHubAuthConfig(
+            github_access_token=self.github_access_token,
+            github_username=self.github_username,
+            github_password=self.github_password,
+            github_app_id=self.github_app_id,  # This will be None if not provided - GitHubAuthConfig should allow this
+            github_app_private_key=self.github_app_private_key,
+            github_base_url=self.github_base_url
         )
 
-        # Rest of initialization code remains the same
-        github_repository = get_from_dict_or_env(values, "github_repository", "GITHUB_REPOSITORY")
-        github_repository = GitHubClient.clean_repository_name(github_repository)
+    @field_validator(
+        'github_access_token',
+        'github_username',
+        'github_password',
+        'github_app_id',
+        'github_app_private_key',
+        'github_repository',
+        'github_base_url',
+        mode='before', check_fields=False
+    )
+    def set_from_values_or_env(cls, value: str, info: ValidationInfo) -> Optional[str]:
+        if value is None:
+            if json_schema_extra := cls.model_fields[info.field_name].json_schema_extra:
+                if env_key := json_schema_extra.get('env_key'):
+                    try:
+                        return get_from_env(key=info.field_name, env_key=env_key,
+                                            default=cls.model_fields[info.field_name].default)
+                    except ValueError:
+                        return None
+        return value
 
-        repo_config = GitHubRepoConfig(
-            github_repository=github_repository,
-            active_branch=get_from_dict_or_env(values, "active_branch", "ACTIVE_BRANCH", default='main'),  # Change from 'ai' to 'main'
-            github_base_branch=get_from_dict_or_env(values, "github_base_branch", "GITHUB_BASE_BRANCH", default="main")
-        )
+    @field_validator('github_repository', mode='after')
+    def clean_value(cls, value: str) -> str:
+        return GitHubClient.clean_repository_name(value)
 
-        # Initialize GitHub client with keyword arguments
-        github_client = GitHubClient(auth_config=auth_config, repo_config=repo_config)
-        # Initialize GraphQL client with keyword argument
-        graphql_client = GraphQLClientWrapper(github_graphql_instance=github_client.github_api._Github__requester)
-        # Set client attributes on the class (renamed from _github_client to github_client_instance)
-        values["github_client_instance"] = github_client
-        values["graphql_client_instance"] = graphql_client
-
-        # Update values
-        values["github_repository"] = github_repository
-        values["active_branch"] = repo_config.active_branch
-        values["github_base_branch"] = repo_config.github_base_branch
-
-        # Ensure LLM is available in values if needed
-        if "llm" not in values:
-            values["llm"] = None
-
-        return values
+    @model_validator(mode='after')
+    def validate_auth(self) -> Self:
+        # Check that at least one authentication method is provided
+        if not (self.github_access_token or (self.github_username and self.github_password) or self.github_app_id):
+            raise ValueError(
+                "You must provide either a GitHub access token, username/password, or app credentials."
+            )
+        return self
 
     # Expose GitHub REST client methods directly via property
     @property
     def github_client(self) -> GitHubClient:
         """Access to GitHub REST client methods"""
-        return self.github_client_instance
+        if not self._github_client_instance:
+            self._github_client_instance = GitHubClient(
+                auth_config=self.auth_config,
+                repo_config=GitHubRepoConfig.model_validate(self)
+            )
+        return self._github_client_instance
 
-    # Expose GraphQL client methods directly via property
+    # Expose GraphQL client methods directly via property  
     @property
     def graphql_client(self) -> GraphQLClientWrapper:
         """Access to GitHub GraphQL client methods"""
-        return self.graphql_client_instance
-
+        if not self._graphql_client_instance:
+            self._graphql_client_instance = GraphQLClientWrapper(
+                github_graphql_instance=self.github_client.github_api._Github__requester
+            )
+        return self._graphql_client_instance
 
     def process_github_query(self, query: str) -> Any:
         try:
@@ -160,7 +152,6 @@ class AlitaGitHubAPIWrapper(BaseModel):
             import traceback
             logger.error(f"Error processing GitHub query: {e}\n{traceback.format_exc()}")
             return f"Error processing GitHub query: {e}"
-
 
     def generate_github_code(self, task_to_solve: str, error_trace: str = None) -> str:
         """Generate Python code using LLM based on the GitHub task to solve."""
@@ -218,7 +209,7 @@ class AlitaGitHubAPIWrapper(BaseModel):
                 generated_code = self.generate_github_code(query, error_context)
                 # Basic validation: check if code seems runnable (contains 'self.run')
                 if "self.run(" in generated_code:
-                     return generated_code
+                    return generated_code
                 else:
                     raise ValueError("Generated code does not seem to call any GitHub tools.")
             except Exception as e:
@@ -231,20 +222,21 @@ class AlitaGitHubAPIWrapper(BaseModel):
                     logger.error(
                         f"Maximum retry attempts exceeded for GitHub code generation. Last error: {last_error}"
                     )
-                    raise Exception(f"Failed to generate valid GitHub code after {max_retries} retries. Last error: {e}") from e
+                    raise Exception(
+                        f"Failed to generate valid GitHub code after {max_retries} retries. Last error: {e}") from e
         # Should not be reached if logic is correct, but added for safety
         raise Exception("Failed to generate GitHub code.")
 
-    def get_available_tools(self):
+    @property
+    def github_tools(self) -> list:
+        return self.github_client.get_available_tools()
+
+    @property
+    def graphql_tools(self) -> list:
+        return self.graphql_client.get_available_tools()
+
+    def get_available_tools(self) -> list[dict[str, Any]]:
         # this is horrible, I need to think on something better
-        if not self.github_client_instance:
-            github_tools = GitHubClient.model_construct().get_available_tools()
-        else:
-            github_tools = self.github_client_instance.get_available_tools()
-        if not self.graphql_client_instance:
-            graphql_tools = GraphQLClientWrapper.model_construct().get_available_tools()
-        else:
-            graphql_tools = self.graphql_client_instance.get_available_tools()
         code_gen = [
             # {
             #     "ref": self.process_github_query,
@@ -254,7 +246,7 @@ class AlitaGitHubAPIWrapper(BaseModel):
             #     "args_schema": ProcessGitHubQueryModel
             # }
         ]
-        tools = github_tools + graphql_tools + code_gen
+        tools = self.github_tools + self.graphql_tools + code_gen
         return tools
 
     def run(self, name: str, *args: Any, **kwargs: Any):
@@ -262,18 +254,18 @@ class AlitaGitHubAPIWrapper(BaseModel):
             if tool["name"] == name:
                 # Handle potential dictionary input for args when only one dict is passed
                 if len(args) == 1 and isinstance(args[0], dict) and not kwargs:
-                     kwargs = args[0]
-                     args = () # Clear args
+                    kwargs = args[0]
+                    args = ()  # Clear args
                 try:
                     return tool["ref"](*args, **kwargs)
                 except TypeError as e:
-                     # Attempt to call with kwargs only if args fail and kwargs exist
-                     if kwargs and not args:
-                         try:
-                             return tool["ref"](**kwargs)
-                         except TypeError:
-                             raise ValueError(f"Argument mismatch for tool '{name}'. Error: {e}") from e
-                     else:
-                         raise ValueError(f"Argument mismatch for tool '{name}'. Error: {e}") from e
+                    # Attempt to call with kwargs only if args fail and kwargs exist
+                    if kwargs and not args:
+                        try:
+                            return tool["ref"](**kwargs)
+                        except TypeError:
+                            raise ValueError(f"Argument mismatch for tool '{name}'. Error: {e}") from e
+                    else:
+                        raise ValueError(f"Argument mismatch for tool '{name}'. Error: {e}") from e
         else:
             raise ValueError(f"Unknown tool name: {name}")

@@ -1,30 +1,36 @@
-from .test_plan import AzureDevOpsPlansToolkit
-from .wiki import AzureDevOpsWikiToolkit
-from .work_item import AzureDevOpsWorkItemsToolkit
-from .repos import AzureDevOpsReposToolkit
+from typing import List, Literal, Union
+
+from langchain_core.tools import BaseTool
+
+from .repos import AzureDevOpsReposToolkit, name as ado_repos_name, get_tools as ado_repos_get_tools
+from .test_plan import AzureDevOpsPlansToolkit, name as ado_plans_name, name_alias as ado_plans_name_alias, \
+    get_tools as ado_plans_get_tools
+from .wiki import AzureDevOpsWikiToolkit, name as ado_wiki_name, name_alias as ado_wiki_name_alias, \
+    get_tools as ado_wiki_get_tools
+from .work_item import AzureDevOpsWorkItemsToolkit, name as ado_work_items_name, \
+    name_alias as ado_work_items_name_alias, get_tools as ado_work_items_get_tools
 
 name = "azure_devops"
 
 
-def get_tools(tool_type, tool):
-    config_dict = {
-        # common
-        "selected_tools": tool['settings'].get('selected_tools', []),
-        "organization_url": tool['settings']['organization_url'],
-        "project": tool['settings'].get('project', None),
-        "token": tool['settings'].get('token', None),
-        "limit": tool['settings'].get('limit', 5),
-        # repos only
-        "repository_id": tool['settings'].get('repository_id', None),
-        "base_branch": tool['settings'].get('base_branch', None),
-        "active_branch": tool['settings'].get('active_branch', None),
-        "toolkit_name": tool.get('toolkit_name', ''),
-    }
-    if tool_type == 'ado_plans':
-        return AzureDevOpsPlansToolkit().get_toolkit(**config_dict).get_tools()
-    elif tool_type == 'ado_wiki':
-        return AzureDevOpsWikiToolkit().get_toolkit(**config_dict).get_tools()
-    elif tool_type == 'ado_repos' or tool_type == 'azure_devops_repos':
-        return AzureDevOpsReposToolkit().get_toolkit(**config_dict).get_tools()
-    else:
-        return AzureDevOpsWorkItemsToolkit().get_toolkit(**config_dict).get_tools()
+supported_types: set = {
+    ado_plans_name, ado_plans_name_alias,
+    ado_wiki_name, ado_wiki_name_alias,
+    ado_repos_name, ado_work_items_name,
+    ado_work_items_name_alias
+}
+
+
+def get_tools(
+        tool_type: Union[*supported_types],
+        tool: dict
+) -> List[BaseTool]:
+    if tool_type in (ado_plans_name, ado_plans_name_alias):
+        return ado_plans_get_tools(tool)
+    elif tool_type in (ado_wiki_name, ado_wiki_name_alias):
+        return ado_wiki_get_tools(tool)
+    elif tool_type == ado_repos_name:
+        return ado_repos_get_tools(tool)
+    elif tool_type in (ado_work_items_name, ado_work_items_name_alias):
+        return ado_work_items_get_tools(tool)
+    raise ValueError(f"Unsupported tool type: {tool_type}")
