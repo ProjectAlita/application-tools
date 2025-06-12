@@ -980,7 +980,7 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
 
         vectorstore_params["collection_name"] = self.collection_name
         if vectorstore_type.lower() != "chroma":
-            vectorstore_params["connection_string"] = self.connection_string
+            vectorstore_params["connection_string"] = self.connection_string.get_secret_value()
 
         return VectorStoreWrapper(
             llm=self.llm,
