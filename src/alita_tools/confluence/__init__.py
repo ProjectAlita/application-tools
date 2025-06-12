@@ -23,7 +23,10 @@ def get_tools(tool):
         verify_ssl=tool['settings'].get('verify_ssl', True),
         alita=tool['settings'].get('alita'),
         llm=tool['settings'].get('llm', None),
-        toolkit_name=tool.get('toolkit_name')
+        toolkit_name=tool.get('toolkit_name'),
+        # indexer settings
+        connection_string = tool['settings'].get('connection_string', None),
+        collection_name = tool['settings'].get('collection_name', None),
     ).get_tools()
 
 
@@ -57,6 +60,12 @@ class ConfluenceToolkit(BaseToolkit):
             max_retry_seconds=(int, Field(description="Max retry, sec", default=60)),
             selected_tools=(List[Literal[tuple(selected_tools)]],
                             Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
+            # indexer settings
+            connection_string = (Optional[SecretStr], Field(description="Connection string for vectorstore",
+                                                            default=None, json_schema_extra={'hidden': True})),
+            collection_name = (Optional[str], Field(description="Collection name for vectorstore",
+                                                            default=None, json_schema_extra={'hidden': True})),
+
             __config__=ConfigDict(json_schema_extra={
                 'metadata': {
                     "label": "Confluence",
