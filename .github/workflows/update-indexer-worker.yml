@@ -42,11 +42,16 @@ jobs:
           VERSION=$(python -c "import build.util; print(build.util.project_wheel_metadata('.').get('Version'))")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
+      # - name: Install SSH key
+      #   uses: webfactory/ssh-agent@v0.8.0
+      #   with:
+      #     ssh-private-key: ${{ secrets.INDEXER_WORKER_DEPLOYMENT_KEY }}
+
       - name: Checkout indexer_worker
         uses: actions/checkout@v4
         with:
           repository: ProjectAlita/indexer_worker
-          token: ${{ secrets.GITHUB_TOKEN }}
+          ssh-key: ${{ secrets.INDEXER_WORKER_DEPLOYMENT_KEY }}
           path: indexer_worker
 
       - name: Update requirements.txt
