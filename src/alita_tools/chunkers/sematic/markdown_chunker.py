@@ -11,7 +11,7 @@ def markdown_chunker(file_content_generator: Generator[Document, None, None], co
     return_each_line = config.get("return_each_line", False)
     headers_to_split_on = config.get("headers_to_split_on", [])
     max_tokens = config.get("max_tokens", 512)
-    tokens_overlapping = config.get("token_owerlap", 10)
+    tokens_overlapping = config.get("token_overlap", 10)
     headers_to_split_on = [tuple(header) for header in headers_to_split_on]
     for doc in file_content_generator:
         doc_metadata = doc.metadata

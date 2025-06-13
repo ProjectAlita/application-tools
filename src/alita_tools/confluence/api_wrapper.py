@@ -169,9 +169,9 @@ indexPagesParams = create_model(
                     Field(description="The format of the content to be retrieved.")),
 
     ### Loader Parameters
-    page_ids=(List[str], Field(description="List of page IDs to retrieve.", default=None)),
-    label=(str, Field(description="Label to filter pages.", default=None)),
-    cql=(str, Field(description="CQL query to filter pages.", default=None)),
+    page_ids=(Optional[List[str]], Field(description="List of page IDs to retrieve.", default=None)),
+    label=(Optional[str], Field(description="Label to filter pages.", default=None)),
+    cql=(Optional[str], Field(description="CQL query to filter pages.", default=None)),
     limit=(Optional[int], Field(description="Limit the number of results.", default=10)),
     max_pages=(Optional[int], Field(description="Maximum number of pages to retrieve.", default=1000)),
     include_restricted_content=(Optional[bool], Field(description="Include restricted content.", default=False)),
@@ -319,8 +319,8 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
         username = values.get('username')
         token = values.get('token')
         cloud = values.get('cloud')
-        if values.get('collection_name'):
-            values['collection_name'] = shortuuid.encode(values['collection_name'])
+        # if values.get('collection_name'):
+        #     values['collection_name'] = shortuuid.encode(values['collection_name'])
         if token and is_cookie_token(token):
             session = requests.Session()
             session.cookies.update(parse_cookie_string(token))
@@ -953,7 +953,10 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
         """Load Confluence pages and index them in the vector store."""
 
         from alita_tools.chunkers import __confluence_chunkers__ as chunkers, __confluence_models__ as models
-        from alita_sdk.langchain.interfaces.llm_processor import get_embeddings
+        try:
+            from alita_sdk.langchain.interfaces.llm_processor import get_embeddings
+        except ImportError:
+            from src.alita_sdk.langchain.interfaces.llm_processor import get_embeddings
         
         embedding_model = kwargs.get('embedding_model', "HuggingFaceEmbeddings")
         embedding_model_params = kwargs.get('embedding_model_params', {"model_name": "sentence-transformers/all-MiniLM-L6-v2"})
@@ -1053,14 +1056,17 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
 
     def _init_vector_store(self, vectorstore_type: str, embedding_model: str, embedding_model_params: dict, collection_suffix: str = ""):
         """ Initializes the vector store wrapper with the provided parameters."""
-        from alita_sdk.tools.vectorstore import VectorStoreWrapper
+        try:
+            from alita_sdk.tools.vectorstore import VectorStoreWrapper
+        except ImportError:
+            from src.alita_sdk.tools.vectorstore import VectorStoreWrapper
         
         # Validate collection_suffix length
         if collection_suffix and len(collection_suffix.strip()) > 7:
             raise ToolException("collection_suffix must be 7 characters or less")
         
         # Create collection name with suffix if provided
-        collection_name = self.collection_name
+        collection_name = str(self.collection_name)
         if collection_suffix and collection_suffix.strip():
             collection_name = f"{self.collection_name}_{collection_suffix.strip()}"
         

@@ -31,7 +31,7 @@ class MarkdownChunkerConfig(BaseModel):
         description="List of tuples containing header patterns to split on"
     )
     max_tokens: int = Field(default=512, description="Maximum tokens per chunk")
-    token_owerlap: int = Field(default=10, description="Token overlap between chunks")
+    token_overlap: int = Field(default=10, description="Token overlap between chunks")
 
 
 class ProposalChunkerConfig(BaseModel):
