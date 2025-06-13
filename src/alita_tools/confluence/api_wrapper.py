@@ -600,6 +600,9 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
         start = 0
         pages_info = []
         for _ in range((self.max_pages + self.limit - 1) // self.limit):
+            cql_rs = self.client.cql(cql, start=start, limit=self.limit)
+            if not isinstance(cql_rs, dict):
+                return ToolException(f"Unable to find anything per cql {cql}. Search results: {str(cql_rs)}")
             pages = self.client.cql(cql, start=start, limit=self.limit).get("results", [])
             if not pages:
                 break
