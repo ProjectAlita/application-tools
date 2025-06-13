@@ -1547,6 +1547,12 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
                 "ref": self.execute_generic_confluence,
             },
             {
+                "name": "loader",
+                "ref": self.loader,
+                "description": self.loader.__doc__,
+                "args_schema": loaderParams,
+            },
+            {
                 "name": "index_pages",
                 "ref": self.index_pages,
                 "description": self.index_pages.__doc__,
