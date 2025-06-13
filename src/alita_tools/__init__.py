@@ -52,7 +52,7 @@ def get_tools(tools_list, alita: 'AlitaClient', llm: 'LLMLikeObject', *args, **k
     for tool in tools_list:
         # validate tool name syntax - it cannot be started with _
         for tool_name in tool.get('settings', {}).get('selected_tools', []):
-            if tool_name.startswith('_'):
+            if isinstance(tool_name, str) and tool_name.startswith('_'):
                 raise ValueError(f"Tool name '{tool_name}' from toolkit '{tool.get('type', '')}' cannot start with '_'")
         tool['settings']['alita'] = alita
         tool['settings']['llm'] = llm
