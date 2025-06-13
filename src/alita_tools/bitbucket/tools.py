@@ -184,7 +184,8 @@ class GetFilesListTool(BaseTool):
         "GetFilesListModel",
         file_path=(Optional[str], Field(
             description="Package path to read files from. e.g. `src/agents/developer/tools/git/`. Default: None. "
-                        "**IMPORTANT**: the path must not start with a slash")),
+                        "**IMPORTANT**: the path must not start with a slash",
+            default=None)),
         branch=(Optional[str], Field(
             description="branch - name of the branch file should be read from. e.g. `feature-1`. Default: None. "
                         "**IMPORTANT**: if branch not specified, try to determine from the chat history or use active branch.",
