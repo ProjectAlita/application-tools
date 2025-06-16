@@ -6,9 +6,9 @@ from langchain_core.tools import ToolException
 from pydantic import SecretStr
 
 # Modules to test
-from src.alita_tools.carrier.create_ticket_tool import CreateTicketTool, TicketData
 from src.alita_tools.carrier.api_wrapper import CarrierAPIWrapper
 from src.alita_tools.carrier.carrier_sdk import CarrierClient, CarrierCredentials
+from src.alita_tools.carrier.tickets_tool import CreateTicketTool, TicketData
 
 
 @pytest.mark.unit

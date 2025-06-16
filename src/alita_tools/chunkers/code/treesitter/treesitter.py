@@ -1,7 +1,7 @@
 from abc import ABC
 
 import tree_sitter
-from tree_sitter_languages import get_language, get_parser
+from tree_sitter_language_pack import get_language, get_parser
 
 from ..constants import Language
 from .treesitter_registry import TreesitterRegistry

@@ -69,11 +69,9 @@ class TestCarrierApiWrapper:
 
 
     @pytest.mark.negative
+    @pytest.mark.skip(reason="Pydantic validation happens before our custom validator")
     def test_init_missing_project_id(self, wrapper_config):
         """Test initialization fails if project_id is missing or empty."""
-        # Skip this test as Pydantic validation happens before our custom validator
-        pytest.skip("Pydantic validation happens before our custom validator")
-        
         # Original test code kept for reference
         invalid_config_none = wrapper_config.copy()
         invalid_config_none["project_id"] = None
