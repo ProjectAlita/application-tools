@@ -33,10 +33,8 @@ from typing import Literal
 
 indexGitHubRepoParams = create_model(
     "indexGitHubRepoParams",
-    branch=(Optional[str], Field(description="Branch to index files from. Defaults to active branch if None.", default=None)),
     whitelist=(Optional[List[str]], Field(description="File extensions or paths to include. Defaults to all files if None.", default=None)),
     blacklist=(Optional[List[str]], Field(description="File extensions or paths to exclude. Defaults to no exclusions if None.", default=None)),
-    repo_name=(Optional[str], Field(description="Name of the repository in format 'owner/repo'. Defaults to configured repository if None.", default=None)),
     collection_suffix=(Optional[str], Field(description="Optional suffix for collection name (max 7 characters)", default="", max_length=7)),
 )
 
@@ -223,18 +221,21 @@ class AlitaGitHubAPIWrapper(BaseVectorStoreToolApiWrapper):
             {
                 "name": "index_data",
                 "ref": self.index_data,
+                "mode": "index_data",
                 "description": self.index_data.__doc__,
                 "args_schema": indexGitHubRepoParams
             },
             {
                 "name": "search_index",
                 "ref": self.search_index,
+                "mode": "search_index",
                 "description": self.search_index.__doc__,
                 "args_schema": searchGitHubIndexParams
             },
             {
                 "name": "stepback_search_index",
                 "ref": self.stepback_search_index,
+                "mode": "stepback_search_index",
                 "description": self.stepback_search_index.__doc__,
                 "args_schema": stepbackSearchGitHubIndexParams
             }
@@ -265,10 +266,8 @@ class AlitaGitHubAPIWrapper(BaseVectorStoreToolApiWrapper):
             raise ValueError(f"Unknown tool name: {name}")
 
     def index_data(self,
-                   branch: Optional[str] = None,
                    whitelist: Optional[List[str]] = None,
                    blacklist: Optional[List[str]] = None,
-                   repo_name: Optional[str] = None,
                    collection_suffix: str = "",
                    **kwargs) -> str:
         """Index GitHub repository files in the vector store using code parsing."""
@@ -279,10 +278,10 @@ class AlitaGitHubAPIWrapper(BaseVectorStoreToolApiWrapper):
             from src.alita_sdk.langchain.interfaces.llm_processor import get_embeddings
         
         documents = self.github_client_instance.loader(
-            branch=branch,
+            branch=self.active_branch,
             whitelist=whitelist,
             blacklist=blacklist,
-            repo_name=repo_name
+            repo_name=self.github_repository
         )
         vectorstore = self._init_vector_store(collection_suffix)
         return vectorstore.index_documents(documents)
