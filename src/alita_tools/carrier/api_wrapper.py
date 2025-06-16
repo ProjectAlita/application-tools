@@ -69,9 +69,6 @@ class CarrierAPIWrapper(BaseModel):
     def get_engagements_list(self) -> List[Dict[str, Any]]:
         return self._client.get_engagements_list()
 
-    def download_and_unzip_reports(self, file_name: str, bucket: str, extract_to: str = "/tmp") -> str:
-        return self._client.download_and_unzip_reports(file_name, bucket, extract_to)
-
     def get_report_file_name(self, report_id: str, extract_to: str = "/tmp"):
         return self._client.get_report_file_name(report_id, extract_to)
 

@@ -7,7 +7,6 @@ from langchain_core.tools import BaseTool, ToolException
 from pydantic.fields import Field
 from pydantic import create_model, BaseModel
 from .api_wrapper import CarrierAPIWrapper
-from .carrier_sdk import CarrierCredentials
 from .utils import get_latest_log_file, calculate_thresholds
 import os
 from .excel_reporter import GatlingReportParser, JMeterReportParser, ExcelReporter
@@ -166,12 +165,12 @@ class CreateExcelReportTool(BaseTool):
     def _process_report_by_id(self, report_id, parameters):
         """Process report using report ID."""
         report, file_path = self.api_wrapper.get_report_file_name(report_id)
-        carrier_report = f"https://platform.getcarrier.io/-/performance/backend/results?result_id={report_id}"
+        carrier_report = f"{self.api_wrapper.url.rstrip('/')}/-/performance/backend/results?result_id={report_id}"
         lg_type = report.get("lg_type")
         excel_report_file_name = f'/tmp/reports_test_results_{report["build_id"]}_excel_report.xlsx'
         bucket_name = report["name"].replace("_", "").replace(" ", "").lower()
 
-        result_stats_j = self._parse_report(file_path, lg_type, parameters["think_time"])
+        result_stats_j = self._parse_report(file_path, lg_type, parameters["think_time"], is_absolute_file_path=True)
         calc_thr_j = self._calculate_thresholds(result_stats_j, parameters)
 
         return self._generate_and_upload_report(
@@ -243,7 +242,7 @@ class CreateExcelReportTool(BaseTool):
         return f"Excel report generated and uploaded to bucket {bucket_name}, " \
                f"report name: {excel_report}, " \
                f"link to download report from Carrier: " \
-               f"https://platform.getcarrier.io/api/v1/artifacts/artifact/default/{self.api_wrapper.project_id}/{bucket_name}/{excel_report}"
+               f"{self.api_wrapper.url.rstrip('/')}/api/v1/artifacts/artifact/default/{self.api_wrapper.project_id}/{bucket_name}/{excel_report}"
 
     def _cleanup(self, file_path, excel_report_file_name):
         """Clean up temporary files."""
