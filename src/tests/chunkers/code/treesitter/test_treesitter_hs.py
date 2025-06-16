@@ -10,13 +10,13 @@ class TestTreesitterHaskell:
         return TreesitterHaskell()
 
     def test_query_method_name_with_signature(self, parser):
-        """Test method name extraction from signature with identifier"""
-        # Setup mock nodes structure: signature -> identifier
+        """Test method name extraction from signature with variable"""
+        # Setup mock nodes structure: signature -> variable
         mock_node = MagicMock()
         mock_node.type = "signature"
 
         name_mock = MagicMock()
-        name_mock.type = "identifier"
+        name_mock.type = "variable"
         name_mock.text.decode.return_value = "testFunction"
 
         mock_node.children = [name_mock]
@@ -26,13 +26,13 @@ class TestTreesitterHaskell:
         name_mock.text.decode.assert_called_once()
 
     def test_query_method_name_with_function(self, parser):
-        """Test method name extraction from function declaration"""
-        # Setup mock nodes structure: function -> identifier
+        """Test method name extraction from function declaration with variable"""
+        # Setup mock nodes structure: function -> variable
         mock_node = MagicMock()
         mock_node.type = "function"
 
         name_mock = MagicMock()
-        name_mock.type = "identifier"
+        name_mock.type = "variable"
         name_mock.text.decode.return_value = "simpleFunction"
 
         mock_node.children = [name_mock]
@@ -42,7 +42,7 @@ class TestTreesitterHaskell:
         name_mock.text.decode.assert_called_once()
 
     def test_query_method_name_not_found(self, parser):
-        """Test method name extraction when no identifier found"""
+        """Test method name extraction when no variable found"""
         mock_node = MagicMock()
         mock_node.type = "signature"
         mock_node.children = [MagicMock(type="unexpected_node_type")]

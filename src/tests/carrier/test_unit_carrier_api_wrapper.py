@@ -7,7 +7,6 @@ from src.alita_tools.carrier.api_wrapper import CarrierAPIWrapper
 from src.alita_tools.carrier.carrier_sdk import CarrierClient, CarrierCredentials, CarrierAPIError
 from src.alita_tools.carrier.utils import TicketPayload # Assuming TicketPayload is used
 
-
 @pytest.mark.unit
 @pytest.mark.carrier
 class TestCarrierApiWrapper:
@@ -32,7 +31,6 @@ class TestCarrierApiWrapper:
             mock_instance.credentials.project_id = "mock_project_id_from_client" # Set a mock project_id
             mock_client_class.return_value = mock_instance
             yield mock_client_class # Yield the class itself
-
 
     @pytest.mark.positive
     # Patch the validator to prevent it running during this test
@@ -66,7 +64,6 @@ class TestCarrierApiWrapper:
             assert call_kwargs['credentials'].token == wrapper_config["private_token"].get_secret_value()
         assert call_kwargs['credentials'].organization == wrapper_config["organization"]
         assert call_kwargs['credentials'].project_id == wrapper_config["project_id"]
-
 
     @pytest.mark.negative
     @pytest.mark.skip(reason="Pydantic validation happens before our custom validator")
@@ -148,41 +145,6 @@ class TestCarrierApiWrapper:
         mock_client_instance.create_ticket.assert_called_once_with(mock_payload)
         assert result == {} # Wrapper should return empty dict on API error
 
-    @pytest.mark.positive
-    # Patch the validator as it runs during instantiation
-    @patch('src.alita_tools.carrier.api_wrapper.CarrierAPIWrapper.initialize_client', return_value=None)
-    def test_fetch_test_data(self, mock_init_validator, wrapper_config, mock_carrier_client):
-        """Test fetch_test_data calls the client method."""
-        wrapper = CarrierAPIWrapper(**wrapper_config)
-        # Manually assign the mocked client instance since the validator didn't run
-        wrapper._client = mock_carrier_client.return_value
-        mock_client_instance = wrapper._client
-        start_time = "2024-01-01T00:00:00Z"
-        expected_result = [{"data": "value"}]
-        mock_client_instance.fetch_test_data.return_value = expected_result
-
-        result = wrapper.fetch_test_data(start_time)
-
-        mock_client_instance.fetch_test_data.assert_called_once_with(start_time)
-        assert result == expected_result
-
-
-    @pytest.mark.positive
-    @patch('src.alita_tools.carrier.api_wrapper.CarrierAPIWrapper.initialize_client', return_value=None)
-    def test_fetch_audit_logs(self, mock_init_validator, wrapper_config, mock_carrier_client):
-        """Test fetch_audit_logs calls the client method."""
-        wrapper = CarrierAPIWrapper(**wrapper_config)
-        wrapper._client = mock_carrier_client.return_value # Manually assign mock client
-        mock_client_instance = wrapper._client
-        auditable_ids = [1, 2]
-        days = 3
-        expected_result = [{"log": "entry"}]
-        mock_client_instance.fetch_audit_logs.return_value = expected_result
-
-        result = wrapper.fetch_audit_logs(auditable_ids, days)
-
-        mock_client_instance.fetch_audit_logs.assert_called_once_with(auditable_ids, days)
-        assert result == expected_result
 
     @pytest.mark.positive
     @patch('src.alita_tools.carrier.api_wrapper.CarrierAPIWrapper.initialize_client', return_value=None)

@@ -143,6 +143,7 @@ class TestConfluenceToolkit:
         
         # Create a mock tool configuration
         tool_config = {
+            'id': 'test-id-123',
             'settings': {
                 'base_url': 'https://confluence.example.com',
                 'space': 'TEST',

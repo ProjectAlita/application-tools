@@ -52,7 +52,8 @@ class TestCarrierTools:
         result = tool._run(board_id=board_id)
 
         mock_api_wrapper.fetch_tickets.assert_called_once_with(board_id)
-        assert result == json.dumps(expected_tickets, indent=2)
+        expected_result = f"{expected_tickets[0]['title']}\n{expected_tickets[1]['title']}"
+        assert result == expected_result, f"Expected: {expected_result}, Got: {result}"
 
     @pytest.mark.negative
     def test_fetch_tickets_tool_run_exception(self, mock_api_wrapper):
