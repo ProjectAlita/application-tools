@@ -44,3 +44,11 @@ class ProposalChunkerConfig(BaseModel):
         if self.llm is None:
             raise ValueError("llm field must be set before using the chunker")
         return self
+
+
+class CodeChunkerConfig(BaseModel):
+    """Configuration for code chunker using parse_code_files_for_db"""
+    chunk_size: int = Field(default=1024, description="Maximum characters per chunk for code splitting")
+    chunk_overlap: int = Field(default=128, description="Character overlap between chunks")
+    token_chunk_size: int = Field(default=256, description="Token chunk size for unknown language files")
+    token_overlap: int = Field(default=30, description="Token overlap for unknown language files")

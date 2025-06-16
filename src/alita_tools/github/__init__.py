@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Literal
+from typing import Dict, List, Optional, Literal, Any
 
 from langchain_core.tools import BaseTool, BaseToolkit
 from pydantic import create_model, BaseModel, ConfigDict, Field, SecretStr
@@ -23,6 +23,12 @@ def _get_toolkit(tool) -> BaseToolkit:
         github_app_id=tool['settings'].get('app_id', None),
         github_app_private_key=tool['settings'].get('app_private_key', None),
         llm=tool['settings'].get('llm', None),
+        connection_string=tool['settings'].get('connection_string', None),
+        collection_name=str(tool['id']),
+        doctype='code',
+        embedding_model="HuggingFaceEmbeddings",
+        embedding_model_params={"model_name": "sentence-transformers/all-MiniLM-L6-v2"},
+        vectorstore_type="PGVector",
         toolkit_name=tool.get('toolkit_name')
     )
 
@@ -64,7 +70,7 @@ class AlitaGitHubToolkit(BaseToolkit):
                                         "fields": ["app_id", "app_private_key"]
                                     }
                                 ]
-                            }
+                            },
                         }
                     },
                 }
@@ -81,6 +87,12 @@ class AlitaGitHubToolkit(BaseToolkit):
             repository=(str, Field(description="Github repository", json_schema_extra={'toolkit_name': True, 'max_toolkit_length': AlitaGitHubToolkit.toolkit_max_length})),
             active_branch=(Optional[str], Field(description="Active branch", default="main")),
             base_branch=(Optional[str], Field(description="Github Base branch", default="main")),
+            
+            # indexer settings
+            connection_string = (Optional[SecretStr], Field(description="Connection string for vectorstore",
+                                                            default=None,
+                                                            json_schema_extra={'secret': True})),
+            
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools}))
         )
 

@@ -2,7 +2,7 @@ import ast
 import fnmatch
 import logging
 import traceback
-from typing import Any, Optional, List
+from typing import Any, Optional, List, Dict
 from langchain_core.tools import ToolException
 from pydantic import BaseModel, create_model, Field
 from .utils import TOOLKIT_SPLITTER
@@ -104,7 +104,81 @@ class BaseToolApiWrapper(BaseModel):
             raise ValueError(f"Unknown mode: {mode}")
 
 
-class BaseCodeToolApiWrapper(BaseToolApiWrapper):
+class BaseVectorStoreToolApiWrapper(BaseToolApiWrapper):
+    """Base class for tool API wrappers that support vector store functionality."""
+    
+    def _init_vector_store(self, collection_suffix: str = "", embeddings: Optional[Any] = None):
+        """ Initializes the vector store wrapper with the provided parameters."""
+        try:
+            from alita_sdk.tools.vectorstore import VectorStoreWrapper
+        except ImportError:
+            from src.alita_sdk.tools.vectorstore import VectorStoreWrapper
+        
+        # Validate collection_suffix length
+        if collection_suffix and len(collection_suffix.strip()) > 7:
+            raise ToolException("collection_suffix must be 7 characters or less")
+        
+        # Create collection name with suffix if provided
+        collection_name = str(self.collection_name)
+        if collection_suffix and collection_suffix.strip():
+            collection_name = f"{self.collection_name}_{collection_suffix.strip()}"
+        
+        if self.vectorstore_type == 'PGVector':
+            vectorstore_params = {
+                "use_jsonb": True,
+                "collection_name": collection_name,
+                "create_extension": True,
+                "alita_sdk_options": {
+                    "target_schema": collection_name,
+                },
+                "connection_string": self.connection_string.get_secret_value()
+            }
+        elif self.vectorstore_type == 'Chroma':
+            vectorstore_params = {
+                "collection_name": collection_name,
+                "persist_directory": "./indexer_db"
+            }
+
+        return VectorStoreWrapper(
+            llm=self.llm,
+            vectorstore_type=self.vectorstore_type,
+            embedding_model=self.embedding_model,
+            embedding_model_params=self.embedding_model_params,
+            vectorstore_params=vectorstore_params,
+            embeddings=embeddings
+        )
+
+    def search_index(self,
+                     query: str,
+                     collection_suffix: str = "",
+                     filter: dict | str = {}, cut_off: float = 0.5,
+                     search_top: int = 10, reranker: dict = {},
+                     full_text_search: Optional[Dict[str, Any]] = None,
+                     reranking_config: Optional[Dict[str, Dict[str, Any]]] = None,
+                     extended_search: Optional[List[str]] = None,
+                     **kwargs):
+        """ Searches indexed documents in the vector store."""
+        vectorstore = self._init_vector_store(collection_suffix)
+        return vectorstore.search_documents(query, self.doctype, filter, cut_off, search_top, reranker,
+                                            full_text_search, reranking_config, extended_search)
+
+    def stepback_search_index(self,
+                     query: str,
+                     messages: List[Dict[str, Any]] = [],
+                     collection_suffix: str = "",
+                     filter: dict | str = {}, cut_off: float = 0.5,
+                     search_top: int = 10, reranker: dict = {},
+                     full_text_search: Optional[Dict[str, Any]] = None,
+                     reranking_config: Optional[Dict[str, Dict[str, Any]]] = None,
+                     extended_search: Optional[List[str]] = None,
+                     **kwargs):
+        """ Searches indexed documents in the vector store."""
+        vectorstore = self._init_vector_store(collection_suffix)
+        return vectorstore.stepback_search(query, messages, self.doctype, filter, cut_off, search_top, reranker,
+                                           full_text_search, reranking_config, extended_search)
+
+
+class BaseCodeToolApiWrapper(BaseVectorStoreToolApiWrapper):
 
     def _get_files(self):
         raise NotImplementedError("Subclasses should implement this method")
@@ -180,3 +254,24 @@ class BaseCodeToolApiWrapper(BaseToolApiWrapper):
                            "file_content": self._read_file(file, branch=branch or self.active_branch)}
 
         return parse_code_files_for_db(file_content_generator())
+    
+    def index_data(self,
+                   branch: Optional[str] = None,
+                   whitelist: Optional[List[str]] = None,
+                   blacklist: Optional[List[str]] = None,
+                   collection_suffix: str = "",
+                   **kwargs) -> str:
+        """Index repository files in the vector store using code parsing."""
+        
+        try:
+            from alita_sdk.langchain.interfaces.llm_processor import get_embeddings
+        except ImportError:
+            from src.alita_sdk.langchain.interfaces.llm_processor import get_embeddings
+        
+        documents = self.loader(
+            branch=branch,
+            whitelist=whitelist,
+            blacklist=blacklist
+        )
+        vectorstore = self._init_vector_store(collection_suffix)
+        return vectorstore.index_documents(documents)

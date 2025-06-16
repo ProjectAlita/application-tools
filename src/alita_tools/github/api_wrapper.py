@@ -3,18 +3,16 @@ import logging
 import traceback
 import json
 import re
-from pydantic import BaseModel, model_validator, Field
+from pydantic import BaseModel, model_validator, Field, SecretStr
 
 from .github_client import GitHubClient
 from .graphql_client_wrapper import GraphQLClientWrapper
-# Add imports for the executor and generator
-from .executor.github_code_executor import GitHubCodeExecutor
-from .generator.github_code_generator import GitHubCodeGenerator
 from .schemas import (
     GitHubAuthConfig,
-    GitHubRepoConfig,
-    ProcessGitHubQueryModel
+    GitHubRepoConfig
 )
+
+from ..elitea_base import BaseVectorStoreToolApiWrapper
 
 from langchain_core.callbacks import dispatch_custom_event
 
@@ -26,12 +24,83 @@ from .tool_prompts import (
     CREATE_ISSUE_PROMPT,
     UPDATE_ISSUE_PROMPT,
     CREATE_ISSUE_ON_PROJECT_PROMPT,
-    UPDATE_ISSUE_ON_PROJECT_PROMPT,
-    CODE_AND_RUN
+    UPDATE_ISSUE_ON_PROJECT_PROMPT
+)
+
+# Create schema models for the new indexing functionality
+from pydantic import create_model
+from typing import Literal
+
+indexGitHubRepoParams = create_model(
+    "indexGitHubRepoParams",
+    branch=(Optional[str], Field(description="Branch to index files from. Defaults to active branch if None.", default=None)),
+    whitelist=(Optional[List[str]], Field(description="File extensions or paths to include. Defaults to all files if None.", default=None)),
+    blacklist=(Optional[List[str]], Field(description="File extensions or paths to exclude. Defaults to no exclusions if None.", default=None)),
+    repo_name=(Optional[str], Field(description="Name of the repository in format 'owner/repo'. Defaults to configured repository if None.", default=None)),
+    collection_suffix=(Optional[str], Field(description="Optional suffix for collection name (max 7 characters)", default="", max_length=7)),
+)
+
+searchGitHubIndexParams = create_model(
+    "searchGitHubIndexParams",
+    query=(str, Field(description="Query text to search in the index")),
+    collection_suffix=(Optional[str], Field(description="Optional suffix for collection name (max 7 characters)", default="", max_length=7)),
+    filter=(Optional[dict | str], Field(
+        description="Filter to apply to the search results. Can be a dictionary or a JSON string.",
+        default={},
+        examples=["{\"repository\": \"owner/repo\"}", "{\"branch\": \"main\"}"]
+    )),
+    cut_off=(Optional[float], Field(description="Cut-off score for search results", default=0.5)),
+    search_top=(Optional[int], Field(description="Number of top results to return", default=10)),
+    reranker=(Optional[dict], Field(
+        description="Reranker configuration. Can be a dictionary with reranking parameters.",
+        default={}
+    )),
+    full_text_search=(Optional[Dict[str, Any]], Field(
+        description="Full text search parameters. Can be a dictionary with search options.",
+        default=None
+    )),
+    reranking_config=(Optional[Dict[str, Dict[str, Any]]], Field(
+        description="Reranking configuration. Can be a dictionary with reranking settings.",
+        default=None
+    )),
+    extended_search=(Optional[List[str]], Field(
+        description="List of additional fields to include in the search results.",
+        default=None
+    )),
+)
+
+stepbackSearchGitHubIndexParams = create_model(
+    "stepbackSearchGitHubIndexParams",
+    query=(str, Field(description="Query text to search in the index")),
+    collection_suffix=(Optional[str], Field(description="Optional suffix for collection name (max 7 characters)", default="", max_length=7)),
+    messages=(Optional[List], Field(description="Chat messages for stepback search context", default=[])),
+    filter=(Optional[dict | str], Field(
+        description="Filter to apply to the search results. Can be a dictionary or a JSON string.",
+        default={},
+        examples=["{\"repository\": \"owner/repo\"}", "{\"branch\": \"main\"}"]
+    )),
+    cut_off=(Optional[float], Field(description="Cut-off score for search results", default=0.5)),
+    search_top=(Optional[int], Field(description="Number of top results to return", default=10)),
+    reranker=(Optional[dict], Field(
+        description="Reranker configuration. Can be a dictionary with reranking parameters.",
+        default={}
+    )),
+    full_text_search=(Optional[Dict[str, Any]], Field(
+        description="Full text search parameters. Can be a dictionary with search options.",
+        default=None
+    )),
+    reranking_config=(Optional[Dict[str, Dict[str, Any]]], Field(
+        description="Reranking configuration. Can be a dictionary with reranking settings.",
+        default=None
+    )),
+    extended_search=(Optional[List[str]], Field(
+        description="List of additional fields to include in the search results.",
+        default=None
+    )),
 )
 
 
-class AlitaGitHubAPIWrapper(BaseModel):
+class AlitaGitHubAPIWrapper(BaseVectorStoreToolApiWrapper):
     """
     Wrapper for GitHub API that integrates both REST and GraphQL functionality.
     """
@@ -50,6 +119,14 @@ class AlitaGitHubAPIWrapper(BaseModel):
 
     # Add LLM instance
     llm: Optional[Any] = None
+
+    # Vector store configuration
+    connection_string: Optional[SecretStr] = None
+    collection_name: Optional[str] = None
+    doctype: Optional[str] = 'code'  # GitHub uses 'code' doctype
+    embedding_model: Optional[str] = "HuggingFaceEmbeddings"
+    embedding_model_params: Optional[Dict[str, Any]] = {"model_name": "sentence-transformers/all-MiniLM-L6-v2"}
+    vectorstore_type: Optional[str] = "PGVector"
 
     # Client instances - renamed without leading underscores and marked as exclude=True
     github_client_instance: Optional[GitHubClient] = Field(default=None, exclude=True)
@@ -131,110 +208,6 @@ class AlitaGitHubAPIWrapper(BaseModel):
         return self.graphql_client_instance
 
 
-    def process_github_query(self, query: str) -> Any:
-        try:
-            code = self.generate_code_with_retries(query)
-            dispatch_custom_event(
-                name="thinking_step",
-                data={
-                    "message": f"Executing generated code... \n\n```python\n{code}\n```",
-                    "tool_name": "process_github_query",
-                    "toolkit": "github"
-                }
-            )
-
-            result = self.execute_github_code(code)
-            dispatch_custom_event(
-                name="thinking_step",
-                data={
-                    "message": f"Execution Results... \n\n```\n{result}\n```",
-                    "tool_name": "process_github_query",
-                    "toolkit": "github"
-                }
-            )
-            if isinstance(result, (dict, list)):
-                import json
-                return json.dumps(result, indent=2)
-            return str(result)
-        except Exception as e:
-            import traceback
-            logger.error(f"Error processing GitHub query: {e}\n{traceback.format_exc()}")
-            return f"Error processing GitHub query: {e}"
-
-
-    def generate_github_code(self, task_to_solve: str, error_trace: str = None) -> str:
-        """Generate Python code using LLM based on the GitHub task to solve."""
-        if not self.llm:
-            raise ValueError("LLM instance is required for code generation.")
-
-        # Prepare tool descriptions for the generator
-        from .schemas import GenericGithubAPICall
-        approved_tools = [
-            {
-                "name": "generic_github_api_call",
-                "args_schema": GenericGithubAPICall,
-            }
-        ]
-
-        tool_info = [
-            {
-                "name": tool["name"],
-                "args_schema": json.dumps(tool["args_schema"].schema()),
-            }
-            for tool in approved_tools + self.graphql_client_instance.get_available_tools()
-        ]
-
-        prompt_addon = f"""
-        
-        ** Default github repository **
-        {self.github_repository}
-        
-        """
-        code = GitHubCodeGenerator(
-            tools_info=tool_info,
-            prompt_addon=prompt_addon,
-            llm=self.llm
-        ).generate_code(task_to_solve, error_trace)
-        return code
-
-    def execute_github_code(self, code: str) -> Any:
-        """Execute the generated GitHub command sequence and return the result."""
-        executor = GitHubCodeExecutor()
-        # Pass the current wrapper instance to the executor's environment
-        # so the generated code can call self.run()
-        executor.add_to_env("self", self)
-        return executor.execute_and_return_result(code)
-
-    def generate_code_with_retries(self, query: str) -> str:
-        """Generate code with retry logic."""
-        max_retries = 3
-        attempts = 0
-        last_error = None
-        generated_code = None
-
-        while attempts <= max_retries:
-            try:
-                error_context = f"Previous attempt failed with error:\n{last_error}" if last_error else None
-                generated_code = self.generate_github_code(query, error_context)
-                # Basic validation: check if code seems runnable (contains 'self.run')
-                if "self.run(" in generated_code:
-                     return generated_code
-                else:
-                    raise ValueError("Generated code does not seem to call any GitHub tools.")
-            except Exception as e:
-                attempts += 1
-                last_error = traceback.format_exc()
-                logger.info(
-                    f"Retrying GitHub Code Generation ({attempts}/{max_retries}). Error: {e}"
-                )
-                if attempts > max_retries:
-                    logger.error(
-                        f"Maximum retry attempts exceeded for GitHub code generation. Last error: {last_error}"
-                    )
-                    raise Exception(f"Failed to generate valid GitHub code after {max_retries} retries. Last error: {e}") from e
-        # Should not be reached if logic is correct, but added for safety
-        raise Exception("Failed to generate GitHub code.")
-
     def get_available_tools(self):
         # this is horrible, I need to think on something better
         if not self.github_client_instance:
@@ -245,16 +218,32 @@ class AlitaGitHubAPIWrapper(BaseModel):
             graphql_tools = GraphQLClientWrapper.model_construct().get_available_tools()
         else:
             graphql_tools = self.graphql_client_instance.get_available_tools()
-        code_gen = [
-            # {
-            #     "ref": self.process_github_query,
-            #     "name": "process_github_query",
-            #     "mode": "process_github_query",
-            #     "description": CODE_AND_RUN,
-            #     "args_schema": ProcessGitHubQueryModel
-            # }
-        ]
-        tools = github_tools + graphql_tools + code_gen
+        
+        # Add vector store tools if configuration is available
+        vector_store_tools = []
+        if self.collection_name and self.connection_string:
+            vector_store_tools = [
+                {
+                    "name": "index_data",
+                    "ref": self.index_data,
+                    "description": self.index_data.__doc__,
+                    "args_schema": indexGitHubRepoParams
+                },
+                {
+                    "name": "search_index",
+                    "ref": self.search_index,
+                    "description": self.search_index.__doc__,
+                    "args_schema": searchGitHubIndexParams
+                },
+                {
+                    "name": "stepback_search_index",
+                    "ref": self.stepback_search_index,
+                    "description": self.stepback_search_index.__doc__,
+                    "args_schema": stepbackSearchGitHubIndexParams
+                }
+            ]
+        
+        tools = github_tools + graphql_tools + vector_store_tools
         return tools
 
     def run(self, name: str, *args: Any, **kwargs: Any):
@@ -277,3 +266,26 @@ class AlitaGitHubAPIWrapper(BaseModel):
                          raise ValueError(f"Argument mismatch for tool '{name}'. Error: {e}") from e
         else:
             raise ValueError(f"Unknown tool name: {name}")
+
+    def index_data(self,
+                   branch: Optional[str] = None,
+                   whitelist: Optional[List[str]] = None,
+                   blacklist: Optional[List[str]] = None,
+                   repo_name: Optional[str] = None,
+                   collection_suffix: str = "",
+                   **kwargs) -> str:
+        """Index GitHub repository files in the vector store using code parsing."""
+        
+        try:
+            from alita_sdk.langchain.interfaces.llm_processor import get_embeddings
+        except ImportError:
+            from src.alita_sdk.langchain.interfaces.llm_processor import get_embeddings
+        
+        documents = self.github_client_instance.loader(
+            branch=branch,
+            whitelist=whitelist,
+            blacklist=blacklist,
+            repo_name=repo_name
+        )
+        vectorstore = self._init_vector_store(collection_suffix)
+        return vectorstore.index_documents(documents)

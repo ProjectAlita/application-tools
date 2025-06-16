@@ -201,13 +201,6 @@ Returns:
     str: JSON string containing project items.
 """
 
-CODE_AND_RUN = """
-EXPERIMENTAL: Takes a natural language query describing a task involving multiple GitHub operations,
-generates Python code using available GitHub tools, executes it, and returns the result.
-The generated code should aim to store the final result in a variable named 'result'.
-Example Query: "Create a new branch named 'feature/new-thing', create a file 'docs/new_feature.md' in it with content '# New Feature', and then create a pull request for it."
-"""
-
 # GraphQL templates moved from graphql_github.py
 from enum import Enum
 from string import Template

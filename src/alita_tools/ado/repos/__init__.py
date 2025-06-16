@@ -9,6 +9,33 @@ from ...utils import clean_string, TOOLKIT_SPLITTER, get_max_toolkit_length
 
 name = "ado_repos"
 
+
+def _get_toolkit(tool) -> BaseToolkit:
+    return AzureDevOpsReposToolkit().get_toolkit(
+        selected_tools=tool['settings'].get('selected_tools', []),
+        organization_url=tool['settings'].get('organization_url', ""),
+        project=tool['settings'].get('project', ""),
+        token=tool['settings'].get('token', ""),
+        limit=tool['settings'].get('limit', 5),
+        repository_id=tool['settings'].get('repository_id', ""),
+        base_branch=tool['settings'].get('base_branch', ""),
+        active_branch=tool['settings'].get('active_branch', ""),
+        toolkit_name=tool['settings'].get('toolkit_name', ""),
+        connection_string=tool['settings'].get('connection_string', None),
+        collection_name=str(tool['id']),
+        doctype='code',
+        embedding_model="HuggingFaceEmbeddings",
+        embedding_model_params={"model_name": "sentence-transformers/all-MiniLM-L6-v2"},
+        vectorstore_type="PGVector",
+        toolkit_name=tool.get('toolkit_name')
+    )
+
+def get_toolkit():
+    return AzureDevOpsReposToolkit.toolkit_config_schema()
+
+def get_tools(tool):
+    return _get_toolkit(tool).get_tools()
+
 class AzureDevOpsReposToolkit(BaseToolkit):
     tools: List[BaseTool] = []
     toolkit_max_length: int = 0
@@ -25,6 +52,12 @@ class AzureDevOpsReposToolkit(BaseToolkit):
             token=(Optional[SecretStr], Field(default="", title="Token", description="ADO token", json_schema_extra={'secret': True})),
             base_branch=(Optional[str], Field(default="", title="Base branch", description="ADO base branch (e.g., main)")),
             active_branch=(Optional[str], Field(default="", title="Active branch", description="ADO active branch (e.g., main)")),
+
+            # indexer settings
+            connection_string = (Optional[SecretStr], Field(description="Connection string for vectorstore",
+                                                            default=None,
+                                                            json_schema_extra={'secret': True})),
+            
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
             __config__={'json_schema_extra': {'metadata':
                 {
@@ -52,6 +85,7 @@ class AzureDevOpsReposToolkit(BaseToolkit):
             environ["AZURE_DEVOPS_CACHE_DIR"] = "/tmp/.azure-devops"
         if selected_tools is None:
             selected_tools = []
+        
         azure_devops_repos_wrapper = ReposApiWrapper(**kwargs)
         available_tools = azure_devops_repos_wrapper.get_available_tools()
         tools = []

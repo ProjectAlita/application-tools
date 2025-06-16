@@ -3,7 +3,7 @@ import re
 from datetime import datetime
 from enum import Enum
 from json import dumps
-from typing import List, Union, Optional
+from typing import List, Union, Optional, Any
 
 from azure.devops.v7_0.git.git_client import GitClient
 from azure.devops.v7_0.git.models import (
@@ -244,6 +244,14 @@ class ReposApiWrapper(BaseCodeToolApiWrapper):
     active_branch: Optional[str]
     token: Optional[SecretStr]
     _client: Optional[GitClient] = PrivateAttr()
+
+    # Vector store configuration
+    connection_string: Optional[SecretStr] = None
+    collection_name: Optional[str] = None
+    doctype: Optional[str] = 'code'
+    embedding_model: Optional[str] = "HuggingFaceEmbeddings"
+    embedding_model_params: Optional[dict] = {"model_name": "sentence-transformers/all-MiniLM-L6-v2"}
+    vectorstore_type: Optional[str] = "PGVector"
 
     class Config:
         arbitrary_types_allowed = True
@@ -1119,7 +1127,7 @@ class ReposApiWrapper(BaseCodeToolApiWrapper):
 
     def get_available_tools(self):
         """Return a list of available tools."""
-        return [
+        tools = [
             {
                 "ref": self.list_branches_in_repo,
                 "name": "list_branches_in_repo",
@@ -1217,3 +1225,99 @@ class ReposApiWrapper(BaseCodeToolApiWrapper):
                 "args_schema": ArgsSchema.GetCommits.value,
             }
         ]
+        
+        # Add vector store tools if configuration is available
+        if self.collection_name and self.connection_string:
+            from pydantic import create_model, Field
+            from typing import Optional, List, Dict, Any
+            
+            indexAdoRepoParams = create_model(
+                "indexAdoRepoParams",
+                branch=(Optional[str], Field(description="Branch to index files from. Defaults to active branch if None.", default=None)),
+                whitelist=(Optional[List[str]], Field(description="File extensions or paths to include. Defaults to all files if None.", default=None)),
+                blacklist=(Optional[List[str]], Field(description="File extensions or paths to exclude. Defaults to no exclusions if None.", default=None)),
+                collection_suffix=(Optional[str], Field(description="Optional suffix for collection name (max 7 characters)", default="", max_length=7)),
+            )
+
+            searchAdoRepoParams = create_model(
+                "searchAdoRepoParams",
+                query=(str, Field(description="Query text to search in the index")),
+                collection_suffix=(Optional[str], Field(description="Optional suffix for collection name (max 7 characters)", default="", max_length=7)),
+                filter=(Optional[dict | str], Field(
+                    description="Filter to apply to the search results. Can be a dictionary or a JSON string.",
+                    default={},
+                    examples=["{\"repository\": \"project/repo\"}", "{\"branch\": \"main\"}"]
+                )),
+                cut_off=(Optional[float], Field(description="Cut-off score for search results", default=0.5)),
+                search_top=(Optional[int], Field(description="Number of top results to return", default=10)),
+                reranker=(Optional[dict], Field(
+                    description="Reranker configuration. Can be a dictionary with reranking parameters.",
+                    default={}
+                )),
+                full_text_search=(Optional[Dict[str, Any]], Field(
+                    description="Full text search parameters. Can be a dictionary with search options.",
+                    default=None
+                )),
+                reranking_config=(Optional[Dict[str, Dict[str, Any]]], Field(
+                    description="Reranking configuration. Can be a dictionary with reranking settings.",
+                    default=None
+                )),
+                extended_search=(Optional[List[str]], Field(
+                    description="List of additional fields to include in the search results.",
+                    default=None
+                )),
+            )
+
+            stepbackSearchAdoRepoParams = create_model(
+                "stepbackSearchAdoRepoParams",
+                query=(str, Field(description="Query text to search in the index")),
+                collection_suffix=(Optional[str], Field(description="Optional suffix for collection name (max 7 characters)", default="", max_length=7)),
+                messages=(Optional[List], Field(description="Chat messages for stepback search context", default=[])),
+                filter=(Optional[dict | str], Field(
+                    description="Filter to apply to the search results. Can be a dictionary or a JSON string.",
+                    default={},
+                    examples=["{\"repository\": \"project/repo\"}", "{\"branch\": \"main\"}"]
+                )),
+                cut_off=(Optional[float], Field(description="Cut-off score for search results", default=0.5)),
+                search_top=(Optional[int], Field(description="Number of top results to return", default=10)),
+                reranker=(Optional[dict], Field(
+                    description="Reranker configuration. Can be a dictionary with reranking parameters.",
+                    default={}
+                )),
+                full_text_search=(Optional[Dict[str, Any]], Field(
+                    description="Full text search parameters. Can be a dictionary with search options.",
+                    default=None
+                )),
+                reranking_config=(Optional[Dict[str, Dict[str, Any]]], Field(
+                    description="Reranking configuration. Can be a dictionary with reranking settings.",
+                    default=None
+                )),
+                extended_search=(Optional[List[str]], Field(
+                    description="List of additional fields to include in the search results.",
+                    default=None
+                )),
+            )
+            
+            vector_store_tools = [
+                {
+                    "name": "index_data",
+                    "ref": self.index_data,
+                    "description": self.index_data.__doc__,
+                    "args_schema": indexAdoRepoParams
+                },
+                {
+                    "name": "search_index",
+                    "ref": self.search_index,
+                    "description": self.search_index.__doc__,
+                    "args_schema": searchAdoRepoParams
+                },
+                {
+                    "name": "stepback_search_index",
+                    "ref": self.stepback_search_index,
+                    "description": self.stepback_search_index.__doc__,
+                    "args_schema": stepbackSearchAdoRepoParams
+                }
+            ]
+            tools.extend(vector_store_tools)
+        
+        return tools
