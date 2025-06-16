@@ -159,8 +159,17 @@ class BaseVectorStoreToolApiWrapper(BaseToolApiWrapper):
                      **kwargs):
         """ Searches indexed documents in the vector store."""
         vectorstore = self._init_vector_store(collection_suffix)
-        return vectorstore.search_documents(query, self.doctype, filter, cut_off, search_top, reranker,
-                                            full_text_search, reranking_config, extended_search)
+        return vectorstore.search_documents(
+            query, 
+            doctype=self.doctype, 
+            filter=filter, 
+            cut_off=cut_off, 
+            search_top=search_top, 
+            reranker=reranker,
+            full_text_search=full_text_search, 
+            reranking_config=reranking_config, 
+            extended_search=extended_search
+        )
 
     def stepback_search_index(self,
                      query: str,
@@ -174,8 +183,17 @@ class BaseVectorStoreToolApiWrapper(BaseToolApiWrapper):
                      **kwargs):
         """ Searches indexed documents in the vector store."""
         vectorstore = self._init_vector_store(collection_suffix)
-        return vectorstore.stepback_search(query, messages, self.doctype, filter, cut_off, search_top, reranker,
-                                           full_text_search, reranking_config, extended_search)
+        return vectorstore.stepback_search(
+            query, 
+            messages, 
+            self.doctype, 
+            filter=filter, 
+            cut_off=cut_off, 
+            search_top=search_top,
+            full_text_search=full_text_search, 
+            reranking_config=reranking_config, 
+            extended_search=extended_search
+        )
 
 
 class BaseCodeToolApiWrapper(BaseVectorStoreToolApiWrapper):
