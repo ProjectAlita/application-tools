@@ -27,7 +27,6 @@ def _get_toolkit(tool) -> BaseToolkit:
         embedding_model="HuggingFaceEmbeddings",
         embedding_model_params={"model_name": "sentence-transformers/all-MiniLM-L6-v2"},
         vectorstore_type="PGVector",
-        toolkit_name=tool.get('toolkit_name')
     )
 
 def get_toolkit():
