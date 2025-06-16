@@ -62,7 +62,7 @@ class TestIOApiWrapper(BaseToolApiWrapper):
         if api_key is not None:
             values['headers'] = {
                 "Accept": "application/json",
-                "Authorization": f"Bearer {api_key.get_secret_value()}",
+                "Authorization": f"Bearer {api_key}",
             }
         return values
 

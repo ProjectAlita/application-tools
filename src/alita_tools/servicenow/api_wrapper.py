@@ -40,12 +40,10 @@ createIncident = create_model(
 updateIncident = create_model(
     "updateIncident",
     sys_id=(str, Field(description="Sys ID of the incident")),
-    data=(Dict[str, Any], Field(
-        description=(
-            "A dictionary containing the incident fields to update. Possible fields include: category, description, "
-            "short_description, impact, incident_state, urgency, and assignment_group."
-        )
-    ))
+    update_fields=(str, Field(description="JSON string of fields to update. Possible fields include: "
+                                                    "category, description, short_description, impact, incident_state, "
+                                                    "urgency, and assignment_group.")
+                   )
 )
 
 class ServiceNowAPIWrapper(BaseToolApiWrapper):
@@ -104,13 +102,20 @@ class ServiceNowAPIWrapper(BaseToolApiWrapper):
         except Exception as e:
             return ToolException(f"ServiceNow tool exception. {e}")
 
-    def update_incident(self, sys_id: str, data: Optional[Dict[str, Any]] = {}) -> ToolException | str:
-        """Updates an existing incident on the ServiceNow database."""
+    def update_incident(self, sys_id: str, update_fields: str) -> ToolException | str:
+        """Updates an existing incident on the ServiceNow database per the provided sys_id and
+         data describing the fields to update.
+
+        Args:
+            sys_id (str): The sys_id of the incident to update.
+            update_fields (str): A JSON string containing the fields to update. Possible fields include:
+            category, description, short_description, impact, incident_state, urgency, and assignment_group.
+         """
         try:
             gr = self.client.GlideRecord('incident')
             if not gr.get(sys_id):
                 return ToolException(f"Incident with sys_id '{sys_id}' not found")
-            self._update_record(gr, data)
+            self._update_record(gr, json.loads(update_fields))
             gr.update()
             incidents = self.parse_glide_results(gr._GlideRecord__results)
             return json.dumps(incidents)

@@ -1,11 +1,11 @@
+import shortuuid
 import re
 import logging
-import hashlib
 import requests
 import json
 import base64
 import traceback
-from typing import Optional, List, Any, Dict, Callable, Generator
+from typing import Optional, List, Any, Dict, Callable, Generator, Literal
 from json import JSONDecodeError
 
 from pydantic import Field, PrivateAttr, model_validator, create_model, SecretStr
@@ -97,7 +97,7 @@ getPageTree = create_model(
     page_id=(str, Field(description="Page id")),
 )
 
-getPageIdByTitleInput= create_model(
+getPageIdByTitleInput = create_model(
     "getPageIdByTitleInput",
     title=(str, Field(description="Page title")),
     type=(Optional[str], Field(description="Jira type of content: Page or Blogpost. Defaults to page", default="page")),
@@ -141,23 +141,115 @@ pageId = create_model(
                                  description="Optional JSON of parameters to be sent in request body or query params. MUST be string with valid JSON. For search/read operations, you MUST always get minimum fields and set max results, until users ask explicitly for more fields. For search/read operations you must generate CQL query string and pass it as params."))
 )
 
-loaderParams = create_model(
-    "LoaderParams",
-    content_format=(str, Field(description="The format of the content to be retrieved.")),
+# loaderParams = create_model(
+#     "LoaderParams",
+#     content_format=(str, Field(description="The format of the content to be retrieved.")),
+#     page_ids=(Optional[List[str]], Field(description="List of page IDs to retrieve.", default=None)),
+#     label=(Optional[str], Field(description="Label to filter pages.", default=None)),
+#     cql=(Optional[str], Field(description="CQL query to filter pages.", default=None)),
+#     include_restricted_content=(Optional[bool], Field(description="Include restricted content.", default=False)),
+#     include_archived_content=(Optional[bool], Field(description="Include archived content.", default=False)),
+#     include_attachments=(Optional[bool], Field(description="Include attachments.", default=False)),
+#     include_comments=(Optional[bool], Field(description="Include comments.", default=False)),
+#     include_labels=(Optional[bool], Field(description="Include labels.", default=False)),
+#     limit=(Optional[int], Field(description="Limit the number of results.", default=10)),
+#     max_pages=(Optional[int], Field(description="Maximum number of pages to retrieve.", default=1000)),
+#     ocr_languages=(Optional[str], Field(description="OCR languages for processing attachments.", default=None)),
+#     keep_markdown_format=(Optional[bool], Field(description="Keep the markdown format.", default=True)),
+#     keep_newlines=(Optional[bool], Field(description="Keep newlines in the content.", default=True)),
+#     bins_with_llm=(Optional[bool], Field(description="Use LLM for processing binary files.", default=False)),
+# )
+
+indexPagesParams = create_model(
+    "indexPagesParams",
+    # embedding_model=(Optional[str], Field(description="Embedding model", default="HuggingFaceEmbeddings")),
+    # embedding_model_params=(Optional[dict], Field(description="Embedding model parameters",
+    #                                               default={"model_name": "sentence-transformers/all-MiniLM-L6-v2"})),
+    content_format=(Literal['view', 'storage', 'export_view', 'editor', 'anonymous'], 
+                    Field(description="The format of the content to be retrieved.")),
+
+    ### Loader Parameters
     page_ids=(Optional[List[str]], Field(description="List of page IDs to retrieve.", default=None)),
     label=(Optional[str], Field(description="Label to filter pages.", default=None)),
     cql=(Optional[str], Field(description="CQL query to filter pages.", default=None)),
+    limit=(Optional[int], Field(description="Limit the number of results.", default=10)),
+    max_pages=(Optional[int], Field(description="Maximum number of pages to retrieve.", default=1000)),
     include_restricted_content=(Optional[bool], Field(description="Include restricted content.", default=False)),
     include_archived_content=(Optional[bool], Field(description="Include archived content.", default=False)),
     include_attachments=(Optional[bool], Field(description="Include attachments.", default=False)),
     include_comments=(Optional[bool], Field(description="Include comments.", default=False)),
-    include_labels=(Optional[bool], Field(description="Include labels.", default=False)),
-    limit=(Optional[int], Field(description="Limit the number of results.", default=10)),
-    max_pages=(Optional[int], Field(description="Maximum number of pages to retrieve.", default=1000)),
-    ocr_languages=(Optional[str], Field(description="OCR languages for processing attachments.", default=None)),
+    include_labels=(Optional[bool], Field(description="Include labels.", default=True)),
+    vectorstore_type=(Optional[str], Field(description="Vectorstore type (Chroma, PGVector, Elastic, etc.)", default="PGVector")),
+    collection_suffix=(Optional[str], Field(description="Optional suffix for collection name (max 7 characters)", default="", max_length=7)),
+    ocr_languages=(Optional[str], Field(description="OCR languages for processing attachments.", default='eng')),
     keep_markdown_format=(Optional[bool], Field(description="Keep the markdown format.", default=True)),
     keep_newlines=(Optional[bool], Field(description="Keep newlines in the content.", default=True)),
     bins_with_llm=(Optional[bool], Field(description="Use LLM for processing binary files.", default=False)),
+    
+    ### Chunking Parameters
+    chunking_tool=(Literal['markdown', 'statistical', 'proposal'], Field(description="Name of chunking tool", default="markdown")),
+    chunking_config=(Optional[dict], Field(description="Chunking tool configuration", default_factory=dict)),
+)
+
+searchIndexParams = create_model(
+    "searchIndexParams",
+    query=(str, Field(description="Query text to search in the index")),
+    vectorstore_type=(Optional[str], Field(description="Vectorstore type (Chroma, PGVector, Elastic, etc.)", default="PGVector")),
+    collection_suffix=(Optional[str], Field(description="Optional suffix for collection name (max 7 characters)", default="", max_length=7)),
+    filter=(Optional[dict | str], Field(
+        description="Filter to apply to the search results. Can be a dictionary or a JSON string.",
+        default={},
+        examples=["{\"key\": \"value\"}", "{\"status\": \"active\"}"]
+    )),
+    cut_off=(Optional[float], Field(description="Cut-off score for search results", default=0.5)),
+    search_top=(Optional[int], Field(description="Number of top results to return", default=10)),
+    reranker=(Optional[dict], Field(
+        description="Reranker configuration. Can be a dictionary with reranking parameters.",
+        default={}
+    )),
+    full_text_search=(Optional[Dict[str, Any]], Field(
+        description="Full text search parameters. Can be a dictionary with search options.",
+        default=None
+    )),
+    reranking_config=(Optional[Dict[str, Dict[str, Any]]], Field(
+        description="Reranking configuration. Can be a dictionary with reranking settings.",
+        default=None
+    )),
+    extended_search=(Optional[List[str]], Field(
+        description="List of additional fields to include in the search results.",
+        default=None
+    )),
+)
+
+stepbackSearchIndexParams = create_model(
+    "stepbackSearchIndexParams",
+    query=(str, Field(description="Query text to search in the index")),
+    vectorstore_type=(Optional[str], Field(description="Vectorstore type (Chroma, PGVector, Elastic, etc.)", default="PGVector")),
+    collection_suffix=(Optional[str], Field(description="Optional suffix for collection name (max 7 characters)", default="", max_length=7)),
+    messages=(Optional[List], Field(description="Chat messages for stepback search context", default=[])),
+    filter=(Optional[dict | str], Field(
+        description="Filter to apply to the search results. Can be a dictionary or a JSON string.",
+        default={},
+        examples=["{\"key\": \"value\"}", "{\"status\": \"active\"}"]
+    )),
+    cut_off=(Optional[float], Field(description="Cut-off score for search results", default=0.5)),
+    search_top=(Optional[int], Field(description="Number of top results to return", default=10)),
+    reranker=(Optional[dict], Field(
+        description="Reranker configuration. Can be a dictionary with reranking parameters.",
+        default={}
+    )),
+    full_text_search=(Optional[Dict[str, Any]], Field(
+        description="Full text search parameters. Can be a dictionary with search options.",
+        default=None
+    )),
+    reranking_config=(Optional[Dict[str, Dict[str, Any]]], Field(
+        description="Reranking configuration. Can be a dictionary with reranking settings.",
+        default=None
+    )),
+    extended_search=(Optional[List[str]], Field(
+        description="List of additional fields to include in the search results.",
+        default=None
+    )),
 )
 
 GetPageWithImageDescriptions = create_model(
@@ -205,6 +297,10 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
     ocr_languages: Optional[str] = None
     keep_newlines: Optional[bool] = True
     llm: Any = None
+    # indexer related
+    connection_string: Optional[SecretStr] = None
+    collection_name: Optional[str] = None
+
     _image_cache: ImageDescriptionCache = PrivateAttr(default_factory=ImageDescriptionCache)
 
     @model_validator(mode='before')
@@ -223,6 +319,8 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
         username = values.get('username')
         token = values.get('token')
         cloud = values.get('cloud')
+        # if values.get('collection_name'):
+        #     values['collection_name'] = shortuuid.encode(values['collection_name'])
         if token and is_cookie_token(token):
             session = requests.Session()
             session.cookies.update(parse_cookie_string(token))
@@ -334,7 +432,7 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
         if not page_id and not page_title:
             raise ValueError("Either page_id or page_title is required to delete the page")
         resolved_page_id = page_id if page_id else (
-                    self.client.get_page_by_title(space=self.space, title=page_title) or {}).get('id')
+                self.client.get_page_by_title(space=self.space, title=page_title) or {}).get('id')
         if resolved_page_id:
             self.client.remove_page(resolved_page_id)
             message = f"Page with ID '{resolved_page_id}' has been successfully deleted."
@@ -533,6 +631,7 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
             "Page not found"
         return result[0].page_content
         # return self._strip_base64_images(result[0].page_content) if skip_images else result[0].page_content
+
     def get_page_id_by_title(self, title: str, type: str = "page"):
         """
         Provide page id from search result by title.
@@ -540,7 +639,7 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
         :param type: type of content: page or blogpost. Defaults to page
         """
         return self.client.get_page_id(space=self.space, title=title, type=type)
-    
+
     def _strip_base64_images(self, content):
         base64_md_pattern = r'data:image/(png|jpeg|gif);base64,[a-zA-Z0-9+/=]+'
         return re.sub(base64_md_pattern, "[Image Removed]", content)
@@ -803,31 +902,16 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
             docs.extend(batch)
         return docs[:max_pages]
 
-    def loader(self,
-               content_format: str,
-               page_ids: Optional[List[str]] = None,
-               label: Optional[str] = None,
-               cql: Optional[str] = None,
-               include_restricted_content: Optional[bool] = False,
-               include_archived_content: Optional[bool] = False,
-               include_attachments: Optional[bool] = False,
-               include_comments: Optional[bool] = False,
-               include_labels: Optional[bool] = False,
-               limit: Optional[int] = 10,
-               max_pages: Optional[int] = 10,
-               ocr_languages: Optional[str] = None,
-               keep_markdown_format: Optional[bool] = True,
-               keep_newlines: Optional[bool] = True,
-               bins_with_llm: bool = False,
-               **kwargs) -> Generator[str, None, None]:
+    def _loader(self, **kwargs) -> Generator[str, None, None]:
         """
         Loads content from Confluence based on parameters.
         Returns:
             Generator: A generator that yields content of pages that match specified criteria
         """
         from .loader import AlitaConfluenceLoader
-
-        content_formant = content_format.lower() if content_format else 'view'
+        from copy import copy
+        content_format = kwargs.get('content_format', 'view').lower()
+        confluence_loader_params = copy(kwargs)
         mapping = {
             'view': ContentFormat.VIEW,
             'storage': ContentFormat.STORAGE,
@@ -835,11 +919,52 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
             'editor': ContentFormat.EDITOR,
             'anonymous': ContentFormat.ANONYMOUS_EXPORT_VIEW
         }
-        content_format = mapping.get(content_formant, ContentFormat.VIEW)
+        confluence_loader_params['content_format'] = mapping.get(content_format, ContentFormat.VIEW)
+        confluence_loader_params['url'] = self.base_url
+        confluence_loader_params['space_key'] = self.space
+        confluence_loader_params['min_retry_seconds'] = self.min_retry_seconds
+        confluence_loader_params['max_retry_seconds'] = self.max_retry_seconds
+        confluence_loader_params['number_of_retries'] = self.number_of_retries
+        bins_with_llm = confluence_loader_params.pop('bins_with_llm', False)
+        loader = AlitaConfluenceLoader(self.client, self.llm, bins_with_llm, **confluence_loader_params)
 
-        confluence_loader_params = {
+        for document in loader._lazy_load(kwargs={}):
+            yield document
+
+    def index_data(self, content_format: str,
+                    vectorstore_type: str = 'PGVector',
+                    collection_suffix: str = "",
+                    page_ids: Optional[List[str]] = None,
+                    label: Optional[str] = None,
+                    cql: Optional[str] = None,
+                    include_restricted_content: Optional[bool] = False,
+                    include_archived_content: Optional[bool] = False,
+                    include_attachments: Optional[bool] = False,
+                    include_comments: Optional[bool] = False,
+                    include_labels: Optional[bool] = False,
+                    limit: Optional[int] = 10,
+                    max_pages: Optional[int] = 10,
+                    keep_markdown_format: Optional[bool] = True,
+                    keep_newlines: Optional[bool] = True,
+                    bins_with_llm: bool = False,
+                    chunking_tool: str = "markdown",
+                    chunking_config: Optional[Dict[str, Any]] = None,
+                    **kwargs) -> Generator[str, None, None]:
+        """Load Confluence pages and index them in the vector store."""
+
+        from alita_tools.chunkers import __confluence_chunkers__ as chunkers, __confluence_models__ as models
+        try:
+            from alita_sdk.langchain.interfaces.llm_processor import get_embeddings
+        except ImportError:
+            from src.alita_sdk.langchain.interfaces.llm_processor import get_embeddings
+        
+        embedding_model = kwargs.get('embedding_model', "HuggingFaceEmbeddings")
+        embedding_model_params = kwargs.get('embedding_model_params', {"model_name": "sentence-transformers/all-MiniLM-L6-v2"})
+        
+        loader_params = {
             'url': self.base_url,
             'space_key': self.space,
+            'content_format': content_format,
             'page_ids': page_ids,
             'label': label,
             'cql': cql,
@@ -848,22 +973,126 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
             'include_attachments': include_attachments,
             'include_comments': include_comments,
             'include_labels': include_labels,
-            'content_format': content_format,
             'limit': limit,
             'max_pages': max_pages,
-            'ocr_languages': ocr_languages,
             'keep_markdown_format': keep_markdown_format,
             'keep_newlines': keep_newlines,
+            'bins_with_llm': bins_with_llm,
             'min_retry_seconds': self.min_retry_seconds,
             'max_retry_seconds': self.max_retry_seconds,
             'number_of_retries': self.number_of_retries
-
         }
+        documents = self._loader(**loader_params)
+        embedding = get_embeddings(embedding_model, embedding_model_params)
+        
+        chunker = chunkers.get(chunking_tool)
+        
+        chunking_config = chunking_config or {}
 
-        loader = AlitaConfluenceLoader(self.client, self.llm, bins_with_llm, **confluence_loader_params)
+        if chunker:
+            # Validate and prepare chunking configuration using Pydantic models
+            config_model = models.get(chunking_tool)
+            if config_model:
+                # Set required fields that should come from the instance
+                chunking_config['embedding'] = embedding
+                chunking_config['llm'] = self.llm
+                
+                try:
+                    # Validate the configuration using the appropriate Pydantic model
+                    validated_config = config_model(**chunking_config)
+                    chunking_config = validated_config.model_dump()
+                except Exception as e:
+                    logger.error(f"Invalid chunking configuration for {chunking_tool}: {e}")
+                    raise ToolException(f"Invalid chunking configuration: {e}")
+            else:
+                # Fallback for chunkers without models
+                chunking_config['embedding'] = embedding
+                chunking_config['llm'] = self.llm
+                
+            documents = chunker(documents, chunking_config)
 
-        for document in loader._lazy_load(kwargs={}):
-            yield document
+        vectorstore = self._init_vector_store(vectorstore_type, embedding_model, embedding_model_params, collection_suffix)
+        return vectorstore.index_documents(documents)
+        
+
+    def search_index(self,
+                     query: str,
+                     vectorstore_type: str = 'PGVector',
+                     collection_suffix: str = "",
+                     filter: dict | str = {}, cut_off: float = 0.5,
+                     search_top: int = 10, reranker: dict = {},
+                     full_text_search: Optional[Dict[str, Any]] = None,
+                     reranking_config: Optional[Dict[str, Dict[str, Any]]] = None,
+                     extended_search: Optional[List[str]] = None,
+                     **kwargs):
+        """ Searches indexed documents in the vector store."""
+        embedding_model = kwargs.get('embedding_model', "HuggingFaceEmbeddings")
+        embedding_model_params = kwargs.get('embedding_model_params', {"model_name": "sentence-transformers/all-MiniLM-L6-v2"})
+        doctype = kwargs.get('doctype', 'doc')
+        vectorstore = self._init_vector_store(vectorstore_type, embedding_model, embedding_model_params, collection_suffix)
+        
+        return vectorstore.search_documents(query, doctype, filter, cut_off, search_top, reranker,
+                                            full_text_search, reranking_config, extended_search)
+
+    def stepback_search_index(self,
+                     query: str,
+                     messages: List[Dict[str, Any]] = [],
+                     vectorstore_type: str = 'PGVector',
+                     collection_suffix: str = "",
+                     filter: dict | str = {}, cut_off: float = 0.5,
+                     search_top: int = 10, reranker: dict = {},
+                     full_text_search: Optional[Dict[str, Any]] = None,
+                     reranking_config: Optional[Dict[str, Dict[str, Any]]] = None,
+                     extended_search: Optional[List[str]] = None,
+                     **kwargs):
+        """ Searches indexed documents in the vector store."""
+        embedding_model = kwargs.get('embedding_model', "HuggingFaceEmbeddings")
+        embedding_model_params = kwargs.get('embedding_model_params', {"model_name": "sentence-transformers/all-MiniLM-L6-v2"})
+        doctype = kwargs.get('doctype', 'doc')
+        vectorstore = self._init_vector_store(vectorstore_type, embedding_model, embedding_model_params, collection_suffix)
+        return vectorstore.stepback_search(query,  messages, doctype, filter, cut_off, search_top, reranker,
+                                           full_text_search, reranking_config, extended_search)
+    
+
+    def _init_vector_store(self, vectorstore_type: str, embedding_model: str, embedding_model_params: dict, collection_suffix: str = ""):
+        """ Initializes the vector store wrapper with the provided parameters."""
+        try:
+            from alita_sdk.tools.vectorstore import VectorStoreWrapper
+        except ImportError:
+            from src.alita_sdk.tools.vectorstore import VectorStoreWrapper
+        
+        # Validate collection_suffix length
+        if collection_suffix and len(collection_suffix.strip()) > 7:
+            raise ToolException("collection_suffix must be 7 characters or less")
+        
+        # Create collection name with suffix if provided
+        collection_name = str(self.collection_name)
+        if collection_suffix and collection_suffix.strip():
+            collection_name = f"{self.collection_name}_{collection_suffix.strip()}"
+        
+        if vectorstore_type == 'PGVector':
+            vectorstore_params = {
+                "use_jsonb": True,
+                "collection_name": collection_name,
+                "create_extension": True,
+                "alita_sdk_options": {
+                    "target_schema": collection_name,
+                },
+                "connection_string": self.connection_string.get_secret_value()
+        }
+        elif vectorstore_type == 'Chroma':
+            vectorstore_params = {
+                "collection_name": collection_name,
+                "persist_directory": "./indexer_db"
+            }
+
+        return VectorStoreWrapper(
+            llm=self.llm,
+            vectorstore_type=vectorstore_type,
+            embedding_model=embedding_model,
+            embedding_model_params=embedding_model_params,
+            vectorstore_params=vectorstore_params,
+        )
 
     def _download_image(self, image_url):
         """
@@ -1423,10 +1652,22 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
                 "ref": self.execute_generic_confluence,
             },
             {
-                "name": "loader",
-                "ref": self.loader,
-                "description": self.loader.__doc__,
-                "args_schema": loaderParams,
+                "name": "index_data",
+                "ref": self.index_data,
+                "description": self.index_data.__doc__,
+                "args_schema": indexPagesParams,
+            },
+            {
+                "name": "search_index",
+                "ref": self.search_index,
+                "description": self.search_index.__doc__,
+                "args_schema": searchIndexParams,
+            },
+            {
+                "name": "stepback_search_index",
+                "ref": self.stepback_search_index,
+                "description": self.stepback_search_index.__doc__,
+                "args_schema": stepbackSearchIndexParams,
             },
             {
                 "name": "get_page_id_by_title",

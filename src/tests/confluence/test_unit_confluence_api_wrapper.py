@@ -276,3 +276,24 @@ class TestConfluenceAPIWrapper:
         from alita_tools.confluence.api_wrapper import parse_payload_params
         result = parse_payload_params(None)
         assert result == {}
+
+    @pytest.mark.positive
+    def test_index_pages(self, api_wrapper):
+        from langchain_core.documents import Document
+        with patch.object(ConfluenceAPIWrapper, 'loader', return_value=iter([Document(page_content="doc", metadata={})])) as _loader:
+            mock_chunker = MagicMock(return_value=iter([Document(page_content="chunk", metadata={})]))
+            with patch('alita_sdk.tools.vectorstore.VectorStoreWrapper') as mock_vs, \
+                 patch('alita_tools.chunkers.__all__', {'markdown': mock_chunker}):
+                instance = mock_vs.return_value
+                instance.index_documents.return_value = {"status": "ok"}
+                result = api_wrapper.index_pages(
+                    vectorstore_type="chroma",
+                    vectorstore_params={"collection_name": "test"},
+                    embedding_model="model",
+                    embedding_model_params={},
+                    loader_params={"content_format": "view"},
+                    chunking_tool="markdown",
+                    chunking_config={}
+                )
+                instance.index_documents.assert_called_once()
+                assert result == {"status": "ok"}
