@@ -218,30 +218,27 @@ class AlitaGitHubAPIWrapper(BaseVectorStoreToolApiWrapper):
             graphql_tools = GraphQLClientWrapper.model_construct().get_available_tools()
         else:
             graphql_tools = self.graphql_client_instance.get_available_tools()
-        
-        # Add vector store tools if configuration is available
-        vector_store_tools = []
-        if self.collection_name and self.connection_string:
-            vector_store_tools = [
-                {
-                    "name": "index_data",
-                    "ref": self.index_data,
-                    "description": self.index_data.__doc__,
-                    "args_schema": indexGitHubRepoParams
-                },
-                {
-                    "name": "search_index",
-                    "ref": self.search_index,
-                    "description": self.search_index.__doc__,
-                    "args_schema": searchGitHubIndexParams
-                },
-                {
-                    "name": "stepback_search_index",
-                    "ref": self.stepback_search_index,
-                    "description": self.stepback_search_index.__doc__,
-                    "args_schema": stepbackSearchGitHubIndexParams
-                }
-            ]
+            
+        vector_store_tools = [
+            {
+                "name": "index_data",
+                "ref": self.index_data,
+                "description": self.index_data.__doc__,
+                "args_schema": indexGitHubRepoParams
+            },
+            {
+                "name": "search_index",
+                "ref": self.search_index,
+                "description": self.search_index.__doc__,
+                "args_schema": searchGitHubIndexParams
+            },
+            {
+                "name": "stepback_search_index",
+                "ref": self.stepback_search_index,
+                "description": self.stepback_search_index.__doc__,
+                "args_schema": stepbackSearchGitHubIndexParams
+            }
+        ]
         
         tools = github_tools + graphql_tools + vector_store_tools
         return tools
