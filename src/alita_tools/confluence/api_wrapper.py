@@ -1,4 +1,3 @@
-import shortuuid
 import re
 import logging
 import requests
@@ -263,6 +262,10 @@ GetPageWithImageDescriptions = create_model(
         default=500))
 )
 
+GetPageAttachmentsInput = create_model(
+    "GetPageAttachmentsInput",
+    page_id=(str, Field(description="Confluence page ID from which attachments will be retrieved")),
+)
 
 def parse_payload_params(params: Optional[str]) -> Dict[str, Any]:
     if params:
@@ -777,6 +780,7 @@ class ConfluenceAPIWrapper(BaseVectorStoreToolApiWrapper):
             metadata=metadata,
         )
 
+    # todo: refactor this method since file processing is not working
     def process_attachment(
             self,
             page_id: str,
@@ -1103,7 +1107,7 @@ class ConfluenceAPIWrapper(BaseVectorStoreToolApiWrapper):
                         if response.status_code == 200:
                             content_type = response.headers.get('Content-Type', '')
                             if 'text/html' in content_type.lower():
-                                logger.warning(f"Received HTML content instead of image from direct request")
+                                logger.warning("Received HTML content instead of image from direct request")
                                 return None
                             return response.content
                         else:
@@ -1134,7 +1138,7 @@ class ConfluenceAPIWrapper(BaseVectorStoreToolApiWrapper):
 
                 # Check for HTML content which likely indicates an error or login page
                 if 'text/html' in content_type.lower():
-                    logger.warning(f"Received HTML content instead of image. Authentication issue likely.")
+                    logger.warning("Received HTML content instead of image. Authentication issue likely.")
                     return None
 
                 # Basic validation of image data - ensure we actually got image data
@@ -1205,8 +1209,7 @@ class ConfluenceAPIWrapper(BaseVectorStoreToolApiWrapper):
             logger.error(f"Error collecting context for image: {str(e)}")
             return ""
 
-    def _process_image_with_llm(self, image_data, image_name: str = "", context_text: str = "",
-                                custom_prompt: str = None):
+    def _process_image_with_llm(self, image_data, image_name: str = "", context_text: str = "", custom_prompt: str = None):
         """
         Process an image with LLM including surrounding context
 
@@ -1226,22 +1229,36 @@ class ConfluenceAPIWrapper(BaseVectorStoreToolApiWrapper):
             return cached_description
 
         try:
-            from io import BytesIO
-            from PIL import Image, UnidentifiedImageError
-
-            # Get the LLM instance
             llm = self.llm
             if not llm:
                 return "[LLM not available for image processing]"
 
-            # Try to load and validate the image with PIL
+            # If image_data is empty or None, do text-only analysis
+            if not image_data:
+                prompt = custom_prompt if custom_prompt else self._get_default_image_analysis_prompt()
+                if image_name or context_text:
+                    prompt += "\n\n## Additional Context Information:\n"
+                    if image_name:
+                        prompt += f"- Image Name/Reference: {image_name}\n"
+                    if context_text:
+                        prompt += f"- Surrounding Content: {context_text}\n"
+                    prompt += "\nPlease incorporate this contextual information in your description when relevant."
+                result = llm.invoke([
+                    HumanMessage(
+                        content=[{"type": "text", "text": prompt}]
+                    )
+                ])
+                description = result.content
+                self._image_cache.set(image_data, description, image_name)
+                return description
+
+            from io import BytesIO
+            from PIL import Image, UnidentifiedImageError
             try:
                 bio = BytesIO(image_data)
                 bio.seek(0)
                 image = Image.open(bio)
-                # Force load the image to validate it
                 image.load()
-                # Get format directly from PIL
                 image_format = image.format.lower() if image.format else "png"
             except UnidentifiedImageError:
                 logger.warning(f"PIL cannot identify the image format for {image_name}")
@@ -1251,7 +1268,6 @@ class ConfluenceAPIWrapper(BaseVectorStoreToolApiWrapper):
                 return f"[Error loading image {image_name}: {str(img_error)}]"
 
             try:
-                # Convert image to base64
                 buffer = BytesIO()
                 image.save(buffer, format=image_format.upper())
                 buffer.seek(0)
@@ -1260,39 +1276,25 @@ class ConfluenceAPIWrapper(BaseVectorStoreToolApiWrapper):
                 logger.warning(f"Error converting image {image_name}: {str(conv_error)}")
                 return f"[Error converting image {image_name}: {str(conv_error)}]"
 
-            # Use default or custom prompt
             prompt = custom_prompt if custom_prompt else self._get_default_image_analysis_prompt()
-
-            # Add context information if available
             if image_name or context_text:
                 prompt += "\n\n## Additional Context Information:\n"
-
                 if image_name:
                     prompt += f"- Image Name/Reference: {image_name}\n"
-
                 if context_text:
                     prompt += f"- Surrounding Content: {context_text}\n"
-
                 prompt += "\nPlease incorporate this contextual information in your description when relevant."
 
-            # Perform LLM invocation with image
             result = llm.invoke([
                 HumanMessage(
                     content=[
                         {"type": "text", "text": prompt},
-                        {
-                            "type": "image_url",
-                            "image_url": {"url": f"data:image/{image_format};base64,{base64_string}"},
-                        },
+                        {"type": "image_url", "image_url": {"url": f"data:image/{image_format};base64,{base64_string}"}},
                     ]
                 )
             ])
-
             description = result.content
-
-            # Cache the result for future use
             self._image_cache.set(image_data, description, image_name)
-
             return description
         except Exception as e:
             logger.error(f"Error processing image with LLM: {str(e)}")
@@ -1469,6 +1471,175 @@ class ConfluenceAPIWrapper(BaseVectorStoreToolApiWrapper):
             logger.error(f"Error processing page with images: {stacktrace}")
             return f"Error processing page with images: {str(e)}"
 
+    def get_page_attachments(self, page_id: str):
+        """
+        Retrieve all attachments for a Confluence page, including core metadata (with creator, created, updated), comments, file content, and LLM-based analysis for supported types.
+        Returns a list of dicts, each with keys: metadata, comments, content, llm_analysis.
+        """
+        try:
+            attachments = self.client.get_attachments_from_content(page_id)
+            if not attachments or not attachments.get('results'):
+                return f"No attachments found for page ID {page_id}."
+
+            # Get attachment history for created/updated info
+            history_map = {}
+            for attachment in attachments['results']:
+                try:
+                    hist = self.client.history(attachment['id'])
+                    history_map[attachment['id']] = hist
+                except Exception as e:
+                    logger.warning(f"Failed to fetch history for attachment {attachment.get('title', '')}: {str(e)}")
+                    history_map[attachment['id']] = None
+
+            results = []
+            for attachment in attachments['results']:
+                media_type = attachment.get('metadata', {}).get('mediaType', '')
+                # Core metadata extraction with history
+                hist = history_map.get(attachment['id']) or {}
+                created_by = hist.get('createdBy', {}).get('displayName', '') if hist else attachment.get('creator', {}).get('displayName', '')
+                created_date = hist.get('createdDate', '') if hist else attachment.get('created', '')
+                last_updated = hist.get('lastUpdated', {}).get('when', '') if hist else ''
+                metadata = {
+                    'name': attachment.get('title', ''),
+                    'size': attachment.get('extensions', {}).get('fileSize', None),
+                    'creator': created_by,
+                    'created': created_date,
+                    'updated': last_updated,
+                    'media_type': media_type,
+                    'labels': [label['name'] for label in attachment.get('metadata', {}).get('labels', {}).get('results', [])],
+                    'download_url': self.base_url.rstrip('/') + attachment['_links']['download'] if attachment.get('_links', {}).get('download') else None
+                }
+                # Fetch comments for the attachment
+                comments = []
+                try:
+                    comments_response = self.client.get_comments_for_attachment(attachment['id'])
+                    if comments_response and 'results' in comments_response:
+                        for comment in comments_response['results']:
+                            comments.append({
+                                'id': comment.get('id'),
+                                'author': comment.get('creator', {}).get('displayName', ''),
+                                'created': comment.get('created', ''),
+                                'body': comment.get('body', {}).get('storage', {}).get('value', '')
+                            })
+                except Exception as e:
+                    logger.warning(f"Failed to fetch comments for attachment {attachment.get('title', '')}: {str(e)}")
+
+                content = None
+                llm_analysis = None
+                title = attachment.get('title', '')
+                download_url = self.base_url.rstrip('/') + attachment['_links']['download']
+
+                # --- Begin: Raw content for xml, json, markdown, txt ---
+                # Check by media type or file extension
+                file_ext = title.lower().split('.')[-1] if '.' in title else ''
+                is_text_type = (
+                    media_type in [
+                        'application/xml', 'text/xml',
+                        'application/json', 'text/json',
+                        'text/markdown', 'text/x-markdown',
+                        'text/plain'
+                    ]
+                    or file_ext in ['xml', 'json', 'md', 'markdown', 'txt']
+                )
+                if is_text_type:
+                    try:
+                        resp = self.client.request(method="GET", path=download_url[len(self.base_url):], advanced_mode=True)
+                        if resp.status_code == 200:
+                            # Try utf-8, fallback to latin1
+                            try:
+                                content = resp.content.decode('utf-8')
+                            except UnicodeDecodeError:
+                                content = resp.content.decode('latin1')
+                        else:
+                            content = f"[Failed to download: HTTP {resp.status_code}]"
+                    except Exception as e:
+                        content = f"[Error downloading content: {str(e)}]"
+                    # No LLM analysis for these types
+                    results.append({
+                        'metadata': metadata,
+                        'comments': comments,
+                        'content': content,
+                        'llm_analysis': llm_analysis
+                    })
+                    continue
+                # --- End: Raw content for xml, json, markdown, txt ---
+
+                # Download content for supported types
+                if media_type.startswith('image/') or media_type == 'application/pdf' or media_type.startswith('application/vnd.jgraph.mxfile'):
+                    if media_type == 'application/pdf':
+                        try:
+                            from pdf2image import convert_from_bytes
+                        except ImportError:
+                            logger.warning("pdf2image is not installed. Please install it to process PDF attachments.")
+                            llm_analysis = '[pdf2image not installed]'
+                            image_data = None
+                        else:
+                            image_data = self._download_image(download_url)
+                            if image_data:
+                                try:
+                                    pdf_images = convert_from_bytes(image_data)
+                                    llm_analysis = []
+                                    for idx, img in enumerate(pdf_images):
+                                        from io import BytesIO
+                                        img_buffer = BytesIO()
+                                        img.save(img_buffer, format='PNG')
+                                        img_buffer.seek(0)
+                                        page_context = f"Attachment: {title} (type: {media_type}, page {idx+1})"
+                                        page_analysis = self._process_image_with_llm(img_buffer.getvalue(), f"{title} (page {idx+1})", page_context)
+                                        llm_analysis.append(page_analysis)
+                                    llm_analysis = '\n'.join(llm_analysis)
+                                except Exception as e:
+                                    logger.error(f"Failed to process PDF pages: {str(e)}")
+                                    llm_analysis = f"[Error processing PDF: {str(e)}]"
+                            else:
+                                content = None
+                                llm_analysis = None
+                    elif media_type.startswith('application/vnd.jgraph.mxfile'):
+                        # Handle drawio (mxfile): base64 decode & decompress, then run LLM
+                        image_data = self._download_image(download_url)
+                        if image_data:
+                            try:
+                                import xml.etree.ElementTree as ET
+                                import base64
+                                import zlib
+                                xml_str = image_data.decode("utf-8")
+                                root = ET.fromstring(xml_str)
+                                diagram_node = root.find("diagram")
+                                if diagram_node is not None and diagram_node.text:
+                                    diagram_base64 = diagram_node.text
+                                else:
+                                    diagram_base64 = None
+
+                                compressed = base64.b64decode(diagram_base64)
+                                xml_bytes = zlib.decompress(compressed, -15)
+                                xml_string = xml_bytes.decode('utf-8')
+
+                                # Use LLM to analyze the diagram XML string as text
+                                context_text = f"Attachment: {title} (type: {media_type})\nDrawio XML Content: {xml_string[:2000]}"  # Limit context for LLM
+                                llm_analysis = self._process_image_with_llm(b"", title, context_text)  # Pass empty image, just analyze text
+                            except Exception as e:
+                                logger.error(f"Failed to convert drawio to image: {str(e)}")
+                                llm_analysis = f"[Error processing drawio: {str(e)}]"
+                        else:
+                            content = None
+                            llm_analysis = None
+                    else:
+                        image_data = self._download_image(download_url)
+                        if image_data:
+                            context_text = f"Attachment: {title} (type: {media_type})"
+                            llm_analysis = self._process_image_with_llm(image_data, title, context_text)
+
+                results.append({
+                    'metadata': metadata,
+                    'comments': comments,
+                    'content': content,
+                    'llm_analysis': llm_analysis
+                })
+            return results
+        except Exception as e:
+            logger.error(f"Error retrieving attachments for page {page_id}: {str(e)}")
+            return f"Error retrieving attachments: {str(e)}"
+    
     def get_available_tools(self):
         return [
             {
@@ -1596,5 +1767,11 @@ class ConfluenceAPIWrapper(BaseVectorStoreToolApiWrapper):
                 "ref": self.get_page_id_by_title,
                 "description": self.get_page_id_by_title.__doc__,
                 "args_schema": getPageIdByTitleInput,
+            },
+            {
+                "name": "get_page_attachments",
+                "ref": self.get_page_attachments,
+                "description": self.get_page_attachments.__doc__,
+                "args_schema": GetPageAttachmentsInput,
             }
         ]
