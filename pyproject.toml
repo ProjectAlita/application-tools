@@ -40,7 +40,7 @@ markers = [ "dependency: marks dependency from other tests", "integration: marks
 
 [tool.coverage.run]
 dynamic_context = "test_function"
-relative_files = "true"
+relative_files = true
 omit = [ "*/__init__.py", "*/tests/*", "model.py", "*constants.py",]
 
 [tool.setuptools.dynamic.dependencies]
