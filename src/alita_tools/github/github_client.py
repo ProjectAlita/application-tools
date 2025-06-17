@@ -1439,13 +1439,13 @@ class GitHubClient(BaseModel):
                 "description": UPDATE_ISSUE_PROMPT,
                 "args_schema": UpdateIssue,
             },
-            {
-                "ref": self.loader,
-                "name": "loader",
-                "mode": "loader",
-                "description": self.loader.__doc__,
-                "args_schema": LoaderSchema,
-            },
+            # {
+            #     "ref": self.loader,
+            #     "name": "loader",
+            #     "mode": "loader",
+            #     "description": self.loader.__doc__,
+            #     "args_schema": LoaderSchema,
+            # },
             {
                 "ref": self.get_commits,
                 "name": "get_commits",

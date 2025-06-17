@@ -210,9 +210,3 @@ GetProjectItemsByView = create_model(
     after=(Optional[str], Field(description="Cursor for pagination", default=None)),
     filter_by=(Optional[Dict[str, Dict[str, str]]], Field(description="Dictionary containing filter parameters. Format: {'field_name': {'value': 'value'}}", default=None))
 )
-
-# Schema for the process_github_query tool
-ProcessGitHubQueryModel = create_model(
-    "ProcessGitHubQueryModel",
-    query=(str, Field(description="Natural language query describing the GitHub task to perform."))
-)

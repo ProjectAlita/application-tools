@@ -17,7 +17,7 @@ from langchain_core.messages import HumanMessage
 from markdownify import markdownify
 from langchain_community.document_loaders.confluence import ContentFormat
 
-from ..elitea_base import BaseToolApiWrapper
+from ..elitea_base import BaseVectorStoreToolApiWrapper
 from ..llm.img_utils import ImageDescriptionCache
 from ..utils import is_cookie_token, parse_cookie_string
 
@@ -274,7 +274,7 @@ def parse_payload_params(params: Optional[str]) -> Dict[str, Any]:
     return {}
 
 
-class ConfluenceAPIWrapper(BaseToolApiWrapper):
+class ConfluenceAPIWrapper(BaseVectorStoreToolApiWrapper):
     # Changed from PrivateAttr to Optional field with exclude=True
     client: Optional[Any] = Field(default=None, exclude=True)
     base_url: str
@@ -300,6 +300,10 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
     # indexer related
     connection_string: Optional[SecretStr] = None
     collection_name: Optional[str] = None
+    doctype: Optional[str] = 'doc'
+    embedding_model: Optional[str] = "HuggingFaceEmbeddings"
+    embedding_model_params: Optional[Dict[str, Any]] = {"model_name": "sentence-transformers/all-MiniLM-L6-v2"}
+    vectorstore_type: Optional[str] = "PGVector"
 
     _image_cache: ImageDescriptionCache = PrivateAttr(default_factory=ImageDescriptionCache)
 
@@ -932,7 +936,6 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
             yield document
 
     def index_data(self, content_format: str,
-                    vectorstore_type: str = 'PGVector',
                     collection_suffix: str = "",
                     page_ids: Optional[List[str]] = None,
                     label: Optional[str] = None,
@@ -958,9 +961,6 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
         except ImportError:
             from src.alita_sdk.langchain.interfaces.llm_processor import get_embeddings
         
-        embedding_model = kwargs.get('embedding_model', "HuggingFaceEmbeddings")
-        embedding_model_params = kwargs.get('embedding_model_params', {"model_name": "sentence-transformers/all-MiniLM-L6-v2"})
-        
         loader_params = {
             'url': self.base_url,
             'space_key': self.space,
@@ -983,8 +983,8 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
             'number_of_retries': self.number_of_retries
         }
         documents = self._loader(**loader_params)
-        embedding = get_embeddings(embedding_model, embedding_model_params)
-        
+        embedding = get_embeddings(self.embedding_model, self.embedding_model_params)
+
         chunker = chunkers.get(chunking_tool)
         
         chunking_config = chunking_config or {}
@@ -1010,89 +1010,11 @@ class ConfluenceAPIWrapper(BaseToolApiWrapper):
                 chunking_config['llm'] = self.llm
                 
             documents = chunker(documents, chunking_config)
-
-        vectorstore = self._init_vector_store(vectorstore_type, embedding_model, embedding_model_params, collection_suffix)
+        
+        # passing embedding to avoid re-initialization
+        vectorstore = self._init_vector_store(collection_suffix, embeddings=embedding) 
         return vectorstore.index_documents(documents)
         
-
-    def search_index(self,
-                     query: str,
-                     vectorstore_type: str = 'PGVector',
-                     collection_suffix: str = "",
-                     filter: dict | str = {}, cut_off: float = 0.5,
-                     search_top: int = 10, reranker: dict = {},
-                     full_text_search: Optional[Dict[str, Any]] = None,
-                     reranking_config: Optional[Dict[str, Dict[str, Any]]] = None,
-                     extended_search: Optional[List[str]] = None,
-                     **kwargs):
-        """ Searches indexed documents in the vector store."""
-        embedding_model = kwargs.get('embedding_model', "HuggingFaceEmbeddings")
-        embedding_model_params = kwargs.get('embedding_model_params', {"model_name": "sentence-transformers/all-MiniLM-L6-v2"})
-        doctype = kwargs.get('doctype', 'doc')
-        vectorstore = self._init_vector_store(vectorstore_type, embedding_model, embedding_model_params, collection_suffix)
-        
-        return vectorstore.search_documents(query, doctype, filter, cut_off, search_top, reranker,
-                                            full_text_search, reranking_config, extended_search)
-
-    def stepback_search_index(self,
-                     query: str,
-                     messages: List[Dict[str, Any]] = [],
-                     vectorstore_type: str = 'PGVector',
-                     collection_suffix: str = "",
-                     filter: dict | str = {}, cut_off: float = 0.5,
-                     search_top: int = 10, reranker: dict = {},
-                     full_text_search: Optional[Dict[str, Any]] = None,
-                     reranking_config: Optional[Dict[str, Dict[str, Any]]] = None,
-                     extended_search: Optional[List[str]] = None,
-                     **kwargs):
-        """ Searches indexed documents in the vector store."""
-        embedding_model = kwargs.get('embedding_model', "HuggingFaceEmbeddings")
-        embedding_model_params = kwargs.get('embedding_model_params', {"model_name": "sentence-transformers/all-MiniLM-L6-v2"})
-        doctype = kwargs.get('doctype', 'doc')
-        vectorstore = self._init_vector_store(vectorstore_type, embedding_model, embedding_model_params, collection_suffix)
-        return vectorstore.stepback_search(query,  messages, doctype, filter, cut_off, search_top, reranker,
-                                           full_text_search, reranking_config, extended_search)
-    
-
-    def _init_vector_store(self, vectorstore_type: str, embedding_model: str, embedding_model_params: dict, collection_suffix: str = ""):
-        """ Initializes the vector store wrapper with the provided parameters."""
-        try:
-            from alita_sdk.tools.vectorstore import VectorStoreWrapper
-        except ImportError:
-            from src.alita_sdk.tools.vectorstore import VectorStoreWrapper
-        
-        # Validate collection_suffix length
-        if collection_suffix and len(collection_suffix.strip()) > 7:
-            raise ToolException("collection_suffix must be 7 characters or less")
-        
-        # Create collection name with suffix if provided
-        collection_name = str(self.collection_name)
-        if collection_suffix and collection_suffix.strip():
-            collection_name = f"{self.collection_name}_{collection_suffix.strip()}"
-        
-        if vectorstore_type == 'PGVector':
-            vectorstore_params = {
-                "use_jsonb": True,
-                "collection_name": collection_name,
-                "create_extension": True,
-                "alita_sdk_options": {
-                    "target_schema": collection_name,
-                },
-                "connection_string": self.connection_string.get_secret_value()
-        }
-        elif vectorstore_type == 'Chroma':
-            vectorstore_params = {
-                "collection_name": collection_name,
-                "persist_directory": "./indexer_db"
-            }
-
-        return VectorStoreWrapper(
-            llm=self.llm,
-            vectorstore_type=vectorstore_type,
-            embedding_model=embedding_model,
-            embedding_model_params=embedding_model_params,
-            vectorstore_params=vectorstore_params,
-        )
 
     def _download_image(self, image_url):
         """
