@@ -37,7 +37,7 @@ class TestTestIOApiWrapper:
         # Assert headers are set correctly
         assert wrapper.headers == {
             "Accept": "application/json",
-            "Authorization": f"Bearer {api_key.get_secret_value()}",
+            "Authorization": f"Bearer {api_key}",
         }
         # Assert endpoint is set correctly
         assert wrapper.endpoint == endpoint

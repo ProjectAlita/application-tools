@@ -13,9 +13,9 @@ python-gitlab==4.5.0
 jinja2==3.1.3
 lxml==5.2.2
 beautifulsoup4
-pymupdf==1.24.9
+pymupdf==1.26.0
 yagmail==0.15.293
-gitpython==3.1.43   
+gitpython==3.1.43
 qtest-swagger-client==0.0.3
 requests>=2.3.0
 testrail-api==1.13.2
@@ -43,7 +43,7 @@ Office365-REST-Python-Client==2.5.14
 python-docx==1.1.2
 pandas==2.2.3
 tree_sitter==0.20.2
-tree-sitter-languages==1.10.2
+tree-sitter-language-pack==0.8.0
 pdf2image==1.16.3
 reportlab==4.2.5
 svglib==1.5.1
@@ -58,3 +58,7 @@ statsmodels==0.14.4
 tabulate==0.9.0
 pysnc==1.1.10
 shortuuid==1.0.13
+kubernetes==33.1.0
+langchain-openai==0.3.22
+langchain-chroma==0.2.4
+openpyxl==3.1.5
