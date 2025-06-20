@@ -91,3 +91,12 @@ class ArgsSchema(Enum):
             Field(default=None, description="Keyword arguments for the method."),
         ),
     )
+    CreateDeltaLakeTable = create_model(
+        "CreateDeltaLakeTable",
+        table_name=(str, Field(description="Name of the Delta Lake table to create in BigQuery.")),
+        dataset=(Optional[str], Field(default=None, description="BigQuery dataset to contain the table (defaults to self.dataset).")),
+        connection_id=(str, Field(description="Fully qualified connection ID (project.region.connection_id).")),
+        source_uris=(list, Field(description="List of GCS URIs (prefixes) for the Delta Lake table.")),
+        autodetect=(bool, Field(default=True, description="Whether to autodetect schema (default: True).")),
+        project=(Optional[str], Field(default=None, description="GCP project ID (defaults to self.project).")),
+    )

@@ -15,7 +15,7 @@ lxml==5.2.2
 beautifulsoup4
 pymupdf==1.24.9
 yagmail==0.15.293
-gitpython==3.1.43   
+gitpython==3.1.43
 qtest-swagger-client==0.0.3
 requests>=2.3.0
 testrail-api==1.13.2
@@ -58,3 +58,4 @@ statsmodels==0.14.4
 tabulate==0.9.0
 pysnc==1.1.10
 shortuuid==1.0.13
+deltalake==1.0.2

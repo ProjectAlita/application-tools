@@ -363,6 +363,49 @@ class BigQueryApiWrapper(BaseToolApiWrapper):
             logging.error(f"Error executing '{method}': {e}")
             raise ToolException(f"Error executing '{method}': {e}")
 
+    @process_output
+    def create_delta_lake_table(
+        self,
+        table_name: str,
+        dataset: Optional[str] = None,
+        connection_id: str = None,
+        source_uris: list = None,
+        autodetect: bool = True,
+        project: Optional[str] = None,
+        **kwargs,
+    ):
+        """
+        Create a Delta Lake external table in BigQuery using the google.cloud.bigquery library.
+        Args:
+            table_name: Name of the Delta Lake table to create in BigQuery.
+            dataset: BigQuery dataset to contain the table (defaults to self.dataset).
+            connection_id: Fully qualified connection ID (project.region.connection_id).
+            source_uris: List of GCS URIs (prefixes) for the Delta Lake table.
+            autodetect: Whether to autodetect schema (default: True).
+            project: GCP project ID (defaults to self.project).
+        Returns:
+            API response as dict.
+        """
+        dataset = dataset or self.dataset
+        project = project or self.project
+        if not (project and dataset and table_name and connection_id and source_uris):
+            raise ToolException("project, dataset, table_name, connection_id, and source_uris are required.")
+        client = self.bigquery_client
+        table_ref = bigquery.TableReference(
+            bigquery.DatasetReference(project, dataset), table_name
+        )
+        external_config = bigquery.ExternalConfig("DELTA_LAKE")
+        external_config.autodetect = autodetect
+        external_config.source_uris = source_uris
+        external_config.connection_id = connection_id
+        table = bigquery.Table(table_ref)
+        table.external_data_configuration = external_config
+        try:
+            created_table = client.create_table(table, exists_ok=True)
+            return created_table.to_api_repr()
+        except Exception as e:
+            raise ToolException(f"Failed to create Delta Lake table: {e}")
+
     def get_available_tools(self) -> List[Dict[str, Any]]:
         return [
             {
@@ -420,16 +463,16 @@ class BigQueryApiWrapper(BaseToolApiWrapper):
                 "ref": self.similarity_search_by_vectors,
             },
             {
-                "name": "to_vertex_fs_vector_store",
-                "description": self.to_vertex_fs_vector_store.__doc__,
-                "args_schema": ArgsSchema.NoInput.value,
-                "ref": self.to_vertex_fs_vector_store,
-            },
-            {
                 "name": "execute",
                 "description": self.execute.__doc__,
                 "args_schema": ArgsSchema.ExecuteArgs.value,
                 "ref": self.execute,
+            },
+            {
+                "name": "create_delta_lake_table",
+                "description": self.create_delta_lake_table.__doc__,
+                "args_schema": ArgsSchema.CreateDeltaLakeTable.value,
+                "ref": self.create_delta_lake_table,
             },
         ]
 
