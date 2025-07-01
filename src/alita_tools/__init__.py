@@ -18,6 +18,7 @@ from .sharepoint import get_tools as get_sharepoint, SharepointToolkit
 from .qtest import get_tools as get_qtest, QtestToolkit
 from .zephyr_scale import get_tools as get_zephyr_scale, ZephyrScaleToolkit
 from .zephyr_enterprise import get_tools as get_zephyr_enterprise, ZephyrEnterpriseToolkit
+from .zephyr_squad import get_tools as get_zephyr_squad, ZephyrSquadToolkit
 from .ado import get_tools as get_ado
 from .ado.repos import AzureDevOpsReposToolkit
 from .ado.test_plan import AzureDevOpsPlansToolkit
@@ -89,6 +90,8 @@ def get_tools(tools_list, alita: 'AlitaClient', llm: 'LLMLikeObject', *args, **k
             tools.extend(get_zephyr_scale(tool))
         elif tool['type'] == 'zephyr_enterprise':
             tools.extend(get_zephyr_enterprise(tool))
+        elif tool['type'] == 'zephyr_squad':
+            tools.extend(get_zephyr_squad(tool))
         elif tool['type'] == 'rally':
             tools.extend(get_rally(tool))
         elif tool['type'] == 'sql':
@@ -144,6 +147,7 @@ def get_toolkits():
         AlitaGitlabSpaceToolkit.toolkit_config_schema(),
         ZephyrScaleToolkit.toolkit_config_schema(),
         ZephyrEnterpriseToolkit.toolkit_config_schema(),
+        ZephyrSquadToolkit.toolkit_config_schema(),
         ZephyrToolkit.toolkit_config_schema(),
         AlitaYagmailToolkit.toolkit_config_schema(),
         SharepointToolkit.toolkit_config_schema(),
