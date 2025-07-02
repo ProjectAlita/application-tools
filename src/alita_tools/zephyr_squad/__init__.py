@@ -8,7 +8,7 @@ from .api_wrapper import ZephyrSquadApiWrapper
 from ..base.tool import BaseAction
 from ..utils import clean_string, TOOLKIT_SPLITTER, get_max_toolkit_length
 
-name = "zephyr"
+name = "zephyr_squad"
 
 def get_tools(tool):
     return ZephyrSquadToolkit().get_toolkit(
