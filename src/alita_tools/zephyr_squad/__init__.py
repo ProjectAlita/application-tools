@@ -1,7 +1,6 @@
 from typing import List, Literal, Optional
 
-from langchain_community.agent_toolkits.base import BaseToolkit
-from langchain_core.tools import BaseTool
+from langchain_core.tools import BaseTool, BaseToolkit
 from pydantic import create_model, BaseModel, Field, SecretStr
 
 from .api_wrapper import ZephyrSquadApiWrapper
@@ -30,13 +29,10 @@ class ZephyrSquadToolkit(BaseToolkit):
         return create_model(
             name,
             account_id=(str, Field(description="AccountID for the user that is going to be authenticating")),
-            access_key=(str, Field(description="Generated access key")),
-            secret_key=(SecretStr, Field(description="Generated secret key")),
+            access_key=(SecretStr, Field(description="Generated access key", json_schema_extra={'secret': True})),
+            secret_key=(SecretStr, Field(description="Generated secret key", json_schema_extra={'secret': True})),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
-            __config__={'json_schema_extra': {'metadata': {"label": "Zephyr Squad", "icon_url": "zephyr.svg",
-                            "categories": ["test management"],
-                            "extra_categories": ["test automation", "test case management", "test planning"]
-                        }}}
+            __config__={'json_schema_extra': {'metadata': {"label": "Zephyr Squad", "icon_url": "zephyr.svg"}}}
         )
 
     @classmethod
