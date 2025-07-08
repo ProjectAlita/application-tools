@@ -99,7 +99,7 @@ class ZephyrSquadCloud(object):
             raise ToolException(f"Error performing request {method}:{api_path}: {e}")
 
     def _generate_jwt_token(self, method, path):
-        canonical_path = f"{method}&{path}&".replace('?', '&')
+        canonical_path = f"{method}&{path}".replace('?', '&')
         payload_token = {
             'sub': self.account_id,
             'qsh': hashlib.sha256(canonical_path.encode('utf-8')).hexdigest(),
