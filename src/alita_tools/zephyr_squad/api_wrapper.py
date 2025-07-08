@@ -8,7 +8,7 @@ from ..elitea_base import BaseToolApiWrapper
 
 class ZephyrSquadApiWrapper(BaseToolApiWrapper):
     account_id: str
-    access_key: str
+    access_key: SecretStr
     secret_key: SecretStr
     _client: ZephyrSquadCloud = PrivateAttr()
 
