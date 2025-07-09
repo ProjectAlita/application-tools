@@ -47,7 +47,7 @@ class ZephyrSquadCloud(object):
 
     def update_bdd_content(self, issue_id, new_content: str):
         api_path = f"/public/rest/api/1.0/integration/bddcontent/{issue_id}"
-        return self._do_request(method='POST', api_path=api_path, json={"content": new_content})
+        return self._do_request(method='POST', api_path=api_path, json=f'{{"content": "{new_content}"}}')
 
     def delete_bdd_content(self, issue_id):
         api_path = f"/public/rest/api/1.0/integration/bddcontent/{issue_id}"
@@ -86,7 +86,7 @@ class ZephyrSquadCloud(object):
         }
 
         try:
-            resp = requests.request(method=method, url=url, json=json, headers=headers)
+            resp = requests.request(method=method, url=url, data=json, headers=headers)
 
             if resp.ok:
                 if resp.headers.get("Content-Type", "").startswith("application/json"):
@@ -100,6 +100,10 @@ class ZephyrSquadCloud(object):
 
     def _generate_jwt_token(self, method, path):
         canonical_path = f"{method}&{path}".replace('?', '&')
+    
+        if '&' not in path and '?' not in path:
+            canonical_path += '&'
+        
         payload_token = {
             'sub': self.account_id,
             'qsh': hashlib.sha256(canonical_path.encode('utf-8')).hexdigest(),
