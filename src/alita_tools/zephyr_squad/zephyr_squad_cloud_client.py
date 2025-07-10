@@ -1,4 +1,5 @@
 import hashlib
+import json
 import time
 
 import jwt
@@ -47,11 +48,11 @@ class ZephyrSquadCloud(object):
 
     def update_bdd_content(self, issue_id, new_content: str):
         api_path = f"/public/rest/api/1.0/integration/bddcontent/{issue_id}"
-        return self._do_request(method='POST', api_path=api_path, json=f'{{"content": "{new_content}"}}')
+        return self._do_request(method='POST', api_path=api_path, json=json.dumps({"content": new_content}))
 
     def delete_bdd_content(self, issue_id):
         api_path = f"/public/rest/api/1.0/integration/bddcontent/{issue_id}"
-        return self._do_request(method='DELETE', api_path=api_path)
+        return self._do_request(method='DELETE', api_path=api_path, json="[]")
 
     def create_new_cycle(self, json):
         api_path = f"public/rest/api/1.0/cycle"
@@ -81,12 +82,16 @@ class ZephyrSquadCloud(object):
         url = f"{self.base_url}{api_path}"
         headers = {
             "Authorization": f"JWT {self._generate_jwt_token(method, api_path)}",
-            "zapiAccessKey": self.access_key,
-            "Content-Type": "application/json"
+            "zapiAccessKey": self.access_key
         }
+        if json is not None:
+            headers["Content-Type"] = "application/json"
+        params = {"method": method, "url": url, "headers": headers}
+        if json is not None:
+            params["data"] = json
 
         try:
-            resp = requests.request(method=method, url=url, data=json, headers=headers)
+            resp = requests.request(**params)
 
             if resp.ok:
                 if resp.headers.get("Content-Type", "").startswith("application/json"):
