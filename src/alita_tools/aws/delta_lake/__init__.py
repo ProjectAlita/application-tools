@@ -1,3 +1,4 @@
+
 from functools import lru_cache
 from typing import List, Optional, Type
 
@@ -10,7 +11,6 @@ from .tool import DeltaLakeAction
 
 name = "delta_lake"
 
-
 @lru_cache(maxsize=1)
 def get_available_tools() -> dict[str, dict]:
     api_wrapper = DeltaLakeApiWrapper.model_construct()
@@ -20,11 +20,9 @@ def get_available_tools() -> dict[str, dict]:
     }
     return available_tools
 
-
 toolkit_max_length = lru_cache(maxsize=1)(
     lambda: get_max_toolkit_length(get_available_tools())
 )
-
 
 class DeltaLakeToolkitConfig(BaseModel):
     class Config:
@@ -54,47 +52,18 @@ class DeltaLakeToolkitConfig(BaseModel):
             }
         }
 
-    aws_access_key_id: Optional[SecretStr] = Field(
-        default=None,
-        description="AWS access key ID",
-        json_schema_extra={"secret": True, "configuration": True},
-    )
-    aws_secret_access_key: Optional[SecretStr] = Field(
-        default=None,
-        description="AWS secret access key",
-        json_schema_extra={"secret": True, "configuration": True},
-    )
-    aws_session_token: Optional[SecretStr] = Field(
-        default=None,
-        description="AWS session token (optional)",
-        json_schema_extra={"secret": True, "configuration": True},
-    )
-    aws_region: Optional[str] = Field(
-        default=None,
-        description="AWS region for Delta Lake storage",
-        json_schema_extra={"configuration": True},
-    )
-    s3_path: Optional[str] = Field(
-        default=None,
-        description="S3 path to Delta Lake data (e.g., s3://bucket/path)",
-        json_schema_extra={"configuration": True},
-    )
-    table_path: Optional[str] = Field(
-        default=None,
-        description="Delta Lake table path (if not using s3_path)",
-        json_schema_extra={"configuration": True},
-    )
-    selected_tools: List[str] = Field(
-        default=[],
-        description="Selected tools",
-        json_schema_extra={"args_schemas": get_available_tools()},
-    )
+    aws_access_key_id: Optional[SecretStr] = Field(default=None, description="AWS access key ID", json_schema_extra={"secret": True, "configuration": True})
+    aws_secret_access_key: Optional[SecretStr] = Field(default=None, description="AWS secret access key", json_schema_extra={"secret": True, "configuration": True})
+    aws_session_token: Optional[SecretStr] = Field(default=None, description="AWS session token (optional)", json_schema_extra={"secret": True, "configuration": True})
+    aws_region: Optional[str] = Field(default=None, description="AWS region for Delta Lake storage", json_schema_extra={"configuration": True})
+    s3_path: Optional[str] = Field(default=None, description="S3 path to Delta Lake data (e.g., s3://bucket/path)", json_schema_extra={"configuration": True})
+    table_path: Optional[str] = Field(default=None, description="Delta Lake table path (if not using s3_path)", json_schema_extra={"configuration": True})
+    selected_tools: List[str] = Field(default=[], description="Selected tools", json_schema_extra={"args_schemas": get_available_tools()})
 
     @field_validator("selected_tools", mode="before", check_fields=False)
     @classmethod
     def selected_tools_validator(cls, value: List[str]) -> list[str]:
         return [i for i in value if i in get_available_tools()]
-
 
 def _get_toolkit(tool) -> BaseToolkit:
     return DeltaLakeToolkit().get_toolkit(
@@ -108,20 +77,15 @@ def _get_toolkit(tool) -> BaseToolkit:
         toolkit_name=tool.get("toolkit_name"),
     )
 
-
 def get_toolkit():
     return DeltaLakeToolkit.toolkit_config_schema()
-
 
 def get_tools(tool):
     return _get_toolkit(tool).get_tools()
 
-
 class DeltaLakeToolkit(BaseToolkit):
     tools: List[BaseTool] = []
-    api_wrapper: Optional[DeltaLakeApiWrapper] = Field(
-        default_factory=DeltaLakeApiWrapper.model_construct
-    )
+    api_wrapper: Optional[DeltaLakeApiWrapper] = Field(default_factory=DeltaLakeApiWrapper.model_construct)
     toolkit_name: Optional[str] = None
 
     @computed_field
@@ -161,8 +125,7 @@ class DeltaLakeToolkit(BaseToolkit):
                         DeltaLakeAction(
                             api_wrapper=instance.api_wrapper,
                             name=instance.tool_prefix + t["name"],
-                            description=f"S3 Path: {getattr(instance.api_wrapper, 's3_path', '')} Table Path: {getattr(instance.api_wrapper, 'table_path', '')}\n"
-                            + t["description"],
+                            description=f"S3 Path: {getattr(instance.api_wrapper, 's3_path', '')} Table Path: {getattr(instance.api_wrapper, 'table_path', '')}\n" + t["description"],
                             args_schema=t["args_schema"],
                         )
                     )

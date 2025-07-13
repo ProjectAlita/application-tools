@@ -1,3 +1,4 @@
+
 from typing import Optional, Type
 
 from langchain_core.callbacks import CallbackManagerForToolRun
@@ -8,11 +9,10 @@ from .api_wrapper import DeltaLakeApiWrapper
 
 
 class DeltaLakeAction(BaseTool):
-    """Tool for interacting with the Delta Lake API on Azure Databricks."""
+    """Tool for interacting with the Delta Lake API on AWS."""
 
     api_wrapper: DeltaLakeApiWrapper = Field(default_factory=DeltaLakeApiWrapper)
     name: str
-    mode: str = ""
     description: str = ""
     args_schema: Optional[Type[BaseModel]] = None
 
@@ -29,6 +29,7 @@ class DeltaLakeAction(BaseTool):
     ) -> str:
         """Use the Delta Lake API to run an operation."""
         try:
-            return self.api_wrapper.run(self.mode, *args, **kwargs)
+            # Use the tool name to dispatch to the correct API wrapper method
+            return self.api_wrapper.run(self.name, *args, **kwargs)
         except Exception as e:
             return f"Error: {format_exc()}"

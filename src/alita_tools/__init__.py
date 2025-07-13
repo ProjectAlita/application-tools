@@ -1,6 +1,8 @@
 import logging
 from importlib import import_module
 
+from httpx import get
+
 from .github import get_tools as get_github, AlitaGitHubToolkit
 from .openapi import get_tools as get_openapi
 from .jira import get_tools as get_jira, JiraToolkit
@@ -44,6 +46,8 @@ from .salesforce import get_tools as get_salesforce, SalesforceToolkit
 from .carrier import get_tools as get_carrier, AlitaCarrierToolkit
 from .ocr import get_tools as get_ocr, OCRToolkit
 from .pptx import get_tools as get_pptx, PPTXToolkit
+from .aws import get_tools as get_delta_lake, DeltaLakeToolkit
+from .google import get_tools as get_bigquery, BigQueryToolkit
 
 logger = logging.getLogger(__name__)
 
@@ -120,6 +124,10 @@ def get_tools(tools_list, alita: 'AlitaClient', llm: 'LLMLikeObject', *args, **k
             tools.extend(get_ocr(tool))
         elif tool['type'] == 'pptx':
             tools.extend(get_pptx(tool))
+        elif tool['type'] == 'delta_lake':
+            tools.extend(get_delta_lake(tool))
+        elif tool['type'] == 'bigquery':
+            tools.extend(get_bigquery(tool))
         else:
             if tool.get("settings", {}).get("module"):
                 try:
@@ -175,4 +183,6 @@ def get_toolkits():
         AlitaCarrierToolkit.toolkit_config_schema(),
         OCRToolkit.toolkit_config_schema(),
         PPTXToolkit.toolkit_config_schema(),
+        DeltaLakeToolkit.toolkit_config_schema(),
+        BigQueryToolkit.toolkit_config_schema(),
     ]
