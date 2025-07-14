@@ -60,3 +60,4 @@ pysnc==1.1.10
 shortuuid==1.0.13
 textract-py3==2.1.1
 deltalake==1.0.2
+google_cloud_bigquery==3.34.0
