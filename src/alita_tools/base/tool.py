@@ -1,10 +1,10 @@
 
-from typing import Optional, Type, Any
-
+import traceback
 from langchain_core.callbacks import CallbackManagerForToolRun
+from langchain_core.tools import BaseTool, ToolException
 from pydantic import BaseModel
 from pydantic import Field
-from langchain_core.tools import BaseTool, ToolException
+from typing import Optional, Type, Any
 
 
 class BaseAction(BaseTool):
@@ -25,4 +25,5 @@ class BaseAction(BaseTool):
         try:
             return self.api_wrapper.run(self.name, *args, **kwargs)
         except Exception as e:
-            return ToolException(f"An exception occurred: {e}")
+            # stacktrace = traceback.format_exc()
+            return ToolException(f"An exception occurred: {e}\nStacktrace:\n{stacktrace}")
