@@ -18,7 +18,8 @@ logger = logging.getLogger(__name__)
 
 
 NoInput = create_model(
-    "NoInput"
+    "NoInput",
+    api_version=(Optional[str], Field(description="Version of Jira API to use", default="3"))
 )
 
 JiraInput = create_model(
@@ -44,7 +45,9 @@ JiraInput = create_model(
 
 JiraSearch = create_model(
     "JiraSearchModel",
-    jql=(str, Field(description="Jira Query Language (JQL) query string")))
+    jql=(str, Field(description="Jira Query Language (JQL) query string")),
+    api_version=(Optional[str], Field(description="Version of Jira API to use", default="3"))
+)
 
 JiraCreateIssue = create_model(
     "JiraCreateIssueModel",
@@ -57,7 +60,9 @@ JiraCreateIssue = create_model(
                      "in the following STRING dictionary: "
                      "{'fields': {'project': {'key': 'project_key'}, "
                      "'summary': 'test issue', 'description': 'test description', "
-                     "'issuetype': {'name': 'Task'}, 'priority': {'name': 'Major'}}}"))))
+                     "'issuetype': {'name': 'Task'}, 'priority': {'name': 'Major'}}}"))),
+    api_version=(Optional[str], Field(description="Version of Jira API to use", default="3"))
+)
 
 
 JiraUpdateIssue = create_model(
@@ -72,20 +77,23 @@ JiraUpdateIssue = create_model(
                      "{'key': 'issue key', 'fields': {'summary': 'updated issue', "
                      "'description': 'updated description', 'customfield_xxx': 'updated custom field'}, "
                      "'update': {'labels': [ { 'add': 'test' } ]}}")
-    ))
+    )),
+    api_version=(Optional[str], Field(description="Version of Jira API to use", default="3"))
 )
 
 AddCommentInput = create_model(
     "AddCommentInputModel",
     issue_key=(str, Field(description="The issue key of the Jira issue to which the comment is to be added, e.g. 'TEST-123'.")),
-    comment=(str, Field(description="The comment to be added to the Jira issue, e.g. 'This is a test comment.'"))
+    comment=(str, Field(description="The comment to be added to the Jira issue, e.g. 'This is a test comment.'")),
+    api_version=(Optional[str], Field(description="Version of Jira API to use", default="3"))
 )
 
 ModifyLabels = create_model(
     "AddCommentInputModel",
     issue_key=(str, Field(description="The issue key of the Jira issue to which the comment is to be added, e.g. 'TEST-123'.")),
     add_labels=(Optional[list[str]], Field(description="List of labels required to be added", default=None)),
-    remove_labels=(Optional[list[str]], Field(description="List of labels required to be removed", default=None))
+    remove_labels=(Optional[list[str]], Field(description="List of labels required to be removed", default=None)),
+    api_version=(Optional[str], Field(description="Version of Jira API to use", default="3"))
 )
 
 SetIssueStatus = create_model(
@@ -97,23 +105,27 @@ SetIssueStatus = create_model(
      If there are mandatory fields for the transition, these can be set using a dict in 'fields'.
      For updating screen properties that cannot be set/updated via the fields properties,
      they can set using a dict through 'update'.
-     """))
+     """)),
+    api_version=(Optional[str], Field(description="Version of Jira API to use", default="3"))
 )
 
 GetSpecificFieldInfo = create_model(
     "GetSpecificFieldInfoModel",
     jira_issue_key=(str, Field(description="Jira issue key specific information will be exctracted from in following format, TEST-1234")),
-    field_name=(str, Field(description="Field name data from which will be taken. It should be either 'description', 'summary', 'priority' etc or custom field name in following format 'customfield_10300'"))
+    field_name=(str, Field(description="Field name data from which will be taken. It should be either 'description', 'summary', 'priority' etc or custom field name in following format 'customfield_10300'")),
+    api_version=(Optional[str], Field(description="Version of Jira API to use", default="3"))
 )
 
 GetRemoteLinks = create_model(
     "GetRemoteLinksModel",
-    jira_issue_key=(str, Field(description="Jira issue key from which remote links will be extracted, e.g. TEST-1234"))
+    jira_issue_key=(str, Field(description="Jira issue key from which remote links will be extracted, e.g. TEST-1234")),
+    api_version=(Optional[str], Field(description="Version of Jira API to use", default="3"))
 )
 
 ListCommentsInput = create_model(
     "ListCommentsInputModel",
-    issue_key=(str, Field(description="The issue key of the Jira issue from which comments will be extracted, e.g. 'TEST-123'."))
+    issue_key=(str, Field(description="The issue key of the Jira issue from which comments will be extracted, e.g. 'TEST-123'.")),
+    api_version=(Optional[str], Field(description="Version of Jira API to use", default="3"))
 )
 LinkIssues = create_model(
     "LinkIssuesModel",
@@ -131,7 +143,8 @@ LinkIssues = create_model(
                                     Example: 
                                     To link test to another issue ( test 'test' story, story 'is tested by test'). 
                                     Use the appropriate issue link type (e.g., "Test", "Relates", "Blocks").
-                                    If we use "Test" linktype, the test is inward issue, the story/other issue is outward issue."""))
+                                    If we use "Test" linktype, the test is inward issue, the story/other issue is outward issue.""")),
+    api_version=(Optional[str], Field(description="Version of Jira API to use", default="2"))
 )
 
 SUPPORTED_ATTACHMENT_MIME_TYPES = (
@@ -237,8 +250,8 @@ def process_search_response(jira_url, response, payload_params: Dict[str, Any] =
 
 class JiraApiWrapper(BaseToolApiWrapper):
     base_url: str
-    api_version: Optional[str] = "2",
-    api_key: Optional[SecretStr] = None,
+    api_version: Optional[str] = "3"
+    api_key: Optional[SecretStr] = None
     username: Optional[str] = None
     token: Optional[SecretStr] = None
     cloud: Optional[bool] = True
@@ -265,8 +278,15 @@ class JiraApiWrapper(BaseToolApiWrapper):
         username = values.get('username')
         token = values.get('token')
         cloud = values.get('cloud')
-        api_version = values.get('api_version', '2')
+        api_version = values.get('api_version', '3')
         additional_fields = values.get('additional_fields')
+        cls.api_version = api_version
+        cls.token = token
+        cls.url = url
+        cls.cloud = cloud
+        cls.username = username
+        cls.api_key = api_key
+        cls.verify_ssl = values.get('verify_ssl')
         if isinstance(additional_fields, str):
             values['additional_fields'] = [i.strip() for i in additional_fields.split(',')]
         if token and is_cookie_token(token):
@@ -280,6 +300,20 @@ class JiraApiWrapper(BaseToolApiWrapper):
         else:
             cls._client = Jira(url=url, username=username, password=api_key, cloud=cloud, verify_ssl=values['verify_ssl'], api_version=api_version)
         return values
+
+    def _resolve_client(self, api_version: str):
+        if api_version == self.api_version:
+            return self._client
+        #
+        if self.token and is_cookie_token(self.token):
+            session = requests.Session()
+            session.cookies.update(parse_cookie_string(self.token.get_secret_value()))
+            return Jira(url=self.url, session=session, cloud=self.cloud, verify_ssl=self.verify_ssl, api_version=api_version)
+        elif self.token:
+            return Jira(url=self.url, token=self.token.get_secret_value(), cloud=self.cloud, verify_ssl=self.verify_ssl, api_version=api_version)
+        else:
+            return Jira(url=self.url, username=self.username, password=self.api_key.get_secret_value(), cloud=self.cloud, verify_ssl=self.verify_ssl, api_version=api_version)
+
 
     def _parse_issues(self, issues: Dict) -> List[dict]:
         parsed = []
@@ -376,14 +410,14 @@ class JiraApiWrapper(BaseToolApiWrapper):
         """)
 
 
-    def search_using_jql(self, jql: str):
+    def search_using_jql(self, jql: str, api_version: str = "3"):
         """ Search for Jira issues using JQL."""
-        parsed = self._parse_issues(self._client.jql(jql))
+        parsed = self._parse_issues(self._resolve_client(api_version).jql(jql))
         if len(parsed) == 0:
             return "No Jira issues found"
         return "Found " + str(len(parsed)) + " Jira issues:\n" + str(parsed)
 
-    def link_issues(self, inward_issue_key: str, outward_issue_key: str, linktype:str ):
+    def link_issues(self, inward_issue_key: str, outward_issue_key: str, linktype:str, api_version: str = "2"):
         """ Link issues functionality for Jira issues. To link test to another issue ( test 'test' story, story 'is tested by test').
         Use the appropriate issue link type (e.g., "Test", "Relates", "Blocks").
         If we use "Test" linktype, the test is inward issue, the story/other issue is outward issue.."""
@@ -396,24 +430,24 @@ class JiraApiWrapper(BaseToolApiWrapper):
                 "body": "This test is linked to the story."
             }
         }
-        self._client.create_issue_link(link_data)
+        self._resolve_client(api_version).create_issue_link(link_data)
         """ Get the remote links from the specified jira issue key"""
         return f"Link created using following data: {link_data}."
 
-    def get_specific_field_info(self, jira_issue_key: str, field_name: str):
+    def get_specific_field_info(self, jira_issue_key: str, field_name: str, api_version: str = "3"):
         """ Get the specific field information from Jira by jira issue key and field name """
 
-        jira_issue = self._client.issue(jira_issue_key, fields=field_name)
+        jira_issue = self._resolve_client(api_version).issue(jira_issue_key, fields=field_name)
         field_info = jira_issue.get('fields', {}).get(field_name)
         if not field_info:
-            existing_fields = [key for key, value in self._client.issue(jira_issue_key).get("fields").items() if value is not None]
+            existing_fields = [key for key, value in self._resolve_client(api_version).issue(jira_issue_key).get("fields").items() if value is not None]
             existing_fields_str = ', '.join(existing_fields)
             return ToolException(f"Unable to find field '{field_name}'. All available fields are '{existing_fields_str}'")
         return f"Got the data from following Jira issue - {jira_issue_key} and field - {field_name}. The data is:\n{field_info}"
 
-    def get_remote_links(self, jira_issue_key: str):
+    def get_remote_links(self, jira_issue_key: str, api_version: str = "3"):
         """ Get the remote links from the specified jira issue key"""
-        remote_links = self._client.get_issue_remotelinks(jira_issue_key)
+        remote_links = self._resolve_client(api_version).get_issue_remotelinks(jira_issue_key)
         return f"Jira issue - {jira_issue_key} has the following remote links:\n{str(remote_links)}"
 
     def _add_default_labels(self, issue_key: str):
@@ -422,14 +456,14 @@ class JiraApiWrapper(BaseToolApiWrapper):
             logger.info(f'Add pre-defined labels to the issue: {self.labels}')
             self.modify_labels(issue_key=issue_key, add_labels=self.labels)
 
-    def create_issue(self, issue_json: str):
+    def create_issue(self, issue_json: str, api_version: str = "3"):
         """ Create an issue in Jira."""
         try:
             params = json.loads(issue_json)
             self.create_issue_validate(params)
             # used in case linkage via `update` is required
             update = dict(params["update"]) if (params.get("update")) is not None else None
-            issue = self._client.create_issue(fields=dict(params["fields"]), update=update)
+            issue = self._resolve_client(api_version).create_issue(fields=dict(params["fields"]), update=update)
             issue_url = f"{self._client.url}browse/{issue['key']}"
             logger.info(f"issue is created: {issue}")
             self._add_default_labels(issue_key=issue['key'])
@@ -441,7 +475,7 @@ class JiraApiWrapper(BaseToolApiWrapper):
             logger.error(f"Error creating Jira issue: {stacktrace}")
             return ToolException(f"Error creating Jira issue: {stacktrace}")
 
-    def set_issue_status(self, issue_key: str, status_name: str, mandatory_fields_json: str):
+    def set_issue_status(self, issue_key: str, status_name: str, mandatory_fields_json: str, api_version: str = "3"):
         """Set new status for the issue in Jira. Used to move ticket through the defined workflow."""
         try:
             print(f"Fields to be updated during the status change: {mandatory_fields_json}")
@@ -451,7 +485,7 @@ class JiraApiWrapper(BaseToolApiWrapper):
             fields_data = dict(fields["update"]) if (fields.get("update")) is not None else None
             # prepare update block
             update = dict(fields["update"]) if (fields.get("update")) is not None else None
-            self._client.set_issue_status(issue_key=issue_key, status_name=status_name, fields=fields_data,
+            self._resolve_client(api_version).set_issue_status(issue_key=issue_key, status_name=status_name, fields=fields_data,
                                           update=update)
             logger.info(f"issue is updated: {issue_key} with status {status_name}")
             issue_url = f"{self._client.url}browse/{issue_key}"
@@ -464,7 +498,7 @@ class JiraApiWrapper(BaseToolApiWrapper):
             logger.error(f"Error creating Jira issue: {stacktrace}")
             return ToolException(f"Error creating Jira issue: {stacktrace}")
 
-    def _update_issue(self, issue_json: str):
+    def _update_issue(self, issue_json: str, api_version: str = "3"):
         """ Update an issue in Jira.
             IMPORTANT: default labels won't be changed
         """
@@ -474,7 +508,7 @@ class JiraApiWrapper(BaseToolApiWrapper):
             key = params["key"]
             update_body = {"fields": dict(params["fields"])} if params.get("fields") else {}
             update_body = update_body | {"update": dict(params["update"])} if params.get('update') else update_body
-            issue = self._client.update_issue(issue_key=key, update=dict(update_body))
+            issue = self._resolve_client(api_version).update_issue(issue_key=key, update=dict(update_body))
             issue_url = f"{self._client.url.rstrip('/')}/browse/{key}"
             output = f"Done. Issue {key} has been updated successfully. You can view it at {issue_url}. Details: {str(issue)}"
             logger.info(output)
@@ -486,15 +520,15 @@ class JiraApiWrapper(BaseToolApiWrapper):
             logger.error(f"Error updating Jira issue: {stacktrace}")
             return f"Error updating Jira issue: {stacktrace}"
 
-    def update_issue(self, issue_json: str):
+    def update_issue(self, issue_json: str, api_version: str = "3"):
         """ Update an issue in Jira."""
         params = json.loads(issue_json)
         key = params["key"]
-        result = self._update_issue(issue_json)
+        result = self._update_issue(issue_json, api_version)
         self._add_default_labels(issue_key=key)
         return result
 
-    def modify_labels(self, issue_key: str, add_labels: list[str] = None, remove_labels: list[str] = None):
+    def modify_labels(self, issue_key: str, add_labels: list[str] = None, remove_labels: list[str] = None, api_version: str = "3"):
         """Updates labels of an issue in Jira."""
 
         if add_labels is None and remove_labels is None:
@@ -509,12 +543,12 @@ class JiraApiWrapper(BaseToolApiWrapper):
         if remove_labels:
             for label in remove_labels:
                 update_issue_json["update"]["labels"].append({"remove": label})
-        return self._update_issue(json.dumps(update_issue_json))
+        return self._update_issue(json.dumps(update_issue_json), api_version)
 
-    def list_comments(self, issue_key: str):
+    def list_comments(self, issue_key: str, api_version: str = "3"):
         """ Extract the comments related to specified Jira issue """
         try:
-            comments = self._client.issue_get_comments(issue_key)
+            comments = self._resolve_client(api_version).issue_get_comments(issue_key)
             comments_list = []
             for comment in comments['comments']:
                 comments_list.append(
@@ -528,10 +562,10 @@ class JiraApiWrapper(BaseToolApiWrapper):
             logger.error(f"Unable to extract any comments from the issue: {stacktrace}")
             return f"Error during the attempt to extract available comments: {stacktrace}"
 
-    def add_comments(self, issue_key: str, comment: str):
+    def add_comments(self, issue_key: str, comment: str, api_version: str = "3"):
         """ Add a comment to a Jira issue."""
         try:
-            self._client.issue_add_comment(issue_key, comment)
+            self._resolve_client(api_version).issue_add_comment(issue_key, comment)
             issue_url = f"{self._client.url}browse/{issue_key}"
             output = f"Done. Comment is added for issue {issue_key}. You can view it at {issue_url}"
             logger.info(output)
@@ -542,10 +576,10 @@ class JiraApiWrapper(BaseToolApiWrapper):
             logger.error(f"Error adding comment to Jira issue: {stacktrace}")
             return ToolException(f"Error adding comment to Jira issue: {stacktrace}")
 
-    def list_projects(self):
+    def list_projects(self, api_version: str = "3"):
         """ List all projects in Jira. """
         try:
-            projects = self._client.projects()
+            projects = self._resolve_client(api_version).projects()
             parsed_projects = self._parse_projects(projects)
             parsed_projects_str = (
                     "Found " + str(len(parsed_projects)) + " projects:\n" + str(parsed_projects)
@@ -557,19 +591,19 @@ class JiraApiWrapper(BaseToolApiWrapper):
             logger.error(f"Error creating Jira issue: {stacktrace}")
             return ToolException(f"Error creating Jira issue: {stacktrace}")
 
-    def get_attachments_content(self, jira_issue_key: str):
+    def get_attachments_content(self, jira_issue_key: str, api_version: str = "3"):
         """ Extract content of all attachments related to specified Jira issue key.
          NOTE: only parsable attachments will be considered """
 
         attachment_data = []
-        attachments = self._client.get_attachments_ids_from_issue(issue=jira_issue_key)
+        attachments = self._resolve_client(api_version).get_attachments_ids_from_issue(issue=jira_issue_key)
         for attachment in attachments:
             if self.api_version == "3":
-                attachment_data.append(self._client.get_attachment_content(attachment['attachment_id']))
+                attachment_data.append(self._resolve_client(api_version).get_attachment_content(attachment['attachment_id']))
             else:
-                extracted_attachment = self._client.get_attachment(attachment_id=attachment['attachment_id'])
+                extracted_attachment = self._resolve_client(api_version).get_attachment(attachment_id=attachment['attachment_id'])
                 if extracted_attachment['mimeType'] in SUPPORTED_ATTACHMENT_MIME_TYPES:
-                    attachment_data.append(self._extract_attachment_content(extracted_attachment))
+                    attachment_data.append(self._extract_attachment_content(extracted_attachment), api_version)
         return "\n\n".join(attachment_data)
 
     def execute_generic_rq(self, method: str, relative_url: str, params: Optional[str] = "", *args):
@@ -603,11 +637,11 @@ class JiraApiWrapper(BaseToolApiWrapper):
         logger.debug(response_string)
         return response_string
 
-    def _extract_attachment_content(self, attachment):
+    def _extract_attachment_content(self, attachment, api_version: str = "3"):
         """Extract attachment's content if possible (used for api v.2)"""
 
         try:
-            content = self._client.get(attachment['content'].replace(self.base_url, ''))
+            content = self._resolve_client(api_version).get(attachment['content'].replace(self.base_url, ''))
         except Exception as e:
             content = f"Unable to parse content of '{attachment['filename']}' due to: {str(e)}"
         return f"filename: {attachment['filename']}\ncontent: {content}"
