@@ -1,7 +1,7 @@
 pydantic~=2.10.0
 sentence-transformers==2.7.0
 pygithub==2.3.0
-atlassian_python_api==3.41.16
+atlassian_python_api==4.0.7
 markdownify~=1.1.0
 pillow==11.1.0
 requests_openapi==1.0.5
