@@ -760,7 +760,13 @@ class JiraApiWrapper(BaseToolApiWrapper):
         attachments = self._resolve_client(api_version).get_attachments_ids_from_issue(issue=jira_issue_key)
         for attachment in attachments:
             if self.api_version == "3":
-                attachment_data.append(self._resolve_client(api_version).get_attachment_content(attachment['attachment_id']))
+                content_bytes = self._resolve_client(api_version).get_attachment_content(attachment['attachment_id'])
+                # Decode bytes to string (assuming UTF-8)
+                try:
+                    decoded_content = content_bytes.decode("latin1")
+                except Exception as e:
+                    decoded_content = f"[Decoding error: {str(e)}]"
+                attachment_data.append(decoded_content)
             else:
                 extracted_attachment = self._resolve_client(api_version).get_attachment(attachment_id=attachment['attachment_id'])
                 if extracted_attachment['mimeType'] in SUPPORTED_ATTACHMENT_MIME_TYPES:
