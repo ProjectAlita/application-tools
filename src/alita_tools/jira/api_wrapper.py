@@ -1047,11 +1047,39 @@ class JiraApiWrapper(BaseToolApiWrapper):
 
     def _extract_image_data(self, field_data):
         """
-        Extracts image data from general JSON response
+        Extracts image data from general JSON response.
+        Handles lists, dicts with image info, and plain strings.
         """
-        if isinstance(field_data, dict) and 'filename' in field_data and 'content' in field_data:
-            return f"!{field_data['filename']}|alt={field_data['filename']}!"
-        return str(field_data)
+        if isinstance(field_data, list):
+            return ' '.join(self._extract_image_data(item) for item in field_data)
+        if isinstance(field_data, dict):
+            if 'filename' in field_data and 'content' in field_data:
+                return f"!{field_data['filename']}|alt={field_data['filename']}!"
+            if 'content' in field_data and isinstance(field_data['content'], list):
+                result = []
+                for content_item in field_data['content']:
+                    if (
+                        isinstance(content_item, dict)
+                        and 'content' in content_item
+                        and isinstance(content_item['content'], list)
+                        and content_item['content']
+                    ):
+                        if content_item.get('type') == 'mediaSingle':
+                            media = content_item['content'][0]
+                            attrs = media.get('attrs', {})
+                            if attrs.get('type') == 'file':
+                                alt = attrs.get('alt', '')
+                                image_str = f'!{alt}|alt="{alt}"!'
+                                result.append(image_str)
+                        elif content_item.get('type') == 'paragraph':
+                            result.append(content_item['content'][0].get('text', ''))
+                        else:
+                            result.append(self._extract_image_data(content_item))
+                return '\n'.join(result)
+            return f"Unsupported format of field content."
+        if isinstance(field_data, str):
+            return field_data
+        return f"Unsupported field content type: {type(field_data)}. Expected a string, list, or dict."
 
     def get_field_with_image_descriptions(self, jira_issue_key: str, field_name: str, prompt: Optional[str] = None,
                                           context_radius: int = 500, api_version: str = "3"):
@@ -1086,12 +1114,7 @@ class JiraApiWrapper(BaseToolApiWrapper):
                 return f"Unable to find field '{field_name}' or it's empty. Available fields are: {existing_fields_str}"
 
             # Handle multiple images or non-string content
-            if isinstance(field_content, list):
-                field_content = ' '.join(map(self._extract_image_data, field_content))
-            elif isinstance(field_content, dict):
-                field_content = self._extract_image_data(field_content)
-            elif not isinstance(field_content, str):
-                return f"Unsupported field content type: {type(field_content)}. Expected a string, list, or dict."
+            field_content = self._extract_image_data(field_content)
 
             # Regular expression to find image references in Jira markup
             image_pattern = r'!([^!|]+)(?:\|[^!]*)?!'
@@ -1193,6 +1216,7 @@ class JiraApiWrapper(BaseToolApiWrapper):
 
                 comment_author = comment.get('author', {}).get('displayName', 'Unknown')
                 comment_created = comment.get('created', 'Unknown date')
+                comment_body = self._extract_image_data(comment_body)
 
                 # Function to process images in comment text
                 def process_image_match(match):
